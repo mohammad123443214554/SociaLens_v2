@@ -1,9 +1,7 @@
-const CACHE_NAME = 'geolink-v4'
+const CACHE_NAME = 'socialens-v5'
 const OFFLINE_URL = '/offline'
 
 const PRECACHE = [
-  '/',
-  '/feed',
   '/offline',
   '/manifest.json',
   '/icons/icon-192x192.png',
@@ -46,16 +44,40 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return
   if (url.origin !== location.origin) return
 
+  // Never cache account pages, feed/chat routes, or API responses. Those can
+  // contain private or account-specific data. Cache only public static assets.
+  const isPublicStaticAsset =
+    url.pathname.startsWith('/_next/static/') ||
+    url.pathname.startsWith('/icons/') ||
+    url.pathname.startsWith('/images/') ||
+    url.pathname === '/manifest.json' ||
+    url.pathname === '/favicon.ico'
+
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).catch(() =>
+        caches.match(OFFLINE_URL).then(cached => cached || new Response(
+          '<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SociaLens offline</title><body><h1>You are offline</h1><p>Reconnect to the internet and try again.</p></body></html>',
+          { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        ))
+      )
+    )
+    return
+  }
+
+  if (!isPublicStaticAsset) return
+
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        const clone = res.clone()
-        caches.open(CACHE_NAME).then(c => c.put(e.request, clone))
+        const cacheControl = res.headers.get('Cache-Control') || ''
+        const vary = (res.headers.get('Vary') || '').trim()
+        if (res.ok && res.type === 'basic' && !/private|no-store/i.test(cacheControl) && vary !== '*') {
+          e.waitUntil(caches.open(CACHE_NAME).then(c => c.put(e.request, res.clone())).catch(() => {}))
+        }
         return res
       })
-      .catch(() => caches.match(e.request)
-        .then(cached => cached || caches.match(OFFLINE_URL))
-      )
+      .catch(() => caches.match(e.request).then(cached => cached || Response.error()))
   )
 })
 
@@ -76,7 +98,7 @@ async function handleShareTarget(request) {
 
 self.addEventListener('push', e => {
   if (!e.data) return
-  let data = { title: 'GeoLink', body: 'New notification', url: '/feed', kind: 'generic' }
+  let data = { title: 'SociaLens', body: 'New notification', url: '/feed', kind: 'generic' }
   try { data = { ...data, ...e.data.json() } } catch {}
 
   const isCall = data.kind === 'call'
@@ -91,7 +113,7 @@ self.addEventListener('push', e => {
       // a shorter, single buzz for an ordinary message.
       vibrate: isCall ? [400, 200, 400, 200, 400, 200, 400] : [200, 100, 200],
       data: { url: data.url, kind: data.kind, callId: data.callId, chatId: data.chatId },
-      tag: data.tag || 'geolink',
+      tag: data.tag || 'socialens',
       renotify: true,
       // Calls stay on screen until the person acts on them instead of
       // auto-dismissing, same as a real incoming-call notification.
