@@ -1,0 +1,22 @@
+import { NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/server/requireAdmin'
+
+export async function GET(_request: Request, { params }: { params: Promise<{ userId: string }> }) {
+  const auth = await requireAdmin()
+  if (!auth.ok) return auth.error
+  const { admin } = auth
+  const { userId } = await params
+
+  // Every comment this account has ever posted, plus a preview of the
+  // post it was left on (and who that post belongs to) so an admin can
+  // See the context without hopping to a second screen.
+  const { data, error } = await admin
+    .from('comments')
+    .select('*, posts(id, content, media_url, media_type, user_id, profiles(username, avatar_url))')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(300)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ comments: data })
+}
