@@ -1,6 +1,6 @@
 # SociaLens 🌐
 
-A full-stack social media app built with **Next.js 15**, **TypeScript**, **Tailwind CSS**, and **Supabase** — Instagram-style features including feed, reels, real-time chat, follow system, and more.
+A full-stack social media app built with **Next.js 16**, **TypeScript**, **Tailwind CSS**, and **Supabase** — Instagram-style features including feed, reels, real-time chat, follow system, and more.
 
 ---
 
@@ -27,7 +27,7 @@ A full-stack social media app built with **Next.js 15**, **TypeScript**, **Tailw
 
 | Layer | Tech |
 |-------|------|
-| Framework | Next.js 15 (App Router + Turbopack) |
+| Framework | Next.js 16 (App Router) |
 | Language | TypeScript (strict) |
 | Styling | Tailwind CSS v3 + shadcn/ui |
 | Backend | Supabase (Auth + DB + Realtime + Storage) |
@@ -43,7 +43,7 @@ A full-stack social media app built with **Next.js 15**, **TypeScript**, **Tailw
 ### 1. Create Supabase Project
 
 1. Go to [supabase.com](https://supabase.com) and create a new project
-2. Go to **SQL Editor** and run the entire contents of `supabase-setup.sql`
+2. For a brand-new database only, review `socialens_v2_sql/000_legacy_initial_setup_reference.sql` before using it. **Do not run this legacy setup script against the existing SociaLens V2 database.**
 3. This will create all tables, RLS policies, helper functions, storage buckets, and triggers
 
 ### 2. Configure Environment Variables
@@ -144,9 +144,15 @@ socialens/
 ├── public/
 │   └── images/          # socialens-logo.png, default-avatar.svg
 ├── middleware.ts          # Route protection
-├── supabase-setup.sql     # Complete DB setup — run this first!
+├── socialens_v2_sql/     # Versioned SQL history and future incremental migrations
 └── .env.local            # Your environment variables
 ```
+
+---
+
+## 🗄️ Database SQL workflow
+
+All SociaLens V2 SQL scripts are kept in `socialens_v2_sql/`. The legacy initial setup file is preserved for reference only and must not be run against the existing V2 database. Future feature migrations should be added as new numbered SQL files and reviewed before anyone runs them in Supabase SQL Editor. Adding a SQL file to GitHub does not execute it.
 
 ---
 
