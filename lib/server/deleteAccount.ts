@@ -76,16 +76,23 @@ export async function deleteAccountCompletely(userId: string) {
       admin.from('account_appeals').delete().eq('user_id', userId)],
     ['delete posts', () =>
       admin.from('posts').delete().eq('user_id', userId)],
-    ['delete profile', () =>
-      admin.from('profiles').delete().eq('id', userId).select('id')],
   ] as const
 
   for (const [step, run] of operations) {
     const result = await run()
     assertOk(step, result.error)
-    if (step === 'delete profile' && (!result.data || result.data.length === 0)) {
-      throw new Error('Account deletion failed at delete profile: profile row was not deleted')
-    }
+  }
+
+  // Verify profile removal before deleting the Auth identity. This is the row
+  // referenced by profiles_id_fkey and was the blocker seen in production logs.
+  const { data: deletedProfiles, error: profileDeleteError } = await admin
+    .from('profiles')
+    .delete()
+    .eq('id', userId)
+    .select('id')
+  assertOk('delete profile', profileDeleteError)
+  if (!deletedProfiles || deletedProfiles.length === 0) {
+    throw new Error('Account deletion failed at delete profile: profile row was not deleted')
   }
 
   // Only remove the Auth identity after database cleanup is confirmed.
