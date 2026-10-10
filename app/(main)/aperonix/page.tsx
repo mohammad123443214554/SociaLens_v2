@@ -543,13 +543,13 @@ export default function AperonixPage() {
                   </div>
                 </div>
               ) : (
-                <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap ${
+                <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
                   msg.role === 'user'
                     ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white'
                     : 'bg-muted'
-                }`}>
+                } ${msg.attachments?.length && msg.content ? 'flex flex-col gap-3' : ''}`}>
                   {msg.attachments && msg.attachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-2">
+                    <div className="flex flex-wrap items-start gap-2.5">
                       {msg.attachments.map((a, i) => (
                         <button
                           key={a.path || i}
@@ -581,7 +581,9 @@ export default function AperonixPage() {
                         style={{ animationDuration: '1.2s' }}
                       />
                     </span>
-                  ) : msg.content}
+                  ) : msg.content && (
+                    <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                  )}
                 </div>
               )}
 
