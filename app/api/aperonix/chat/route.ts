@@ -136,21 +136,26 @@ export async function POST(request: NextRequest) {
     const messages = Array.isArray(body.messages) ? body.messages : []
     const newMessage = typeof body.newMessage === 'string' ? body.newMessage : ''
     const currentFiles = Array.isArray(body.files) ? body.files : []
-    // Include recent conversation attachments so follow-up questions can refer
-    // to an earlier upload without uploading its bytes through the app again.
+    // Never silently re-analyze an old attachment when a new prompt is sent.
+    // A previous upload is reused only when the user explicitly refers to it.
+    const asksAboutEarlierFile = /\\b(previous|earlier|last file|that file|same file|already uploaded|pehle|pahle|pichhle|us file|woh file|wahi file|upar wali)\\b/i.test(newMessage)
+    const latestPriorUserFiles = asksAboutEarlierFile
+      ? (messages.slice().reverse().find(m => m.role === 'user' && Array.isArray(m.files) && m.files.length)?.files || [])
+      : []
+    const selectedFiles = currentFiles.length ? currentFiles : latestPriorUserFiles
     const seenPaths = new Set<string>()
-    const files = [...currentFiles, ...messages.slice().reverse().flatMap(m => Array.isArray(m.files) ? m.files : [])]
-      .filter(file => {
-        if (!file || typeof file.path !== 'string' || seenPaths.has(file.path)) return false
-        seenPaths.add(file.path)
-        return true
-      }).slice(0, MAX_FILES)
+    const files = selectedFiles.filter(file => {
+      if (!file || typeof file.path !== 'string' || seenPaths.has(file.path)) return false
+      seenPaths.add(file.path)
+      return true
+    }).slice(0, MAX_FILES)
 
     if (!newMessage.trim() && files.length === 0) {
       return NextResponse.json({ error: 'Write a message or attach a file first.' }, { status: 400 })
     }
 
     const userParts: GeminiPart[] = []
+    const unsupportedFiles: { name: string; type: string }[] = []
     let totalAnalysisBytes = 0
     for (const file of files) {
       if (!file || typeof file.path !== 'string' || !file.path.startsWith(`${user.id}/`)) {
@@ -192,15 +197,34 @@ export async function POST(request: NextRequest) {
         }
         continue
       }
+      const baseName = (file.name || '').split(/[\\/]/).pop()?.toLowerCase() || ''
+      const isArchive = ['zip','rar','7z','tar','gz','tgz','bz2','xz'].includes(ext)
+        || ['application/zip','application/x-zip-compressed','application/x-rar-compressed','application/x-7z-compressed','application/gzip','application/x-tar'].includes(mimeType)
+      const isDockerArtifact = ['docker','dockerfile','dockerignore'].includes(ext)
+        || ['dockerfile','.dockerignore'].includes(baseName)
+      if (isArchive || isDockerArtifact) {
+        const typeName = isArchive ? ext.toUpperCase() + ' archive' : 'Docker file'
+        unsupportedFiles.push({ name: file.name, type: typeName })
+        userParts.push({ text: `File type notice: “${file.name}” is a ${typeName}. Do not claim to have inspected its internal contents. Explain politely that this file type can be uploaded and stored, but its contents are not inspected by Aperonix yet.` })
+        continue
+      }
       if (!MODEL_INLINE_TYPES.has(mimeType)) {
-        return NextResponse.json({
-          error: `Aperonix can upload and store “${file.name}”, but cannot read this format yet. For content analysis, use PDF, an image, supported audio/video, or export the document as TXT, CSV, JSON or PDF.`,
-        }, { status: 415 })
+        const typeName = ext ? `. ${ext} file` : 'unsupported file format'
+        unsupportedFiles.push({ name: file.name, type: typeName })
+        userParts.push({ text: `File type notice: “${file.name}” is ${typeName}. Do not claim to have inspected its contents. Tell the user this format can be stored but is not readable by Aperonix yet, and suggest a supported export such as PDF or TXT.` })
+        continue
       }
       const buffer = await blob.arrayBuffer()
       const base64 = Buffer.from(buffer).toString('base64')
       userParts.push({ inlineData: { mimeType, data: base64 } })
       userParts.push({ text: `Attached file: ${file.name}` })
+    }
+
+    if (files.length > 0 && unsupportedFiles.length === files.length) {
+      const names = unsupportedFiles.map(file => `“${file.name}” (${file.type})`).join(', ')
+      return NextResponse.json({
+        reply: `I received ${names}. I can store this file, but I cannot inspect its contents yet. If you want me to analyze what is inside, please extract or convert it to a supported format such as PDF, TXT, CSV, JSON, or an image and upload that instead.`,
+      })
     }
 
     userParts.push({ text: newMessage.trim() || 'Analyze the attached file(s), summarize the content, and answer clearly.' })
