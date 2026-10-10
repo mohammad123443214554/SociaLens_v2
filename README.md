@@ -1,6 +1,6 @@
 # SociaLens 🌐
 
-A full-stack social media app built with **Next.js 15**, **TypeScript**, **Tailwind CSS**, and **Supabase** — Instagram-style features including feed, reels, real-time chat, follow system, and more.
+A full-stack social media app built with **Next.js 16**, **TypeScript**, **Tailwind CSS**, and **Supabase** — Instagram-style features including feed, reels, real-time chat, follow system, and more.
 
 ---
 
@@ -27,8 +27,8 @@ A full-stack social media app built with **Next.js 15**, **TypeScript**, **Tailw
 
 | Layer | Tech |
 |-------|------|
-| Framework | Next.js 15 (App Router + Turbopack) |
-| Language | TypeScript (strict) |
+| Framework | Next.js 16 (App Router + Webpack) |
+| Language | TypeScript (strict mode not yet enabled) |
 | Styling | Tailwind CSS v3 + shadcn/ui |
 | Backend | Supabase (Auth + DB + Realtime + Storage) |
 | Forms | react-hook-form + zod |
@@ -48,7 +48,7 @@ A full-stack social media app built with **Next.js 15**, **TypeScript**, **Tailw
 
 ### 2. Configure Environment Variables
 
-Copy `.env.local` and fill in your values:
+Copy `.env.example` to `.env.local` and fill in your local values:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -145,7 +145,8 @@ socialens/
 │   └── images/          # socialens-logo.png, default-avatar.svg
 ├── middleware.ts          # Route protection
 ├── supabase-setup.sql     # Complete DB setup — run this first!
-└── .env.local            # Your environment variables
+├── .env.example          # Safe environment variable template
+└── .env.local            # Local-only environment variables (not committed)
 ```
 
 ---
@@ -155,7 +156,7 @@ socialens/
 - All routes protected via `middleware.ts`
 - Row Level Security (RLS) enabled on all tables
 - Storage policies restrict access by user ID
-- TypeScript strict mode catches type errors at build time
+- TypeScript type-checking is available with `npm run typecheck`; strict mode is currently disabled and should be enabled incrementally after existing type errors are resolved
 
 ---
 
