@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { getAvatarUrl } from '@/lib/utils/helpers'
 
 // A public, no-login-required page for a shared Aperonix reply or user prompt.
 // The content is stored in the shared-content table and read back by id.
@@ -83,7 +84,7 @@ export default function PublicAperonixReplyPage() {
           <>
             <div className="flex items-center gap-3 border-b pb-4">
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
-                {owner?.avatar_url ? <img src={owner.avatar_url} alt={owner.username || 'User'} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-sm font-semibold">{(owner?.username || 'U').slice(0, 1).toUpperCase()}</div>}
+                {owner?.avatar_url ? <img src={getAvatarUrl(owner.avatar_url)} alt={owner.username || 'User'} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-sm font-semibold">{(owner?.username || 'U').slice(0, 1).toUpperCase()}</div>}
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Shared conversation</p>
@@ -98,7 +99,7 @@ export default function PublicAperonixReplyPage() {
                     {message.role === 'model' ? (
                       <img src="/images/aperonix-logo.png" alt="Aperonix" className="h-full w-full object-contain" />
                     ) : owner?.avatar_url ? (
-                      <img src={owner.avatar_url} alt={owner.username || 'User'} className="h-full w-full rounded-full object-cover" />
+                      <img src={getAvatarUrl(owner.avatar_url)} alt={owner.username || 'User'} className="h-full w-full rounded-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center rounded-full bg-muted text-xs font-semibold">{(owner?.username || 'U').slice(0, 1).toUpperCase()}</div>
                     )}
@@ -116,7 +117,7 @@ export default function PublicAperonixReplyPage() {
           <>
             <div className="flex items-center gap-2.5">
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
-                {isPrompt && owner?.avatar_url ? <img src={owner.avatar_url} alt={owner.username || 'User'} className="h-full w-full object-cover" /> : <img src="/images/aperonix-logo.png" alt="Aperonix" className="h-full w-full object-contain" />}
+                {isPrompt && owner?.avatar_url ? <img src={getAvatarUrl(owner.avatar_url)} alt={owner.username || 'User'} className="h-full w-full object-cover" /> : <img src="/images/aperonix-logo.png" alt="Aperonix" className="h-full w-full object-contain" />}
               </div>
               <div>
                 <p className="font-semibold text-sm">{isPrompt ? owner?.username || 'Shared user prompt' : 'Aperonix'}</p>
