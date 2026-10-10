@@ -12,7 +12,7 @@ import { ExternalShareBar } from '@/components/shared/ExternalShareBar'
 
 interface AperonixShareModalProps {
   replyText: string
-  contentType?: 'reply' | 'prompt'
+  contentType?: 'reply' | 'prompt' | 'chat'
   onClose: () => void
 }
 
@@ -28,12 +28,27 @@ interface Person {
 // Lets people share an Aperonix reply or a user's prompt externally or in SocialLens chats.
 export function AperonixShareModal({ replyText, contentType = 'reply', onClose }: AperonixShareModalProps) {
   const isPrompt = contentType === 'prompt'
-  const shareLabel = isPrompt ? 'Your prompt' : 'Aperonix'
-  const shareTitle = isPrompt ? 'Share your prompt' : 'Share Aperonix reply'
-  const externalTitle = isPrompt ? 'SociaLens prompt' : 'Aperonix - SociaLens'
-  const externalText = isPrompt
-    ? 'Check out this prompt shared from SociaLens'
-    : 'Check out this reply from Aperonix on SociaLens'
+  const isChat = contentType === 'chat'
+  const sharedChat = (() => {
+    if (!isChat) return null
+    try {
+      const parsed = JSON.parse(replyText)
+      return parsed?.type === 'chat' && Array.isArray(parsed.messages) ? parsed : null
+    } catch {
+      return null
+    }
+  })()
+  const chatTranscript = sharedChat
+    ? sharedChat.messages.map((message: { role?: string; content?: string; attachments?: { name?: string }[] }) => `${message.role === 'user' ? (sharedChat.owner?.username || 'User') : 'Aperonix'}:\\n${message.content || ''}${message.attachments?.length ? `\\n[Attachments: ${message.attachments.map((a: { name?: string }) => a.name || 'file').join(', ')}]` : ''}`).join('\\n\\n')
+    : ''
+  const shareLabel = isChat ? 'Chat' : isPrompt ? 'Your prompt' : 'Aperonix'
+  const shareTitle = isChat ? 'Share Chat' : isPrompt ? 'Share your prompt' : 'Share Aperonix reply'
+  const externalTitle = isChat ? `${sharedChat?.title || 'Chat'} - SociaLens` : isPrompt ? 'SociaLens prompt' : 'Aperonix - SociaLens'
+  const externalText = isChat
+    ? `Read this conversation, ${sharedChat?.title || 'shared chat'}, on SociaLens`
+    : isPrompt
+      ? 'Check out this prompt shared from SociaLens'
+      : 'Check out this reply from Aperonix on SociaLens'
   const { user, profile } = useUser()
   const [people, setPeople] = useState<Person[]>([])
   const [selected, setSelected] = useState<string[]>([])
@@ -102,15 +117,15 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
         const { error: messageError } = await supabase.from('messages').insert({
           chat_id: chatId,
           sender_id: user.id,
-          content: replyText,
-          is_aperonix_reply: !isPrompt,
+          content: isChat ? chatTranscript : replyText,
+          is_aperonix_reply: !isPrompt && !isChat,
         })
         if (messageError) continue
 
         await supabase.from('chats').update({
-          last_message: isPrompt ? 'Shared a prompt' : '✨ Shared an Aperonix reply',
+          last_message: isChat ? `Shared a chat: ${sharedChat?.title || 'Chat'}` : isPrompt ? 'Shared a prompt' : '✨ Shared an Aperonix reply',
           last_message_time: new Date().toISOString(),
-          last_message_type: isPrompt ? 'text' : 'aperonix',
+          last_message_type: isPrompt || isChat ? 'text' : 'aperonix',
           last_message_sender_id: user.id,
         }).eq('id', chatId)
         successful += 1
@@ -144,6 +159,7 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
     if (error || !data) throw error || new Error('Could not create link')
     const url = new URL(`/share/aperonix/${data.id}`, window.location.origin)
     if (isPrompt) url.searchParams.set('type', 'prompt')
+    if (isChat) url.searchParams.set('type', 'chat')
     return url.toString()
   }
 
@@ -192,11 +208,16 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
                 </AvatarFallback>
               </Avatar>
               <span className="text-sm font-semibold">{shareLabel}</span>
-              <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-2 py-0.5 text-[10px] font-medium text-fuchsia-200">{isPrompt ? 'User prompt' : 'AI reply'}</span>
+              <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-2 py-0.5 text-[10px] font-medium text-fuchsia-200">{isChat ? `${sharedChat?.messages?.length || 0} messages` : isPrompt ? 'User prompt' : 'AI reply'}</span>
             </div>
-            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden">
-              {replyText}
-            </p>
+            {isChat ? (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-slate-100">{sharedChat?.title || 'Shared chat'}</p>
+                <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] overflow-hidden">{chatTranscript}</p>
+              </div>
+            ) : (
+              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden">{replyText}</p>
+            )}
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4">
