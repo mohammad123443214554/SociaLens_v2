@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Send, Search, Check, Sparkles, Users, Share2 } from 'lucide-react'
+import Image from 'next/image'
+import { X, Send, Search, Check, Users } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
@@ -33,7 +34,7 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
   const externalText = isPrompt
     ? 'Check out this prompt shared from SociaLens'
     : 'Check out this reply from Aperonix on SociaLens'
-  const { user } = useUser()
+  const { user, profile } = useUser()
   const [people, setPeople] = useState<Person[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [search, setSearch] = useState('')
@@ -159,9 +160,14 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
         onClick={e => e.stopPropagation()}
       >
         <header className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 via-fuchsia-500 to-violet-600 shadow-lg shadow-fuchsia-950/40">
-            <Share2 className="h-5 w-5 text-white" />
-          </div>
+          <Image
+            src="/images/aperonix-logo.png"
+            alt="Aperonix"
+            width={40}
+            height={40}
+            className="h-10 w-10 shrink-0 object-contain"
+            priority
+          />
           <div className="min-w-0 flex-1">
             <h2 id="aperonix-share-title" className="text-base font-semibold tracking-tight">{shareTitle}</h2>
             <p className="mt-0.5 text-xs text-slate-400">Send it to friends or share a link</p>
@@ -179,9 +185,12 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
         <div className="space-y-4 overflow-y-auto overscroll-contain p-5">
           <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
             <div className="mb-2 flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-violet-600">
-                <Sparkles className="h-3.5 w-3.5 text-white" />
-              </span>
+              <Avatar className="h-7 w-7 shrink-0 ring-1 ring-white/10">
+                <AvatarImage src={isPrompt ? getAvatarUrl(profile?.avatar_url ?? null) : '/images/aperonix-logo.png'} />
+                <AvatarFallback className="bg-slate-800 text-[10px] font-semibold text-slate-200">
+                  {isPrompt ? (profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U') : 'A'}
+                </AvatarFallback>
+              </Avatar>
               <span className="text-sm font-semibold">{shareLabel}</span>
               <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-2 py-0.5 text-[10px] font-medium text-fuchsia-200">{isPrompt ? 'User prompt' : 'AI reply'}</span>
             </div>
