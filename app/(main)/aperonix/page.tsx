@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText } from 'lucide-react'
-import { useAperonixChats, AperonixMessage } from '@/lib/hooks/useAperonixChats'
+import { useAperonixChats, AperonixMessage, AperonixConversation } from '@/lib/hooks/useAperonixChats'
+import { useUser } from '@/lib/hooks/useUser'
 import { AperonixShareModal } from '@/components/aperonix/AperonixShareModal'
 import { speakText, stopSpeaking, isSpeechRecognitionSupported, createVoiceInput } from '@/lib/utils/voice'
 import { createClient } from '@/lib/supabase/client'
 
 export default function AperonixPage() {
+  const { user, profile } = useUser()
   const {
     conversations,
     activeId,
@@ -32,7 +34,7 @@ export default function AperonixPage() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const [shareText, setShareText] = useState<string | null>(null)
-  const [shareContentType, setShareContentType] = useState<'reply' | 'prompt'>('reply')
+  const [shareContentType, setShareContentType] = useState<'reply' | 'prompt' | 'chat'>('reply')
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -255,6 +257,31 @@ export default function AperonixPage() {
     setShowHistory(false)
   }
 
+  const handleShareChat = (convo: AperonixConversation) => {
+    setOpenMenuId(null)
+    const sharedChat = {
+      version: 1,
+      type: 'chat',
+      title: convo.title,
+      owner: {
+        username: profile?.username || user?.email?.split('@')[0] || 'SociaLens user',
+        avatar_url: profile?.avatar_url ?? null,
+      },
+      messages: convo.messages.map(message => ({
+        role: message.role,
+        content: message.content,
+        timestamp: message.timestamp,
+        attachments: (message.attachments ?? []).map(attachment => ({
+          name: attachment.name,
+          kind: attachment.kind,
+          mimeType: attachment.mimeType,
+        })),
+      })),
+    }
+    setShareContentType('chat')
+    setShareText(JSON.stringify(sharedChat))
+  }
+
   const handleCopy = async (msg: AperonixMessage) => {
     try {
       await navigator.clipboard.writeText(msg.content)
@@ -475,6 +502,12 @@ export default function AperonixPage() {
                           className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
                         >
                           <Link2 className="h-3.5 w-3.5" /> Connect with new chat
+                        </button>
+                        <button
+                          onClick={() => handleShareChat(convo)}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
+                        >
+                          <Forward className="h-3.5 w-3.5" /> Share Chat
                         </button>
                         <button
                           onClick={async () => { setOpenMenuId(null); try { await deleteConversation(convo.id) } catch (error) { alert(error instanceof Error ? error.message : 'Could not delete this chat and its files.') } }}
