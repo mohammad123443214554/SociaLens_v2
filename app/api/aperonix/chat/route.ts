@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { inflateRawSync } from 'node:zlib'
 import { createClient } from '@/lib/supabase/server'
 import { callGemini, extractText, GeminiMessage, GeminiPart } from '@/lib/aperonix/gemini'
 import { APERONIX_SYSTEM_PROMPT } from '@/lib/aperonix/systemPrompt'
@@ -37,8 +38,88 @@ function normalizedMimeType(mimeType: string, name: string) {
     txt: 'text/plain', csv: 'text/csv', tsv: 'text/tab-separated-values',
     json: 'application/json', xml: 'application/xml', html: 'text/html',
     md: 'text/markdown', log: 'text/plain', srt: 'text/plain', vtt: 'text/plain',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   }
   return known[ext] || mimeType || 'application/octet-stream'
+}
+
+function unzipTextEntries(input: Buffer): Map<string, string> {
+  const entries = new Map<string, string>()
+  let eocd = -1
+  for (let i = input.length - 22; i >= Math.max(0, input.length - 65557); i--) {
+    if (input.readUInt32LE(i) === 0x06054b50) { eocd = i; break }
+  }
+  if (eocd < 0) throw new Error('Invalid office document archive')
+  const count = input.readUInt16LE(eocd + 10)
+  let cursor = input.readUInt32LE(eocd + 16)
+  for (let i = 0; i < count && cursor + 46 <= input.length; i++) {
+    if (input.readUInt32LE(cursor) !== 0x02014b50) break
+    const method = input.readUInt16LE(cursor + 10)
+    const compressedSize = input.readUInt32LE(cursor + 20)
+    const nameLength = input.readUInt16LE(cursor + 28)
+    const extraLength = input.readUInt16LE(cursor + 30)
+    const commentLength = input.readUInt16LE(cursor + 32)
+    const localOffset = input.readUInt32LE(cursor + 42)
+    const name = input.toString('utf8', cursor + 46, cursor + 46 + nameLength)
+    cursor += 46 + nameLength + extraLength + commentLength
+    if (!/\.(xml|rels)$/i.test(name) || localOffset + 30 > input.length) continue
+    if (input.readUInt32LE(localOffset) !== 0x04034b50) continue
+    const localNameLength = input.readUInt16LE(localOffset + 26)
+    const localExtraLength = input.readUInt16LE(localOffset + 28)
+    const start = localOffset + 30 + localNameLength + localExtraLength
+    const compressed = input.subarray(start, start + compressedSize)
+    let uncompressed: Buffer
+    if (method === 0) uncompressed = compressed
+    else if (method === 8) uncompressed = inflateRawSync(compressed)
+    else continue
+    entries.set(name, uncompressed.toString('utf8'))
+  }
+  return entries
+}
+
+function xmlText(value: string) {
+  return value.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([\\da-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
+    .replace(/[\\t ]+/g, ' ').replace(/ *\\n */g, '\\n').trim()
+}
+
+function extractOfficeText(buffer: Buffer, ext: string): string | null {
+  const entries = unzipTextEntries(buffer)
+  if (ext === 'docx') {
+    const document = entries.get('word/document.xml')
+    if (!document) return null
+    return xmlText(document.replace(/<\\/w:p>/g, '\\n').replace(/<\\/w:tr>/g, '\\n'))
+  }
+  if (ext === 'pptx') {
+    const slides = [...entries.entries()].filter(([name]) => /^ppt\\/slides\\/slide\\d+\\.xml$/.test(name))
+      .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+    return slides.map(([name, xml], i) => `Slide ${i + 1}: ${xmlText(xml)}`).join('\\n\\n')
+  }
+  if (ext === 'xlsx') {
+    const sharedXml = entries.get('xl/sharedStrings.xml') || ''
+    const shared = [...sharedXml.matchAll(/<si[ >][\\s\\S]*?<\\/si>/g)]
+      .map(match => [...match[0].matchAll(/<t(?: [^>]*)?>([\\s\\S]*?)<\\/t>/g)].map(t => xmlText(t[1])).join(''))
+    const sheets = [...entries.entries()].filter(([name]) => /^xl\\/worksheets\\/sheet\\d+\\.xml$/.test(name))
+      .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+    return sheets.map(([name, xml], sheetIndex) => {
+      const rows = [...xml.matchAll(/<row[ >][\\s\\S]*?<\\/row>/g)].map(row => {
+        const cells = [...row[0].matchAll(/<c\\b([^>]*)>([\\s\\S]*?)<\\/c>/g)].map(cell => {
+          const attrs = cell[1]
+          const value = cell[2].match(/<v>([\\s\\S]*?)<\\/v>/)?.[1] ?? ''
+          if (/t="s"/.test(attrs)) return shared[Number(value)] ?? ''
+          const inline = cell[2].match(/<is[ >][\\s\\S]*?<\\/is>/)?.[0]
+          return inline ? xmlText(inline) : xmlText(value)
+        })
+        return cells.join('\\t')
+      })
+      return `Sheet ${sheetIndex + 1} ( ${name} )\\n${rows.join('\\n')}`
+    }).join('\\n\\n')
+  }
+  return null
 }
 
 export async function POST(request: NextRequest) {
@@ -92,6 +173,16 @@ export async function POST(request: NextRequest) {
       }
       const mimeType = normalizedMimeType((file.mimeType || blob.type || 'application/octet-stream').toLowerCase(), file.name || '')
       const ext = extensionOf(file.name || '')
+      if (['docx','xlsx','pptx'].includes(ext)) {
+        try {
+          const extracted = extractOfficeText(Buffer.from(await blob.arrayBuffer()), ext)
+          if (!extracted?.trim()) throw new Error('No readable text found')
+          userParts.push({ text: `Extracted text from Office file “${file.name}”:\\n\\n${extracted.slice(0, 120000)}` })
+          continue
+        } catch {
+          return NextResponse.json({ error: `Could not extract readable text from “${file.name}”. Please save it as PDF or TXT and upload again.` }, { status: 415 })
+        }
+      }
       if (mimeType.startsWith('text/') || TEXT_EXTENSIONS.has(ext) || ['application/json','application/xml','application/csv','application/rtf'].includes(mimeType)) {
         const text = await blob.text()
         if (text.length > 120_000) {
