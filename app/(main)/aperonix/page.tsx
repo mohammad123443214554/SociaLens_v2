@@ -661,7 +661,7 @@ export default function AperonixPage() {
 
                     {/* Keep user actions directly under the prompt, aligned with the message content. */}
                     {msg.role === 'user' && editingMsgId !== msg.id && (
-                      <div className={`flex items-center gap-1 -mt-1 px-1 text-muted-foreground ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                      <div className={`flex items-center gap-1 -mt-1 px-1 text-muted-foreground ${msg.role === 'user' ? 'mr-10 justify-end' : ''}`}>
                         <button
                           onClick={() => handleCopy(msg)}
                           title="Copy"
