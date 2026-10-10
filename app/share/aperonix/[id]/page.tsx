@@ -2,17 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-// A public, no-login-required page for a single shared Aperonix reply.
-// Aperonix conversations aren't stored anywhere normally, so sharing one
-// outside the app first saves just that reply's text into its own public
-// Row (see the Share button in the Aperonix chat) - this page just reads
-// that row back by id.
+// A public, no-login-required page for a shared Aperonix reply or user prompt.
+// The content is stored in the shared-content table and read back by id.
 export default function PublicAperonixReplyPage() {
   const params = useParams<{ id: string }>()
+  const searchParams = useSearchParams()
+  const isPrompt = searchParams.get('type') === 'prompt'
   const [content, setContent] = useState<string | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'not-found'>('loading')
 
@@ -45,8 +44,8 @@ export default function PublicAperonixReplyPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-6 text-center bg-background">
         <span className="text-3xl font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">SociaLens</span>
-        <p className="font-semibold mt-4">This reply isn't available</p>
-        <p className="text-sm text-muted-foreground max-w-xs">The link may be broken, or the reply is no longer available.</p>
+        <p className="font-semibold mt-4">{isPrompt ? "This prompt isn't available" : "This reply isn't available"}</p>
+        <p className="text-sm text-muted-foreground max-w-xs">The link may be broken, or the shared content is no longer available.</p>
         <Link href="/login" className="mt-3 px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white text-sm font-semibold">
           Open SociaLens
         </Link>
@@ -69,8 +68,8 @@ export default function PublicAperonixReplyPage() {
             <Sparkles className="h-5 w-5 text-white" />
           </div>
           <div>
-            <p className="font-semibold text-sm">Aperonix</p>
-            <p className="text-xs text-muted-foreground">SociaLens's AI assistant</p>
+            <p className="font-semibold text-sm">{isPrompt ? 'Shared user prompt' : 'Aperonix'}</p>
+            <p className="text-xs text-muted-foreground">{isPrompt ? 'Shared from a SociaLens conversation' : "SociaLens's AI assistant"}</p>
           </div>
         </div>
 
