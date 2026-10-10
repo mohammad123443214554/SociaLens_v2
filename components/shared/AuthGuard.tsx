@@ -11,9 +11,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [suspension, setSuspension] = useState<{ reason: string | null; deadline: string | null } | null>(null)
   const router = useRouter()
   const pathname = usePathname()
-  const supabase = createClient()
-
-  const checkSuspension = async (userId: string) => {
+  const checkSuspension = async (supabase: ReturnType<typeof createClient>, userId: string) => {
     const { data } = await supabase
       .from('profiles')
       .select('is_suspended, suspension_reason, suspension_deadline')
@@ -27,12 +25,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    const supabase = createClient()
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
         router.replace('/login')
         return
       }
-      await checkSuspension(session.user.id)
+      await checkSuspension(supabase, session.user.id)
       setReady(true)
     })
 
@@ -40,7 +39,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_OUT') {
         router.replace('/login')
       } else if (session) {
-        checkSuspension(session.user.id).then(() => setReady(true))
+        checkSuspension(supabase, session.user.id).then(() => setReady(true))
       }
     })
 
@@ -59,9 +58,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 export function GuestGuard({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
-
   useEffect(() => {
+    const supabase = createClient()
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         router.replace('/feed')
