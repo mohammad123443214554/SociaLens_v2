@@ -10,6 +10,7 @@ interface StoredFileInput { path: string; name: string; mimeType: string; size: 
 
 const MAX_FILES = 5
 const MAX_FILE_BYTES = 20 * 1024 * 1024
+const MAX_TOTAL_ANALYSIS_BYTES = 30 * 1024 * 1024
 const TEXT_EXTENSIONS = new Set([
   'txt','md','markdown','csv','tsv','json','jsonl','xml','html','htm','css','js','jsx','ts','tsx',
   'py','java','c','h','cpp','cs','go','rs','sql','sh','bash','yml','yaml','toml','ini','log',
@@ -24,6 +25,20 @@ const MODEL_INLINE_TYPES = new Set([
 
 function extensionOf(name: string) {
   return name.split('.').pop()?.toLowerCase() || ''
+}
+
+function normalizedMimeType(mimeType: string, name: string) {
+  if (mimeType && mimeType !== 'application/octet-stream') return mimeType
+  const ext = extensionOf(name)
+  const known: Record<string, string> = {
+    pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+    webp: 'image/webp', gif: 'image/gif', mp3: 'audio/mpeg', wav: 'audio/wav',
+    mp4: 'video/mp4', webm: 'video/webm', mov: 'video/mov',
+    txt: 'text/plain', csv: 'text/csv', tsv: 'text/tab-separated-values',
+    json: 'application/json', xml: 'application/xml', html: 'text/html',
+    md: 'text/markdown', log: 'text/plain', srt: 'text/plain', vtt: 'text/plain',
+  }
+  return known[ext] || mimeType || 'application/octet-stream'
 }
 
 export async function POST(request: NextRequest) {
@@ -46,6 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userParts: GeminiPart[] = []
+    let totalAnalysisBytes = 0
     for (const file of files) {
       if (!file || typeof file.path !== 'string' || !file.path.startsWith(`${user.id}/`)) {
         return NextResponse.json({ error: 'One of the files is not accessible from your account.' }, { status: 403 })
@@ -58,7 +74,14 @@ export async function POST(request: NextRequest) {
       if (error || !blob) {
         return NextResponse.json({ error: `Could not read “${file.name || 'file'}” from secure storage. Please upload it again.` }, { status: 400 })
       }
-      const mimeType = (file.mimeType || blob.type || 'application/octet-stream').toLowerCase()
+      if (blob.size > MAX_FILE_BYTES) {
+        return NextResponse.json({ error: `“${file.name || 'File'}” exceeds the 20 MB limit.` }, { status: 413 })
+      }
+      totalAnalysisBytes += blob.size
+      if (totalAnalysisBytes > MAX_TOTAL_ANALYSIS_BYTES) {
+        return NextResponse.json({ error: 'Please attach files with a combined size under 30 MB per message for fast analysis.' }, { status: 413 })
+      }
+      const mimeType = normalizedMimeType((file.mimeType || blob.type || 'application/octet-stream').toLowerCase(), file.name || '')
       const ext = extensionOf(file.name || '')
       if (mimeType.startsWith('text/') || TEXT_EXTENSIONS.has(ext) || ['application/json','application/xml','application/csv','application/rtf'].includes(mimeType)) {
         const text = await blob.text()
