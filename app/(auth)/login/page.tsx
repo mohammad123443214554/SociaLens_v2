@@ -49,18 +49,28 @@ export default function LoginPage() {
     }
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    })
+    try {
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        setError('Login is unavailable because Supabase is not configured for this deployment.')
+        setLoading(false)
+        return
+      }
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      })
 
-    if (error) {
-      setError(error.message)
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+      } else {
+        router.refresh()
+        router.push('/feed')
+      }
+    } catch {
+      setError('Login is unavailable because Supabase is not configured for this deployment.')
       setLoading(false)
-    } else {
-      // router.refresh() - cookies update karo server pe
-      router.refresh()
-      router.push('/feed')
     }
   }
 
