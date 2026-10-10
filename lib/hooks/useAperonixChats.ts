@@ -197,20 +197,24 @@ export function useAperonixChats() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Sign in to save Aperonix messages.')
-      const { error } = await supabase.from('aperonix_messages').insert({
+      const { data: convo } = await supabase.from('aperonix_conversations')
+        .select('title,pinned,context_messages,created_at').eq('id', conversationId).maybeSingle()
+      const nextTitle = message.role === 'user' && (!convo || convo.title === 'New chat')
+        ? (message.content.slice(0, 40) || message.attachments?.[0]?.name || 'File chat').slice(0, 40)
+        : (convo?.title || 'New chat')
+      const { error: convoError } = await supabase.from('aperonix_conversations').upsert({
+        id: conversationId, user_id: user.id, title: nextTitle,
+        pinned: convo?.pinned ?? false, context_messages: convo?.context_messages ?? [],
+        created_at: convo?.created_at ?? new Date().toISOString(), updated_at: new Date().toISOString(),
+      })
+      if (convoError) throw convoError
+      const { error } = await supabase.from('aperonix_messages').upsert({
         id: withId.id, conversation_id: conversationId, user_id: user.id,
         role: withId.role, content: withId.content,
         feedback: withId.feedback ?? null, attachments: withId.attachments ?? [],
         created_at: new Date(withId.timestamp).toISOString(),
       })
       if (error) throw error
-      const { data: convo } = await supabase.from('aperonix_conversations').select('title,pinned,context_messages,created_at').eq('id', conversationId).maybeSingle()
-      if (convo) await supabase.from('aperonix_conversations').update({
-        title: (message.role === 'user' && convo.title === 'New chat')
-          ? (message.content.slice(0, 40) || message.attachments?.[0]?.name || 'File chat').slice(0, 40)
-          : convo.title,
-        updated_at: new Date().toISOString(),
-      }).eq('id', conversationId)
     })().catch(error => console.error('Could not save Aperonix message', error))
     return withId.id
   }, [])
