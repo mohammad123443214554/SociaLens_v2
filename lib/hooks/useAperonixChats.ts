@@ -14,7 +14,7 @@ export interface AperonixMessage {
   // Small compressed thumbnails are kept for photos (so localStorage
   // Doesn't fill up over time) - videos aren't thumbnailed at all, just
   // Labeled, since even one video's worth of base64 would blow the quota.
-  attachments?: { type: 'image' | 'video'; thumbnailDataUrl?: string }[] | null
+  attachments?: { type: 'image' | 'video'; thumbnailDataUrl?: string; fileName?: string }[] | null
 }
 
 export interface AperonixConversation {
