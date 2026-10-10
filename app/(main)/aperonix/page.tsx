@@ -146,6 +146,7 @@ export default function AperonixPage() {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Please try again later.'
+      if (text) setInput(text)
       setAttachError(message)
       addMessage(conversationId, { role: 'model', content: message, timestamp: Date.now() })
     } finally {
