@@ -569,7 +569,7 @@ export default function AperonixPage() {
                     </div>
                   )}
                   {(regeneratingId === msg.id || msg.content) && (
-                    <div className={`rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap break-words ${msg.role === 'user' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
+                    <div className={`min-w-0 max-w-full text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${msg.role === 'user' ? 'rounded-2xl px-4 py-3 bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'w-full py-1 text-foreground'}`}>
                       {regeneratingId === msg.id ? (
                         <span className="flex items-center py-1">
                           <Image
