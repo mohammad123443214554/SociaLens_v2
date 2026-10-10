@@ -103,7 +103,7 @@ async function requestGemini(apiKey: string, model: string, systemPrompt: string
       // is tuned around those defaults, and overriding them tends to hurt
       // more than it helps. maxOutputTokens is just a length cap, safe to
       // keep custom.
-      maxOutputTokens: 1024,
+      maxOutputTokens: 8192,
     },
   })
 
