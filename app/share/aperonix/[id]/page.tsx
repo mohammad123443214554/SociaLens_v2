@@ -43,24 +43,33 @@ export default function PublicAperonixReplyPage() {
         }
       } else if (contentType === 'prompt') {
         let promptText = data.content
+        let promptOwner: { username?: string; avatar_url?: string | null } | null = null
         try {
           const parsed = JSON.parse(data.content)
           if (parsed?.__sociaLensShare === 1 && parsed.type === 'prompt') {
             promptText = parsed.prompt || ''
-            setOwner(parsed.owner || null)
+            promptOwner = parsed.owner || null
           }
         } catch {
           // Older shared prompts stored plain text; keep them readable.
         }
         if (!promptText) { setStatus('not-found'); return }
         setContent(promptText)
-        if (!owner) {
+
+        // Prefer saved owner details, then enrich them from the shared-by profile.
+        if (promptOwner) setOwner(promptOwner)
+        if (!promptOwner?.username || !promptOwner?.avatar_url) {
           const { data: sharedByProfile } = await supabase
             .from('profiles')
             .select('username,avatar_url')
             .eq('id', data.shared_by)
             .maybeSingle()
-          if (!cancelled && sharedByProfile) setOwner(sharedByProfile)
+          if (!cancelled && sharedByProfile) {
+            setOwner({
+              username: sharedByProfile.username || promptOwner?.username,
+              avatar_url: sharedByProfile.avatar_url || promptOwner?.avatar_url || null,
+            })
+          }
         }
       } else {
         setContent(data.content)
@@ -94,7 +103,10 @@ export default function PublicAperonixReplyPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="flex items-center justify-between px-4 h-14 border-b sticky top-0 bg-background/90 backdrop-blur-md z-10">
-        <span className="font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">SociaLens</span>
+        <Link href="/login" aria-label="SociaLens home" className="flex items-center gap-2 min-w-0">
+          <img src="/icons/icon-512x512.png" alt="" className="h-8 w-8 shrink-0 rounded-full object-contain" />
+          <span className="font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">SociaLens</span>
+        </Link>
         <Link href="/login" className="text-xs font-semibold px-3.5 py-1.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white">
           Open app
         </Link>
@@ -138,10 +150,20 @@ export default function PublicAperonixReplyPage() {
           <>
             <div className="flex items-center gap-2.5">
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
-                {isPrompt && owner?.avatar_url ? <img src={getAvatarUrl(owner.avatar_url)} alt={owner.username || 'User'} className="h-full w-full object-cover" /> : <img src="/images/aperonix-logo.png" alt="Aperonix" className="h-full w-full object-contain" />}
+                {isPrompt ? (
+                  owner?.avatar_url ? (
+                    <img src={getAvatarUrl(owner.avatar_url)} alt={owner.username || 'User'} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center rounded-full bg-muted text-sm font-semibold">
+                      {(owner?.username || 'U').slice(0, 1).toUpperCase()}
+                    </div>
+                  )
+                ) : (
+                  <img src="/images/aperonix-logo.png" alt="Aperonix" className="h-full w-full object-contain" />
+                )}
               </div>
               <div>
-                <p className="font-semibold text-sm">{isPrompt ? owner?.username || 'Shared user prompt' : 'Aperonix'}</p>
+                <p className="font-semibold text-sm">{isPrompt ? (owner?.username || 'User') + ' Prompt' : 'Aperonix'}</p>
                 <p className="text-xs text-muted-foreground">{isPrompt ? 'Shared from a SociaLens conversation' : "SociaLens's AI assistant"}</p>
               </div>
             </div>
