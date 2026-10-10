@@ -546,7 +546,7 @@ export default function AperonixPage() {
                 <div className={`max-w-[80%] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div className={`w-full rounded-2xl p-3 ${msg.role === 'user' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
-                      <div className="flex flex-wrap items-start gap-3">
+                      <div className="flex flex-col items-start gap-3">
                         {msg.attachments.map((a, i) => (
                           <button
                             key={a.path || i}
@@ -677,7 +677,7 @@ export default function AperonixPage() {
 
         <div className="border-t">
           {(attachedItems.length > 0 || attachError || checkingVideo) && (
-            <div className="px-3 pt-2.5 flex items-start gap-2 flex-wrap">
+            <div className="px-3 pt-2.5 flex flex-col items-stretch gap-2">
               {checkingVideo && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted rounded-xl px-3 py-2">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Checking video length...
@@ -690,14 +690,14 @@ export default function AperonixPage() {
                 </div>
               )}
               {attachedItems.map((item, i) => (
-                <div key={i} className="relative w-20 min-h-16 rounded-xl overflow-hidden border border-border bg-muted shrink-0 p-1.5 flex flex-col items-center justify-center gap-1">
+                <div key={i} className="relative w-full max-w-sm min-h-16 rounded-xl overflow-hidden border border-border bg-muted shrink-0 p-2 flex items-center justify-start gap-3">
                   {item.type === 'image' ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.previewUrl} alt="Attached" className="w-16 h-10 object-cover rounded" />
+                    <img src={item.previewUrl} alt="Attached" className="w-16 h-10 object-cover rounded shrink-0" />
                   ) : item.type === 'video' ? (
-                    <video src={item.previewUrl} className="w-16 h-10 object-cover rounded" muted />
+                    <video src={item.previewUrl} className="w-16 h-10 object-cover rounded shrink-0" muted />
                   ) : <FileText className="h-5 w-5 text-muted-foreground" />}
-                  <span className="w-full truncate text-[10px] text-center">{item.file.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-xs text-left">{item.file.name}</span>
                   <button onClick={() => removeAttachedItem(i)} className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5">
                     <X className="h-3 w-3 text-white" />
                   </button>
