@@ -123,6 +123,17 @@ export function useAperonixChats() {
     setActiveId(prev => prev === id ? null : prev)
     void (async () => {
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: rows } = await supabase.from('aperonix_messages')
+        .select('attachments').eq('conversation_id', id)
+      const paths = (rows || []).flatMap((row: any) => Array.isArray(row.attachments) ? row.attachments : [])
+        .map((attachment: any) => attachment?.path)
+        .filter((path: unknown): path is string => typeof path === 'string' && path.startsWith(`${user.id}/`))
+      if (paths.length) {
+        const { error: storageError } = await supabase.storage.from('aperonix-files').remove(paths)
+        if (storageError) console.error('Could not clean up Aperonix files', storageError)
+      }
       const { error } = await supabase.from('aperonix_conversations').delete().eq('id', id)
       if (error) console.error('Could not delete Aperonix chat', error)
     })()
