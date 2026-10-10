@@ -613,7 +613,8 @@ export default function AperonixPage() {
                             key={a.path || i}
                             type="button"
                             onClick={() => void openStoredAttachment(a)}
-                            title={`Open ${a.name}`}                            className="group flex w-full items-center gap-2.5 min-w-0 rounded-xl border border-white/20 bg-black/10 hover:bg-black/20 px-3 py-2.5 text-left transition-colors"
+                            title={`Open ${a.name}`}
+                            className="group flex w-full items-center gap-2.5 min-w-0 rounded-xl border border-white/20 bg-black/10 hover:bg-black/20 px-3 py-2.5 text-left transition-colors"
                           >
                             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
                               <FileText className="h-4 w-4" />
