@@ -543,46 +543,46 @@ export default function AperonixPage() {
                   </div>
                 </div>
               ) : (
-                <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
-                  msg.role === 'user'
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white'
-                    : 'bg-muted'
-                } ${msg.attachments?.length ? 'flex flex-col gap-4' : ''}`}>
+                <div className={`max-w-[80%] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   {msg.attachments && msg.attachments.length > 0 && (
-                    <div className="flex flex-wrap items-start gap-3">
-                      {msg.attachments.map((a, i) => (
-                        <button
-                          key={a.path || i}
-                          type="button"
-                          onClick={() => void openStoredAttachment(a)}
-                          title={`Open ${a.name}`}
-                          className="group flex items-center gap-2.5 w-[min(260px,100%)] min-w-0 rounded-xl border border-white/15 bg-black/10 hover:bg-black/20 px-3 py-2.5 text-left transition-colors"
-                        >
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
-                            <FileText className="h-4 w-4" />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-xs font-medium">{a.name}</span>
-                            <span className="block text-[10px] opacity-70">{a.mimeType || 'File'} · Click to open</span>
-                          </span>
-                          <span className="text-[10px] opacity-70 group-hover:opacity-100">Open</span>
-                        </button>
-                      ))}
+                    <div className={`w-full rounded-2xl p-3 ${msg.role === 'user' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
+                      <div className="flex flex-wrap items-start gap-3">
+                        {msg.attachments.map((a, i) => (
+                          <button
+                            key={a.path || i}
+                            type="button"
+                            onClick={() => void openStoredAttachment(a)}
+                            title={`Open ${a.name}`}
+                            className="group flex items-center gap-2.5 w-[min(260px,100%)] min-w-0 rounded-xl border border-white/20 bg-black/10 hover:bg-black/20 px-3 py-2.5 text-left transition-colors"
+                          >
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
+                              <FileText className="h-4 w-4" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-xs font-medium">{a.name}</span>
+                              <span className="block text-[10px] opacity-70">{a.mimeType || 'File'} · Click to open</span>
+                            </span>
+                            <span className="text-[10px] opacity-70 group-hover:opacity-100">Open</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
-                  {regeneratingId === msg.id ? (
-                    <span className="flex items-center py-1">
-                      <Image
-                        src="/images/aperonix-logo.png"
-                        alt="Aperonix is thinking"
-                        width={20}
-                        height={20}
-                        className="rounded-full animate-spin"
-                        style={{ animationDuration: '1.2s' }}
-                      />
-                    </span>
-                  ) : msg.content && (
-                    <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                  {(regeneratingId === msg.id || msg.content) && (
+                    <div className={`rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap break-words ${msg.role === 'user' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
+                      {regeneratingId === msg.id ? (
+                        <span className="flex items-center py-1">
+                          <Image
+                            src="/images/aperonix-logo.png"
+                            alt="Aperonix is thinking"
+                            width={20}
+                            height={20}
+                            className="rounded-full animate-spin"
+                            style={{ animationDuration: '1.2s' }}
+                          />
+                        </span>
+                      ) : msg.content}
+                    </div>
                   )}
                 </div>
               )}
