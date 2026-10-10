@@ -532,18 +532,14 @@ export default function AperonixPage() {
                     : 'bg-muted'
                 }`}>
                   {msg.attachments && msg.attachments.length > 0 && (
-                    msg.attachments[0].type === 'video' ? (
-                      <div className="flex items-center gap-1.5 mb-2 text-xs opacity-90">🎥 Video attached</div>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5 mb-2">
-                        {msg.attachments.map((a, i) => (
-                          a.thumbnailDataUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img key={i} src={a.thumbnailDataUrl} alt="Attached" className="rounded-xl w-20 h-20 object-cover" />
-                          ) : null
-                        ))}
-                      </div>
-                    )
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {msg.attachments.map((a, i) => (
+                        <div key={a.path || i} className="flex items-center gap-2 max-w-52 rounded-lg bg-black/10 px-2 py-1.5 text-xs">
+                          <FileText className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{a.name}</span>
+                        </div>
+                      ))}
+                    </div>
                   )}
                   {regeneratingId === msg.id ? (
                     <span className="flex items-center py-1">
