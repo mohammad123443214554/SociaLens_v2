@@ -131,7 +131,7 @@ export default function AperonixPage() {
       clearAttachment()
 
       const history = [...(activeConversation?.contextMessages ?? []), ...(activeConversation?.messages ?? [])]
-        .map(m => ({ role: m.role, content: m.content }))
+        .map(m => ({ role: m.role, content: m.content, files: m.attachments ?? [] }))
       const res = await fetch('/api/aperonix/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -264,7 +264,7 @@ export default function AperonixPage() {
     if (idx === -1) { setEditingMsgId(null); return }
 
     const historyBefore = [...(activeConversation.contextMessages ?? []), ...activeConversation.messages.slice(0, idx)]
-      .map(m => ({ role: m.role, content: m.content }))
+      .map(m => ({ role: m.role, content: m.content, files: m.attachments ?? [] }))
 
     editUserMessage(activeId, msg.id, newContent)
     setEditingMsgId(null)
@@ -305,7 +305,7 @@ export default function AperonixPage() {
 
     const priorUserIdx = activeConversation.messages.findIndex(m => m.id === priorUserMsg.id)
     const history = [...(activeConversation.contextMessages ?? []), ...activeConversation.messages.slice(0, priorUserIdx)]
-      .map(m => ({ role: m.role, content: m.content }))
+      .map(m => ({ role: m.role, content: m.content, files: m.attachments ?? [] }))
 
     setRegeneratingId(msg.id)
     try {
