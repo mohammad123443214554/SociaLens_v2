@@ -82,9 +82,9 @@ function unzipTextEntries(input: Buffer): Map<string, string> {
 function xmlText(value: string) {
   return value.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
-    .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&#x([\\da-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
-    .replace(/[\\t ]+/g, ' ').replace(/ *\\n */g, '\\n').trim()
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([\da-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
+    .replace(/[\t ]+/g, ' ').replace(/ *\n */g, '\n').trim()
 }
 
 function extractOfficeText(buffer: Buffer, ext: string): string | null {
@@ -92,32 +92,32 @@ function extractOfficeText(buffer: Buffer, ext: string): string | null {
   if (ext === 'docx') {
     const document = entries.get('word/document.xml')
     if (!document) return null
-    return xmlText(document.replace(/<\\/w:p>/g, '\\n').replace(/<\\/w:tr>/g, '\\n'))
+    return xmlText(document.replace(/<\/w:p>/g, '\n').replace(/<\/w:tr>/g, '\n'))
   }
   if (ext === 'pptx') {
-    const slides = [...entries.entries()].filter(([name]) => /^ppt\\/slides\\/slide\\d+\\.xml$/.test(name))
+    const slides = [...entries.entries()].filter(([name]) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
       .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-    return slides.map(([name, xml], i) => `Slide ${i + 1}: ${xmlText(xml)}`).join('\\n\\n')
+    return slides.map(([, xml], i) => \`Slide \${i + 1}: \${xmlText(xml)}\`).join('\n\n')
   }
   if (ext === 'xlsx') {
     const sharedXml = entries.get('xl/sharedStrings.xml') || ''
-    const shared = [...sharedXml.matchAll(/<si[ >][\\s\\S]*?<\\/si>/g)]
-      .map(match => [...match[0].matchAll(/<t(?: [^>]*)?>([\\s\\S]*?)<\\/t>/g)].map(t => xmlText(t[1])).join(''))
-    const sheets = [...entries.entries()].filter(([name]) => /^xl\\/worksheets\\/sheet\\d+\\.xml$/.test(name))
+    const shared = [...sharedXml.matchAll(/<si[ >][\s\S]*?<\/si>/g)]
+      .map(match => [...match[0].matchAll(/<t(?: [^>]*)?>([\s\S]*?)<\/t>/g)].map(t => xmlText(t[1])).join(''))
+    const sheets = [...entries.entries()].filter(([name]) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name))
       .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
     return sheets.map(([name, xml], sheetIndex) => {
-      const rows = [...xml.matchAll(/<row[ >][\\s\\S]*?<\\/row>/g)].map(row => {
-        const cells = [...row[0].matchAll(/<c\\b([^>]*)>([\\s\\S]*?)<\\/c>/g)].map(cell => {
+      const rows = [...xml.matchAll(/<row[ >][\s\S]*?<\/row>/g)].map(row => {
+        const cells = [...row[0].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)].map(cell => {
           const attrs = cell[1]
-          const value = cell[2].match(/<v>([\\s\\S]*?)<\\/v>/)?.[1] ?? ''
+          const value = cell[2].match(/<v>([\s\S]*?)<\/v>/)?.[1] ?? ''
           if (/t="s"/.test(attrs)) return shared[Number(value)] ?? ''
-          const inline = cell[2].match(/<is[ >][\\s\\S]*?<\\/is>/)?.[0]
+          const inline = cell[2].match(/<is[ >][\s\S]*?<\/is>/)?.[0]
           return inline ? xmlText(inline) : xmlText(value)
         })
-        return cells.join('\\t')
+        return cells.join('\t')
       })
-      return `Sheet ${sheetIndex + 1} ( ${name} )\\n${rows.join('\\n')}`
-    }).join('\\n\\n')
+      return \`Sheet \${sheetIndex + 1} (\${name})\n\${rows.join('\n')}\`
+    }).join('\n\n')
   }
   return null
 }
