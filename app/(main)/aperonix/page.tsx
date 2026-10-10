@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText } from 'lucide-react'
 import { useAperonixChats, AperonixMessage, AperonixConversation } from '@/lib/hooks/useAperonixChats'
 import { useUser } from '@/lib/hooks/useUser'
+import { getAvatarUrl } from '@/lib/utils/helpers'
 import { AperonixShareModal } from '@/components/aperonix/AperonixShareModal'
 import { speakText, stopSpeaking, isSpeechRecognitionSupported, createVoiceInput } from '@/lib/utils/voice'
 import { createClient } from '@/lib/supabase/client'
@@ -265,7 +266,7 @@ export default function AperonixPage() {
       title: convo.title,
       owner: {
         username: profile?.username || user?.email?.split('@')[0] || 'SociaLens user',
-        avatar_url: profile?.avatar_url ?? null,
+        avatar_url: getAvatarUrl(profile?.avatar_url ?? null),
       },
       messages: convo.messages.map(message => ({
         role: message.role,
