@@ -695,6 +695,7 @@ export default function AperonixPage() {
                   <div className="fixed inset-0 z-30" onClick={() => setShowAttachMenu(false)} />
                   <div className="absolute bottom-12 left-0 z-40 w-44 bg-card border rounded-xl shadow-xl overflow-hidden">
                     <button
+                      type="button"
                       onClick={() => fileInputRef.current?.click()}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
                     >
