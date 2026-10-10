@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText } from 'lucide-react'
 import { useAperonixChats, AperonixMessage, AperonixConversation } from '@/lib/hooks/useAperonixChats'
 import { useUser } from '@/lib/hooks/useUser'
@@ -198,7 +199,6 @@ export default function AperonixPage() {
     })
     setAttachError(null)
   }
-
   const handleFilesPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     e.target.value = ''
@@ -397,8 +397,7 @@ export default function AperonixPage() {
       onInterim: (transcript) => setInput(transcript),
       onFinal: (transcript) => {
         if (transcript) sendMessage(transcript, true)
-      },
-      onEnd: () => setIsListening(false),
+      },      onEnd: () => setIsListening(false),
       onError: () => setIsListening(false),
     })
     if (!controller) return
@@ -588,7 +587,24 @@ export default function AperonixPage() {
                   </div>
                 </div>
               ) : (
-                <div className={`max-w-[80%] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                <div className={`max-w-[90%] flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className="mt-1 h-8 w-8 shrink-0">
+                    {msg.role === 'model' ? (
+                      <Image
+                        src="/images/aperonix-logo.png"
+                        alt="Aperonix"
+                        width={32}
+                        height={32}
+                        className="h-8 w-8 rounded-full object-contain"
+                      />
+                    ) : (
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={getAvatarUrl(profile?.avatar_url ?? null)} alt={profile?.username || 'Your profile'} />
+                        <AvatarFallback>{profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                      </Avatar>
+                    )}
+                  </div>
+                  <div className={`min-w-0 max-w-[calc(100%-2.5rem)] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div className={`w-[min(284px,100%)] max-w-full shrink-0 rounded-2xl p-3 ${msg.role === 'user' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
                       <div className="flex flex-col items-start gap-3">
@@ -597,8 +613,7 @@ export default function AperonixPage() {
                             key={a.path || i}
                             type="button"
                             onClick={() => void openStoredAttachment(a)}
-                            title={`Open ${a.name}`}
-                            className="group flex w-full items-center gap-2.5 min-w-0 rounded-xl border border-white/20 bg-black/10 hover:bg-black/20 px-3 py-2.5 text-left transition-colors"
+                            title={`Open ${a.name}`}                            className="group flex w-full items-center gap-2.5 min-w-0 rounded-xl border border-white/20 bg-black/10 hover:bg-black/20 px-3 py-2.5 text-left transition-colors"
                           >
                             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
                               <FileText className="h-4 w-4" />
@@ -629,6 +644,7 @@ export default function AperonixPage() {
                       ) : msg.content}
                     </div>
                   )}
+                  </div>
                 </div>
               )}
 
@@ -797,8 +813,7 @@ export default function AperonixPage() {
                 }
               }}
               placeholder={isListening ? 'Listening...' : 'Message Aperonix...'}
-              rows={1}
-              className="flex-1 bg-muted rounded-2xl px-4 py-2.5 text-sm outline-none border border-transparent focus:border-pink-500 resize-none overflow-y-auto leading-relaxed"
+              rows={1}              className="flex-1 bg-muted rounded-2xl px-4 py-2.5 text-sm outline-none border border-transparent focus:border-pink-500 resize-none overflow-y-auto leading-relaxed"
             />
             <button
               type="button"
