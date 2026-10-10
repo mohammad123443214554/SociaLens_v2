@@ -545,7 +545,7 @@ export default function AperonixPage() {
               ) : (
                 <div className={`max-w-[80%] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   {msg.attachments && msg.attachments.length > 0 && (
-                    <div className={`w-full rounded-2xl p-3 ${msg.role === 'user' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
+                    <div className={`w-fit max-w-full rounded-2xl p-3 ${msg.role === 'user' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
                       <div className="flex flex-col items-start gap-3">
                         {msg.attachments.map((a, i) => (
                           <button
