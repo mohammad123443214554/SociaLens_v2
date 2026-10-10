@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
     const currentFiles = Array.isArray(body.files) ? body.files : []
     // Never silently re-analyze an old attachment when a new prompt is sent.
     // A previous upload is reused only when the user explicitly refers to it.
-    const asksAboutEarlierFile = /\\b(previous|earlier|last file|that file|same file|already uploaded|pehle|pahle|pichhle|us file|woh file|wahi file|upar wali)\\b/i.test(newMessage)
+    const asksAboutEarlierFile = /\b(previous|earlier|last file|that file|same file|already uploaded|pehle|pahle|pichhle|us file|woh file|wahi file|upar wali)\b/i.test(newMessage)
     const latestPriorUserFiles = asksAboutEarlierFile
       ? (messages.slice().reverse().find(m => m.role === 'user' && Array.isArray(m.files) && m.files.length)?.files || [])
       : []
