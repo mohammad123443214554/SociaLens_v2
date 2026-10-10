@@ -560,7 +560,7 @@ export default function AperonixPage() {
           )}
 
           {activeConversation?.messages.map((msg) => (
-            <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               {editingMsgId === msg.id ? (
                 <div className="max-w-[80%] w-full flex flex-col items-end gap-1.5">
                   <textarea
@@ -587,28 +587,148 @@ export default function AperonixPage() {
                   </div>
                 </div>
               ) : (
-                <div className={`max-w-[90%] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  {msg.attachments && msg.attachments.length > 0 && (
-                    <div className={`w-[min(284px,100%)] max-w-full shrink-0 rounded-2xl p-3 ${msg.role === 'user' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
-                      <div className="flex flex-col items-start gap-3">
-                        {msg.attachments.map((a, i) => (
-                          <button
-                            key={a.path || i}
-                            type="button"
-                            onClick={() => void openStoredAttachment(a)}
-                            title={`Open ${a.name}`}
-                            className="group flex w-full items-center gap-2.5 min-w-0 rounded-xl border border-white/20 bg-black/10 hover:bg-black/20 px-3 py-2.5 text-left transition-colors"
-                          >
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
-                              <FileText className="h-4 w-4" />
+                <div className={`flex items-start gap-2 max-w-[90%] min-w-0 ${msg.role === 'user' ? 'flex-row' : 'flex-row'}`}>
+                  <div className="mt-1 h-8 w-8 shrink-0">
+                    {msg.role === 'model' ? (
+                      <Image
+                        src="/images/aperonix-logo.png"
+                        alt="Aperonix"
+                        width={32}
+                        height={32}
+                        className="h-8 w-8 rounded-full object-contain"
+                      />
+                    ) : (
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={getAvatarUrl(profile?.avatar_url ?? null)} alt={profile?.username || 'Your profile'} />
+                        <AvatarFallback>{profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                      </Avatar>
+                    )}
+                  </div>
+
+                  <div className={`min-w-0 max-w-full flex flex-col gap-2 ${msg.role === 'user' ? 'items-start' : 'items-start'}`}>
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className={`w-[min(284px,100%)] max-w-full shrink-0 rounded-2xl p-3 ${msg.role === 'user' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
+                        <div className="flex flex-col items-start gap-3">
+                          {msg.attachments.map((a, i) => (
+                            <button
+                              key={a.path || i}
+                              type="button"
+                              onClick={() => void openStoredAttachment(a)}
+                              title={`Open ${a.name}`}
+                              className="group flex w-full items-center gap-2.5 min-w-0 rounded-xl border border-white/20 bg-black/10 hover:bg-black/20 px-3 py-2.5 text-left transition-colors"
+                            >
+                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
+                                <FileText className="h-4 w-4" />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-xs font-medium">{a.name}</span>
+                                <span className="block text-[10px] opacity-70">{a.mimeType || 'File'} · Click to open</span>
+                              </span>
+                              <span className="text-[10px] opacity-70 group-hover:opacity-100">Open</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(regeneratingId === msg.id || msg.content) && (
+                      <div className="min-w-0 max-w-full">
+                        <div className={`min-w-0 max-w-full text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${msg.role === 'user' ? 'rounded-2xl px-4 py-3 bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'w-full py-1 text-foreground'}`}>
+                          {regeneratingId === msg.id ? (
+                            <span className="flex items-center py-1">
+                              <Image
+                                src="/images/aperonix-logo.png"
+                                alt="Aperonix is thinking"
+                                width={30}
+                                height={30}
+                                className="rounded-full animate-spin"
+                                style={{ animationDuration: '1.2s' }}
+                              />
                             </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-xs font-medium">{a.name}</span>
-                              <span className="block text-[10px] opacity-70">{a.mimeType || 'File'} · Click to open</span>
-                            </span>
-                            <span className="text-[10px] opacity-70 group-hover:opacity-100">Open</span>
-                          </button>
-                        ))}
+                          ) : msg.content}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Keep user actions directly under the prompt, aligned with the message content. */}
+                    {msg.role === 'user' && editingMsgId !== msg.id && (
+                      <div className="flex items-center gap-1 -mt-1 px-1 text-muted-foreground">
+                        <button
+                          onClick={() => handleCopy(msg)}
+                          title="Copy"
+                          className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          {copiedMessageId === msg.id ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => { setShareContentType('prompt'); setShareText(msg.content) }}
+                          title="Share prompt"
+                          className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          <Forward className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleStartEditMsg(msg)}
+                          title="Edit"
+                          className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          <PencilLine className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Aperonix actions stay beneath the reply. */}
+                    {msg.role === 'model' && regeneratingId !== msg.id && (
+                      <div className="flex items-center gap-1 -mt-1 px-1 text-muted-foreground">
+                        <button
+                          onClick={() => handleCopy(msg)}
+                          title="Copy"
+                          className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          {copiedMessageId === msg.id ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => handleRegenerate(msg)}
+                          title="Regenerate"
+                          className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleReadAloud(msg)}
+                          title={speakingMessageId === msg.id ? 'Stop' : 'Read aloud'}
+                          className={`p-1.5 rounded-lg hover:bg-muted transition-colors ${speakingMessageId === msg.id ? 'text-pink-500' : 'hover:text-foreground'}`}
+                        >
+                          {speakingMessageId === msg.id ? <Square className="h-3.5 w-3.5 fill-current" /> : <Volume2 className="h-3.5 w-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => handleFeedback(msg, 'like')}
+                          title="Good response"
+                          className={`p-1.5 rounded-lg hover:bg-muted transition-colors ${msg.feedback === 'like' ? 'text-pink-500' : 'hover:text-foreground'}`}
+                        >
+                          <ThumbsUp className={`h-3.5 w-3.5 ${msg.feedback === 'like' ? 'fill-current' : ''}`} />
+                        </button>
+                        <button
+                          onClick={() => handleFeedback(msg, 'dislike')}
+                          title="Bad response"
+                          className={`p-1.5 rounded-lg hover:bg-muted transition-colors ${msg.feedback === 'dislike' ? 'text-pink-500' : 'hover:text-foreground'}`}
+                        >
+                          <ThumbsDown className={`h-3.5 w-3.5 ${msg.feedback === 'dislike' ? 'fill-current' : ''}`} />
+                        </button>
+                        <button
+                          onClick={() => { setShareContentType('reply'); setShareText(msg.content) }}
+                          title="Share"
+                          className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          <Forward className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
                       </div>
                     </div>
                   )}
