@@ -627,6 +627,108 @@ export default function AperonixPage() {
                               <span className="text-[10px] opacity-70 group-hover:opacity-100">Open</span>
                             </button>
                           ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(regeneratingId === msg.id || msg.content) && (
+                      <div className="min-w-0 max-w-full">
+                        <div className={`min-w-0 max-w-full text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${msg.role === 'user' ? 'rounded-2xl px-4 py-3 bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'w-full py-1 text-foreground'}`}>
+                          {regeneratingId === msg.id ? (
+                            <span className="flex items-center py-1">
+                              <Image
+                                src="/images/aperonix-logo.png"
+                                alt="Aperonix is thinking"
+                                width={30}
+                                height={30}
+                                className="rounded-full animate-spin"
+                                style={{ animationDuration: '1.2s' }}
+                              />
+                            </span>
+                          ) : msg.content}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Keep user actions directly under the prompt, aligned with the message content. */}
+                    {msg.role === 'user' && editingMsgId !== msg.id && (
+                      <div className="flex items-center gap-1 -mt-1 px-1 text-muted-foreground">
+                        <button
+                          onClick={() => handleCopy(msg)}
+                          title="Copy"
+                          className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          {copiedMessageId === msg.id ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => { setShareContentType('prompt'); setShareText(msg.content) }}
+                          title="Share prompt"
+                          className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          <Forward className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleStartEditMsg(msg)}
+                          title="Edit"
+                          className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          <PencilLine className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Aperonix actions stay beneath the reply. */}
+                    {msg.role === 'model' && regeneratingId !== msg.id && (
+                      <div className="flex items-center gap-1 -mt-1 px-1 text-muted-foreground">
+                        <button
+                          onClick={() => handleCopy(msg)}
+                          title="Copy"
+                          className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          {copiedMessageId === msg.id ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => handleRegenerate(msg)}
+                          title="Regenerate"
+                          className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleReadAloud(msg)}
+                          title={speakingMessageId === msg.id ? 'Stop' : 'Read aloud'}
+                          className={`p-1.5 rounded-lg hover:bg-muted transition-colors ${speakingMessageId === msg.id ? 'text-pink-500' : 'hover:text-foreground'}`}
+                        >
+                          {speakingMessageId === msg.id ? <Square className="h-3.5 w-3.5 fill-current" /> : <Volume2 className="h-3.5 w-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => handleFeedback(msg, 'like')}
+                          title="Good response"
+                          className={`p-1.5 rounded-lg hover:bg-muted transition-colors ${msg.feedback === 'like' ? 'text-pink-500' : 'hover:text-foreground'}`}
+                        >
+                          <ThumbsUp className={`h-3.5 w-3.5 ${msg.feedback === 'like' ? 'fill-current' : ''}`} />
+                        </button>
+                        <button
+                          onClick={() => handleFeedback(msg, 'dislike')}
+                          title="Bad response"
+                          className={`p-1.5 rounded-lg hover:bg-muted transition-colors ${msg.feedback === 'dislike' ? 'text-pink-500' : 'hover:text-foreground'}`}
+                        >
+                          <ThumbsDown className={`h-3.5 w-3.5 ${msg.feedback === 'dislike' ? 'fill-current' : ''}`} />
+                        </button>
+                        <button
+                          onClick={() => { setShareContentType('reply'); setShareText(msg.content) }}
+                          title="Share"
+                          className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          <Forward className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
 
           {sending && (
             <div className="flex justify-start items-center py-1">
