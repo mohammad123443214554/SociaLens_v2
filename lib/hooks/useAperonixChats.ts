@@ -118,25 +118,31 @@ export function useAperonixChats() {
     return newConvo.id
   }, [persistConversation])
 
-  const deleteConversation = useCallback((id: string) => {
+  const deleteConversation = useCallback(async (id: string) => {
+    const supabase = createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError) throw authError
+    if (!user) throw new Error('Please sign in again before deleting this chat.')
+
+    // Read only this user's conversation and its attachment paths. Never remove
+    // files outside the signed-in user's storage prefix.
+    const { data: rows, error: rowsError } = await supabase.from('aperonix_messages')
+      .select('attachments').eq('conversation_id', id).eq('user_id', user.id)
+    if (rowsError) throw new Error(`Could not prepare chat deletion: ${rowsError.message}`)
+    const paths = (rows || []).flatMap((row: any) => Array.isArray(row.attachments) ? row.attachments : [])
+      .map((attachment: any) => attachment?.path)
+      .filter((path: unknown): path is string => typeof path === 'string' && path.startsWith(`${user.id}/`))
+    if (paths.length) {
+      const { error: storageError } = await supabase.storage.from('aperonix-files').remove([...new Set(paths)])
+      if (storageError) throw new Error(`Chat files could not be deleted, so the chat was kept: ${storageError.message}`)
+    }
+
+    const { error: deleteError } = await supabase.from('aperonix_conversations')
+      .delete().eq('id', id).eq('user_id', user.id)
+    if (deleteError) throw new Error(`Could not delete chat: ${deleteError.message}`)
+
     setConversations(prev => prev.filter(c => c.id !== id))
     setActiveId(prev => prev === id ? null : prev)
-    void (async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: rows } = await supabase.from('aperonix_messages')
-        .select('attachments').eq('conversation_id', id)
-      const paths = (rows || []).flatMap((row: any) => Array.isArray(row.attachments) ? row.attachments : [])
-        .map((attachment: any) => attachment?.path)
-        .filter((path: unknown): path is string => typeof path === 'string' && path.startsWith(`${user.id}/`))
-      if (paths.length) {
-        const { error: storageError } = await supabase.storage.from('aperonix-files').remove(paths)
-        if (storageError) console.error('Could not clean up Aperonix files', storageError)
-      }
-      const { error } = await supabase.from('aperonix_conversations').delete().eq('id', id)
-      if (error) console.error('Could not delete Aperonix chat', error)
-    })()
   }, [])
 
   const renameConversation = useCallback((id: string, title: string) => {
