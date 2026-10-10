@@ -598,6 +598,13 @@ export default function AperonixPage() {
                     {copiedMessageId === msg.id ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
                   </button>
                   <button
+                    onClick={() => setShareText(msg.content)}
+                    title="Share prompt"
+                    className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    <Forward className="h-3.5 w-3.5" />
+                  </button>
+                  <button
                     onClick={() => handleStartEditMsg(msg)}
                     title="Edit"
                     className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
@@ -798,8 +805,12 @@ export default function AperonixPage() {
           </div>
         </div>
       )}
-      {shareText && (
-        <AperonixShareModal replyText={shareText} onClose={() => setShareText(null)} />
+      {shareText !== null && (
+        <AperonixShareModal
+          replyText={shareText}
+          contentType={activeConversation?.messages.find(msg => msg.role === 'user' && msg.content === shareText) ? 'prompt' : 'reply'}
+          onClose={() => setShareText(null)}
+        />
       )}
     </div>
   )
