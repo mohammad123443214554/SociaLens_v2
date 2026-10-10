@@ -249,7 +249,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
         onClick={handleTap}
         onTimeUpdate={handleTimeUpdate}
         onError={handleVideoError}
-        className="absolute inset-0 w-full h-full object-cover" />
+        className="absolute inset-0 w-full h-full object-contain bg-black" />
 
       {paused && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
