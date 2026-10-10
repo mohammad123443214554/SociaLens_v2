@@ -602,7 +602,7 @@ export default function AperonixPage() {
 
                   <div className={`min-w-0 max-w-full flex flex-col gap-2 ${msg.role === 'user' ? 'w-full items-end' : 'items-start'}`}>
                     {msg.attachments && msg.attachments.length > 0 && (
-                      <div className={`w-[min(284px,100%)] max-w-full shrink-0 rounded-2xl p-3 ${msg.role === 'user' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
+                      <div className={`w-[min(284px,100%)] max-w-full shrink-0 rounded-2xl p-3 ${msg.role === 'user' ? 'mr-10 bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
                         <div className="flex flex-col items-start gap-3">
                           {msg.attachments.map((a, i) => (
                             <button
