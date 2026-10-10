@@ -195,38 +195,67 @@ export function useAperonixChats() {
     })().catch(error => console.error('Could not edit Aperonix message', error))
   }, [])
 
-  const addMessage = useCallback((conversationId: string, message: Omit<AperonixMessage, 'id'> & { id?: string }) => {
+  const addMessage = useCallback(async (conversationId: string, message: Omit<AperonixMessage, 'id'> & { id?: string }): Promise<string> => {
     const withId: AperonixMessage = { ...message, id: message.id || crypto.randomUUID() }
+    const now = new Date().toISOString()
+    const titleFromMessage = message.role === 'user'
+      ? (message.content.slice(0, 40) || message.attachments?.[0]?.name || 'File chat').slice(0, 40)
+      : 'New chat'
+
+    // Persist first, then report success to the caller. This prevents a fast
+    // refresh/close from racing an un-awaited background database write.
+    const supabase = createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError) throw new Error(`Could not verify your session: ${authError.message}`)
+    if (!user) throw new Error('Your session has expired. Sign in again to save this chat.')
+
+    const { data: convo, error: convoReadError } = await supabase
+      .from('aperonix_conversations')
+      .select('title,pinned,context_messages,created_at')
+      .eq('id', conversationId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (convoReadError) throw new Error(`Could not read chat history: ${convoReadError.message}`)
+
+    const nextTitle = message.role === 'user' && (!convo || convo.title === 'New chat')
+      ? titleFromMessage
+      : (convo?.title || 'New chat')
+    const { error: convoError } = await supabase.from('aperonix_conversations').upsert({
+      id: conversationId,
+      user_id: user.id,
+      title: nextTitle,
+      pinned: convo?.pinned ?? false,
+      context_messages: convo?.context_messages ?? [],
+      created_at: convo?.created_at ?? now,
+      updated_at: now,
+    })
+    if (convoError) throw new Error(`Could not save chat: ${convoError.message}`)
+
+    const { error: messageError } = await supabase.from('aperonix_messages').upsert({
+      id: withId.id,
+      conversation_id: conversationId,
+      user_id: user.id,
+      role: withId.role,
+      content: withId.content,
+      feedback: withId.feedback ?? null,
+      attachments: withId.attachments ?? [],
+      created_at: new Date(withId.timestamp).toISOString(),
+    })
+    if (messageError) throw new Error(`Could not save message: ${messageError.message}`)
+
     setConversations(prev => prev.map(c => {
       if (c.id !== conversationId) return c
       const title = c.messages.length === 0 && message.role === 'user' && c.title === 'New chat'
-        ? (message.content.slice(0, 40) || message.attachments?.[0]?.name || 'File chat').slice(0, 40)
-        : c.title
-      return { ...c, messages: [...c.messages, withId], title, updatedAt: Date.now() }
+        ? titleFromMessage : nextTitle
+      return {
+        ...c,
+        title,
+        messages: c.messages.some(m => m.id === withId.id)
+          ? c.messages.map(m => m.id === withId.id ? withId : m)
+          : [...c.messages, withId],
+        updatedAt: Date.now(),
+      }
     }))
-    void (async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Sign in to save Aperonix messages.')
-      const { data: convo } = await supabase.from('aperonix_conversations')
-        .select('title,pinned,context_messages,created_at').eq('id', conversationId).maybeSingle()
-      const nextTitle = message.role === 'user' && (!convo || convo.title === 'New chat')
-        ? (message.content.slice(0, 40) || message.attachments?.[0]?.name || 'File chat').slice(0, 40)
-        : (convo?.title || 'New chat')
-      const { error: convoError } = await supabase.from('aperonix_conversations').upsert({
-        id: conversationId, user_id: user.id, title: nextTitle,
-        pinned: convo?.pinned ?? false, context_messages: convo?.context_messages ?? [],
-        created_at: convo?.created_at ?? new Date().toISOString(), updated_at: new Date().toISOString(),
-      })
-      if (convoError) throw convoError
-      const { error } = await supabase.from('aperonix_messages').upsert({
-        id: withId.id, conversation_id: conversationId, user_id: user.id,
-        role: withId.role, content: withId.content,
-        feedback: withId.feedback ?? null, attachments: withId.attachments ?? [],
-        created_at: new Date(withId.timestamp).toISOString(),
-      })
-      if (error) throw error
-    })().catch(error => console.error('Could not save Aperonix message', error))
     return withId.id
   }, [])
 
