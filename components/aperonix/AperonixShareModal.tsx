@@ -57,33 +57,75 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
   const [sent, setSent] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [loadingPeople, setLoadingPeople] = useState(true)
+  const [peopleError, setPeopleError] = useState<string | null>(null)
+  const [peopleRetry, setPeopleRetry] = useState(0)
   const supabase = createClient()
 
   useEffect(() => {
     let active = true
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
     const fetchPeople = async () => {
+      setLoadingPeople(true)
+      setPeopleError(null)
+
       if (!user) {
+        setPeople([])
         setLoadingPeople(false)
         return
       }
-      setLoadingPeople(true)
-      const { data: f1 } = await supabase
-        .from('follows')
-        .select('profiles!follows_following_id_fkey(id,username,avatar_url,full_name,is_verified,verification_type)')
-        .eq('follower_id', user.id).eq('status', 'accepted')
-      const { data: f2 } = await supabase
-        .from('follows')
-        .select('profiles!follows_follower_id_fkey(id,username,avatar_url,full_name,is_verified,verification_type)')
-        .eq('following_id', user.id).eq('status', 'accepted')
-      if (!active) return
-      const l1 = (f1 || []).map((d: any) => d.profiles).filter(Boolean)
-      const l2 = (f2 || []).map((d: any) => d.profiles).filter(Boolean)
-      setPeople([...l1, ...l2.filter((p: Person) => !l1.find((x: Person) => x.id === p.id))])
-      setLoadingPeople(false)
+
+      // Query follow edges first, then profiles by ID. This avoids fragile
+      // PostgREST embedded-profile relationship names and always settles the UI.
+      const load = async () => {
+        const { data: edges, error: followsError } = await supabase
+          .from('follows')
+          .select('follower_id,following_id')
+          .eq('status', 'accepted')
+          .or(`follower_id.eq.${user.id},following_id.eq.${user.id}`)
+
+        if (followsError) throw followsError
+
+        const ids = Array.from(new Set((edges || []).map(edge =>
+          edge.follower_id === user.id ? edge.following_id : edge.follower_id
+        ).filter((id): id is string => Boolean(id) && id !== user.id)))
+
+        if (ids.length === 0) return [] as Person[]
+
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id,username,avatar_url,full_name,is_verified,verification_type')
+          .in('id', ids)
+          .order('username', { ascending: true })
+
+        if (profilesError) throw profilesError
+        return (profiles || []) as Person[]
+      }
+
+      try {
+        const timeout = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Loading people took too long. Please retry.')), 12000)
+        })
+        const result = await Promise.race([load(), timeout])
+        if (!active) return
+        setPeople(result)
+      } catch (error) {
+        if (!active) return
+        console.error('[AperonixShareModal] Could not load share recipients:', error)
+        setPeople([])
+        setPeopleError(error instanceof Error ? error.message : 'Could not load people. Please retry.')
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId)
+        if (active) setLoadingPeople(false)
+      }
     }
-    fetchPeople()
-    return () => { active = false }
-  }, [user])
+
+    void fetchPeople()
+    return () => {
+      active = false
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [user?.id, peopleRetry])
 
   const handleSend = async () => {
     if (!user || selected.length === 0 || sending) return
@@ -271,6 +313,14 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
                 <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-400">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-fuchsia-400" />
                   Loading people...
+                </div>
+              ) : peopleError ? (
+                <div className="px-4 py-6 text-center">
+                  <Users className="mx-auto mb-2 h-5 w-5 text-slate-500" />
+                  <p role="alert" className="text-sm text-rose-300">{peopleError}</p>
+                  <button type="button" onClick={() => setPeopleRetry(value => value + 1)} className="mt-3 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/5">
+                    Retry
+                  </button>
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="px-4 py-8 text-center">
