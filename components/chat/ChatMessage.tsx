@@ -5,6 +5,7 @@ import { MoreVertical, Reply as ReplyIcon, Smile, Pencil, Trash2, EyeOff, Copy, 
 import { SharedPostMessage } from './SharedPostMessage'
 import { SharedStoryMessage } from './SharedStoryMessage'
 import { AperonixReplyMessage } from './AperonixReplyMessage'
+import { SharedAperonixContentMessage } from './SharedAperonixContentMessage'
 import { MessageForwardModal } from './MessageForwardModal'
 import { VoiceMessagePlayer } from './VoiceMessagePlayer'
 import { FullEmojiPicker } from './FullEmojiPicker'
@@ -399,6 +400,27 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
     return (
       <div className={cn('flex mb-2', isOwn && 'justify-end')}>
         <UnavailableMessage isOwn={isOwn} />
+      </div>
+    )
+  }
+
+  let isSharedAperonixContent = false
+  try {
+    const sharedPayload = JSON.parse(message.content)
+    isSharedAperonixContent = sharedPayload?.__sociaLensShare === 1 &&
+      (sharedPayload.type === 'prompt' || sharedPayload.type === 'chat')
+  } catch {}
+
+  if (isSharedAperonixContent) {
+    return (
+      <div className={cn('flex gap-2 mb-3', isOwn && 'flex-row-reverse')}>
+        <div className="min-w-0">
+          <SharedAperonixContentMessage content={message.content} isOwn={isOwn} />
+          <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-muted-foreground' : 'text-muted-foreground')}>
+            {formatTimeAgo(message.created_at)}
+            {isOwn && (message.is_read ? ' · Seen' : ' · Sent')}
+          </p>
+        </div>
       </div>
     )
   }
