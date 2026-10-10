@@ -41,6 +41,7 @@ export default function AperonixPage() {
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [attachedItems, setAttachedItems] = useState<{ file: File; type: 'image' | 'video'; previewUrl: string }[]>([])
   const [attachError, setAttachError] = useState<string | null>(null)
+  const [previewImage, setPreviewImage] = useState<{ src: string; name: string } | null>(null)
   const [checkingVideo, setCheckingVideo] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
@@ -97,16 +98,16 @@ export default function AperonixPage() {
     // Only photos get stored thumbnails - a video is never persisted to
     // localStorage (even compressed, one video's worth of base64 would
     // blow the quota), it just shows a simple label in the chat instead.
-    const attachments: { type: 'image' | 'video'; thumbnailDataUrl?: string }[] = []
+    const attachments: { type: 'image' | 'video'; thumbnailDataUrl?: string; fileName?: string }[] = []
     for (const item of items) {
       if (item.type === 'image') {
         try {
-          attachments.push({ type: 'image', thumbnailDataUrl: await compressImage(item.file) })
+          attachments.push({ type: 'image', thumbnailDataUrl: await compressImage(item.file), fileName: item.file.name })
         } catch {
-          attachments.push({ type: 'image' })
+          attachments.push({ type: 'image', fileName: item.file.name })
         }
       } else {
-        attachments.push({ type: 'video' })
+        attachments.push({ type: 'video', fileName: item.file.name })
       }
     }
 
@@ -580,18 +581,40 @@ export default function AperonixPage() {
                     : 'bg-muted'
                 }`}>
                   {msg.attachments && msg.attachments.length > 0 && (
-                    msg.attachments[0].type === 'video' ? (
-                      <div className="flex items-center gap-1.5 mb-2 text-xs opacity-90">🎥 Video attached</div>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5 mb-2">
-                        {msg.attachments.map((a, i) => (
-                          a.thumbnailDataUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img key={i} src={a.thumbnailDataUrl} alt="Attached" className="rounded-xl w-20 h-20 object-cover" />
-                          ) : null
-                        ))}
-                      </div>
-                    )
+                    <div className="mb-3 flex flex-col gap-2">
+                      {msg.attachments.map((a, i) => (
+                        <div key={i} className="flex items-center gap-3 rounded-xl border border-white/20 bg-black/10 p-2.5 max-w-full">
+                          {a.type === 'image' && a.thumbnailDataUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewImage({ src: a.thumbnailDataUrl!, name: a.fileName || 'Attached photo' })}
+                              className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-black/20"
+                              title="Open photo"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={a.thumbnailDataUrl} alt={a.fileName || 'Attached photo'} className="h-full w-full object-cover" />
+                            </button>
+                          ) : (
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-black/20 text-xl">
+                              {a.type === 'video' ? '🎥' : '📄'}
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-medium">{a.fileName || (a.type === 'video' ? 'Video attachment' : 'Photo attachment')}</p>
+                            <p className="mt-0.5 text-[11px] opacity-70">{a.type === 'video' ? 'Video attachment' : 'Photo attachment'}</p>
+                          </div>
+                          {a.type === 'image' && a.thumbnailDataUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewImage({ src: a.thumbnailDataUrl!, name: a.fileName || 'Attached photo' })}
+                              className="shrink-0 rounded-lg px-2 py-1 text-xs hover:bg-white/10"
+                            >
+                              Open
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   )}
                   {regeneratingId === msg.id ? (
                     <span className="flex items-center py-1">
@@ -797,6 +820,30 @@ export default function AperonixPage() {
         </div>
       </div>
 
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={previewImage.name}
+          onClick={() => setPreviewImage(null)}
+          onKeyDown={e => { if (e.key === 'Escape') setPreviewImage(null) }}
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            aria-label="Close image preview"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <div className="flex max-h-[90vh] max-w-[92vw] flex-col items-center gap-2" onClick={e => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={previewImage.src} alt={previewImage.name} className="max-h-[82vh] max-w-full rounded-xl object-contain" />
+            <p className="max-w-full truncate text-sm text-white">{previewImage.name}</p>
+          </div>
+        </div>
+      )}
       {shareText && (
         <AperonixShareModal replyText={shareText} onClose={() => setShareText(null)} />
       )}
