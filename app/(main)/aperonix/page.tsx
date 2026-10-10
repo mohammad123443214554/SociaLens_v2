@@ -389,6 +389,10 @@ export default function AperonixPage() {
     setSpeakingMessageId(null)
   }, [activeId])
 
+  const continuedFromTitle = activeConversation?.title.endsWith(' (continued)')
+    ? activeConversation.title.slice(0, -' (continued)'.length).trim()
+    : null
+
   return (
     <div className="flex h-[100dvh] lg:h-[calc(100vh-56px)] min-h-0 overflow-hidden">
       {/* History panel */}
@@ -506,7 +510,13 @@ export default function AperonixPage() {
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-          {(!activeConversation || activeConversation.messages.length === 0) && (
+          {continuedFromTitle && (
+            <div className="flex items-center gap-2 border-b border-border/70 pb-3 text-sm text-muted-foreground">
+              <Link2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>Continued from <span className="font-medium text-foreground">{continuedFromTitle}</span></span>
+            </div>
+          )}
+          {(!activeConversation || activeConversation.messages.length === 0) && !continuedFromTitle && (
             <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-muted-foreground">
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center">
                 <Sparkles className="h-8 w-8 text-white" />
