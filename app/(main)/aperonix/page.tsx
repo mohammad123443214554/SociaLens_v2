@@ -560,7 +560,7 @@ export default function AperonixPage() {
           )}
 
           {activeConversation?.messages.map((msg) => (
-            <div key={msg.id} className="flex justify-start">
+            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               {editingMsgId === msg.id ? (
                 <div className="max-w-[80%] w-full flex flex-col items-end gap-1.5">
                   <textarea
@@ -600,7 +600,7 @@ export default function AperonixPage() {
                     </div>
                   )}
 
-                  <div className={`min-w-0 max-w-full flex flex-col gap-2 items-start ${msg.role === 'user' ? 'w-full' : ''}`}>
+                  <div className={`min-w-0 max-w-full flex flex-col gap-2 ${msg.role === 'user' ? 'w-full items-end' : 'items-start'}`}>
                     {msg.attachments && msg.attachments.length > 0 && (
                       <div className={`w-[min(284px,100%)] max-w-full shrink-0 rounded-2xl p-3 ${msg.role === 'user' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
                         <div className="flex flex-col items-start gap-3">
@@ -628,7 +628,7 @@ export default function AperonixPage() {
 
                     {(regeneratingId === msg.id || msg.content) && (
                       msg.role === 'user' ? (
-                        <div className="flex w-full items-end gap-2">
+                        <div className="flex w-full items-end justify-end gap-2">
                           <div className="min-w-0 max-w-full text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-2xl px-4 py-3 bg-gradient-to-r from-pink-500 to-purple-500 text-white">
                             {msg.content}
                           </div>
@@ -661,7 +661,7 @@ export default function AperonixPage() {
 
                     {/* Keep user actions directly under the prompt, aligned with the message content. */}
                     {msg.role === 'user' && editingMsgId !== msg.id && (
-                      <div className="flex items-center gap-1 -mt-1 px-1 text-muted-foreground">
+                      <div className={`flex items-center gap-1 -mt-1 px-1 text-muted-foreground ${msg.role === 'user' ? 'justify-end' : ''}`}>
                         <button
                           onClick={() => handleCopy(msg)}
                           title="Copy"
