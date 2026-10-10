@@ -52,6 +52,65 @@ function fileToBase64(file: File): Promise<string> {
 
 // Finds the hashtag "word" the cursor is currently inside of, e.g.
 // typing "hello #re|els world" (| = cursor) returns { word: '#re', start: 6, end: 9 }
+
+// Extract a small set of representative frames locally in the browser. Only
+// compressed JPEG stills are sent to Vercel/Gemini, never the original video.
+// This keeps long videos comfortably below the request-body limit.
+async function sampleVideoFrames(file: File, maxFrames = 6): Promise<string[]> {
+  const video = document.createElement('video')
+  const objectUrl = URL.createObjectURL(file)
+  video.preload = 'metadata'
+  video.muted = true
+  video.playsInline = true
+  video.src = objectUrl
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve()
+      video.onerror = () => reject(new Error('This video could not be read in your browser.'))
+    })
+
+    const duration = Number.isFinite(video.duration) ? video.duration : 0
+    if (!duration) throw new Error('This video has no readable duration.')
+
+    const count = Math.min(maxFrames, Math.max(1, Math.ceil(duration / 8)))
+    const frames: string[] = []
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Video frame extraction is not supported by this browser.')
+
+    for (let i = 0; i < count; i++) {
+      // Evenly distribute samples through the full video, avoiding the very
+      // first/last frame where fades or black frames are common.
+      const time = count === 1 ? duration / 2 : duration * (0.06 + 0.88 * (i / (count - 1)))
+      await new Promise<void>((resolve, reject) => {
+        const onSeeked = () => { cleanup(); resolve() }
+        const onError = () => { cleanup(); reject(new Error('Could not read a frame from this video.')) }
+        const cleanup = () => {
+          video.removeEventListener('seeked', onSeeked)
+          video.removeEventListener('error', onError)
+        }
+        video.addEventListener('seeked', onSeeked, { once: true })
+        video.addEventListener('error', onError, { once: true })
+        video.currentTime = Math.min(time, Math.max(0, duration - 0.05))
+      })
+
+      const scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight))
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale))
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale))
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      frames.push(canvas.toDataURL('image/jpeg', 0.58).split(',')[1])
+    }
+
+    return frames
+  } finally {
+    video.pause()
+    video.removeAttribute('src')
+    video.load()
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
 function getActiveHashtagWord(value: string, cursorPos: number) {
   const before = value.slice(0, cursorPos)
   const hashIndex = before.lastIndexOf('#')
@@ -141,8 +200,10 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
       return
     }
 
-    if (hasMedia && mediaFile!.size > MAX_AI_MEDIA_BYTES) {
-      setGenerateError('This content is very long for Aperonix to look at right now. Try a shorter photo/video, or write the details yourself.')
+    // Original photos are sent directly; videos are represented by a few
+    // compressed frames, so even long videos do not hit Vercel's body limit.
+    if (hasMedia && mediaType === 'image' && mediaFile!.size > MAX_AI_MEDIA_BYTES) {
+      setGenerateError('This photo is too large to analyze. Please choose a smaller photo.')
       return
     }
 
@@ -150,14 +211,18 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
     setGenerating(prev => ({ ...prev, [field]: true }))
     try {
       const previousResult = field === 'title' ? title : field === 'description' ? description : hashtags
-      const mediaBase64 = hasMedia ? await fileToBase64(mediaFile!) : undefined
+      const isVideo = hasMedia && mediaType === 'video'
+      const sampledImages = isVideo ? await sampleVideoFrames(mediaFile!, 6) : undefined
+      const mediaBase64 = hasMedia && !isVideo ? await fileToBase64(mediaFile!) : undefined
 
       const res = await fetch('/api/aperonix/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mediaBase64,
-          mimeType: hasMedia ? mediaFile!.type : undefined,
+          mimeType: mediaBase64 ? mediaFile!.type : undefined,
+          sampledImages,
+          mediaKind: isVideo ? 'video' : mediaType,
           context: hasMedia ? undefined : aiContext.trim(),
           field,
           regenerate: generated[field],
