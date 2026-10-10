@@ -575,8 +575,8 @@ export default function AperonixPage() {
                           <Image
                             src="/images/aperonix-logo.png"
                             alt="Aperonix is thinking"
-                            width={20}
-                            height={20}
+                            width={30}
+                            height={30}
                             className="rounded-full animate-spin"
                             style={{ animationDuration: '1.2s' }}
                           />
@@ -664,8 +664,8 @@ export default function AperonixPage() {
                 <Image
                   src="/images/aperonix-logo.png"
                   alt="Aperonix is thinking"
-                  width={22}
-                  height={22}
+                  width={30}
+                  height={30}
                   className="rounded-full animate-spin"
                   style={{ animationDuration: '1.2s' }}
                 />
