@@ -32,6 +32,7 @@ export default function AperonixPage() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const [shareText, setShareText] = useState<string | null>(null)
+  const [shareContentType, setShareContentType] = useState<'reply' | 'prompt'>('reply')
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -598,7 +599,7 @@ export default function AperonixPage() {
                     {copiedMessageId === msg.id ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
                   </button>
                   <button
-                    onClick={() => setShareText(msg.content)}
+                    onClick={() => { setShareContentType('prompt'); setShareText(msg.content) }}
                     title="Share prompt"
                     className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
                   >
@@ -654,7 +655,7 @@ export default function AperonixPage() {
                     <ThumbsDown className={`h-3.5 w-3.5 ${msg.feedback === 'dislike' ? 'fill-current' : ''}`} />
                   </button>
                   <button
-                    onClick={() => setShareText(msg.content)}
+                    onClick={() => { setShareContentType('reply'); setShareText(msg.content) }}
                     title="Share"
                     className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition-colors"
                   >
@@ -808,7 +809,7 @@ export default function AperonixPage() {
       {shareText !== null && (
         <AperonixShareModal
           replyText={shareText}
-          contentType={activeConversation?.messages.find(msg => msg.role === 'user' && msg.content === shareText) ? 'prompt' : 'reply'}
+          contentType={shareContentType}
           onClose={() => setShareText(null)}
         />
       )}
