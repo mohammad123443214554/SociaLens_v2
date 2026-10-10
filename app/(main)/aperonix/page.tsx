@@ -547,16 +547,16 @@ export default function AperonixPage() {
                   msg.role === 'user'
                     ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white'
                     : 'bg-muted'
-                } ${msg.attachments?.length && msg.content ? 'flex flex-col gap-3' : ''}`}>
+                } ${msg.attachments?.length ? 'flex flex-col gap-4' : ''}`}>
                   {msg.attachments && msg.attachments.length > 0 && (
-                    <div className="flex flex-wrap items-start gap-2.5">
+                    <div className="flex flex-wrap items-start gap-3">
                       {msg.attachments.map((a, i) => (
                         <button
                           key={a.path || i}
                           type="button"
                           onClick={() => void openStoredAttachment(a)}
                           title={`Open ${a.name}`}
-                          className="group flex items-center gap-2.5 max-w-[260px] min-w-0 rounded-xl border border-white/15 bg-black/10 hover:bg-black/20 px-3 py-2 text-left transition-colors"
+                          className="group flex items-center gap-2.5 w-[min(260px,100%)] min-w-0 rounded-xl border border-white/15 bg-black/10 hover:bg-black/20 px-3 py-2.5 text-left transition-colors"
                         >
                           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
                             <FileText className="h-4 w-4" />
