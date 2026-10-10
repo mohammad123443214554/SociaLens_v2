@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
       const baseName = (file.name || '').split(/[\\/]/).pop()?.toLowerCase() || ''
       const isArchive = ['zip','rar','7z','tar','gz','tgz','bz2','xz'].includes(ext)
         || ['application/zip','application/x-zip-compressed','application/x-rar-compressed','application/x-7z-compressed','application/gzip','application/x-tar'].includes(mimeType)
-      const isDockerArtifact = ['docker','dockerfile','dockerignore'].includes(ext)
+      const isDockerArtifact = ['docker','doker','dockerfile','dockerignore'].includes(ext)
         || ['dockerfile','.dockerignore'].includes(baseName)
       if (isArchive || isDockerArtifact) {
         const typeName = isArchive ? ext.toUpperCase() + ' archive' : 'Docker file'
