@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
-import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2 } from 'lucide-react'
+import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText } from 'lucide-react'
 import { useAperonixChats, AperonixMessage } from '@/lib/hooks/useAperonixChats'
 import { AperonixShareModal } from '@/components/aperonix/AperonixShareModal'
 import { speakText, stopSpeaking, isSpeechRecognitionSupported, createVoiceInput } from '@/lib/utils/voice'
+import { createClient } from '@/lib/supabase/client'
 
 export default function AperonixPage() {
   const {
@@ -39,19 +40,13 @@ export default function AperonixPage() {
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null)
   const [editMsgValue, setEditMsgValue] = useState('')
   const [showAttachMenu, setShowAttachMenu] = useState(false)
-  const [attachedItems, setAttachedItems] = useState<{ file: File; type: 'image' | 'video'; previewUrl: string }[]>([])
+  const [attachedItems, setAttachedItems] = useState<{ file: File; type: 'image' | 'video' | 'file'; previewUrl: string }[]>([])
   const [attachError, setAttachError] = useState<string | null>(null)
   const [checkingVideo, setCheckingVideo] = useState(false)
-  const photoInputRef = useRef<HTMLInputElement>(null)
-  const videoInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Kept intentionally out of any user-facing copy - enforced silently
-  // rather than advertised as a documented limit.
-  const MAX_PHOTOS = 5
-  // Max clip length the chat can accept - Vercel's serverless function
-  // timeout means Gemini can't realistically process much more than this
-  // for a video before the request itself gets killed.
-  const MAX_VIDEO_SECONDS = 20
+  const MAX_FILES = 5
+  const MAX_FILE_BYTES = 20 * 1024 * 1024
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const speakHandleRef = useRef<{ stop: () => void } | null>(null)
@@ -87,68 +82,72 @@ export default function AperonixPage() {
     if ((!text && items.length === 0) || sending || attachError) return
 
     let conversationId = activeId
-    if (!conversationId) {
-      conversationId = createConversation()
-    }
-
+    if (!conversationId) conversationId = createConversation()
+    const messageId = crypto.randomUUID()
     setInput('')
     setSending(true)
 
-    // Only photos get stored thumbnails - a video is never persisted to
-    // localStorage (even compressed, one video's worth of base64 would
-    // blow the quota), it just shows a simple label in the chat instead.
-    const attachments: { type: 'image' | 'video'; thumbnailDataUrl?: string }[] = []
-    for (const item of items) {
-      if (item.type === 'image') {
-        try {
-          attachments.push({ type: 'image', thumbnailDataUrl: await compressImage(item.file) })
-        } catch {
-          attachments.push({ type: 'image' })
-        }
-      } else {
-        attachments.push({ type: 'video' })
-      }
-    }
-
-    const userMessage: Omit<AperonixMessage, 'id'> = {
-      role: 'user',
-      content: text,
-      timestamp: Date.now(),
-      attachments: attachments.length > 0 ? attachments : null,
-    }
-    addMessage(conversationId, userMessage)
-    clearAttachment()
-
     try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Please sign in to upload files and save your chat.')
+
+      // Compress image files before storage; all other file bytes go directly
+      // from the browser to private Supabase Storage, never through Vercel.
+      const uploaded = await Promise.all(items.map(async item => {
+        let uploadBlob: Blob = item.file
+        let uploadName = item.file.name
+        let mimeType = item.file.type || 'application/octet-stream'
+        if (item.type === 'image') {
+          try {
+            uploadBlob = await compressImageBlob(item.file)
+            uploadName = item.file.name.replace(/\.[^.]+$/, '') + '.jpg'
+            mimeType = 'image/jpeg'
+          } catch {
+            // Preserve the original if this browser cannot decode/compress it.
+          }
+        }
+        if (uploadBlob.size > MAX_FILE_BYTES) {
+          throw new Error(`“${item.file.name}” is larger than the 20 MB limit after compression.`)
+        }
+        const safeName = uploadName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120) || 'upload.bin'
+        const path = `${user.id}/${conversationId}/${messageId}/${crypto.randomUUID()}-${safeName}`
+        const { error } = await supabase.storage.from('aperonix-files').upload(path, uploadBlob, {
+          contentType: mimeType, upsert: false, cacheControl: '3600',
+        })
+        if (error) throw new Error(`Could not upload “${item.file.name}”. Please try again.`)
+        const kind = mimeType.startsWith('image/') ? 'image'
+          : mimeType.startsWith('video/') ? 'video'
+          : mimeType.startsWith('audio/') ? 'audio'
+          : ['application/pdf','text/plain','text/csv','application/json'].includes(mimeType) ? 'document' : 'file'
+        return { name: item.file.name, path, mimeType, size: uploadBlob.size, kind: kind as 'image'|'video'|'audio'|'document'|'file' }
+      }))
+
+      const userMessage: Omit<AperonixMessage, 'id'> & { id: string } = {
+        id: messageId, role: 'user', content: text, timestamp: Date.now(),
+        attachments: uploaded.length > 0 ? uploaded : null,
+      }
+      addMessage(conversationId, userMessage)
+      clearAttachment()
+
       const history = [...(activeConversation?.contextMessages ?? []), ...(activeConversation?.messages ?? [])]
         .map(m => ({ role: m.role, content: m.content }))
-
-      const media = items.length > 0
-        ? await Promise.all(items.map(async item => ({ mimeType: item.file.type, data: await fileToBase64(item.file) })))
-        : undefined
-
       const res = await fetch('/api/aperonix/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history, newMessage: text, media }),
+        body: JSON.stringify({ messages: history, newMessage: text, files: uploaded }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Something went wrong')
-
+      if (!res.ok) throw new Error(data.error || 'Aperonix could not analyze this message.')
       const modelMsgId = addMessage(conversationId, { role: 'model', content: data.reply, timestamp: Date.now() })
-      // A message sent by voice gets its reply read back out loud
-      // automatically - that's what makes it feel like an actual spoken
-      // conversation instead of just dictating into a text box.
       if (viaVoice) {
         setSpeakingMessageId(modelMsgId)
         speakHandleRef.current = await speakText(data.reply, () => setSpeakingMessageId(null))
       }
-    } catch (err: any) {
-      addMessage(conversationId, {
-        role: 'model',
-        content: 'Try again later.',
-        timestamp: Date.now(),
-      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Please try again later.'
+      setAttachError(message)
+      addMessage(conversationId, { role: 'model', content: message, timestamp: Date.now() })
     } finally {
       setSending(false)
     }
@@ -159,49 +158,23 @@ export default function AperonixPage() {
     sendMessage(input, false)
   }
 
-  // Downscales + compresses a photo before it's ever stored, so the chat
-  // history's local thumbnail never meaningfully adds up in localStorage
-  // even after many photos over time.
-  const compressImage = (file: File, maxDim = 480, quality = 0.6): Promise<string> => {
+  const compressImageBlob = (file: File, maxDim = 1600, quality = 0.78): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const img = document.createElement('img')
       const url = URL.createObjectURL(file)
       img.onload = () => {
         const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
         const canvas = document.createElement('canvas')
-        canvas.width = img.width * scale
-        canvas.height = img.height * scale
+        canvas.width = Math.max(1, Math.round(img.width * scale))
+        canvas.height = Math.max(1, Math.round(img.height * scale))
         const ctx = canvas.getContext('2d')
-        if (!ctx) { reject(new Error('canvas unavailable')); return }
+        if (!ctx) { URL.revokeObjectURL(url); reject(new Error('Image compression unavailable')); return }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
         URL.revokeObjectURL(url)
-        resolve(canvas.toDataURL('image/jpeg', quality))
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Image compression failed')), 'image/jpeg', quality)
       }
-      img.onerror = reject
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image could not be decoded')) }
       img.src = url
-    })
-  }
-
-  const getVideoDuration = (file: File): Promise<number> => {
-    return new Promise((resolve, reject) => {
-      const video = document.createElement('video')
-      const url = URL.createObjectURL(file)
-      video.preload = 'metadata'
-      video.onloadedmetadata = () => {
-        URL.revokeObjectURL(url)
-        resolve(video.duration)
-      }
-      video.onerror = reject
-      video.src = url
-    })
-  }
-
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve((reader.result as string).split(',')[1])
-      reader.onerror = reject
-      reader.readAsDataURL(file)
     })
   }
 
@@ -220,47 +193,26 @@ export default function AperonixPage() {
     setAttachError(null)
   }
 
-  const handlePhotoPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilesPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     e.target.value = ''
     setShowAttachMenu(false)
-    if (files.length === 0) return
-
+    if (!files.length) return
+    const tooLarge = files.find(file => file.size > MAX_FILE_BYTES)
+    if (tooLarge) {
+      setAttachError(`“${tooLarge.name}” is larger than the 20 MB per-file limit.`)
+      return
+    }
     setAttachedItems(prev => {
-      // Photos and a video don't mix - picking a photo while a video is
-      // attached starts a fresh photo-only selection instead.
-      const base = prev.some(i => i.type === 'video') ? [] : prev
-      const remainingSlots = Math.max(0, MAX_PHOTOS - base.length)
-      const toAdd = files.slice(0, remainingSlots).map(file => ({
-        file, type: 'image' as const, previewUrl: URL.createObjectURL(file),
-      }))
-      return [...base, ...toAdd]
+      const remaining = Math.max(0, MAX_FILES - prev.length)
+      const toAdd = files.slice(0, remaining).map(file => {
+        const type = file.type.startsWith('image/') ? 'image' as const
+          : file.type.startsWith('video/') ? 'video' as const : 'file' as const
+        return { file, type, previewUrl: type === 'image' || type === 'video' ? URL.createObjectURL(file) : '' }
+      })
+      return [...prev, ...toAdd]
     })
     setAttachError(null)
-  }
-
-  const handleVideoPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    setShowAttachMenu(false)
-    if (!file) return
-
-    setCheckingVideo(true)
-    try {
-      const duration = await getVideoDuration(file)
-      if (duration > MAX_VIDEO_SECONDS) {
-        setAttachError(`This video is ${Math.round(duration)}s long. Please pick one under ${MAX_VIDEO_SECONDS} seconds.`)
-        setCheckingVideo(false)
-        return
-      }
-      // Only one video at a time, and it replaces any photos already picked.
-      clearAttachment()
-      setAttachedItems([{ file, type: 'video', previewUrl: URL.createObjectURL(file) }])
-    } catch {
-      setAttachError('Could not read that video. Try a different file.')
-    } finally {
-      setCheckingVideo(false)
-    }
   }
 
   const handleNewChat = () => {
@@ -711,13 +663,14 @@ export default function AperonixPage() {
                 </div>
               )}
               {attachedItems.map((item, i) => (
-                <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-border bg-black shrink-0">
+                <div key={i} className="relative w-20 min-h-16 rounded-xl overflow-hidden border border-border bg-muted shrink-0 p-1.5 flex flex-col items-center justify-center gap-1">
                   {item.type === 'image' ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.previewUrl} alt="Attached" className="w-full h-full object-cover" />
-                  ) : (
-                    <video src={item.previewUrl} className="w-full h-full object-cover" muted />
-                  )}
+                    <img src={item.previewUrl} alt="Attached" className="w-16 h-10 object-cover rounded" />
+                  ) : item.type === 'video' ? (
+                    <video src={item.previewUrl} className="w-16 h-10 object-cover rounded" muted />
+                  ) : <FileText className="h-5 w-5 text-muted-foreground" />}
+                  <span className="w-full truncate text-[10px] text-center">{item.file.name}</span>
                   <button onClick={() => removeAttachedItem(i)} className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5">
                     <X className="h-3 w-3 text-white" />
                   </button>
@@ -727,14 +680,13 @@ export default function AperonixPage() {
           )}
 
           <form onSubmit={handleSend} className="p-3 flex items-end gap-2">
-            <input ref={photoInputRef} type="file" accept="image/*" multiple hidden onChange={handlePhotoPicked} />
-            <input ref={videoInputRef} type="file" accept="video/*" hidden onChange={handleVideoPicked} />
+            <input ref={fileInputRef} type="file" multiple hidden onChange={handleFilesPicked} />
 
             <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setShowAttachMenu(v => !v)}
-                title="Attach photo or video"
+                title="Upload file"
                 className="w-10 h-10 rounded-full bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-transform duration-200"
                 style={{ transform: showAttachMenu ? 'rotate(45deg)' : 'rotate(0deg)' }}
               >
@@ -746,16 +698,10 @@ export default function AperonixPage() {
                   <div className="fixed inset-0 z-30" onClick={() => setShowAttachMenu(false)} />
                   <div className="absolute bottom-12 left-0 z-40 w-44 bg-card border rounded-xl shadow-xl overflow-hidden">
                     <button
-                      onClick={() => photoInputRef.current?.click()}
+                      onClick={() => fileInputRef.current?.click()}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
                     >
-                      📷 Photo
-                    </button>
-                    <button
-                      onClick={() => videoInputRef.current?.click()}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
-                    >
-                      🎥 Video
+                      <FileText className="h-4 w-4" /> Upload File
                     </button>
                   </div>
                 </>
