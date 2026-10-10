@@ -81,7 +81,7 @@ export default function PublicAperonixReplyPage() {
   if (status === 'not-found' || (!content && !sharedChat)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-6 text-center bg-background">
-        <span className="text-3xl font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">SociaLens</span>
+        <div className="flex items-center gap-2"><img src="/images/socialens-logo.png" alt="SociaLens" className="h-7 w-7 object-contain" /><span className="text-xl font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">SociaLens</span></div>
         <p className="font-semibold mt-4">{isChat ? "This chat isn't available" : isPrompt ? "This prompt isn't available" : "This reply isn't available"}</p>
         <p className="text-sm text-muted-foreground max-w-xs">The link may be broken, or the shared content is no longer available.</p>
         <Link href="/login" className="mt-3 px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white text-sm font-semibold">
@@ -94,7 +94,7 @@ export default function PublicAperonixReplyPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="flex items-center justify-between px-4 h-14 border-b sticky top-0 bg-background/90 backdrop-blur-md z-10">
-        <span className="font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">SociaLens</span>
+        <div className="flex items-center gap-2"><img src="/images/socialens-logo.png" alt="SociaLens" className="h-7 w-7 object-contain" /><span className="font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">SociaLens</span></div>
         <Link href="/login" className="text-xs font-semibold px-3.5 py-1.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white">
           Open app
         </Link>
@@ -138,10 +138,10 @@ export default function PublicAperonixReplyPage() {
           <>
             <div className="flex items-center gap-2.5">
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
-                {isPrompt && owner?.avatar_url ? <img src={getAvatarUrl(owner.avatar_url)} alt={owner.username || 'User'} className="h-full w-full object-cover" /> : <img src="/images/aperonix-logo.png" alt="Aperonix" className="h-full w-full object-contain" />}
+                {isPrompt ? (owner?.avatar_url ? <img src={getAvatarUrl(owner.avatar_url)} alt={owner.username || 'User'} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center rounded-full bg-muted text-sm font-semibold">{(owner?.username || 'U').slice(0, 1).toUpperCase()}</div>) : <img src="/images/aperonix-logo.png" alt="Aperonix" className="h-full w-full object-contain" />}
               </div>
               <div>
-                <p className="font-semibold text-sm">{isPrompt ? owner?.username || 'Shared user prompt' : 'Aperonix'}</p>
+                <p className="font-semibold text-sm">{isPrompt ? `${owner?.username || 'User'} Prompt` : 'Aperonix'}</p>
                 <p className="text-xs text-muted-foreground">{isPrompt ? 'Shared from a SociaLens conversation' : "SociaLens's AI assistant"}</p>
               </div>
             </div>
