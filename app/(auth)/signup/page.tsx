@@ -50,8 +50,6 @@ export default function SignupPage() {
   const [sent, setSent] = useState(false)
   const [pendingEmail, setPendingEmail] = useState('')
   const router = useRouter()
-  const supabase = createClient()
-
   const { register, handleSubmit, formState: { errors } } = useForm<SignupForm>()
 
   const onSubmit = async (data: SignupForm) => {
@@ -79,6 +77,7 @@ export default function SignupPage() {
       }
 
       // 1. Signup karo
+      const supabase = createClient()
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
