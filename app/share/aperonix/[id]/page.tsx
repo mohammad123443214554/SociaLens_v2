@@ -41,6 +41,27 @@ export default function PublicAperonixReplyPage() {
           setStatus('not-found')
           return
         }
+      } else if (contentType === 'prompt') {
+        let promptText = data.content
+        try {
+          const parsed = JSON.parse(data.content)
+          if (parsed?.__sociaLensShare === 1 && parsed.type === 'prompt') {
+            promptText = parsed.prompt || ''
+            setOwner(parsed.owner || null)
+          }
+        } catch {
+          // Older shared prompts stored plain text; keep them readable.
+        }
+        if (!promptText) { setStatus('not-found'); return }
+        setContent(promptText)
+        if (!owner) {
+          const { data: sharedByProfile } = await supabase
+            .from('profiles')
+            .select('username,avatar_url')
+            .eq('id', data.shared_by)
+            .maybeSingle()
+          if (!cancelled && sharedByProfile) setOwner(sharedByProfile)
+        }
       } else {
         setContent(data.content)
       }
