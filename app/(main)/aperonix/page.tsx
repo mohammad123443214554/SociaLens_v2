@@ -127,7 +127,7 @@ export default function AperonixPage() {
         id: messageId, role: 'user', content: text, timestamp: Date.now(),
         attachments: uploaded.length > 0 ? uploaded : null,
       }
-      addMessage(conversationId, userMessage)
+      await addMessage(conversationId, userMessage)
       clearAttachment()
 
       const history = [...(activeConversation?.contextMessages ?? []), ...(activeConversation?.messages ?? [])]
@@ -139,7 +139,7 @@ export default function AperonixPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Aperonix could not analyze this message.')
-      const modelMsgId = addMessage(conversationId, { role: 'model', content: data.reply, timestamp: Date.now() })
+      const modelMsgId = await addMessage(conversationId, { role: 'model', content: data.reply, timestamp: Date.now() })
       if (viaVoice) {
         setSpeakingMessageId(modelMsgId)
         speakHandleRef.current = await speakText(data.reply, () => setSpeakingMessageId(null))
@@ -148,7 +148,7 @@ export default function AperonixPage() {
       const message = err instanceof Error ? err.message : 'Please try again later.'
       if (text) setInput(text)
       setAttachError(message)
-      addMessage(conversationId, { role: 'model', content: message, timestamp: Date.now() })
+      try { await addMessage(conversationId, { role: 'model', content: message, timestamp: Date.now() }) } catch (saveError) { console.error('Could not save Aperonix error message', saveError) }
     } finally {
       setSending(false)
     }
@@ -279,9 +279,9 @@ export default function AperonixPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Something went wrong')
-      addMessage(activeId, { role: 'model', content: data.reply, timestamp: Date.now() })
+      await addMessage(activeId, { role: 'model', content: data.reply, timestamp: Date.now() })
     } catch {
-      addMessage(activeId, { role: 'model', content: 'Try again later.', timestamp: Date.now() })
+      try { await addMessage(activeId, { role: 'model', content: 'Try again later.', timestamp: Date.now() }) } catch (saveError) { console.error('Could not save Aperonix error message', saveError) }
     } finally {
       setSending(false)
     }
