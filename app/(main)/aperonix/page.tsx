@@ -518,11 +518,11 @@ export default function AperonixPage() {
           )}
           {(!activeConversation || activeConversation.messages.length === 0) && !continuedFromTitle && (
             <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-muted-foreground">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center">
-                <Sparkles className="h-8 w-8 text-white" />
+              <div className="flex items-center justify-center">
+                <img src="/images/aperonix-logo.png" alt="Aperonix" className="h-16 w-16 object-contain" />
               </div>
-              <p className="font-semibold text-foreground">Hey, I'm Aperonix 👋</p>
-              <p className="text-sm max-w-xs">Ask me anything about SociaLens, or just chat with me about whatever's on your mind.</p>
+              <p className="text-xl font-semibold text-foreground">Hey, I'm Aperonix</p>
+              <p className="text-base max-w-sm">Ask me anything about SociaLens, or just chat with me about whatever's on your mind.</p>
             </div>
           )}
 
