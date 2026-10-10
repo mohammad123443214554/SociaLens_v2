@@ -587,24 +587,7 @@ export default function AperonixPage() {
                   </div>
                 </div>
               ) : (
-                <div className={`max-w-[90%] flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className="mt-1 h-8 w-8 shrink-0">
-                    {msg.role === 'model' ? (
-                      <Image
-                        src="/images/aperonix-logo.png"
-                        alt="Aperonix"
-                        width={32}
-                        height={32}
-                        className="h-8 w-8 rounded-full object-contain"
-                      />
-                    ) : (
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={getAvatarUrl(profile?.avatar_url ?? null)} alt={profile?.username || 'Your profile'} />
-                        <AvatarFallback>{profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
-                      </Avatar>
-                    )}
-                  </div>
-                  <div className={`min-w-0 max-w-[calc(100%-2.5rem)] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                <div className={`max-w-[90%] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div className={`w-[min(284px,100%)] max-w-full shrink-0 rounded-2xl p-3 ${msg.role === 'user' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
                       <div className="flex flex-col items-start gap-3">
@@ -630,22 +613,41 @@ export default function AperonixPage() {
                     </div>
                   )}
                   {(regeneratingId === msg.id || msg.content) && (
-                    <div className={`min-w-0 max-w-full text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${msg.role === 'user' ? 'rounded-2xl px-4 py-3 bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'w-full py-1 text-foreground'}`}>
-                      {regeneratingId === msg.id ? (
-                        <span className="flex items-center py-1">
+                    <div className={`flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                      <div className="mt-1 h-8 w-8 shrink-0">
+                        {msg.role === 'model' ? (
                           <Image
                             src="/images/aperonix-logo.png"
-                            alt="Aperonix is thinking"
-                            width={30}
-                            height={30}
-                            className="rounded-full animate-spin"
-                            style={{ animationDuration: '1.2s' }}
+                            alt="Aperonix"
+                            width={32}
+                            height={32}
+                            className="h-8 w-8 rounded-full object-contain"
                           />
-                        </span>
-                      ) : msg.content}
+                        ) : (
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={getAvatarUrl(profile?.avatar_url ?? null)} alt={profile?.username || 'Your profile'} />
+                            <AvatarFallback>{profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                          </Avatar>
+                        )}
+                      </div>
+                      <div className={`min-w-0 max-w-[calc(100%-2.5rem)] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                        <div className={`min-w-0 max-w-full text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${msg.role === 'user' ? 'rounded-2xl px-4 py-3 bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'w-full py-1 text-foreground'}`}>
+                          {regeneratingId === msg.id ? (
+                            <span className="flex items-center py-1">
+                              <Image
+                                src="/images/aperonix-logo.png"
+                                alt="Aperonix is thinking"
+                                width={30}
+                                height={30}
+                                className="rounded-full animate-spin"
+                                style={{ animationDuration: '1.2s' }}
+                              />
+                            </span>
+                          ) : msg.content}
+                        </div>
+                      </div>
                     </div>
                   )}
-                  </div>
                 </div>
               )}
 
