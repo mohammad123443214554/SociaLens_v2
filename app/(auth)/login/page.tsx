@@ -25,8 +25,6 @@ export default function LoginPage() {
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
-
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>()
 
   const onSubmit = async (data: LoginForm) => {
@@ -50,6 +48,7 @@ export default function LoginPage() {
       return
     }
 
+    const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({
       email: data.email,
       password: data.password,
