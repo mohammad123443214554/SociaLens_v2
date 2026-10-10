@@ -97,7 +97,7 @@ function extractOfficeText(buffer: Buffer, ext: string): string | null {
   if (ext === 'pptx') {
     const slides = [...entries.entries()].filter(([name]) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
       .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-    return slides.map(([, xml], i) => \`Slide \${i + 1}: \${xmlText(xml)}\`).join('\n\n')
+    return slides.map(([, xml], i) => 'Slide ' + (i + 1) + ': ' + xmlText(xml)).join('\n\n')
   }
   if (ext === 'xlsx') {
     const sharedXml = entries.get('xl/sharedStrings.xml') || ''
@@ -116,7 +116,7 @@ function extractOfficeText(buffer: Buffer, ext: string): string | null {
         })
         return cells.join('\t')
       })
-      return \`Sheet \${sheetIndex + 1} (\${name})\n\${rows.join('\n')}\`
+      return 'Sheet ' + (sheetIndex + 1) + ' (' + name + ')\n' + rows.join('\n')
     }).join('\n\n')
   }
   return null
