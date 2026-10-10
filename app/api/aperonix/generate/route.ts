@@ -27,16 +27,24 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { mediaBase64, mimeType, context, field, regenerate, previousResult } = (await request.json()) as {
+    const { mediaBase64, mimeType, sampledImages, mediaKind, context, field, regenerate, previousResult } = (await request.json()) as {
       mediaBase64?: string
       mimeType?: string
+      sampledImages?: string[]
+      mediaKind?: 'image' | 'video' | 'none'
       context?: string
       field: 'title' | 'description' | 'hashtags'
       regenerate?: boolean
       previousResult?: string
     }
 
-    const hasMedia = !!mediaBase64 && !!mimeType
+    // Videos arrive as at most six small JPEG frames extracted client-side.
+    // Never accept an unbounded frame array or an original long video payload.
+    const safeSampledImages = Array.isArray(sampledImages)
+      ? sampledImages.filter((frame): frame is string => typeof frame === 'string' && frame.length > 0).slice(0, 6)
+      : []
+    const hasSampledImages = mediaKind === 'video' && safeSampledImages.length > 0
+    const hasMedia = (!!mediaBase64 && !!mimeType) || hasSampledImages
     const hasContext = !!context?.trim()
 
     if (!field || (!hasMedia && !hasContext)) {
@@ -58,10 +66,18 @@ export async function POST(request: NextRequest) {
       promptText += ` You already suggested: "${previousResult}". Give a noticeably different alternative this time.`
     }
 
-    const parts: GeminiMessage['parts'] = hasMedia
-      ? [{ inlineData: { mimeType: mimeType!, data: mediaBase64! } }, { text: promptText }]
-      : [{ text: promptText }]
+    const mediaParts: GeminiMessage['parts'] = hasSampledImages
+      ? [
+          { text: 'The following are representative frames sampled at different points throughout the same video, in chronological order. Analyze them together to understand the video overall.' },
+          ...safeSampledImages.map(data => ({
+            inlineData: { mimeType: 'image/jpeg', data },
+          })),
+        ]
+      : hasMedia
+        ? [{ inlineData: { mimeType: mimeType!, data: mediaBase64! } }]
+        : []
 
+    const parts: GeminiMessage['parts'] = [...mediaParts, { text: promptText }]
     const contents: GeminiMessage[] = [{ role: 'user', parts }]
 
     const content = await callGemini('generate', SYSTEM_PROMPT, contents)
