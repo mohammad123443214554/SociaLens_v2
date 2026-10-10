@@ -25,8 +25,6 @@ export default function LoginPage() {
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
-
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>()
 
   const onSubmit = async (data: LoginForm) => {
@@ -50,18 +48,29 @@ export default function LoginPage() {
       return
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    })
+    const supabase = createClient()
+    try {
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        setError('Login is unavailable because Supabase is not configured for this deployment.')
+        setLoading(false)
+        return
+      }
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      })
 
-    if (error) {
-      setError(error.message)
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+      } else {
+        router.refresh()
+        router.push('/feed')
+      }
+    } catch {
+      setError('Login is unavailable because Supabase is not configured for this deployment.')
       setLoading(false)
-    } else {
-      // router.refresh() - cookies update karo server pe
-      router.refresh()
-      router.push('/feed')
     }
   }
 
