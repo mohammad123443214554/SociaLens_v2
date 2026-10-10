@@ -39,7 +39,7 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
     }
   })()
   const chatTranscript = sharedChat
-    ? sharedChat.messages.map((message: { role?: string; content?: string; attachments?: { name?: string }[] }) => `${message.role === 'user' ? (sharedChat.owner?.username || 'User') : 'Aperonix'}:\\n${message.content || ''}${message.attachments?.length ? `\\n[Attachments: ${message.attachments.map((a: { name?: string }) => a.name || 'file').join(', ')}]` : ''}`).join('\\n\\n')
+    ? sharedChat.messages.map((message: { role?: string; content?: string; attachments?: { name?: string }[] }) => `${message.role === 'user' ? (sharedChat.owner?.username || 'User') : 'Aperonix'}:\n${message.content || ''}${message.attachments?.length ? `\n[Attachments: ${message.attachments.map((a: { name?: string }) => a.name || 'file').join(', ')}]` : ''}`).join('\n\n')
     : ''
   const shareLabel = isChat ? 'Chat' : isPrompt ? 'Your prompt' : 'Aperonix'
   const shareTitle = isChat ? 'Share Chat' : isPrompt ? 'Share your prompt' : 'Share Aperonix reply'
