@@ -5,7 +5,7 @@ import { APERONIX_SYSTEM_PROMPT } from '@/lib/aperonix/systemPrompt'
 
 export const maxDuration = 30
 
-interface ChatHistoryItem { role: 'user' | 'model'; content: string }
+interface ChatHistoryItem { role: 'user' | 'model'; content: string; files?: StoredFileInput[] }
 interface StoredFileInput { path: string; name: string; mimeType: string; size: number }
 
 const MAX_FILES = 5
@@ -54,7 +54,16 @@ export async function POST(request: NextRequest) {
     }
     const messages = Array.isArray(body.messages) ? body.messages : []
     const newMessage = typeof body.newMessage === 'string' ? body.newMessage : ''
-    const files = Array.isArray(body.files) ? body.files.slice(0, MAX_FILES) : []
+    const currentFiles = Array.isArray(body.files) ? body.files : []
+    // Include recent conversation attachments so follow-up questions can refer
+    // to an earlier upload without uploading its bytes through the app again.
+    const seenPaths = new Set<string>()
+    const files = [...currentFiles, ...messages.slice().reverse().flatMap(m => Array.isArray(m.files) ? m.files : [])]
+      .filter(file => {
+        if (!file || typeof file.path !== 'string' || seenPaths.has(file.path)) return false
+        seenPaths.add(file.path)
+        return true
+      }).slice(0, MAX_FILES)
 
     if (!newMessage.trim() && files.length === 0) {
       return NextResponse.json({ error: 'Write a message or attach a file first.' }, { status: 400 })
