@@ -11,6 +11,7 @@ import { ExternalShareBar } from '@/components/shared/ExternalShareBar'
 
 interface AperonixShareModalProps {
   replyText: string
+  contentType?: 'reply' | 'prompt'
   onClose: () => void
 }
 
@@ -23,8 +24,16 @@ interface Person {
   verification_type?: 'blue' | 'yellow' | null
 }
 
-// Lets people share an Aperonix reply externally or forward it to SocialLens chats.
-export function AperonixShareModal({ replyText, onClose }: AperonixShareModalProps) {
+// Lets people share an Aperonix reply or a user's prompt externally or in SocialLens chats.
+export function AperonixShareModal({ replyText, contentType = 'reply', onClose }: AperonixShareModalProps) {
+  const isPrompt = contentType === 'prompt'
+  const shareKind = isPrompt ? 'prompt' : 'reply'
+  const shareLabel = isPrompt ? 'Your prompt' : 'Aperonix'
+  const shareTitle = isPrompt ? 'Share your prompt' : 'Share Aperonix reply'
+  const externalTitle = isPrompt ? 'SociaLens prompt' : 'Aperonix - SociaLens'
+  const externalText = isPrompt
+    ? 'Check out this prompt shared from SociaLens'
+    : 'Check out this reply from Aperonix on SociaLens'
   const { user } = useUser()
   const [people, setPeople] = useState<Person[]>([])
   const [selected, setSelected] = useState<string[]>([])
@@ -89,14 +98,14 @@ export function AperonixShareModal({ replyText, onClose }: AperonixShareModalPro
         chat_id: chatId,
         sender_id: user.id,
         content: replyText,
-        is_aperonix_reply: true,
+        is_aperonix_reply: !isPrompt,
       })
       if (messageError) continue
 
       await supabase.from('chats').update({
-        last_message: '✨ Shared an Aperonix reply',
+        last_message: isPrompt ? 'Shared a prompt' : '✨ Shared an Aperonix reply',
         last_message_time: new Date().toISOString(),
-        last_message_type: 'aperonix',
+        last_message_type: isPrompt ? 'text' : 'aperonix',
         last_message_sender_id: user.id,
       }).eq('id', chatId)
       successful += 1
@@ -120,7 +129,9 @@ export function AperonixShareModal({ replyText, onClose }: AperonixShareModalPro
       .select('id')
       .single()
     if (error || !data) throw error || new Error('Could not create link')
-    return `${window.location.origin}/share/aperonix/${data.id}`
+    const url = new URL(`/share/aperonix/${data.id}`, window.location.origin)
+    if (isPrompt) url.searchParams.set('type', 'prompt')
+    return url.toString()
   }
 
   return (
@@ -140,7 +151,7 @@ export function AperonixShareModal({ replyText, onClose }: AperonixShareModalPro
             <Share2 className="h-5 w-5 text-white" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 id="aperonix-share-title" className="text-base font-semibold tracking-tight">Share Aperonix reply</h2>
+            <h2 id="aperonix-share-title" className="text-base font-semibold tracking-tight">{shareTitle}</h2>
             <p className="mt-0.5 text-xs text-slate-400">Send it to friends or share a link</p>
           </div>
           <button
@@ -159,8 +170,8 @@ export function AperonixShareModal({ replyText, onClose }: AperonixShareModalPro
               <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-violet-600">
                 <Sparkles className="h-3.5 w-3.5 text-white" />
               </span>
-              <span className="text-sm font-semibold">Aperonix</span>
-              <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-2 py-0.5 text-[10px] font-medium text-fuchsia-200">AI reply</span>
+              <span className="text-sm font-semibold">{shareLabel}</span>
+              <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-2 py-0.5 text-[10px] font-medium text-fuchsia-200">{isPrompt ? 'User prompt' : 'AI reply'}</span>
             </div>
             <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden">
               {replyText}
@@ -171,8 +182,8 @@ export function AperonixShareModal({ replyText, onClose }: AperonixShareModalPro
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Share outside SocialLens</p>
             <ExternalShareBar
               getShareUrl={getExternalShareUrl}
-              shareTitle="Aperonix - SociaLens"
-              shareText="Check out this reply from Aperonix on SociaLens"
+              shareTitle={externalTitle}
+              shareText={externalText}
             />
             <p className="mt-2 text-xs leading-5 text-slate-500">Create a share link or send it using your phone's share menu.</p>
           </div>
