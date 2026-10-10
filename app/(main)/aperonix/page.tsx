@@ -483,7 +483,7 @@ export default function AperonixPage() {
                       <div className="fixed inset-0 z-30" onClick={e => { e.stopPropagation(); setOpenMenuId(null) }} />
                       <div
                         onClick={e => e.stopPropagation()}
-                        className="absolute right-0 top-7 z-40 w-48 bg-card border rounded-xl shadow-xl overflow-hidden text-foreground"
+                        className="absolute right-0 top-7 z-40 w-56 bg-card border rounded-xl shadow-xl overflow-hidden text-foreground"
                       >
                         <button
                           onClick={() => { togglePinConversation(convo.id); setOpenMenuId(null) }}
@@ -499,9 +499,9 @@ export default function AperonixPage() {
                         </button>
                         <button
                           onClick={() => handleConnectAsNewChat(convo.id)}
-                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
+                          className="w-full flex items-center gap-2.5 whitespace-nowrap px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
                         >
-                          <Link2 className="h-3.5 w-3.5" /> Connect with new chat
+                          <Link2 className="h-3.5 w-3.5 shrink-0" /> Connect with new chat
                         </button>
                         <button
                           onClick={() => handleShareChat(convo)}
