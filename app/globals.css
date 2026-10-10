@@ -58,7 +58,23 @@
   }
 }
 
-/* Hide scrollbar */
+/* Hide scrollbar visuals globally while preserving scrolling (mouse wheel, touch, trackpad). */
+html, body, *, *::before, *::after {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar,
+*::before::-webkit-scrollbar,
+*::after::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+/* Utility class for explicitly scrollable panels. */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
