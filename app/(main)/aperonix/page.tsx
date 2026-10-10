@@ -42,6 +42,7 @@ export default function AperonixPage() {
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [attachedItems, setAttachedItems] = useState<{ file: File; type: 'image' | 'video' | 'file'; previewUrl: string }[]>([])
   const [attachError, setAttachError] = useState<string | null>(null)
+  const [openedAttachment, setOpenedAttachment] = useState<{ url: string; name: string; mimeType: string } | null>(null)
   const [checkingVideo, setCheckingVideo] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -214,6 +215,21 @@ export default function AperonixPage() {
       return [...prev, ...toAdd]
     })
     setAttachError(null)
+  }
+
+  const openStoredAttachment = async (attachment: { path: string; name: string; mimeType: string }) => {
+    try {
+      const supabase = createClient()
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) throw new Error('Please sign in again to open this file.')
+      if (!attachment.path.startsWith(`${user.id}/`)) throw new Error('This file does not belong to your account.')
+      const { data, error } = await supabase.storage.from('aperonix-files')
+        .createSignedUrl(attachment.path, 60 * 5)
+      if (error || !data?.signedUrl) throw new Error('Could not open this file. It may have been deleted.')
+      setOpenedAttachment({ url: data.signedUrl, name: attachment.name, mimeType: attachment.mimeType || 'application/octet-stream' })
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not open this file.')
+    }
   }
 
   const handleNewChat = () => {
@@ -456,7 +472,7 @@ export default function AperonixPage() {
                           <Link2 className="h-3.5 w-3.5" /> Connect with new chat
                         </button>
                         <button
-                          onClick={() => { deleteConversation(convo.id); setOpenMenuId(null) }}
+                          onClick={async () => { setOpenMenuId(null); try { await deleteConversation(convo.id) } catch (error) { alert(error instanceof Error ? error.message : 'Could not delete this chat and its files.') } }}
                           className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
                         >
                           <Trash2 className="h-3.5 w-3.5" /> Delete
@@ -535,10 +551,22 @@ export default function AperonixPage() {
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-2">
                       {msg.attachments.map((a, i) => (
-                        <div key={a.path || i} className="flex items-center gap-2 max-w-52 rounded-lg bg-black/10 px-2 py-1.5 text-xs">
-                          <FileText className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{a.name}</span>
-                        </div>
+                        <button
+                          key={a.path || i}
+                          type="button"
+                          onClick={() => void openStoredAttachment(a)}
+                          title={`Open ${a.name}`}
+                          className="group flex items-center gap-2.5 max-w-[260px] min-w-0 rounded-xl border border-white/15 bg-black/10 hover:bg-black/20 px-3 py-2 text-left transition-colors"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
+                            <FileText className="h-4 w-4" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-medium">{a.name}</span>
+                            <span className="block text-[10px] opacity-70">{a.mimeType || 'File'} · Click to open</span>
+                          </span>
+                          <span className="text-[10px] opacity-70 group-hover:opacity-100">Open</span>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -741,6 +769,35 @@ export default function AperonixPage() {
         </div>
       </div>
 
+      {openedAttachment && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-3 sm:p-6" onClick={() => setOpenedAttachment(null)}>
+          <div className="flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-card shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 border-b px-4 py-3">
+              <FileText className="h-4 w-4 shrink-0 text-pink-500" />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{openedAttachment.name}</span>
+              <a href={openedAttachment.url} target="_blank" rel="noreferrer" className="rounded-lg px-3 py-1.5 text-xs hover:bg-muted">Open in new tab</a>
+              <button onClick={() => setOpenedAttachment(null)} aria-label="Close file preview" className="rounded-lg p-2 hover:bg-muted"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto bg-black/5 p-2 sm:p-4 flex items-center justify-center">
+              {openedAttachment.mimeType.startsWith('image/') ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={openedAttachment.url} alt={openedAttachment.name} className="max-h-[78dvh] max-w-full rounded-lg object-contain" />
+              ) : openedAttachment.mimeType.startsWith('video/') ? (
+                <video src={openedAttachment.url} controls className="max-h-[78dvh] max-w-full rounded-lg" />
+              ) : openedAttachment.mimeType === 'application/pdf' ? (
+                <iframe src={openedAttachment.url} title={openedAttachment.name} className="h-[78dvh] w-full rounded-lg bg-white" />
+              ) : (
+                <div className="flex flex-col items-center gap-3 p-8 text-center">
+                  <FileText className="h-12 w-12 text-pink-500" />
+                  <p className="max-w-lg break-words text-sm">{openedAttachment.name}</p>
+                  <p className="text-xs text-muted-foreground">This file type can be downloaded or opened in a new tab.</p>
+                  <a href={openedAttachment.url} download={openedAttachment.name} className="rounded-full bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-2 text-sm font-medium text-white">Download file</a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {shareText && (
         <AperonixShareModal replyText={shareText} onClose={() => setShareText(null)} />
       )}
