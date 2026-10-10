@@ -1,6 +1,6 @@
 # SociaLens 🌐
 
-A full-stack social media app built with **Next.js 16**, **TypeScript**, **Tailwind CSS**, and **Supabase** — Instagram-style features including feed, reels, real-time chat, follow system, and more.
+A full-stack social media app built with **Next.js 15**, **TypeScript**, **Tailwind CSS**, and **Supabase** — Instagram-style features including feed, reels, real-time chat, follow system, and more.
 
 ---
 
@@ -27,8 +27,8 @@ A full-stack social media app built with **Next.js 16**, **TypeScript**, **Tailw
 
 | Layer | Tech |
 |-------|------|
-| Framework | Next.js 16 (App Router + Turbopack) |
-| Language | TypeScript (strict mode not yet enabled) |
+| Framework | Next.js 15 (App Router + Turbopack) |
+| Language | TypeScript (strict) |
 | Styling | Tailwind CSS v3 + shadcn/ui |
 | Backend | Supabase (Auth + DB + Realtime + Storage) |
 | Forms | react-hook-form + zod |
@@ -155,7 +155,7 @@ socialens/
 - All routes protected via `middleware.ts`
 - Row Level Security (RLS) enabled on all tables
 - Storage policies restrict access by user ID
-- TypeScript type-checking is available with `npm run typecheck`; strict mode is currently disabled and should be enabled incrementally after existing type errors are resolved
+- TypeScript strict mode catches type errors at build time
 
 ---
 
