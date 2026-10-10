@@ -29,6 +29,9 @@ export interface AperonixConversation {
   // so the screen only ever shows what's actually been said in THIS chat -
   // like starting a new branch in ChatGPT that still remembers the parent.
   contextMessages?: AperonixMessage[]
+  // Tracks branched chats so deleting a source conversation can also remove
+  // copies of its hidden context from continued chats.
+  parentConversationId?: string
 }
 
 const STORAGE_KEY = 'aperonix-chats'
@@ -90,9 +93,23 @@ export function useAperonixChats() {
   }, [conversations, persist])
 
   const deleteConversation = useCallback((id: string) => {
-    const next = conversations.filter(c => c.id !== id)
+    // A continued chat contains a copy of its source chat's hidden context.
+    // Remove descendant branches too, otherwise deleted messages/thumbnails
+    // could remain duplicated in another saved conversation.
+    const idsToDelete = new Set<string>([id])
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const conversation of conversations) {
+        if (conversation.parentConversationId && idsToDelete.has(conversation.parentConversationId) && !idsToDelete.has(conversation.id)) {
+          idsToDelete.add(conversation.id)
+          changed = true
+        }
+      }
+    }
+    const next = conversations.filter(c => !idsToDelete.has(c.id))
     persist(next)
-    if (activeId === id) setActiveId(null)
+    if (activeId && idsToDelete.has(activeId)) setActiveId(null)
   }, [conversations, persist, activeId])
 
   const renameConversation = useCallback((id: string, title: string) => {
@@ -123,6 +140,7 @@ export function useAperonixChats() {
       title: `${source.title} (continued)`,
       messages: [],
       contextMessages: inheritedContext,
+      parentConversationId: sourceId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       pinned: false,
