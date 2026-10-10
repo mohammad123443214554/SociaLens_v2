@@ -27,7 +27,6 @@ interface Person {
 // Lets people share an Aperonix reply or a user's prompt externally or in SocialLens chats.
 export function AperonixShareModal({ replyText, contentType = 'reply', onClose }: AperonixShareModalProps) {
   const isPrompt = contentType === 'prompt'
-  const shareKind = isPrompt ? 'prompt' : 'reply'
   const shareLabel = isPrompt ? 'Your prompt' : 'Aperonix'
   const shareTitle = isPrompt ? 'Share your prompt' : 'Share Aperonix reply'
   const externalTitle = isPrompt ? 'SociaLens prompt' : 'Aperonix - SociaLens'
@@ -40,6 +39,7 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
   const [search, setSearch] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
   const [loadingPeople, setLoadingPeople] = useState(true)
   const supabase = createClient()
 
@@ -72,48 +72,60 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
   const handleSend = async () => {
     if (!user || selected.length === 0 || sending) return
     setSending(true)
+    setSendError(null)
     let successful = 0
 
-    for (const receiverId of selected) {
-      let chatId: string | null = null
-      const { data: existing } = await supabase
-        .from('chats')
-        .select('id')
-        .or(`and(participant1_id.eq.${user.id},participant2_id.eq.${receiverId}),and(participant1_id.eq.${receiverId},participant2_id.eq.${user.id})`)
-        .maybeSingle()
-
-      if (existing) {
-        chatId = existing.id
-      } else {
-        const { data: newChat } = await supabase
+    try {
+      for (const receiverId of selected) {
+        let chatId: string | null = null
+        const { data: existing, error: lookupError } = await supabase
           .from('chats')
-          .insert({ participant1_id: user.id, participant2_id: receiverId })
-          .select('id').single()
-        chatId = newChat?.id || null
+          .select('id')
+          .or(`and(participant1_id.eq.${user.id},participant2_id.eq.${receiverId}),and(participant1_id.eq.${receiverId},participant2_id.eq.${user.id})`)
+          .maybeSingle()
+
+        if (lookupError) continue
+        if (existing) {
+          chatId = existing.id
+        } else {
+          const { data: newChat, error: createError } = await supabase
+            .from('chats')
+            .insert({ participant1_id: user.id, participant2_id: receiverId })
+            .select('id').single()
+          if (createError) continue
+          chatId = newChat?.id || null
+        }
+
+        if (!chatId) continue
+
+        const { error: messageError } = await supabase.from('messages').insert({
+          chat_id: chatId,
+          sender_id: user.id,
+          content: replyText,
+          is_aperonix_reply: !isPrompt,
+        })
+        if (messageError) continue
+
+        await supabase.from('chats').update({
+          last_message: isPrompt ? 'Shared a prompt' : '✨ Shared an Aperonix reply',
+          last_message_time: new Date().toISOString(),
+          last_message_type: isPrompt ? 'text' : 'aperonix',
+          last_message_sender_id: user.id,
+        }).eq('id', chatId)
+        successful += 1
       }
 
-      if (!chatId) continue
-
-      const { error: messageError } = await supabase.from('messages').insert({
-        chat_id: chatId,
-        sender_id: user.id,
-        content: replyText,
-        is_aperonix_reply: !isPrompt,
-      })
-      if (messageError) continue
-
-      await supabase.from('chats').update({
-        last_message: isPrompt ? 'Shared a prompt' : '✨ Shared an Aperonix reply',
-        last_message_time: new Date().toISOString(),
-        last_message_type: isPrompt ? 'text' : 'aperonix',
-        last_message_sender_id: user.id,
-      }).eq('id', chatId)
-      successful += 1
+      if (successful > 0) {
+        setSent(true)
+        setTimeout(onClose, 1500)
+      } else {
+        setSendError('Could not send this content. Check that you can message the selected person and try again.')
+      }
+    } catch {
+      setSendError('Something went wrong while sharing. Please try again.')
+    } finally {
+      setSending(false)
     }
-
-    setSent(successful > 0)
-    setSending(false)
-    if (successful > 0) setTimeout(onClose, 1500)
   }
 
   const filtered = people.filter(p =>
@@ -256,6 +268,7 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
         </div>
 
         <footer className="border-t border-white/10 bg-slate-950/95 p-4 sm:px-5">
+          {sendError && <p role="alert" className="mb-3 text-center text-xs leading-5 text-rose-300">{sendError}</p>}
           {sent ? (
             <div className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500/15 py-3 text-sm font-semibold text-emerald-300">
               <Check className="h-4 w-4" /> Sent successfully
