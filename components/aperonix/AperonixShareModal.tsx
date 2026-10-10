@@ -98,6 +98,7 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
           .from('chats')
           .select('id')
           .or(`and(participant1_id.eq.${user.id},participant2_id.eq.${receiverId}),and(participant1_id.eq.${receiverId},participant2_id.eq.${user.id})`)
+          .limit(1)
           .maybeSingle()
 
         if (lookupError) continue
@@ -117,7 +118,20 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
         const { error: messageError } = await supabase.from('messages').insert({
           chat_id: chatId,
           sender_id: user.id,
-          content: isChat ? chatTranscript : replyText,
+          content: isPrompt || isChat
+            ? JSON.stringify({
+                __sociaLensShare: 1,
+                type: isChat ? 'chat' : 'prompt',
+                owner: {
+                  username: profile?.username || user.email?.split('@')[0] || 'SociaLens user',
+                  avatar_url: profile?.avatar_url ?? null,
+                },
+                ...(isPrompt ? { prompt: replyText } : {
+                  title: sharedChat?.title || 'Shared chat',
+                  messages: sharedChat?.messages || [],
+                }),
+              })
+            : replyText,
           is_aperonix_reply: !isPrompt && !isChat,
         })
         if (messageError) continue
