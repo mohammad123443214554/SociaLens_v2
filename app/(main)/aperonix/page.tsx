@@ -560,7 +560,7 @@ export default function AperonixPage() {
           )}
 
           {activeConversation?.messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div key={msg.id} className="flex justify-start">
               {editingMsgId === msg.id ? (
                 <div className="max-w-[80%] w-full flex flex-col items-end gap-1.5">
                   <textarea
