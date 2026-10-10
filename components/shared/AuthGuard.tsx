@@ -25,6 +25,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      setReady(true)
+      return
+    }
     const supabase = createClient()
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
@@ -59,6 +63,10 @@ export function GuestGuard({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false)
   const router = useRouter()
   useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      setReady(true)
+      return
+    }
     const supabase = createClient()
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
