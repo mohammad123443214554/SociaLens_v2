@@ -624,7 +624,7 @@ export default function AperonixPage() {
           <button onClick={() => setShowHistory(true)} className="md:hidden text-muted-foreground">
             <Menu className="h-5 w-5" />
           </button>
-          <Image src="/images/aperonix-logo.png" alt="Aperonix" width={28} height={28} className="rounded-full" />
+          <Image src="/images/aperonix-logo.png" alt="Aperonix" width={36} height={36} className="rounded-full" />
           <div>
             <p className="font-semibold text-sm">Aperonix</p>
             <p className="text-xs text-muted-foreground">SociaLens's official AI</p>
