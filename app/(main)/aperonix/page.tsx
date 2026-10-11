@@ -75,13 +75,45 @@ export default function AperonixPage() {
   }, [input])
 
   useEffect(() => {
-    if (!activeId) { setWallpaper(null); return }
-    try {
-      const saved = localStorage.getItem('socialens:aperonix-wallpaper:' + activeId)
-      setWallpaper(saved ? JSON.parse(saved) as ChatWallpaper : null)
-    } catch {
-      setWallpaper(null)
+    let cancelled = false
+    const loadWallpaper = async () => {
+      if (!activeId) { setWallpaper(null); return }
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { setWallpaper(null); return }
+        const { data, error } = await supabase
+          .from('aperonix_chat_wallpapers')
+          .select('original_storage_path,processed_storage_path,filter_index,zoom,position_x,position_y')
+          .eq('conversation_id', activeId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (error) throw error
+        if (!data) { if (!cancelled) setWallpaper(null); return }
+        const [original, processed] = await Promise.all([
+          supabase.storage.from('aperonix-wallpapers').createSignedUrl(data.original_storage_path, 60 * 60),
+          supabase.storage.from('aperonix-wallpapers').createSignedUrl(data.processed_storage_path, 60 * 60),
+        ])
+        if (original.error || processed.error || !original.data?.signedUrl || !processed.data?.signedUrl) {
+          throw new Error('Could not load this chat wallpaper.')
+        }
+        if (!cancelled) setWallpaper({
+          originalDataUrl: original.data.signedUrl,
+          dataUrl: processed.data.signedUrl,
+          originalStoragePath: data.original_storage_path,
+          processedStoragePath: data.processed_storage_path,
+          filterIndex: data.filter_index,
+          zoom: data.zoom,
+          positionX: data.position_x,
+          positionY: data.position_y,
+        })
+      } catch (error) {
+        console.error('Could not load chat wallpaper', error)
+        if (!cancelled) setWallpaper(null)
+      }
     }
+    void loadWallpaper()
+    return () => { cancelled = true }
   }, [activeId])
 
   useEffect(() => {
