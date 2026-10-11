@@ -176,13 +176,18 @@ export default function AperonixPage() {
     }
   }, [loaded, activeId, conversations, setActiveId])
 
+  // Depend on a stable boolean, not the conversations array itself.
+  // useAperonixChats returns a newly sorted array on every render; using that
+  // array as a dependency made this effect rerun after every state update and
+  // repeatedly close the mobile history drawer while an archived chat was open.
+  const requestedConversationExists = Boolean(
+    loaded && requestedChatId && conversations.some(conversation => conversation.id === requestedChatId)
+  )
+
   useEffect(() => {
-    if (!loaded || !requestedChatId) return
-    if (conversations.some(conversation => conversation.id === requestedChatId)) {
-      setActiveId(requestedChatId)
-      setShowHistory(false)
-    }
-  }, [loaded, requestedChatId, conversations, setActiveId])
+    if (!requestedConversationExists || !requestedChatId) return
+    if (activeId !== requestedChatId) setActiveId(requestedChatId)
+  }, [requestedConversationExists, requestedChatId, activeId, setActiveId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
