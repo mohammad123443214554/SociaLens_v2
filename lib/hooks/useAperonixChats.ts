@@ -44,7 +44,8 @@ function rowToMessage(row: any): AperonixMessage {
   }
 }
 
-export function useAperonixChats() {
+export function useAperonixChats(options: { includeArchived?: boolean } = {}) {
+  const includeArchived = options.includeArchived ?? false
   const [conversations, setConversations] = useState<AperonixConversation[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -56,12 +57,12 @@ export function useAperonixChats() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { if (!cancelled) setLoaded(true); return }
-        const { data: rows, error } = await supabase
+        let query = supabase
           .from('aperonix_conversations')
           .select('id,title,pinned,context_messages,created_at,updated_at,archived_at')
-          .is('archived_at', null)
           .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
+        query = includeArchived ? query.not('archived_at', 'is', null) : query.is('archived_at', null)
+        const { data: rows, error } = await query.order('updated_at', { ascending: false })
         if (error) throw error
         const ids = (rows || []).map((row: any) => row.id)
         let messageRows: any[] = []
@@ -91,7 +92,7 @@ export function useAperonixChats() {
     }
     void load()
     return () => { cancelled = true }
-  }, [])
+  }, [includeArchived])
 
   const persistConversation = useCallback(async (conversation: AperonixConversation) => {
     const supabase = createClient()
