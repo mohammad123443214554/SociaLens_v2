@@ -46,18 +46,18 @@ export function ReelsFeed({ reels, isLoading, onLoadMore, hasMore, isLoadingMore
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center bg-black">
-        <LoadingSpinner className="text-white" />
+      <div className="flex h-full items-center justify-center bg-background text-foreground">
+        <LoadingSpinner className="text-primary" />
       </div>
     )
   }
 
   if (reels.length === 0) {
     return (
-      <div className="flex flex-col h-full items-center justify-center bg-black text-white gap-3">
+      <div className="flex flex-col h-full items-center justify-center bg-background text-foreground gap-3">
         <div className="text-5xl">🎬</div>
         <p className="font-semibold">No reels yet</p>
-        <p className="text-sm text-white/50">Be the first to upload!</p>
+        <p className="text-sm text-muted-foreground">Be the first to upload!</p>
       </div>
     )
   }
