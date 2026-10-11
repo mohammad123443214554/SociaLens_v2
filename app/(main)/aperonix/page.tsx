@@ -551,7 +551,7 @@ export default function AperonixPage() {
     <div className="flex h-[100dvh] lg:h-[calc(100vh-56px)] min-h-0 overflow-hidden">
       {/* History panel */}
       <div className={`
-        fixed md:static inset-y-0 left-0 z-30 w-72 bg-card border-r flex-col
+        fixed md:static top-14 bottom-0 md:inset-y-auto left-0 z-30 w-72 bg-card border-r flex-col transition-transform duration-200 ease-out
         ${showHistory ? 'flex' : 'hidden md:flex'}
       `}>
         <div className="p-3 border-b flex items-center justify-between">
@@ -607,10 +607,10 @@ export default function AperonixPage() {
 
                   {openMenuId === convo.id && (
                     <>
-                      <div className="fixed inset-0 z-30" onClick={e => { e.stopPropagation(); setOpenMenuId(null) }} />
+                      <div className="fixed inset-0 z-10" onClick={e => { e.stopPropagation(); setOpenMenuId(null) }} />
                       <div
                         onClick={e => e.stopPropagation()}
-                        className="absolute right-0 top-7 z-40 w-56 bg-card border rounded-xl shadow-xl overflow-hidden text-foreground"
+                        className="absolute right-0 top-7 z-20 w-56 bg-card border border-border rounded-xl shadow-xl overflow-hidden text-foreground"
                       >
                         <button
                           onClick={() => { togglePinConversation(convo.id); setOpenMenuId(null) }}
