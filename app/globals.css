@@ -169,16 +169,16 @@ html:not(.dark) body textarea.bg-slate-900::placeholder {
   color: hsl(var(--muted-foreground));
 }
 
-html:not(.dark) body .hover\\:bg-white\\/10:hover,
-html:not(.dark) body .hover\\:bg-white\\/\\[0\\.045\\]:hover {
+html:not(.dark) body .hover\:bg-white\/10:hover,
+html:not(.dark) body .hover\:bg-white\/\[0\.045\]:hover {
   background-color: hsl(var(--accent));
   color: hsl(var(--accent-foreground));
 }
 
-html:not(.dark) body .bg-slate-950\\/95 {
+html:not(.dark) body .bg-slate-950\/95 {
   background-color: hsl(var(--card) / 0.97);
 }
 
-html:not(.dark) body .bg-slate-950\\/75 {
+html:not(.dark) body .bg-slate-950\/75 {
   background-color: rgb(15 23 42 / 0.35);
 }
