@@ -160,6 +160,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
     setError(null)
     const supabase = createClient()
     let uploadedPaths: string[] = []
+    let databaseSaved = false
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       if (authError || !user) throw new Error('Please sign in to save a wallpaper.')
@@ -220,6 +221,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
         updated_at: new Date().toISOString(),
       }, { onConflict: 'conversation_id' })
       if (saveError) throw saveError
+      databaseSaved = true
 
       const [originalUrl, processedUrl] = await Promise.all([
         supabase.storage.from(BUCKET).createSignedUrl(originalPath, 60 * 60),
@@ -247,7 +249,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
         if (oldPaths.length) await supabase.storage.from(BUCKET).remove(oldPaths)
       }
     } catch (cause) {
-      if (uploadedPaths.length) await supabase.storage.from(BUCKET).remove(uploadedPaths)
+      if (uploadedPaths.length && !databaseSaved) await supabase.storage.from(BUCKET).remove(uploadedPaths)
       setError(cause instanceof Error ? cause.message : 'Could not save this wallpaper. Try again.')
     } finally {
       setSaving(false)
