@@ -102,3 +102,83 @@ body::-webkit-scrollbar,
 .animate-repost-spin {
   animation: repost-spin 0.5s ease-out;
 }
+
+
+/*
+ * App-wide light-theme compatibility for older screens that still use
+ * fixed dark Tailwind neutrals instead of the shared semantic color tokens.
+ * Brand gradients, logos, photos, videos, canvases, and wallpaper backgrounds
+ * are intentionally not filtered or recolored.
+ */
+html:not(.dark) body .bg-slate-950,
+html:not(.dark) body .bg-slate-900,
+html:not(.dark) body .bg-slate-800,
+html:not(.dark) body .bg-gray-950,
+html:not(.dark) body .bg-gray-900,
+html:not(.dark) body .bg-gray-800,
+html:not(.dark) body .bg-zinc-950,
+html:not(.dark) body .bg-zinc-900,
+html:not(.dark) body .bg-zinc-800 {
+  background-color: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+}
+
+html:not(.dark) body .border-white\/10,
+html:not(.dark) body .border-white\/\[0\.08\],
+html:not(.dark) body .border-white\/\[0\.06\],
+html:not(.dark) body .border-white\/\[0\.04\] {
+  border-color: hsl(var(--border));
+}
+
+html:not(.dark) body .bg-white\/\[0\.035\],
+html:not(.dark) body .bg-white\/\[0\.025\] {
+  background-color: hsl(var(--muted));
+}
+
+html:not(.dark) body .text-slate-100,
+html:not(.dark) body .text-slate-200,
+html:not(.dark) body .text-slate-300,
+html:not(.dark) body .text-gray-100,
+html:not(.dark) body .text-gray-200,
+html:not(.dark) body .text-gray-300,
+html:not(.dark) body .text-zinc-100,
+html:not(.dark) body .text-zinc-200,
+html:not(.dark) body .text-zinc-300 {
+  color: hsl(var(--foreground));
+}
+
+html:not(.dark) body .text-slate-400,
+html:not(.dark) body .text-slate-500,
+html:not(.dark) body .text-gray-400,
+html:not(.dark) body .text-gray-500,
+html:not(.dark) body .text-zinc-400,
+html:not(.dark) body .text-zinc-500 {
+  color: hsl(var(--muted-foreground));
+}
+
+html:not(.dark) body input.bg-slate-900,
+html:not(.dark) body textarea.bg-slate-900,
+html:not(.dark) body select.bg-slate-900 {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+html:not(.dark) body input.bg-slate-900::placeholder,
+html:not(.dark) body textarea.bg-slate-900::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
+html:not(.dark) body .hover\\:bg-white\\/10:hover,
+html:not(.dark) body .hover\\:bg-white\\/\\[0\\.045\\]:hover {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+html:not(.dark) body .bg-slate-950\\/95 {
+  background-color: hsl(var(--card) / 0.97);
+}
+
+html:not(.dark) body .bg-slate-950\\/75 {
+  background-color: rgb(15 23 42 / 0.35);
+}
