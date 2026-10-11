@@ -222,7 +222,7 @@ export default function ArchivePage() {
             </section>
           )}
           {(aperonixChats.length === 0 || chats.length === 0 || activeSection === 'users') && chats.length > 0 && <div className="space-y-1">
-          {chats.map(chat => {}
+          {chats.map(chat => {
             const other = getOther(chat)
             const isPinned = chat.pinned_by?.includes(user.id) ?? false
             const iBlockedThem = blockedRelations.has(other?.id || '')
