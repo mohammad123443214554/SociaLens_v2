@@ -509,7 +509,7 @@ export default function AperonixPage() {
                         >
                           <PencilLine className="h-3.5 w-3.5" /> Rename
                         </button>
-                        <ChatWallpaperControls conversationId={convo.id === activeId ? activeId : convo.id} wallpaper={convo.id === activeId ? wallpaper : null} onWallpaperChange={setWallpaper} />
+                        <ChatWallpaperControls conversationId={convo.id} wallpaper={convo.id === activeId ? wallpaper : null} isActive={convo.id === activeId} onWallpaperChange={setWallpaper} />
                         <button
                           onClick={() => handleConnectAsNewChat(convo.id)}
                           className="w-full flex items-center gap-2.5 whitespace-nowrap px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
