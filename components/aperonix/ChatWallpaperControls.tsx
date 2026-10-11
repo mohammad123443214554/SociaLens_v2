@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ImagePlus, SlidersHorizontal, X, Trash2, ZoomIn, MoveHorizontal, MoveVertical, UploadCloud } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -316,8 +317,8 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
         </button>
       )}
 
-      {uploadOpen && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/65 p-4" onClick={() => setUploadOpen(false)}>
+      {uploadOpen && typeof document !== 'undefined' && createPortal((
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/65 p-4" onClick={() => setUploadOpen(false)}>
           <section className="w-full max-w-md rounded-2xl border border-white/10 bg-card p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
             <div className="mb-4 flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-purple-500 text-white"><ImagePlus className="h-5 w-5" /></span>
@@ -331,11 +332,12 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
             <div className="mt-4 flex justify-end"><button type="button" onClick={() => setUploadOpen(false)} className="rounded-xl px-4 py-2 text-sm hover:bg-muted">Cancel</button></div>
           </section>
         </div>
-      )}
+      ), document.body)}
 
-      {open && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/75 p-3 sm:p-6" onClick={() => !saving && setOpen(false)}>
-          <section className="flex max-h-[94dvh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-card shadow-2xl" onClick={event => event.stopPropagation()}>
+      {open && typeof document !== 'undefined' && createPortal((
+
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 p-3 sm:p-6" onClick={() => !saving && setOpen(false)}>
+          <section className="flex max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-card shadow-2xl" onClick={event => event.stopPropagation()}>
             <header className="flex items-center gap-3 border-b border-border px-5 py-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500/20 to-purple-500/20 text-pink-500"><ImagePlus className="h-5 w-5" /></div>
               <div className="min-w-0 flex-1"><h2 className="font-semibold">Chat wallpaper editor</h2><p className="text-xs text-muted-foreground">Set the crop and preview each filter on your photo</p></div>
@@ -359,7 +361,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={draft.originalDataUrl} alt="Wallpaper preview" className="absolute inset-0 h-full w-full object-cover" style={{ filter: FILTERS[draft.filterIndex]?.css || 'none', objectPosition: draft.positionX + '% ' + draft.positionY + '%', transform: 'scale(' + draft.zoom / 100 + ')' }} />
-                    <div className="pointer-events-none absolute inset-0 bg-slate-950/40" />
+                    <div className="pointer-events-none absolute inset-0 bg-slate-950/10" />
                     <div className="absolute bottom-3 left-3 rounded-lg border border-white/20 bg-slate-950/55 px-3 py-2 text-xs text-white backdrop-blur-sm">Chat wallpaper preview</div>
                   </>
                 ) : <button type="button" onClick={() => fileRef.current?.click()} className="flex h-full w-full flex-col items-center justify-center gap-2 p-6"><ImagePlus className="h-8 w-8 text-pink-500" /><span className="text-sm">Choose a photo to start</span></button>}
@@ -384,7 +386,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
             </footer>
           </section>
         </div>
-      )}
+      ), document.body)}
     </>
   )
 }
