@@ -139,18 +139,18 @@ export function PhotoEditorModal({ variant, onDone, onClose, saving }: PhotoEdit
   const busy = saving || baking
 
   return (
-    <div className="fixed inset-0 bg-black z-[140] flex flex-col">
+    <div className="fixed inset-0 z-[140] flex flex-col bg-background text-foreground">
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
 
       {!file ? (
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-6 w-6 text-white animate-spin" />
+          <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
         </div>
       ) : (
         <>
           <div className="flex items-center justify-between px-4 py-3 shrink-0">
-            <button onClick={handleCancel} className="text-white text-sm font-medium">Cancel</button>
-            <p className="text-white text-sm font-semibold">{variant === 'avatar' ? 'Edit profile photo' : 'Edit cover photo'}</p>
+            <button onClick={handleCancel} className="text-muted-foreground hover:text-foreground text-sm font-medium">Cancel</button>
+            <p className="text-foreground text-sm font-semibold">{variant === 'avatar' ? 'Edit profile photo' : 'Edit cover photo'}</p>
             <button onClick={handleDone} disabled={busy} className="text-pink-400 text-sm font-semibold disabled:opacity-50">
               {busy ? 'Saving...' : 'Done'}
             </button>
@@ -158,7 +158,7 @@ export function PhotoEditorModal({ variant, onDone, onClose, saving }: PhotoEdit
 
           <div
             ref={dragAreaRef}
-            className={`relative overflow-hidden touch-none select-none mx-auto w-full ${variant === 'avatar' ? 'max-w-sm aspect-square' : 'aspect-[3/1]'}`}
+            className={`relative overflow-hidden touch-none select-none mx-auto w-full bg-muted ${variant === 'avatar' ? 'max-w-sm aspect-square' : 'aspect-[3/1]'}`}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={stopDragging}
@@ -193,7 +193,7 @@ export function PhotoEditorModal({ variant, onDone, onClose, saving }: PhotoEdit
             />
           </div>
 
-          <div className="shrink-0 border-t border-white/10 py-3">
+          <div className="shrink-0 border-t border-border py-3">
             <div className="flex gap-3 overflow-x-auto px-4 pb-1">
               {PHOTO_FILTERS.map(f => (
                 <button
@@ -211,7 +211,7 @@ export function PhotoEditorModal({ variant, onDone, onClose, saving }: PhotoEdit
                       />
                     )}
                   </div>
-                  <span className={`text-[10px] ${filterId === f.id ? 'text-pink-400 font-semibold' : 'text-white/70'}`}>{f.name}</span>
+                  <span className={`text-[10px] ${filterId === f.id ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>{f.name}</span>
                 </button>
               ))}
             </div>
