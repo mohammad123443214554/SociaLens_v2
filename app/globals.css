@@ -135,24 +135,24 @@ html:not(.dark) body .bg-white\/\[0\.025\] {
   background-color: hsl(var(--muted));
 }
 
-html:not(.dark) body .text-slate-100,
-html:not(.dark) body .text-slate-200,
-html:not(.dark) body .text-slate-300,
-html:not(.dark) body .text-gray-100,
-html:not(.dark) body .text-gray-200,
-html:not(.dark) body .text-gray-300,
-html:not(.dark) body .text-zinc-100,
-html:not(.dark) body .text-zinc-200,
-html:not(.dark) body .text-zinc-300 {
+html:not(.dark) body [role="dialog"] .text-slate-100,
+html:not(.dark) body [role="dialog"] .text-slate-200,
+html:not(.dark) body [role="dialog"] .text-slate-300,
+html:not(.dark) body [role="dialog"] .text-gray-100,
+html:not(.dark) body [role="dialog"] .text-gray-200,
+html:not(.dark) body [role="dialog"] .text-gray-300,
+html:not(.dark) body [role="dialog"] .text-zinc-100,
+html:not(.dark) body [role="dialog"] .text-zinc-200,
+html:not(.dark) body [role="dialog"] .text-zinc-300 {
   color: hsl(var(--foreground));
 }
 
-html:not(.dark) body .text-slate-400,
-html:not(.dark) body .text-slate-500,
-html:not(.dark) body .text-gray-400,
-html:not(.dark) body .text-gray-500,
-html:not(.dark) body .text-zinc-400,
-html:not(.dark) body .text-zinc-500 {
+html:not(.dark) body [role="dialog"] .text-slate-400,
+html:not(.dark) body [role="dialog"] .text-slate-500,
+html:not(.dark) body [role="dialog"] .text-gray-400,
+html:not(.dark) body [role="dialog"] .text-gray-500,
+html:not(.dark) body [role="dialog"] .text-zinc-400,
+html:not(.dark) body [role="dialog"] .text-zinc-500 {
   color: hsl(var(--muted-foreground));
 }
 
