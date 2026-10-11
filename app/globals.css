@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -27,6 +28,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
@@ -103,12 +105,10 @@ body::-webkit-scrollbar,
   animation: repost-spin 0.5s ease-out;
 }
 
-
 /*
- * App-wide light-theme compatibility for older screens that still use
- * fixed dark Tailwind neutrals instead of the shared semantic color tokens.
- * Brand gradients, logos, photos, videos, canvases, and wallpaper backgrounds
- * are intentionally not filtered or recolored.
+ * Compatibility for legacy dark-neutral utility classes in light mode.
+ * Keep this list narrow: intentional branded UI and user media should not
+ * be globally filtered or inverted.
  */
 html:not(.dark) body .bg-slate-950,
 html:not(.dark) body .bg-slate-900,
