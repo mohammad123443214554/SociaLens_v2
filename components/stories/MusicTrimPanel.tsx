@@ -97,8 +97,8 @@ export function MusicTrimPanel({ song, initialStart, initialDuration, sceneDurat
   return (
     // Small, compact, floats near the bottom (above the timeline/footer)
     // instead of a big banner - closer to how Facebook/Instagram do it.
-    <div className="fixed bottom-24 left-4 right-4 z-[110] bg-[#1c1c1e] rounded-2xl shadow-2xl px-3 py-2.5 space-y-2">
-      <p className="text-white text-xs font-medium truncate px-1">{song.title} &middot; {song.artist}</p>
+    <div className="fixed bottom-24 left-4 right-4 z-[110] bg-card text-card-foreground border border-border rounded-2xl shadow-2xl px-3 py-2.5 space-y-2">
+      <p className="text-foreground text-xs font-medium truncate px-1">{song.title} &middot; {song.artist}</p>
       <div className="flex items-center gap-2">
         <button
           onClick={togglePreview}
@@ -108,11 +108,11 @@ export function MusicTrimPanel({ song, initialStart, initialDuration, sceneDurat
         </button>
 
         {/* Compact waveform + trim window */}
-        <div ref={trackRef} className="relative flex-1 h-9 rounded-lg bg-black/40 overflow-hidden touch-none" onPointerMove={onDragMove} onPointerUp={endDrag}>
+        <div ref={trackRef} className="relative flex-1 h-9 rounded-lg bg-muted overflow-hidden touch-none" onPointerMove={onDragMove} onPointerUp={endDrag}>
           {/* Waveform bars */}
           <div className="absolute inset-0 flex items-center justify-between px-1 gap-[1.5px]">
             {BAR_HEIGHTS.map((h, i) => (
-              <span key={i} className="flex-1 bg-white/25 rounded-full" style={{ height: `${h}%` }} />
+              <span key={i} className="flex-1 bg-muted-foreground/30 rounded-full" style={{ height: `${h}%` }} />
             ))}
           </div>
           {/* Trim window */}
@@ -126,7 +126,7 @@ export function MusicTrimPanel({ song, initialStart, initialDuration, sceneDurat
             {/* Playhead - shows exactly how far playback has gotten */}
             {playing && (
               <div
-                className="absolute top-0 bottom-0 w-[2px] bg-white shadow-[0_0_4px_rgba(255,255,255,0.9)]"
+                className="absolute top-0 bottom-0 w-[2px] bg-foreground shadow-sm"
                 style={{ left: `${Math.min(100, Math.max(0, playheadPct))}%` }}
               />
             )}
@@ -135,14 +135,14 @@ export function MusicTrimPanel({ song, initialStart, initialDuration, sceneDurat
 
         <button
           onClick={() => { setStart(0); setDuration(Math.min(sceneDuration, CLIP_LENGTH)); stopAudio() }}
-          className="h-9 w-9 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-white"
+          className="h-9 w-9 shrink-0 rounded-full bg-muted flex items-center justify-center text-foreground"
           title="Reset"
         >
           <RotateCcw className="h-4 w-4" />
         </button>
         <button
           onClick={() => { stopAudio(); onDone(start, duration) }}
-          className="h-9 w-9 shrink-0 rounded-full bg-white flex items-center justify-center text-black"
+          className="h-9 w-9 shrink-0 rounded-full bg-primary flex items-center justify-center text-primary-foreground"
           title="Done"
         >
           <Check className="h-4 w-4" />
@@ -154,7 +154,7 @@ export function MusicTrimPanel({ song, initialStart, initialDuration, sceneDurat
       <div className="flex items-center gap-2 pt-0.5">
         <button
           onClick={() => { stopAudio(); onChangeSong() }}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/10 text-white text-xs font-medium hover:bg-white/20 transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-muted text-foreground text-xs font-medium hover:bg-accent transition-colors"
         >
           <RefreshCw className="h-3.5 w-3.5" /> Change Song
         </button>
