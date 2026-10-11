@@ -10,7 +10,7 @@ export default function ReelsPage() {
   const reels = data?.pages.flatMap(page => page.posts) ?? []
 
   return (
-    <div className="flex justify-center items-center bg-black h-[100dvh] lg:h-[calc(100vh-3.5rem)] overflow-hidden">
+    <div className="flex justify-center items-center bg-background h-[100dvh] lg:h-[calc(100vh-3.5rem)] overflow-hidden">
       {/* Edge-to-edge on mobile (matches every other reels/shorts app);
           a centered phone-width card only on desktop, where there's
           plenty of room around it. A fixed height here - never min-height
