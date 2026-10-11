@@ -12,6 +12,64 @@ import { speakText, stopSpeaking, isSpeechRecognitionSupported, createVoiceInput
 import { createClient } from '@/lib/supabase/client'
 import { ChatWallpaperControls, ChatWallpaper } from '@/components/aperonix/ChatWallpaperControls'
 
+type WallpaperCacheEntry = { wallpaper: ChatWallpaper | null; expiresAt: number }
+const wallpaperCache = new Map<string, WallpaperCacheEntry>()
+const wallpaperLoads = new Map<string, Promise<ChatWallpaper | null>>()
+
+async function loadConversationWallpaper(conversationId: string): Promise<ChatWallpaper | null> {
+  const cached = wallpaperCache.get(conversationId)
+  if (cached && cached.expiresAt > Date.now()) return cached.wallpaper
+  const inFlight = wallpaperLoads.get(conversationId)
+  if (inFlight) return inFlight
+
+  const load = (async (): Promise<ChatWallpaper | null> => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+    const { data, error } = await supabase
+      .from('aperonix_chat_wallpapers')
+      .select('original_storage_path,processed_storage_path,filter_index,zoom,position_x,position_y')
+      .eq('conversation_id', conversationId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (error) throw error
+    if (!data) {
+      wallpaperCache.set(conversationId, { wallpaper: null, expiresAt: Date.now() + 5 * 60 * 1000 })
+      return null
+    }
+    const [original, processed] = await Promise.all([
+      supabase.storage.from('aperonix-wallpapers').createSignedUrl(data.original_storage_path, 60 * 60),
+      supabase.storage.from('aperonix-wallpapers').createSignedUrl(data.processed_storage_path, 60 * 60),
+    ])
+    if (original.error || processed.error || !original.data?.signedUrl || !processed.data?.signedUrl) {
+      throw new Error('Could not load this chat wallpaper.')
+    }
+    const loaded: ChatWallpaper = {
+      originalDataUrl: original.data.signedUrl,
+      dataUrl: processed.data.signedUrl,
+      originalStoragePath: data.original_storage_path,
+      processedStoragePath: data.processed_storage_path,
+      filterIndex: data.filter_index,
+      zoom: data.zoom,
+      positionX: data.position_x,
+      positionY: data.position_y,
+    }
+    if (typeof window !== 'undefined') {
+      const image = new window.Image()
+      image.src = loaded.dataUrl
+      if (typeof image.decode === 'function') await image.decode().catch(() => undefined)
+      else await new Promise<void>(resolve => {
+        image.onload = () => resolve()
+        image.onerror = () => resolve()
+      })
+    }
+    wallpaperCache.set(conversationId, { wallpaper: loaded, expiresAt: Date.now() + 50 * 60 * 1000 })
+    return loaded
+  })()
+  wallpaperLoads.set(conversationId, load)
+  try { return await load } finally { wallpaperLoads.delete(conversationId) }
+}
+
 export default function AperonixPage() {
   const { user, profile } = useUser()
   const {
@@ -76,45 +134,32 @@ export default function AperonixPage() {
 
   useEffect(() => {
     let cancelled = false
-    const loadWallpaper = async () => {
-      if (!activeId) { setWallpaper(null); return }
-      try {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { setWallpaper(null); return }
-        const { data, error } = await supabase
-          .from('aperonix_chat_wallpapers')
-          .select('original_storage_path,processed_storage_path,filter_index,zoom,position_x,position_y')
-          .eq('conversation_id', activeId)
-          .eq('user_id', user.id)
-          .maybeSingle()
-        if (error) throw error
-        if (!data) { if (!cancelled) setWallpaper(null); return }
-        const [original, processed] = await Promise.all([
-          supabase.storage.from('aperonix-wallpapers').createSignedUrl(data.original_storage_path, 60 * 60),
-          supabase.storage.from('aperonix-wallpapers').createSignedUrl(data.processed_storage_path, 60 * 60),
-        ])
-        if (original.error || processed.error || !original.data?.signedUrl || !processed.data?.signedUrl) {
-          throw new Error('Could not load this chat wallpaper.')
-        }
-        if (!cancelled) setWallpaper({
-          originalDataUrl: original.data.signedUrl,
-          dataUrl: processed.data.signedUrl,
-          originalStoragePath: data.original_storage_path,
-          processedStoragePath: data.processed_storage_path,
-          filterIndex: data.filter_index,
-          zoom: data.zoom,
-          positionX: data.position_x,
-          positionY: data.position_y,
+    if (!activeId) {
+      setWallpaper(null)
+      return () => { cancelled = true }
+    }
+    const cached = wallpaperCache.get(activeId)
+    setWallpaper(cached && cached.expiresAt > Date.now() ? cached.wallpaper : null)
+    void loadConversationWallpaper(activeId).then(nextWallpaper => {
+      if (!cancelled) setWallpaper(nextWallpaper)
+    }).catch(error => {
+      console.error('Could not load chat wallpaper', error)
+      if (!cancelled) setWallpaper(null)
+    })
+    return () => { cancelled = true }
+
+
+
+  useEffect(() => {
+    if (!loaded || !user?.id || conversations.length === 0) return
+    for (const conversation of conversations) {
+      if (conversation.id !== activeId) {
+        void loadConversationWallpaper(conversation.id).catch(error => {
+          console.error('Could not prefetch chat wallpaper', error)
         })
-      } catch (error) {
-        console.error('Could not load chat wallpaper', error)
-        if (!cancelled) setWallpaper(null)
       }
     }
-    void loadWallpaper()
-    return () => { cancelled = true }
-  }, [activeId])
+  }, [loaded, user?.id, conversations, activeId])
 
   useEffect(() => {
     if (loaded && !activeId) {
