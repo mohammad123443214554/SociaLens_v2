@@ -34,9 +34,11 @@ type Props = {
   conversationId: string | null
   wallpaper: ChatWallpaper | null
   onWallpaperChange: (wallpaper: ChatWallpaper | null) => void
+  isActive: boolean
 }
 
-export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperChange }: Props) {
+export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperChange, isActive }: Props) {
+  const [currentWallpaper, setCurrentWallpaper] = useState<ChatWallpaper | null>(wallpaper)
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<ChatWallpaper | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -46,7 +48,16 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
     setOpen(false)
     setDraft(null)
     setError(null)
-  }, [conversationId])
+    try {
+      const stored = conversationId ? localStorage.getItem(STORAGE_PREFIX + conversationId) : null
+      const next = stored ? JSON.parse(stored) as ChatWallpaper : null
+      setCurrentWallpaper(next)
+      if (isActive) onWallpaperChange(next)
+    } catch {
+      setCurrentWallpaper(null)
+      if (isActive) onWallpaperChange(null)
+    }
+  }, [conversationId, isActive, onWallpaperChange])
 
   const pickFile = (file?: File) => {
     if (!file) return
@@ -94,7 +105,8 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
       context.drawImage(image, 0, 0, canvas.width, canvas.height)
       const saved = { ...draft, dataUrl: canvas.toDataURL('image/jpeg', 0.82) }
       localStorage.setItem(STORAGE_PREFIX + conversationId, JSON.stringify(saved))
-      onWallpaperChange(saved)
+      setCurrentWallpaper(saved)
+      if (isActive) onWallpaperChange(saved)
       setOpen(false)
       setError(null)
     } catch (cause) {
@@ -105,7 +117,8 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
   const remove = () => {
     if (!conversationId) return
     localStorage.removeItem(STORAGE_PREFIX + conversationId)
-    onWallpaperChange(null)
+    setCurrentWallpaper(null)
+    if (isActive) onWallpaperChange(null)
     setDraft(null)
     setOpen(false)
   }
@@ -114,13 +127,13 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
     <>
       <button
         type="button"
-        onClick={() => { setDraft(wallpaper ? { ...wallpaper } : null); setError(null); setOpen(true) }}
+        onClick={() => { setDraft(currentWallpaper ? { ...currentWallpaper } : null); setError(null); setOpen(true) }}
         className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
       >
-        {wallpaper ? <SlidersHorizontal className="h-3.5 w-3.5" /> : <ImagePlus className="h-3.5 w-3.5" />}
-        {wallpaper ? 'Edit wallpaper' : 'Add wallpaper'}
+        {currentWallpaper ? <SlidersHorizontal className="h-3.5 w-3.5" /> : <ImagePlus className="h-3.5 w-3.5" />}
+        {currentWallpaper ? 'Edit wallpaper' : 'Add wallpaper'}
       </button>
-      {wallpaper && (
+      {currentWallpaper && (
         <button type="button" onClick={remove} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-500/10 transition-colors">
           <Trash2 className="h-3.5 w-3.5" /> Remove wallpaper
         </button>
