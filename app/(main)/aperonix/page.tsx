@@ -556,7 +556,7 @@ export default function AperonixPage() {
     <div className="flex h-[100dvh] lg:h-[calc(100vh-56px)] min-h-0 overflow-hidden">
       {/* History panel */}
       <div className={`
-        fixed md:static top-14 bottom-0 md:inset-y-auto left-0 z-[100] w-72 max-w-[85vw] bg-card border-r flex-col transition-transform duration-200 ease-out
+        fixed md:static inset-y-0 md:inset-y-auto left-0 z-[100] w-72 max-w-[85vw] bg-card border-r flex-col transition-transform duration-200 ease-out
         ${showHistory ? 'flex' : 'hidden md:flex'}
       `}>
         <div className="p-3 border-b flex items-center justify-between">
@@ -571,7 +571,7 @@ export default function AperonixPage() {
         >
           <Plus className="h-4 w-4" /> New chat
         </button>}
-        <div className="flex-1 min-h-0 overflow-y-auto px-2 space-y-1">
+        <div className="flex-1 min-h-0 overflow-y-auto px-2 pt-2 space-y-1">
           {conversations.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-8 px-4">{isArchiveMode ? 'No archived Aperonix chats.' : 'No chats yet. Start a conversation with Aperonix!'}</p>
           ) : conversations.map(convo => (
