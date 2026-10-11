@@ -140,8 +140,8 @@ export default function ArchivePage() {
           {(chats.length === 0 || aperonixChats.length === 0 || activeSection === 'aperonix') && aperonixChats.length > 0 && (
             <section className="border-b border-border">
               {aperonixChats.map(conversation => (
-                <div key={conversation.id} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60">
-                  <button onClick={() => router.push(`/aperonix?archive=1&chatId=${conversation.id}`)} aria-label="Open Aperonix conversation" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><MessageSquare className="h-5 w-5" /></button>
+                <div key={conversation.id} role="button" tabIndex={0} onClick={() => router.push(`/aperonix?archive=1&chatId=${conversation.id}`)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); router.push(`/aperonix?archive=1&chatId=${conversation.id}`) } }} className="group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  <button onClick={event => { event.stopPropagation(); router.push(`/aperonix?archive=1&chatId=${conversation.id}`) }} aria-label="Open Aperonix conversation" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><MessageSquare className="h-5 w-5" /></button>
                   <div className="min-w-0 flex-1">
                     {renamingAperonixId === conversation.id ? (
                       <form className="flex items-center gap-1.5" onSubmit={async event => {
@@ -162,7 +162,7 @@ export default function ArchivePage() {
                     ) : <button onClick={() => router.push(`/aperonix?archive=1&chatId=${conversation.id}`)} className="block max-w-full truncate text-left text-sm font-medium hover:text-primary">{conversation.title || 'Aperonix conversation'}</button>}
                     <p className="mt-0.5 text-xs text-muted-foreground">Archived {new Date(conversation.updated_at).toLocaleDateString()}</p>
                   </div>
-                  <div className="relative shrink-0">
+                  <div className="relative shrink-0" onClick={event => event.stopPropagation()}>
                     <button onClick={() => setOpenAperonixMenuId(current => current === conversation.id ? null : conversation.id)} aria-label="Conversation options" aria-expanded={openAperonixMenuId === conversation.id} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"><MoreVertical className="h-4 w-4" /></button>
                     {openAperonixMenuId === conversation.id && <>
                       <button aria-label="Close conversation menu" className="fixed inset-0 z-30 cursor-default" onClick={() => setOpenAperonixMenuId(null)} />
