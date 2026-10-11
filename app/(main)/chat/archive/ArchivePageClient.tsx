@@ -25,7 +25,7 @@ export default function ArchivePage() {
   const router = useRouter()
   const supabase = createClient()
   const [chats, setChats] = useState<ChatRow[]>([])
-  const [aperonixChats, setAperonixChats] = useState<{ id: string; title: string; updated_at: string }[]>([])
+  const [aperonixChats, setAperonixChats] = useState<{ id: string; title: string; updated_at: string; pinned: boolean }[]>([])
   const [restoringAperonixId, setRestoringAperonixId] = useState<string | null>(null)
   const [openAperonixMenuId, setOpenAperonixMenuId] = useState<string | null>(null)
   const [renamingAperonixId, setRenamingAperonixId] = useState<string | null>(null)
@@ -68,7 +68,7 @@ export default function ArchivePage() {
 
     const { data: archivedAperonix, error: aperonixError } = await supabase
       .from('aperonix_conversations')
-      .select('id,title,updated_at')
+      .select('id,title,updated_at,pinned')
       .eq('user_id', user.id)
       .not('archived_at', 'is', null)
       .order('archived_at', { ascending: false })
@@ -141,7 +141,7 @@ export default function ArchivePage() {
               </div>}
               {aperonixChats.map(conversation => (
                 <div key={conversation.id} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60">
-                  <button onClick={() => router.push('/aperonix')} aria-label="Open Aperonix" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><MessageSquare className="h-5 w-5" /></button>
+                  <button onClick={async () => { const { error } = await supabase.from('aperonix_conversations').update({ archived_at: null, updated_at: new Date().toISOString() }).eq('id', conversation.id).eq('user_id', user.id); if (error) { alert('Could not open this conversation. Please try again.'); return } router.push(`/aperonix?chatId=${conversation.id}`) }} aria-label="Open Aperonix conversation" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><MessageSquare className="h-5 w-5" /></button>
                   <div className="min-w-0 flex-1">
                     {renamingAperonixId === conversation.id ? (
                       <form className="flex items-center gap-1.5" onSubmit={async event => {
@@ -159,7 +159,7 @@ export default function ArchivePage() {
                         <button type="submit" disabled={savingAperonixId === conversation.id} aria-label="Save title" className="rounded-lg p-1.5 text-primary hover:bg-accent"><Check className="h-4 w-4" /></button>
                         <button type="button" onClick={() => setRenamingAperonixId(null)} aria-label="Cancel rename" className="rounded-lg p-1.5 hover:bg-accent"><X className="h-4 w-4" /></button>
                       </form>
-                    ) : <p className="truncate text-sm font-medium">{conversation.title || 'Aperonix conversation'}</p>}
+                    ) : <button onClick={async () => { const { error } = await supabase.from('aperonix_conversations').update({ archived_at: null, updated_at: new Date().toISOString() }).eq('id', conversation.id).eq('user_id', user.id); if (error) { alert('Could not open this conversation. Please try again.'); return } router.push(`/aperonix?chatId=${conversation.id}`) }} className="block max-w-full truncate text-left text-sm font-medium hover:text-primary">{conversation.title || 'Aperonix conversation'}</button>}
                     <p className="mt-0.5 text-xs text-muted-foreground">Archived {new Date(conversation.updated_at).toLocaleDateString()}</p>
                   </div>
                   <div className="relative shrink-0">
@@ -173,6 +173,7 @@ export default function ArchivePage() {
                           if (!error) {
                             const update = await supabase.from('aperonix_conversations').update({ pinned: !data.pinned, updated_at: new Date().toISOString() }).eq('id', conversation.id).eq('user_id', user.id)
                             if (update.error) alert('Could not update the pin. Please try again.')
+                            else setAperonixChats(prev => prev.map(item => item.id === conversation.id ? { ...item, pinned: !data.pinned } : item))
                           } else alert('Could not update the pin. Please try again.')
                           setSavingAperonixId(null); setOpenAperonixMenuId(null)
                         }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted"><Pin className="h-3.5 w-3.5" /> Pin</button>
