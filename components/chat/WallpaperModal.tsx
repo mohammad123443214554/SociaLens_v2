@@ -96,7 +96,7 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-[140] flex flex-col">
+    <div className="fixed inset-0 z-[140] flex flex-col bg-background text-foreground">
       {/* Hidden native file input - this is what opens the device's photo picker */}
       <input
         ref={fileInputRef}
@@ -109,15 +109,15 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
       {!previewUrl ? (
         // Waiting on the OS picker - nothing to show, it's a native popup.
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-6 w-6 text-white/60 animate-spin" />
+          <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
         </div>
       ) : (
         <>
           <div className="flex items-center justify-between px-4 py-3">
-            <button onClick={handleCancel} className="text-white/80 hover:text-white p-1">
+            <button onClick={handleCancel} className="text-muted-foreground hover:text-foreground p-1">
               <X className="h-6 w-6" />
             </button>
-            <p className="text-white text-sm font-medium flex items-center gap-1.5">
+            <p className="text-foreground text-sm font-medium flex items-center gap-1.5">
               <Move className="h-3.5 w-3.5" /> Drag to adjust
             </p>
             <div className="w-8" />
@@ -145,7 +145,7 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
             <button
               onClick={handleCancel}
               disabled={saving}
-              className="flex-1 py-3 rounded-xl bg-white/10 text-white font-medium disabled:opacity-40"
+              className="flex-1 py-3 rounded-xl bg-muted text-foreground hover:bg-accent font-medium transition-colors disabled:opacity-40"
             >
               Cancel
             </button>
