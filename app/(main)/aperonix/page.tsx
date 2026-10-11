@@ -77,6 +77,7 @@ export default function AperonixPage() {
   const { user, profile } = useUser()
   const searchParams = useSearchParams()
   const requestedChatId = searchParams.get('chatId')
+  const isArchiveMode = searchParams.get('archive') === '1'
   const {
     conversations,
     activeId,
@@ -93,7 +94,7 @@ export default function AperonixPage() {
     replaceMessageContent,
     setMessageFeedback,
     loaded,
-  } = useAperonixChats()
+  } = useAperonixChats({ includeArchived: isArchiveMode })
 
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -342,18 +343,28 @@ export default function AperonixPage() {
   }
 
   const handleNewChat = () => {
+    if (isArchiveMode) return
     createConversation()
     setShowHistory(false)
   }
 
   const handleArchiveConversation = async (id: string) => {
     try {
+      if (isArchiveMode) {
+        const supabase = createClient()
+        const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
+        if (authError || !currentUser) throw new Error('Please sign in again before restoring this chat.')
+        const { error } = await supabase.from('aperonix_conversations').update({ archived_at: null, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', currentUser.id)
+        if (error) throw error
+        window.location.href = '/chat/archive'
+        return
+      }
       await archiveConversation(id)
       setArchiveConfirmId(null)
       setShowArchivePasswordWizard(false)
       setOpenMenuId(null)
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Could not archive this conversation. Please try again.')
+      alert(error instanceof Error ? error.message : 'Could not update this conversation. Please try again.')
     }
   }
 
@@ -544,20 +555,20 @@ export default function AperonixPage() {
         ${showHistory ? 'flex' : 'hidden md:flex'}
       `}>
         <div className="p-3 border-b flex items-center justify-between">
-          <p className="font-semibold text-sm">All Chats</p>
+          <p className="font-semibold text-sm">{isArchiveMode ? 'Archived Chats' : 'All Chats'}</p>
           <button onClick={() => setShowHistory(false)} className="md:hidden text-muted-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
-        <button
+        {!isArchiveMode && <button
           onClick={handleNewChat}
           className="m-3 flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-dashed border-pink-500/30 hover:border-pink-500 hover:bg-pink-500/5 text-pink-500 text-sm font-medium transition-colors"
         >
           <Plus className="h-4 w-4" /> New chat
-        </button>
+        </button>}
         <div className="flex-1 min-h-0 overflow-y-auto px-2 space-y-1">
           {conversations.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-8 px-4">No chats yet. Start a conversation with Aperonix!</p>
+            <p className="text-xs text-muted-foreground text-center py-8 px-4">{isArchiveMode ? 'No archived Aperonix chats.' : 'No chats yet. Start a conversation with Aperonix!'}</p>
           ) : conversations.map(convo => (
             <div
               key={convo.id}
@@ -614,12 +625,12 @@ export default function AperonixPage() {
                           <PencilLine className="h-3.5 w-3.5" /> Rename
                         </button>
                         <ChatWallpaperControls conversationId={convo.id} wallpaper={convo.id === activeId ? wallpaper : null} isActive={convo.id === activeId} onWallpaperChange={setWallpaper} />
-                        <button
+                        {!isArchiveMode && <button
                           onClick={() => handleConnectAsNewChat(convo.id)}
                           className="w-full flex items-center gap-2.5 whitespace-nowrap px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
                         >
                           <Link2 className="h-3.5 w-3.5 shrink-0" /> Connect with new chat
-                        </button>
+                        </button>}
                         <button
                           onClick={() => handleShareChat(convo)}
                           className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
@@ -627,10 +638,10 @@ export default function AperonixPage() {
                           <Forward className="h-3.5 w-3.5" /> Share Chat
                         </button>
                         <button
-                          onClick={() => { setArchiveConfirmId(convo.id); setOpenMenuId(null) }}
+                          onClick={() => { if (isArchiveMode) void handleArchiveConversation(convo.id); else { setArchiveConfirmId(convo.id); setOpenMenuId(null) } }}
                           className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
                         >
-                          <Archive className="h-3.5 w-3.5" /> Archive Chat
+                          <Archive className="h-3.5 w-3.5" /> {isArchiveMode ? 'Unarchive Chat' : 'Archive Chat'}
                         </button>
                         <button
                           onClick={async () => { setOpenMenuId(null); try { await deleteConversation(convo.id) } catch (error) { alert(error instanceof Error ? error.message : 'Could not delete this chat and its files.') } }}
@@ -1009,7 +1020,7 @@ export default function AperonixPage() {
         />
       )}
 
-      {archiveConfirmId && (
+      {!isArchiveMode && archiveConfirmId && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]" onClick={() => setArchiveConfirmId(null)}>
           <div role="dialog" aria-modal="true" aria-labelledby="archive-aperonix-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl" onClick={event => event.stopPropagation()}>
             <div className="flex items-start gap-3 border-b border-border p-5">
@@ -1030,7 +1041,7 @@ export default function AperonixPage() {
         </div>
       )}
 
-      {showArchivePasswordWizard && archiveConfirmId && (
+      {!isArchiveMode && showArchivePasswordWizard && archiveConfirmId && (
         <ArchivePasswordWizard
           onClose={() => setShowArchivePasswordWizard(false)}
           onDone={() => { setShowArchivePasswordWizard(false); void handleArchiveConversation(archiveConfirmId) }}
