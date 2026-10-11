@@ -297,6 +297,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
 
   return (
     <>
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={event => { pickFile(event.target.files?.[0]); event.currentTarget.value = '' }} />
       <button
         type="button"
         onClick={() => {
@@ -341,7 +342,6 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
               <button type="button" disabled={saving} onClick={() => setOpen(false)} aria-label="Close wallpaper editor" className="rounded-xl p-2 hover:bg-muted disabled:opacity-40"><X className="h-4 w-4" /></button>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
-              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={event => { pickFile(event.target.files?.[0]); event.currentTarget.value = '' }} />
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border p-3">
                 <div className="flex items-center gap-2 text-sm font-medium"><SlidersHorizontal className="h-4 w-4 text-pink-500" /> Photo positioning</div>
                 <button type="button" onClick={() => fileRef.current?.click()} className="rounded-full border border-pink-500/30 px-3 py-1.5 text-xs text-pink-500 hover:bg-pink-500/10">Change photo</button>
