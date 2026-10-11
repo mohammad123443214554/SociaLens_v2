@@ -10,6 +10,7 @@ import { getAvatarUrl } from '@/lib/utils/helpers'
 import { AperonixShareModal } from '@/components/aperonix/AperonixShareModal'
 import { speakText, stopSpeaking, isSpeechRecognitionSupported, createVoiceInput } from '@/lib/utils/voice'
 import { createClient } from '@/lib/supabase/client'
+import { ChatWallpaperControls, ChatWallpaper } from '@/components/aperonix/ChatWallpaperControls'
 
 export default function AperonixPage() {
   const { user, profile } = useUser()
@@ -40,6 +41,7 @@ export default function AperonixPage() {
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [wallpaper, setWallpaper] = useState<ChatWallpaper | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null)
@@ -71,6 +73,16 @@ export default function AperonixPage() {
   useEffect(() => {
     resizeTextarea()
   }, [input])
+
+  useEffect(() => {
+    if (!activeId) { setWallpaper(null); return }
+    try {
+      const saved = localStorage.getItem('socialens:aperonix-wallpaper:' + activeId)
+      setWallpaper(saved ? JSON.parse(saved) as ChatWallpaper : null)
+    } catch {
+      setWallpaper(null)
+    }
+  }, [activeId])
 
   useEffect(() => {
     if (loaded && !activeId) {
@@ -497,6 +509,7 @@ export default function AperonixPage() {
                         >
                           <PencilLine className="h-3.5 w-3.5" /> Rename
                         </button>
+                        <ChatWallpaperControls conversationId={convo.id === activeId ? activeId : convo.id} wallpaper={convo.id === activeId ? wallpaper : null} onWallpaperChange={setWallpaper} />
                         <button
                           onClick={() => handleConnectAsNewChat(convo.id)}
                           className="w-full flex items-center gap-2.5 whitespace-nowrap px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
@@ -542,7 +555,7 @@ export default function AperonixPage() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 transition-[background-image] duration-300" style={wallpaper ? { backgroundImage: 'linear-gradient(rgba(2, 6, 23, 0.72), rgba(2, 6, 23, 0.78)), url("' + wallpaper.dataUrl + '")', backgroundSize: 'cover, ' + wallpaper.zoom + '% auto', backgroundPosition: 'center, ' + wallpaper.positionX + '% ' + wallpaper.positionY + '%', backgroundRepeat: 'no-repeat, no-repeat' } : undefined}>
           {continuedFromTitle && (
             <div className="flex items-center gap-2 border-b border-border/70 pb-3 text-sm text-muted-foreground">
               <Link2 className="h-4 w-4 shrink-0" aria-hidden="true" />
