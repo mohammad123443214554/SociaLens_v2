@@ -186,10 +186,10 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
         role="dialog"
         aria-modal="true"
         aria-labelledby="aperonix-share-title"
-        className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-slate-950 text-slate-100 shadow-[0_24px_90px_rgba(0,0,0,0.55)] sm:max-h-[min(88dvh,760px)] sm:rounded-3xl"
+        className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-border bg-card text-card-foreground shadow-[0_24px_90px_rgba(0,0,0,0.18)] sm:max-h-[min(88dvh,760px)] sm:rounded-3xl"
         onClick={e => e.stopPropagation()}
       >
-        <header className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
+        <header className="flex items-center gap-3 border-b border-border px-5 py-4">
           <Image
             src="/images/aperonix-logo.png"
             alt="Aperonix"
@@ -200,24 +200,24 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
           />
           <div className="min-w-0 flex-1">
             <h2 id="aperonix-share-title" className="text-base font-semibold tracking-tight">{shareTitle}</h2>
-            <p className="mt-0.5 text-xs text-slate-400">Send it to friends or share a link</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Send it to friends or share a link</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close share dialog"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-fuchsia-400"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-fuchsia-400"
           >
             <X className="h-5 w-5" />
           </button>
         </header>
 
         <div className="space-y-4 overflow-y-auto overscroll-contain p-5">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+          <div className="rounded-2xl border border-border bg-muted/50 p-4">
             <div className="mb-2 flex items-center gap-2">
               <Avatar className="h-7 w-7 shrink-0 ring-1 ring-white/10">
                 <AvatarImage src={isPrompt ? getAvatarUrl(profile?.avatar_url ?? null) : '/images/aperonix-logo.png'} />
-                <AvatarFallback className="bg-slate-800 text-[10px] font-semibold text-slate-200">
+                <AvatarFallback className="bg-muted text-[10px] font-semibold text-muted-foreground">
                   {isPrompt ? (profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U') : 'A'}
                 </AvatarFallback>
               </Avatar>
@@ -226,27 +226,27 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
             </div>
             {isChat ? (
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-slate-100">{sharedChat?.title || 'Shared chat'}</p>
-                <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] overflow-hidden">{chatTranscript}</p>
+                <p className="text-sm font-semibold text-foreground">{sharedChat?.title || 'Shared chat'}</p>
+                <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] overflow-hidden">{chatTranscript}</p>
               </div>
             ) : (
-              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden">{replyText}</p>
+              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden">{replyText}</p>
             )}
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Share outside SocialLens</p>
+          <div className="rounded-2xl border border-border bg-muted/30 p-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Share outside SocialLens</p>
             <ExternalShareBar
               getShareUrl={getExternalShareUrl}
               shareTitle={externalTitle}
               shareText={externalText}
             />
-            <p className="mt-2 text-xs leading-5 text-slate-500">Create a share link or send it using your phone's share menu.</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">Create a share link or send it using your phone's share menu.</p>
           </div>
 
           <div>
             <div className="mb-3 flex items-center gap-2">
-              <Users className="h-4 w-4 text-slate-400" />
+              <Users className="h-4 w-4 text-muted-foreground" />
               <h3 className="text-sm font-semibold">Send on SocialLens</h3>
               {selected.length > 0 && (
                 <span className="ml-auto rounded-full bg-fuchsia-500/15 px-2.5 py-1 text-xs font-semibold text-fuchsia-200">
@@ -256,27 +256,27 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
             </div>
 
             <div className="relative mb-3">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search people by name..."
                 aria-label="Search people"
-                className="h-11 w-full rounded-xl border border-white/10 bg-slate-900 pl-10 pr-4 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-fuchsia-400/70 focus:ring-2 focus:ring-fuchsia-400/15"
+                className="h-11 w-full rounded-xl border border-border bg-slate-900 pl-10 pr-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-fuchsia-400/70 focus:ring-2 focus:ring-fuchsia-400/15"
               />
             </div>
 
-            <div className="max-h-52 overflow-y-auto rounded-2xl border border-white/[0.08]">
+            <div className="max-h-52 overflow-y-auto rounded-2xl border border-border">
               {loadingPeople ? (
-                <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-400">
+                <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-muted-foreground">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-fuchsia-400" />
                   Loading people...
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="px-4 py-8 text-center">
-                  <Users className="mx-auto mb-2 h-5 w-5 text-slate-500" />
-                  <p className="text-sm font-medium text-slate-300">{search ? 'No matches found' : 'No followers or following yet'}</p>
-                  <p className="mt-1 text-xs text-slate-500">{search ? 'Try another name or username.' : 'People you follow or who follow you will appear here.'}</p>
+                  <Users className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
+                  <p className="text-sm font-medium text-muted-foreground">{search ? 'No matches found' : 'No followers or following yet'}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{search ? 'Try another name or username.' : 'People you follow or who follow you will appear here.'}</p>
                 </div>
               ) : filtered.map(person => {
                 const isSelected = selected.includes(person.id)
@@ -288,20 +288,20 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
                       prev.includes(person.id) ? prev.filter(s => s !== person.id) : [...prev, person.id]
                     )}
                     aria-pressed={isSelected}
-                    className={`flex w-full items-center gap-3 border-b border-white/[0.06] px-3.5 py-3 text-left transition last:border-b-0 hover:bg-white/[0.045] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-fuchsia-400 ${isSelected ? 'bg-fuchsia-500/[0.09]' : ''}`}
+                    className={`flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-left transition last:border-b-0 hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-fuchsia-400 ${isSelected ? 'bg-fuchsia-500/[0.09]' : ''}`}
                   >
                     <Avatar className="h-10 w-10 shrink-0 ring-1 ring-white/10">
                       <AvatarImage src={getAvatarUrl(person.avatar_url)} />
-                      <AvatarFallback className="bg-slate-800 text-sm font-semibold text-slate-300">{person.username?.[0]?.toUpperCase()}</AvatarFallback>
+                      <AvatarFallback className="bg-slate-800 text-sm font-semibold text-muted-foreground">{person.username?.[0]?.toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1 truncate text-sm font-semibold text-slate-100">
+                      <p className="flex items-center gap-1 truncate text-sm font-semibold text-foreground">
                         <span className="truncate">{person.username}</span>
                         {person.is_verified && <VerifiedBadge type={person.verification_type} className="shrink-0 text-xs" />}
                       </p>
-                      {person.full_name && <p className="mt-0.5 truncate text-xs text-slate-400">{person.full_name}</p>}
+                      {person.full_name && <p className="mt-0.5 truncate text-xs text-muted-foreground">{person.full_name}</p>}
                     </div>
-                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition ${isSelected ? 'border-fuchsia-400 bg-fuchsia-500 text-white' : 'border-slate-600 text-transparent'}`}>
+                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition ${isSelected ? 'border-fuchsia-400 bg-fuchsia-500 text-white' : 'border-border text-transparent'}`}>
                       {isSelected && <Check className="h-3.5 w-3.5" />}
                     </span>
                   </button>
@@ -311,7 +311,7 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
           </div>
         </div>
 
-        <footer className="border-t border-white/10 bg-slate-950/95 p-4 sm:px-5">
+        <footer className="border-t border-border bg-card p-4 sm:px-5">
           {sendError && <p role="alert" className="mb-3 text-center text-xs leading-5 text-rose-300">{sendError}</p>}
           {sent ? (
             <div className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500/15 py-3 text-sm font-semibold text-emerald-300">
@@ -322,7 +322,7 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
               type="button"
               onClick={handleSend}
               disabled={selected.length === 0 || sending}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-fuchsia-950/25 transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-fuchsia-300 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-fuchsia-950/25 transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-fuchsia-300 focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
               <Send className="h-4 w-4" />
               {sending ? 'Sending...' : selected.length > 0 ? `Send to ${selected.length} ${selected.length === 1 ? 'person' : 'people'}` : 'Select people to send'}
