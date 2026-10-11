@@ -262,7 +262,7 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search people by name..."
                 aria-label="Search people"
-                className="h-11 w-full rounded-xl border border-border bg-slate-900 pl-10 pr-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-fuchsia-400/70 focus:ring-2 focus:ring-fuchsia-400/15"
+                className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-fuchsia-400/70 focus:ring-2 focus:ring-fuchsia-400/15"
               />
             </div>
 
@@ -292,7 +292,7 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
                   >
                     <Avatar className="h-10 w-10 shrink-0 ring-1 ring-white/10">
                       <AvatarImage src={getAvatarUrl(person.avatar_url)} />
-                      <AvatarFallback className="bg-slate-800 text-sm font-semibold text-muted-foreground">{person.username?.[0]?.toUpperCase()}</AvatarFallback>
+                      <AvatarFallback className="bg-muted text-sm font-semibold text-muted-foreground">{person.username?.[0]?.toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1 truncate text-sm font-semibold text-foreground">
