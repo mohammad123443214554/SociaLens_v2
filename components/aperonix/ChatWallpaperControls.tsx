@@ -65,10 +65,15 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
 
   useEffect(() => {
     let cancelled = false
+    // Active wallpaper is managed by the page-level cache. Re-fetching it here
+    // creates a new signed URL and can cause the displayed image to flash.
+    if (isActive) {
+      setCurrentWallpaper(wallpaper)
+      return () => { cancelled = true }
+    }
     const load = async () => {
       if (!conversationId) {
-        setCurrentWallpaper(null)
-        if (isActive) onWallpaperChange(null)
+        if (!cancelled) setCurrentWallpaper(null)
         return
       }
       try {
@@ -83,16 +88,12 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
           .maybeSingle()
         if (queryError) throw queryError
         if (!data) {
-          if (!cancelled) {
-            setCurrentWallpaper(null)
-            if (isActive) onWallpaperChange(null)
-          }
+          if (!cancelled) setCurrentWallpaper(null)
           return
         }
-        const row = data as StoredWallpaper
         const [original, processed] = await Promise.all([
-          supabase.storage.from(BUCKET).createSignedUrl(row.original_storage_path, 60 * 60),
-          supabase.storage.from(BUCKET).createSignedUrl(row.processed_storage_path, 60 * 60),
+          supabase.storage.from(BUCKET).createSignedUrl(data.original_storage_path, 60 * 60),
+          supabase.storage.from(BUCKET).createSignedUrl(data.processed_storage_path, 60 * 60),
         ])
         if (original.error || processed.error || !original.data?.signedUrl || !processed.data?.signedUrl) {
           throw new Error('Could not load the saved wallpaper. Please try again.')
@@ -100,28 +101,24 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
         const loaded: ChatWallpaper = {
           originalDataUrl: original.data.signedUrl,
           dataUrl: processed.data.signedUrl,
-          originalStoragePath: row.original_storage_path,
-          processedStoragePath: row.processed_storage_path,
-          filterIndex: row.filter_index,
-          zoom: row.zoom,
-          positionX: row.position_x,
-          positionY: row.position_y,
+          originalStoragePath: data.original_storage_path,
+          processedStoragePath: data.processed_storage_path,
+          filterIndex: data.filter_index,
+          zoom: data.zoom,
+          positionX: data.position_x,
+          positionY: data.position_y,
         }
-        if (!cancelled) {
-          setCurrentWallpaper(loaded)
-          if (isActive) onWallpaperChange(loaded)
-        }
+        if (!cancelled) setCurrentWallpaper(loaded)
       } catch (cause) {
         if (!cancelled) {
           setCurrentWallpaper(null)
-          if (isActive) onWallpaperChange(null)
           setError(cause instanceof Error ? cause.message : 'Could not load the wallpaper.')
         }
       }
     }
     void load()
     return () => { cancelled = true }
-  }, [conversationId, isActive, onWallpaperChange])
+  }, [conversationId, isActive, wallpaper])
 
   const pickFile = (file?: File) => {
     if (!file) return
