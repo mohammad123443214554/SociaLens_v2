@@ -587,7 +587,7 @@ export default function AperonixPage() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 transition-[background-image] duration-300" style={wallpaper ? { backgroundImage: 'linear-gradient(rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.14)), url("' + wallpaper.dataUrl + '")', backgroundSize: 'cover, ' + wallpaper.zoom + '% auto', backgroundPosition: 'center, ' + wallpaper.positionX + '% ' + wallpaper.positionY + '%', backgroundRepeat: 'no-repeat, no-repeat' } : undefined}>
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" style={wallpaper ? { backgroundImage: 'linear-gradient(rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.14)), url("' + wallpaper.dataUrl + '")', backgroundSize: 'cover, ' + wallpaper.zoom + '% auto', backgroundPosition: 'center, ' + wallpaper.positionX + '% ' + wallpaper.positionY + '%', backgroundRepeat: 'no-repeat, no-repeat' } : undefined}>
           {continuedFromTitle && (
             <div className="flex items-center gap-2 border-b border-border/70 pb-3 text-sm text-muted-foreground">
               <Link2 className="h-4 w-4 shrink-0" aria-hidden="true" />
