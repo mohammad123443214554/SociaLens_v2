@@ -139,11 +139,6 @@ export default function ArchivePage() {
           </div>}
           {(chats.length === 0 || aperonixChats.length === 0 || activeSection === 'aperonix') && aperonixChats.length > 0 && (
             <section className="border-b border-border">
-              {chats.length > 0 && false && <div className="flex items-center gap-2 px-4 py-3 bg-muted/40">
-                <Bot className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-semibold">Aperonix conversations</h2>
-                <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{aperonixChats.length}</span>
-              </div>}
               {aperonixChats.map(conversation => (
                 <div key={conversation.id} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60">
                   <button onClick={() => router.push(`/aperonix?archive=1&chatId=${conversation.id}`)} aria-label="Open Aperonix conversation" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><MessageSquare className="h-5 w-5" /></button>
