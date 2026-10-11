@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ArchiveRestore, Bot, MessageSquare } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { useBlockedRelations, useBlockedByOthers, useArchiveLockStatus } from '@/lib/hooks/useChatSettings'
@@ -22,6 +22,8 @@ export default function ArchivePage() {
   const router = useRouter()
   const supabase = createClient()
   const [chats, setChats] = useState<ChatRow[]>([])
+  const [aperonixChats, setAperonixChats] = useState<{ id: string; title: string; updated_at: string }[]>([])
+  const [restoringAperonixId, setRestoringAperonixId] = useState<string | null>(null)
   const [unreadMap, setUnreadMap] = useState<Record<string, number>>({})
   // Unlocking resets on every visit/reload - the whole point of the
   // password is that it re-asks each time, not just the first time.
@@ -54,6 +56,18 @@ export default function ArchivePage() {
     })
     setChats(visible as ChatRow[])
 
+    const { data: archivedAperonix, error: aperonixError } = await supabase
+      .from('aperonix_conversations')
+      .select('id,title,updated_at')
+      .eq('user_id', user.id)
+      .not('archived_at', 'is', null)
+      .order('archived_at', { ascending: false })
+    if (aperonixError) {
+      console.error('Could not load archived Aperonix chats', aperonixError)
+    } else {
+      setAperonixChats(archivedAperonix || [])
+    }
+
     // Archived chats are intentionally excluded from the unread badge
     // everywhere else, so this list doesn't show one either - it's a
     // private, quiet space, not a second inbox competing for attention.
@@ -66,6 +80,7 @@ export default function ArchivePage() {
     const channel = supabase
       .channel('chat-archive-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, fetchArchivedChats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'aperonix_conversations' }, fetchArchivedChats)
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [user, unlocked, blockedByOthers])
@@ -100,13 +115,47 @@ export default function ArchivePage() {
         <h1 className="text-xl font-bold">Archive</h1>
       </div>
 
-      {chats.length === 0 ? (
+      {chats.length === 0 && aperonixChats.length === 0 ? (
         <div className="text-center py-20 text-muted-foreground">
           <p className="font-medium">No archived chats</p>
           <p className="text-sm mt-1">Chats you archive will show up here.</p>
         </div>
       ) : (
-        <div>
+        <div className="divide-y divide-border">
+          {aperonixChats.length > 0 && (
+            <section className="border-b border-border">
+              <div className="flex items-center gap-2 px-4 py-3 bg-muted/40">
+                <Bot className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Aperonix conversations</h2>
+                <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{aperonixChats.length}</span>
+              </div>
+              {aperonixChats.map(conversation => (
+                <div key={conversation.id} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><MessageSquare className="h-5 w-5" /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{conversation.title || 'Aperonix conversation'}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Archived {new Date(conversation.updated_at).toLocaleDateString()}</p>
+                  </div>
+                  <button
+                    disabled={restoringAperonixId === conversation.id}
+                    onClick={async () => {
+                      setRestoringAperonixId(conversation.id)
+                      const { error } = await supabase.from('aperonix_conversations')
+                        .update({ archived_at: null, updated_at: new Date().toISOString() })
+                        .eq('id', conversation.id).eq('user_id', user.id)
+                      setRestoringAperonixId(null)
+                      if (error) { alert('Could not restore this conversation. Please try again.'); return }
+                      setAperonixChats(prev => prev.filter(item => item.id !== conversation.id))
+                      router.push('/aperonix')
+                    }}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent disabled:opacity-50"
+                  >
+                    <ArchiveRestore className="h-3.5 w-3.5" /> {restoringAperonixId === conversation.id ? 'Restoring…' : 'Restore'}
+                  </button>
+                </div>
+              ))}
+            </section>
+          )}
           {chats.map(chat => {
             const other = getOther(chat)
             const isPinned = chat.pinned_by?.includes(user.id) ?? false
