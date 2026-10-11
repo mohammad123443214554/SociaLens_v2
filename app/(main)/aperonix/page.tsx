@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText } from 'lucide-react'
+import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText, Archive } from 'lucide-react'
 import { useAperonixChats, AperonixMessage, AperonixConversation } from '@/lib/hooks/useAperonixChats'
 import { useUser } from '@/lib/hooks/useUser'
 import { getAvatarUrl } from '@/lib/utils/helpers'
@@ -11,6 +11,8 @@ import { AperonixShareModal } from '@/components/aperonix/AperonixShareModal'
 import { speakText, stopSpeaking, isSpeechRecognitionSupported, createVoiceInput } from '@/lib/utils/voice'
 import { createClient } from '@/lib/supabase/client'
 import { ChatWallpaperControls, ChatWallpaper } from '@/components/aperonix/ChatWallpaperControls'
+import { ArchivePasswordWizard } from '@/components/chat/ArchivePasswordWizard'
+import { useArchiveLockStatus } from '@/lib/hooks/useChatSettings'
 
 type WallpaperCacheEntry = { wallpaper: ChatWallpaper | null; expiresAt: number }
 const wallpaperCache = new Map<string, WallpaperCacheEntry>()
@@ -79,6 +81,7 @@ export default function AperonixPage() {
     activeConversation,
     createConversation,
     deleteConversation,
+    archiveConversation,
     renameConversation,
     togglePinConversation,
     connectAsNewConversation,
@@ -99,6 +102,9 @@ export default function AperonixPage() {
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [archiveConfirmId, setArchiveConfirmId] = useState<string | null>(null)
+  const [showArchivePasswordWizard, setShowArchivePasswordWizard] = useState(false)
+  const { data: archiveLock } = useArchiveLockStatus(user?.id)
   const [wallpaper, setWallpaper] = useState<ChatWallpaper | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -327,6 +333,17 @@ export default function AperonixPage() {
   const handleNewChat = () => {
     createConversation()
     setShowHistory(false)
+  }
+
+  const handleArchiveConversation = async (id: string) => {
+    try {
+      await archiveConversation(id)
+      setArchiveConfirmId(null)
+      setShowArchivePasswordWizard(false)
+      setOpenMenuId(null)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not archive this conversation. Please try again.')
+    }
   }
 
   const handleStartRename = (convo: { id: string; title: string }) => {
@@ -597,6 +614,12 @@ export default function AperonixPage() {
                           className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
                         >
                           <Forward className="h-3.5 w-3.5" /> Share Chat
+                        </button>
+                        <button
+                          onClick={() => { setArchiveConfirmId(convo.id); setOpenMenuId(null) }}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
+                        >
+                          <Archive className="h-3.5 w-3.5" /> Archive Chat
                         </button>
                         <button
                           onClick={async () => { setOpenMenuId(null); try { await deleteConversation(convo.id) } catch (error) { alert(error instanceof Error ? error.message : 'Could not delete this chat and its files.') } }}
@@ -972,6 +995,34 @@ export default function AperonixPage() {
           replyText={shareText}
           contentType={shareContentType}
           onClose={() => setShareText(null)}
+        />
+      )}
+
+      {archiveConfirmId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]" onClick={() => setArchiveConfirmId(null)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="archive-aperonix-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl" onClick={event => event.stopPropagation()}>
+            <div className="flex items-start gap-3 border-b border-border p-5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Archive className="h-5 w-5" /></div>
+              <div className="min-w-0 flex-1">
+                <h2 id="archive-aperonix-title" className="text-base font-semibold">Archive this conversation?</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Your conversation with Aperonix will be moved to your protected Archive and removed from All Chats. Your messages and attachments will be kept.</p>
+              </div>
+            </div>
+            <div className="flex flex-col-reverse gap-2 p-4 sm:flex-row sm:justify-end">
+              <button onClick={() => setArchiveConfirmId(null)} className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent">Cancel</button>
+              <button onClick={() => {
+                if (!archiveLock?.hasPassword) setShowArchivePasswordWizard(true)
+                else void handleArchiveConversation(archiveConfirmId)
+              }} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90">Archive Chat</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showArchivePasswordWizard && archiveConfirmId && (
+        <ArchivePasswordWizard
+          onClose={() => setShowArchivePasswordWizard(false)}
+          onDone={() => { setShowArchivePasswordWizard(false); void handleArchiveConversation(archiveConfirmId) }}
         />
       )}
     </div>
