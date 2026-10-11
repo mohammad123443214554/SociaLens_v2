@@ -173,16 +173,17 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
         image.onload = () => resolve()
         image.onerror = () => reject(new Error('Could not process this photo. Please choose it again.'))
       })
-      const scale = Math.min(1, 1800 / Math.max(image.naturalWidth, image.naturalHeight))
-      const width = Math.max(1, Math.round(image.naturalWidth * scale))
-      const height = Math.max(1, Math.round(image.naturalHeight * scale))
+      // Keep the source image at its native resolution. Downscaling wallpapers
+      // to 1800px made high-resolution photos visibly soft on large displays.
+      const width = image.naturalWidth
+      const height = image.naturalHeight
       const baseCanvas = document.createElement('canvas')
       baseCanvas.width = width
       baseCanvas.height = height
       const baseContext = baseCanvas.getContext('2d')
       if (!baseContext) throw new Error('Image editor is unavailable in this browser.')
       baseContext.drawImage(image, 0, 0, width, height)
-      const originalBlob = await new Promise<Blob>((resolve, reject) => baseCanvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not prepare this photo.')), 'image/jpeg', 0.88))
+      const originalBlob = await new Promise<Blob>((resolve, reject) => baseCanvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not prepare this photo.')), 'image/jpeg', 0.98))
 
       const filteredCanvas = document.createElement('canvas')
       filteredCanvas.width = width
@@ -191,7 +192,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
       if (!filteredContext) throw new Error('Image editor is unavailable in this browser.')
       filteredContext.filter = FILTERS[draft.filterIndex]?.css || 'none'
       filteredContext.drawImage(baseCanvas, 0, 0)
-      const processedBlob = await new Promise<Blob>((resolve, reject) => filteredCanvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not apply this filter.')), 'image/jpeg', 0.88))
+      const processedBlob = await new Promise<Blob>((resolve, reject) => filteredCanvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not apply this filter.')), 'image/jpeg', 0.98))
 
       const folder = user.id + '/' + conversationId + '/'
       const nonce = crypto.randomUUID()
@@ -361,7 +362,6 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={draft.originalDataUrl} alt="Wallpaper preview" className="absolute inset-0 h-full w-full object-cover" style={{ filter: FILTERS[draft.filterIndex]?.css || 'none', objectPosition: draft.positionX + '% ' + draft.positionY + '%', transform: 'scale(' + draft.zoom / 100 + ')' }} />
-                    <div className="pointer-events-none absolute inset-0 bg-slate-950/10" />
                     <div className="absolute bottom-3 left-3 rounded-lg border border-white/20 bg-slate-950/55 px-3 py-2 text-xs text-white backdrop-blur-sm">Chat wallpaper preview</div>
                   </>
                 ) : <button type="button" onClick={() => fileRef.current?.click()} className="flex h-full w-full flex-col items-center justify-center gap-2 p-6"><ImagePlus className="h-8 w-8 text-pink-500" /><span className="text-sm">Choose a photo to start</span></button>}
