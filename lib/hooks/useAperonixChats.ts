@@ -30,6 +30,7 @@ export interface AperonixConversation {
   updatedAt: number
   pinned?: boolean
   contextMessages?: AperonixMessage[]
+  archivedAt?: number | null
 }
 
 function rowToMessage(row: any): AperonixMessage {
@@ -57,7 +58,8 @@ export function useAperonixChats() {
         if (!user) { if (!cancelled) setLoaded(true); return }
         const { data: rows, error } = await supabase
           .from('aperonix_conversations')
-          .select('id,title,pinned,context_messages,created_at,updated_at')
+          .select('id,title,pinned,context_messages,created_at,updated_at,archived_at')
+          .is('archived_at', null)
           .eq('user_id', user.id)
           .order('updated_at', { ascending: false })
         if (error) throw error
@@ -77,6 +79,7 @@ export function useAperonixChats() {
           contextMessages: Array.isArray(row.context_messages) ? row.context_messages : [],
           createdAt: new Date(row.created_at).getTime(),
           updatedAt: new Date(row.updated_at).getTime(),
+          archivedAt: row.archived_at ? new Date(row.archived_at).getTime() : null,
           messages: messageRows.filter((m: any) => m.conversation_id === row.id).map(rowToMessage),
         })) as AperonixConversation[]
         if (!cancelled) setConversations(mapped)
@@ -102,6 +105,7 @@ export function useAperonixChats() {
       context_messages: conversation.contextMessages ?? [],
       created_at: new Date(conversation.createdAt).toISOString(),
       updated_at: new Date(conversation.updatedAt).toISOString(),
+      archived_at: conversation.archivedAt ? new Date(conversation.archivedAt).toISOString() : null,
     })
     if (error) throw error
   }, [])
@@ -110,7 +114,7 @@ export function useAperonixChats() {
     const now = Date.now()
     const newConvo: AperonixConversation = {
       id: crypto.randomUUID(), title: 'New chat', messages: [],
-      createdAt: now, updatedAt: now, pinned: false,
+      createdAt: now, updatedAt: now, pinned: false, archivedAt: null,
     }
     setConversations(prev => [newConvo, ...prev])
     setActiveId(newConvo.id)
@@ -145,6 +149,20 @@ export function useAperonixChats() {
     setActiveId(prev => prev === id ? null : prev)
   }, [])
 
+  const archiveConversation = useCallback(async (id: string) => {
+    const supabase = createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError) throw authError
+    if (!user) throw new Error('Please sign in again before archiving this chat.')
+    const archivedAt = new Date().toISOString()
+    const { error } = await supabase.from('aperonix_conversations')
+      .update({ archived_at: archivedAt, updated_at: archivedAt })
+      .eq('id', id).eq('user_id', user.id)
+    if (error) throw new Error(`Could not archive this chat: ${error.message}`)
+    setConversations(prev => prev.filter(conversation => conversation.id !== id))
+    setActiveId(current => current === id ? (conversations.find(conversation => conversation.id !== id)?.id ?? null) : current)
+  }, [conversations])
+
   const renameConversation = useCallback((id: string, title: string) => {
     const trimmed = title.trim()
     if (!trimmed) return
@@ -176,7 +194,7 @@ export function useAperonixChats() {
       title: `${source.title} (continued)`,
       messages: [],
       contextMessages: [...(source.contextMessages ?? []), ...source.messages],
-      createdAt: now, updatedAt: now, pinned: false,
+      createdAt: now, updatedAt: now, pinned: false, archivedAt: null,
     }
     setConversations(prev => [newConvo, ...prev])
     setActiveId(newConvo.id)
@@ -304,7 +322,7 @@ export function useAperonixChats() {
 
   return {
     conversations: sortedConversations, activeId, setActiveId, activeConversation,
-    createConversation, deleteConversation, renameConversation, togglePinConversation,
+    createConversation, deleteConversation, archiveConversation, renameConversation, togglePinConversation,
     connectAsNewConversation, addMessage, editUserMessage, replaceMessageContent,
     setMessageFeedback, loaded,
   }
