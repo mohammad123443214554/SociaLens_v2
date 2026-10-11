@@ -354,7 +354,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
                 )}
               </div>
 
-              <div onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); pickFile(event.dataTransfer.files?.[0]) }} className="relative mb-5 aspect-video max-h-[300px] min-h-40 w-full overflow-hidden rounded-2xl border border-pink-500/30 bg-muted/50">
+              <div onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); pickFile(event.dataTransfer.files?.[0]) }} className="relative mb-5 aspect-[4/5] w-full overflow-hidden rounded-2xl border border-pink-500/30 bg-muted/50 sm:aspect-video">
                 {draft ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
