@@ -38,6 +38,7 @@ export default function ArchivePage() {
   // Unlocking resets on every visit/reload - the whole point of the
   // password is that it re-asks each time, not just the first time.
   const [unlocked, setUnlocked] = useState(false)
+  const [activeSection, setActiveSection] = useState<'aperonix' | 'users'>('aperonix')
 
   const { data: blockedRelations = new Set<string>() } = useBlockedRelations(user?.id)
   const { data: blockedByOthers = new Set<string>() } = useBlockedByOthers(user?.id)
@@ -131,17 +132,21 @@ export default function ArchivePage() {
           <p className="text-sm mt-1">Chats you archive will show up here.</p>
         </div>
       ) : (
-        <div className="divide-y divide-border">
-          {aperonixChats.length > 0 && (
+        <div className="space-y-4 px-4 py-4">
+          {chats.length > 0 && aperonixChats.length > 0 && <div className="grid grid-cols-2 rounded-xl bg-muted p-1" role="tablist" aria-label="Archived chat types">
+            <button role="tab" aria-selected={activeSection === 'aperonix'} onClick={() => setActiveSection('aperonix')} className={`rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${activeSection === 'aperonix' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Aperonix Chat <span className="ml-1 text-xs opacity-70">{aperonixChats.length}</span></button>
+            <button role="tab" aria-selected={activeSection === 'users'} onClick={() => setActiveSection('users')} className={`rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${activeSection === 'users' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>User Chat <span className="ml-1 text-xs opacity-70">{chats.length}</span></button>
+          </div>}
+          {(chats.length === 0 || aperonixChats.length === 0 || activeSection === 'aperonix') && aperonixChats.length > 0 && (
             <section className="border-b border-border">
-              {chats.length > 0 && <div className="flex items-center gap-2 px-4 py-3 bg-muted/40">
+              {chats.length > 0 && false && <div className="flex items-center gap-2 px-4 py-3 bg-muted/40">
                 <Bot className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-semibold">Aperonix conversations</h2>
                 <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{aperonixChats.length}</span>
               </div>}
               {aperonixChats.map(conversation => (
                 <div key={conversation.id} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60">
-                  <button onClick={async () => { const { error } = await supabase.from('aperonix_conversations').update({ archived_at: null, updated_at: new Date().toISOString() }).eq('id', conversation.id).eq('user_id', user.id); if (error) { alert('Could not open this conversation. Please try again.'); return } router.push(`/aperonix?chatId=${conversation.id}`) }} aria-label="Open Aperonix conversation" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><MessageSquare className="h-5 w-5" /></button>
+                  <button onClick={() => router.push(`/aperonix?archive=1&chatId=${conversation.id}`)} aria-label="Open Aperonix conversation" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><MessageSquare className="h-5 w-5" /></button>
                   <div className="min-w-0 flex-1">
                     {renamingAperonixId === conversation.id ? (
                       <form className="flex items-center gap-1.5" onSubmit={async event => {
@@ -159,7 +164,7 @@ export default function ArchivePage() {
                         <button type="submit" disabled={savingAperonixId === conversation.id} aria-label="Save title" className="rounded-lg p-1.5 text-primary hover:bg-accent"><Check className="h-4 w-4" /></button>
                         <button type="button" onClick={() => setRenamingAperonixId(null)} aria-label="Cancel rename" className="rounded-lg p-1.5 hover:bg-accent"><X className="h-4 w-4" /></button>
                       </form>
-                    ) : <button onClick={async () => { const { error } = await supabase.from('aperonix_conversations').update({ archived_at: null, updated_at: new Date().toISOString() }).eq('id', conversation.id).eq('user_id', user.id); if (error) { alert('Could not open this conversation. Please try again.'); return } router.push(`/aperonix?chatId=${conversation.id}`) }} className="block max-w-full truncate text-left text-sm font-medium hover:text-primary">{conversation.title || 'Aperonix conversation'}</button>}
+                    ) : <button onClick={() => router.push(`/aperonix?archive=1&chatId=${conversation.id}`)} className="block max-w-full truncate text-left text-sm font-medium hover:text-primary">{conversation.title || 'Aperonix conversation'}</button>}
                     <p className="mt-0.5 text-xs text-muted-foreground">Archived {new Date(conversation.updated_at).toLocaleDateString()}</p>
                   </div>
                   <div className="relative shrink-0">
@@ -216,8 +221,8 @@ export default function ArchivePage() {
               ))}
             </section>
           )}
-          {chats.length > 0 && aperonixChats.length > 0 && <div className="flex items-center gap-2 px-4 py-3 bg-muted/40"><MessageSquare className="h-4 w-4 text-primary" /><h2 className="text-sm font-semibold">User chats</h2><span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{chats.length}</span></div>}
-          {chats.map(chat => {
+          {(aperonixChats.length === 0 || chats.length === 0 || activeSection === 'users') && chats.length > 0 && <div className="space-y-1">
+          {chats.map(chat => {}
             const other = getOther(chat)
             const isPinned = chat.pinned_by?.includes(user.id) ?? false
             const iBlockedThem = blockedRelations.has(other?.id || '')
@@ -234,6 +239,7 @@ export default function ArchivePage() {
               />
             )
           })}
+          </div>}
         </div>
       )}
       {shareChatText !== null && <AperonixShareModal replyText={shareChatText} contentType="chat" onClose={() => setShareChatText(null)} />}
