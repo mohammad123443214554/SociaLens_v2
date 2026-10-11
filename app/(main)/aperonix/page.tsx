@@ -147,8 +147,7 @@ export default function AperonixPage() {
       if (!cancelled) setWallpaper(null)
     })
     return () => { cancelled = true }
-
-
+  }, [activeId])
 
   useEffect(() => {
     if (!loaded || !user?.id || conversations.length === 0) return
