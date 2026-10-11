@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText, Archive } from 'lucide-react'
@@ -74,6 +75,8 @@ async function loadConversationWallpaper(conversationId: string): Promise<ChatWa
 
 export default function AperonixPage() {
   const { user, profile } = useUser()
+  const searchParams = useSearchParams()
+  const requestedChatId = searchParams.get('chatId')
   const {
     conversations,
     activeId,
@@ -171,6 +174,14 @@ export default function AperonixPage() {
       if (conversations.length > 0) setActiveId(conversations[0].id)
     }
   }, [loaded, activeId, conversations, setActiveId])
+
+  useEffect(() => {
+    if (!loaded || !requestedChatId) return
+    if (conversations.some(conversation => conversation.id === requestedChatId)) {
+      setActiveId(requestedChatId)
+      setShowHistory(false)
+    }
+  }, [loaded, requestedChatId, conversations, setActiveId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
