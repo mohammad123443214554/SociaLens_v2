@@ -551,7 +551,7 @@ export default function AperonixPage() {
     <div className="flex h-[100dvh] lg:h-[calc(100vh-56px)] min-h-0 overflow-hidden">
       {/* History panel */}
       <div className={`
-        fixed md:static top-14 bottom-0 md:inset-y-auto left-0 z-30 w-72 bg-card border-r flex-col transition-transform duration-200 ease-out
+        fixed md:static top-14 bottom-0 md:inset-y-auto left-0 z-[100] w-72 max-w-[85vw] bg-card border-r flex-col transition-transform duration-200 ease-out
         ${showHistory ? 'flex' : 'hidden md:flex'}
       `}>
         <div className="p-3 border-b flex items-center justify-between">
@@ -660,13 +660,13 @@ export default function AperonixPage() {
       </div>
 
       {showHistory && (
-        <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setShowHistory(false)} />
+        <button type="button" aria-label="Close chat history" className="fixed inset-0 z-[90] bg-black/50 md:hidden" onClick={() => setShowHistory(false)} />
       )}
 
       {/* Chat window */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <div className="sticky top-0 z-20 flex items-center gap-3 p-3 border-b bg-background shrink-0">
-          <button onClick={() => setShowHistory(true)} className="md:hidden text-muted-foreground">
+          <button type="button" aria-label="Open chat history" aria-expanded={showHistory} onClick={() => setShowHistory(true)} className="relative z-10 md:hidden text-muted-foreground">
             <Menu className="h-5 w-5" />
           </button>
           <Image src="/images/aperonix-logo.png" alt="Aperonix" width={36} height={36} className="rounded-full" />
