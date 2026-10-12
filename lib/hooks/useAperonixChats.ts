@@ -127,14 +127,18 @@ export function useAperonixChats(options: { includeArchived?: boolean } = {}) {
   const updateConversationTitle = useCallback((id: string, title: string) => {
     const trimmed = title.trim().replace(/^["'\s]+|["'\s]+$/g, '').slice(0, 80)
     if (!trimmed) return
-    let updated: AperonixConversation | undefined
-    setConversations(prev => prev.map(c => {
-      if (c.id !== id) return c
-      updated = { ...c, title: trimmed, updatedAt: Date.now() }
-      return updated
-    }))
-    if (updated) void persistConversation(updated).catch(error => console.error('Could not save Aperonix chat title', error))
-  }, [persistConversation])
+    const updatedAt = Date.now()
+    setConversations(prev => prev.map(c => c.id === id ? { ...c, title: trimmed, updatedAt } : c))
+    void (async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Sign in to save Aperonix chat titles.')
+      const { error } = await supabase.from('aperonix_conversations')
+        .update({ title: trimmed, updated_at: new Date(updatedAt).toISOString() })
+        .eq('id', id).eq('user_id', user.id)
+      if (error) throw error
+    })().catch(error => console.error('Could not save Aperonix chat title', error))
+  }, [])
 
   const deleteConversation = useCallback(async (id: string) => {
     const supabase = createClient()
