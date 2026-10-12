@@ -16,6 +16,7 @@ const EXACT_EXCLUDE = new Set([
   '/profile/edit',
   '/profile/suggestions',
   '/aperonix',
+  '/aperonix/voice',
 ])
 
 // Matches individual chat threads like /chat/abc123 (but not /chat or
