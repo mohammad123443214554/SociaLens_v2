@@ -45,19 +45,15 @@ function VoiceParticleAnimation() {
 
   useEffect(() => {
     const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d', { alpha: true })
-    if (!canvas || !ctx) return
-
-    let raf = 0
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
     let frame = 0
+    let raf = 0
     let width = 0
     let height = 0
     let dpr = 1
-    let particles: { angle: number; radius: number; depth: number; speed: number; size: number; phase: number }[] = []
-    let sparks: { orbit: number; angle: number; speed: number; size: number; phase: number }[] = []
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const random = (min: number, max: number) => min + Math.random() * (max - min)
-
+    let particles: { x: number; y: number; z: number; size: number; phase: number }[] = []
     const resize = () => {
       const rect = canvas.getBoundingClientRect()
       dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -66,96 +62,73 @@ function VoiceParticleAnimation() {
       canvas.width = Math.round(width * dpr)
       canvas.height = Math.round(height * dpr)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      particles = Array.from({ length: Math.round(Math.min(1500, Math.max(850, width * height / 42))) }, () => ({
-        angle: random(0, Math.PI * 2),
-        // Dense, turbulent center with a fine dust halo instead of a neat wireframe globe.
-        radius: Math.pow(Math.random(), 1.72),
-        depth: random(-1, 1),
-        speed: random(0.001, 0.009) * (Math.random() > 0.5 ? 1 : -1),
-        size: random(0.35, 1.25),
-        phase: random(0, Math.PI * 2),
-      }))
-      sparks = Array.from({ length: 36 }, (_, i) => ({
-        orbit: i % 7,
-        angle: random(0, Math.PI * 2),
-        speed: random(0.008, 0.023) * (i % 2 ? 1 : -1),
-        size: random(0.65, 1.8),
-        phase: random(0, Math.PI * 2),
-      }))
+      const count = Math.round(Math.min(1050, Math.max(560, width * height / 55)))
+      particles = Array.from({ length: count }, (_, i) => {
+        const y = 1 - 2 * ((i + 0.5) / count)
+        const radius = Math.sqrt(Math.max(0, 1 - y * y))
+        const angle = i * Math.PI * (3 - Math.sqrt(5))
+        return { x: Math.cos(angle) * radius, y, z: Math.sin(angle) * radius, size: 0.45 + Math.random() * 1.15, phase: Math.random() * Math.PI * 2 }
+      })
     }
-
+    resize()
     const draw = () => {
-      frame += reducedMotion ? 0 : 1
+      frame += 1
       ctx.clearRect(0, 0, width, height)
-      const cx = width * 0.5
-      const cy = height * 0.49
-      const radius = Math.min(width, height) * 0.285
-      const t = frame * 0.012
-      const pulse = 1 + Math.sin(t * 1.7) * 0.035
-      const coreR = radius * pulse
+      const cx = width / 2
+      const cy = height / 2
+      const radius = Math.min(width, height) * 0.325
+      const t = frame * 0.0065
+      const cos = Math.cos(t)
+      const sin = Math.sin(t)
+      const tilt = -0.22
+      const ct = Math.cos(tilt)
+      const st = Math.sin(tilt)
 
-      // A deep electric-blue bloom gives the center a luminous, cinematic core.
-      const aura = ctx.createRadialGradient(cx, cy, coreR * 0.03, cx, cy, radius * 1.7)
-      aura.addColorStop(0, 'rgba(0, 105, 255, 0.24)')
-      aura.addColorStop(0.28, 'rgba(0, 67, 255, 0.14)')
-      aura.addColorStop(0.62, 'rgba(0, 38, 180, 0.055)')
-      aura.addColorStop(1, 'rgba(0, 15, 90, 0)')
-      ctx.fillStyle = aura
+      // Soft electric-blue aura behind the particle core.
+      const glow = ctx.createRadialGradient(cx, cy, radius * 0.04, cx, cy, radius * 1.3)
+      glow.addColorStop(0, 'rgba(0, 140, 255, 0.24)')
+      glow.addColorStop(0.48, 'rgba(0, 72, 255, 0.12)')
+      glow.addColorStop(1, 'rgba(0, 20, 120, 0)')
+      ctx.fillStyle = glow
       ctx.beginPath()
-      ctx.arc(cx, cy, radius * 1.7, 0, Math.PI * 2)
+      ctx.arc(cx, cy, radius * 1.3, 0, Math.PI * 2)
       ctx.fill()
 
-      // Uneven orbital ribbons: elliptical, tilted and moving at different speeds.
-      for (let i = 0; i < 7; i++) {
+      // Fine orbital filaments wrap around the glowing sphere.
+      for (let orbit = 0; orbit < 4; orbit++) {
         ctx.save()
         ctx.translate(cx, cy)
-        ctx.rotate(t * (i % 2 ? -0.29 : 0.23) + i * 0.77)
-        ctx.scale(1, 0.36 + (i % 4) * 0.13)
+        ctx.rotate(t * (orbit % 2 ? -0.38 : 0.52) + orbit * 1.31)
+        ctx.scale(1, 0.34 + (orbit % 3) * 0.13)
         ctx.beginPath()
-        const rx = radius * (0.76 + (i % 3) * 0.18)
-        const ry = radius * (0.77 + (i % 4) * 0.09)
-        ctx.ellipse(0, 0, rx, ry, Math.sin(i * 2.3) * 0.22, 0.08 + i * 0.31, Math.PI * (1.56 + (i % 3) * 0.14))
-        ctx.strokeStyle = i % 3 === 0 ? 'rgba(18, 112, 255, 0.72)' : 'rgba(0, 92, 255, 0.34)'
-        ctx.lineWidth = i % 3 === 0 ? 0.95 : 0.55
-        ctx.shadowColor = '#087bff'
-        ctx.shadowBlur = i % 3 === 0 ? 5 : 1
+        ctx.ellipse(0, 0, radius * (1.02 + orbit * 0.055), radius * (0.78 + orbit * 0.04), 0, 0, Math.PI * 2)
+        ctx.strokeStyle = orbit % 2 ? 'rgba(0, 100, 255, 0.44)' : 'rgba(24, 125, 255, 0.25)'
+        ctx.lineWidth = 0.7
         ctx.stroke()
         ctx.restore()
       }
 
-      // Fine particles churn in a spherical volume; the radial distribution keeps
-      // the core bright and organic, matching the reference's high-energy nucleus.
-      const projected = particles.map((p) => {
-        const angle = p.angle + t * p.speed * 16
-        const wobble = 0.92 + Math.sin(t * 1.8 + p.phase) * 0.075
-        const r = p.radius * coreR * wobble
-        const x = Math.cos(angle) * r
-        const y = Math.sin(angle) * r
-        const perspective = 0.8 + (p.depth + 1) * 0.18
-        return {
-          x: cx + (x + p.depth * radius * 0.12) * perspective,
-          y: cy + (y * (0.72 + 0.13 * Math.sin(t + p.phase)) - p.depth * radius * 0.08) * perspective,
-          z: p.depth,
-          size: p.size * perspective,
-          phase: p.phase,
-          angle,
-          r,
-        }
-      })
+      const projected = particles.map(p => {
+        const rx = p.x * cos - p.z * sin
+        const rz = p.x * sin + p.z * cos
+        const ry = p.y * ct - rz * st
+        const z = p.y * st + rz * ct
+        const perspective = 2.1 / (2.1 - z * 0.28)
+        return { x: cx + rx * radius * perspective, y: cy + ry * radius * perspective, z, size: p.size * perspective, phase: p.phase }
+      }).sort((a, b) => a.z - b.z)
 
-      // Connect only close neighbors, producing a living, irregular neural mesh.
+      // Connect nearby visible particles to create a living neural web.
       ctx.lineWidth = 0.55
-      for (let i = 0; i < projected.length; i += 3) {
+      for (let i = 0; i < projected.length; i += 2) {
         const a = projected[i]
-        if (a.z < -0.25) continue
-        for (let j = i + 1; j < Math.min(i + 17, projected.length); j += 2) {
+        if (a.z < -0.12) continue
+        for (let j = i + 1; j < Math.min(i + 15, projected.length); j++) {
           const b = projected[j]
           const dx = a.x - b.x
           const dy = a.y - b.y
-          const dist = Math.hypot(dx, dy)
-          if (dist < radius * 0.12) {
-            const alpha = (1 - dist / (radius * 0.12)) * (0.1 + Math.max(0, a.z) * 0.34)
-            ctx.strokeStyle = 'rgba(15, 112, 255, ' + alpha + ')'
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          if (dist < radius * 0.19) {
+            ctx.strokeStyle = 'rgba(0, 111, 255, ' + ((1 - dist / (radius * 0.19)) * (0.16 + Math.max(0, a.z) * 0.3)) + ')'
             ctx.beginPath()
             ctx.moveTo(a.x, a.y)
             ctx.lineTo(b.x, b.y)
@@ -164,90 +137,55 @@ function VoiceParticleAnimation() {
         }
       }
 
-      // Tiny electric dust, with brighter points pulsing through the core.
       for (const p of projected) {
-        const depth = Math.max(0.12, (p.z + 1) * 0.5)
-        const twinkle = 0.48 + 0.52 * Math.sin(frame * 0.07 + p.phase)
-        const alpha = (0.18 + depth * 0.8) * twinkle
-        const size = p.size * (0.65 + depth * 0.62)
-        ctx.fillStyle = 'rgba(12, 108, 255, ' + alpha + ')'
+        const depth = Math.max(0.12, (p.z + 1) / 2)
+        const twinkle = 0.55 + 0.45 * Math.sin(frame * 0.075 + p.phase)
+        const alpha = (0.18 + depth * 0.82) * twinkle
+        const size = p.size * (0.7 + depth * 0.7)
+        if (depth > 0.55 && size > 1.05 && (Math.sin(p.phase * 4 + frame * 0.035) > 0.78)) {
+          ctx.strokeStyle = 'rgba(24, 125, 255, ' + alpha * 0.65 + ')'
+          ctx.lineWidth = 0.8
+          ctx.beginPath()
+          ctx.moveTo(p.x - size * 4, p.y)
+          ctx.lineTo(p.x + size * 4, p.y)
+          ctx.moveTo(p.x, p.y - size * 4)
+          ctx.lineTo(p.x, p.y + size * 4)
+          ctx.stroke()
+        }
+        ctx.fillStyle = 'rgba(22, 119, 255, ' + alpha + ')'
         ctx.beginPath()
         ctx.arc(p.x, p.y, size, 0, Math.PI * 2)
         ctx.fill()
-        if (depth > 0.55 && size > 0.72 && Math.sin(p.phase + frame * 0.04) > 0.62) {
-          ctx.fillStyle = 'rgba(125, 200, 255, ' + alpha * 0.9 + ')'
+        if (depth > 0.72 && size > 0.8) {
+          ctx.fillStyle = 'rgba(130, 205, 255, ' + alpha * 0.65 + ')'
           ctx.beginPath()
-          ctx.arc(p.x, p.y, Math.max(0.3, size * 0.42), 0, Math.PI * 2)
+          ctx.arc(p.x, p.y, Math.max(0.35, size * 0.36), 0, Math.PI * 2)
           ctx.fill()
         }
       }
 
-      // A few intense, irregular rays flare out from the center and retract smoothly.
-      for (let i = 0; i < 19; i++) {
-        const angle = i * 2.399 + t * (i % 2 ? -0.21 : 0.17)
-        const wave = 0.5 + 0.5 * Math.sin(t * 2.1 + i * 1.73)
-        const inner = radius * (0.36 + wave * 0.22)
-        const outer = radius * (0.72 + wave * 0.54 + (i % 4) * 0.05)
-        const x1 = cx + Math.cos(angle) * inner
-        const y1 = cy + Math.sin(angle) * inner * 0.82
-        const x2 = cx + Math.cos(angle) * outer
-        const y2 = cy + Math.sin(angle) * outer * 0.82
-        const ray = ctx.createLinearGradient(x1, y1, x2, y2)
-        ray.addColorStop(0, 'rgba(0, 92, 255, 0)')
-        ray.addColorStop(0.56, 'rgba(0, 112, 255, ' + (0.12 + wave * 0.2) + ')')
-        ray.addColorStop(1, 'rgba(72, 175, 255, ' + (0.12 + wave * 0.42) + ')')
-        ctx.strokeStyle = ray
-        ctx.lineWidth = 0.45 + wave * 1.1
+      // Bright moving sparks give the orb the same energetic, electric feel.
+      for (let i = 0; i < 13; i++) {
+        const a = t * (i % 2 ? -0.75 : 0.9) + i * 2.399
+        const orbitR = radius * (0.78 + 0.28 * Math.sin(i * 3.1))
+        const x = cx + Math.cos(a) * orbitR
+        const y = cy + Math.sin(a * 1.19) * orbitR * 0.67
+        const spark = 1.1 + 1.6 * (0.5 + 0.5 * Math.sin(frame * 0.11 + i))
+        const sg = ctx.createRadialGradient(x, y, 0, x, y, spark * 4)
+        sg.addColorStop(0, 'rgba(190, 230, 255, 0.95)')
+        sg.addColorStop(0.25, 'rgba(0, 132, 255, 0.75)')
+        sg.addColorStop(1, 'rgba(0, 82, 255, 0)')
+        ctx.fillStyle = sg
         ctx.beginPath()
-        ctx.moveTo(x1, y1)
-        ctx.lineTo(x2, y2)
-        ctx.stroke()
-      }
-
-      // Fast luminous nodes travel along different orbital paths with sharp light trails.
-      for (const spark of sparks) {
-        const angle = spark.angle + t * spark.speed * 10
-        const orbitRx = radius * (0.78 + (spark.orbit % 4) * 0.13)
-        const orbitRy = radius * (0.46 + (spark.orbit % 5) * 0.1)
-        const x = cx + Math.cos(angle) * orbitRx
-        const y = cy + Math.sin(angle + spark.orbit * 0.7) * orbitRy
-        const tailX = cx + Math.cos(angle - spark.speed * 12) * orbitRx
-        const tailY = cy + Math.sin(angle - spark.speed * 12 + spark.orbit * 0.7) * orbitRy
-        const glow = ctx.createRadialGradient(x, y, 0, x, y, spark.size * 8)
-        glow.addColorStop(0, 'rgba(210, 239, 255, 1)')
-        glow.addColorStop(0.18, 'rgba(45, 155, 255, 0.96)')
-        glow.addColorStop(0.52, 'rgba(0, 91, 255, 0.36)')
-        glow.addColorStop(1, 'rgba(0, 65, 255, 0)')
-        ctx.strokeStyle = 'rgba(45, 145, 255, 0.72)'
-        ctx.lineWidth = spark.size * 0.7
-        ctx.beginPath()
-        ctx.moveTo(tailX, tailY)
-        ctx.lineTo(x, y)
-        ctx.stroke()
-        ctx.fillStyle = glow
-        ctx.beginPath()
-        ctx.arc(x, y, spark.size * 8, 0, Math.PI * 2)
+        ctx.arc(x, y, spark * 4, 0, Math.PI * 2)
         ctx.fill()
-        ctx.fillStyle = 'rgba(225, 245, 255, 0.98)'
+        ctx.fillStyle = 'rgba(205, 239, 255, 0.95)'
         ctx.beginPath()
-        ctx.arc(x, y, spark.size * 0.72, 0, Math.PI * 2)
+        ctx.arc(x, y, spark * 0.55, 0, Math.PI * 2)
         ctx.fill()
       }
-
-      // Central flare breathes softly instead of showing a solid sphere surface.
-      const centerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 0.72)
-      centerGlow.addColorStop(0, 'rgba(22, 130, 255, 0.2)')
-      centerGlow.addColorStop(0.32, 'rgba(0, 75, 255, 0.09)')
-      centerGlow.addColorStop(1, 'rgba(0, 40, 255, 0)')
-      ctx.fillStyle = centerGlow
-      ctx.beginPath()
-      ctx.arc(cx, cy, radius * 0.72, 0, Math.PI * 2)
-      ctx.fill()
-
       raf = window.requestAnimationFrame(draw)
     }
-
-    resize()
     raf = window.requestAnimationFrame(draw)
     window.addEventListener('resize', resize)
     return () => {
@@ -256,7 +194,7 @@ function VoiceParticleAnimation() {
     }
   }, [])
 
-  return <canvas ref={canvasRef} aria-label="Aperonix voice animation" role="img" className="h-72 w-72 sm:h-80 sm:w-80 max-w-full" />
+  return <canvas ref={canvasRef} aria-label="Aperonix voice animation" role="img" className="h-64 w-64 sm:h-72 sm:w-72 max-w-full" />
 }
 
 export default function AperonixVoiceAgentPage() {
