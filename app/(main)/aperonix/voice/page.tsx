@@ -276,7 +276,7 @@ export default function AperonixVoiceAgentPage() {
   const active = rows.find(row => row.id === activeId) || null
   const busy = status !== 'idle'
 
-  return <div className="h-[calc(100dvh-3.5rem)] min-h-[520px] flex bg-background text-foreground">
+  return <div className="h-[100dvh] lg:h-[calc(100dvh-3.5rem)] min-h-[520px] flex bg-background text-foreground">
     <aside className="w-[260px] sm:w-[290px] shrink-0 border-r border-border flex flex-col bg-card/40">
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2 mb-4"><div className="h-9 w-9 rounded-xl bg-gradient-to-br from-pink-500 to-violet-600 flex items-center justify-center text-white"><AudioLines className="h-5 w-5" /></div><div><h1 className="font-semibold text-sm">Aperonix Voice</h1><p className="text-xs text-muted-foreground">Voice conversations</p></div></div>
