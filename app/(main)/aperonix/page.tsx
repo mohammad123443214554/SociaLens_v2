@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText, Archive } from 'lucide-react'
+import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText, Archive, LoaderCircle } from 'lucide-react'
 import { useAperonixChats, AperonixMessage, AperonixConversation } from '@/lib/hooks/useAperonixChats'
 import { useUser } from '@/lib/hooks/useUser'
 import { getAvatarUrl } from '@/lib/utils/helpers'
@@ -99,6 +99,7 @@ export default function AperonixPage() {
 
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [titleGeneratingId, setTitleGeneratingId] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
@@ -249,19 +250,10 @@ export default function AperonixPage() {
       await addMessage(conversationId, userMessage)
       clearAttachment()
 
-      const history = [...(activeConversation?.contextMessages ?? []), ...(activeConversation?.messages ?? [])]
-        .map(m => ({ role: m.role, content: m.content, files: m.attachments ?? [] }))
-      const res = await fetch('/api/aperonix/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history, newMessage: text, files: uploaded }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Aperonix could not analyze this message.')
-      const modelMsgId = await addMessage(conversationId, { role: 'model', content: data.reply, timestamp: Date.now() })
+      // Start naming as soon as the first message is submitted. Keep "New chat"
+      // visible with Aperonix's spinner until the AI-generated title is ready.
       if (isFirstMessage) {
-        // Generate a meaningful title from the whole first prompt (or attached
-        // file names), rather than copying the first few prompt words.
+        setTitleGeneratingId(conversationId)
         void fetch('/api/aperonix/title', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -275,8 +267,23 @@ export default function AperonixPage() {
           if (typeof titleData.title === 'string' && titleData.title.trim()) {
             updateConversationTitle(conversationId, titleData.title)
           }
-        }).catch(error => console.error('Could not generate Aperonix chat title', error))
+        }).catch(error => {
+          console.error('Could not generate Aperonix chat title', error)
+        }).finally(() => {
+          setTitleGeneratingId(current => current === conversationId ? null : current)
+        })
       }
+
+      const history = [...(activeConversation?.contextMessages ?? []), ...(activeConversation?.messages ?? [])]
+        .map(m => ({ role: m.role, content: m.content, files: m.attachments ?? [] }))
+      const res = await fetch('/api/aperonix/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history, newMessage: text, files: uploaded }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Aperonix could not analyze this message.')
+      const modelMsgId = await addMessage(conversationId, { role: 'model', content: data.reply, timestamp: Date.now() })
       if (viaVoice) {
         setSpeakingMessageId(modelMsgId)
         speakHandleRef.current = await speakText(data.reply, () => setSpeakingMessageId(null))
@@ -619,6 +626,9 @@ export default function AperonixPage() {
                 />
               ) : (
                 <span className="flex-1 min-w-0 text-sm truncate">{convo.title}</span>
+              )}
+              {titleGeneratingId === convo.id && (
+                <LoaderCircle aria-label="Aperonix is generating the chat title" className="h-3.5 w-3.5 shrink-0 animate-spin text-pink-500" />
               )}
 
               {renamingId !== convo.id && (
