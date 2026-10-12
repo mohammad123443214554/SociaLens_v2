@@ -722,8 +722,8 @@ export default function AperonixPage() {
             aria-label="Open Aperonix Voice Agent"
           >
             <span aria-hidden="true" className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-pink-400/15 to-transparent transition-transform duration-500 group-hover:translate-x-full" />
-            <Image src="/images/aperonix-logo.png" alt="" width={20} height={20} className="relative h-5 w-5 shrink-0 object-contain" />
-            <span className="relative">Voice Agent</span>
+            <AudioLines aria-hidden="true" className="relative h-5 w-5 shrink-0 text-pink-500 transition-transform duration-200 group-hover:scale-110" />
+            <span className="relative hidden sm:inline">Voice Agent</span>
           </Link>
         </div>
 
