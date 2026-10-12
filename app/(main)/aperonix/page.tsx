@@ -109,6 +109,8 @@ export default function AperonixPage() {
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const [archiveConfirmId, setArchiveConfirmId] = useState<string | null>(null)
   const [showArchivePasswordWizard, setShowArchivePasswordWizard] = useState(false)
   const { data: archiveLock } = useArchiveLockStatus(user?.id)
@@ -680,7 +682,7 @@ export default function AperonixPage() {
                           <Archive className="h-3.5 w-3.5" /> {isArchiveMode ? 'Unarchive Chat' : 'Archive Chat'}
                         </button>
                         <button
-                          onClick={async () => { setOpenMenuId(null); try { await deleteConversation(convo.id) } catch (error) { alert(error instanceof Error ? error.message : 'Could not delete this chat and its files.') } }}
+                          onClick={() => { setOpenMenuId(null); setDeleteConfirmId(convo.id) }}
                           className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
                         >
                           <Trash2 className="h-3.5 w-3.5" /> Delete
@@ -1065,6 +1067,7 @@ export default function AperonixPage() {
         />
       )}
 
+      {deleteConfirmId && (() => { const convo = conversations.find(item => item.id === deleteConfirmId); if (!convo) return null; return <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]" onClick={() => { if (!deleteBusy) setDeleteConfirmId(null) }}><div role="dialog" aria-modal="true" aria-labelledby="delete-chat-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl" onClick={event => event.stopPropagation()}><div className="flex items-start gap-3 border-b border-border p-5"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-500"><Trash2 className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h2 id="delete-chat-title" className="text-base font-semibold">Delete this conversation?</h2><p className="mt-1 text-sm text-muted-foreground">“{convo.title}” and its messages and attachments will be permanently deleted. This action cannot be undone.</p></div></div><div className="flex flex-col-reverse gap-2 p-4 sm:flex-row sm:justify-end"><button disabled={deleteBusy} onClick={() => setDeleteConfirmId(null)} className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-50">Cancel</button><button disabled={deleteBusy} onClick={async () => { setDeleteBusy(true); try { await deleteConversation(convo.id); setDeleteConfirmId(null) } catch (error) { alert(error instanceof Error ? error.message : 'Could not delete this chat and its files.') } finally { setDeleteBusy(false) } }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">{deleteBusy && <LoaderCircle className="h-4 w-4 animate-spin" />} {deleteBusy ? 'Deleting…' : 'Delete conversation'}</button></div></div></div> })()}
       {!isArchiveMode && archiveConfirmId && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]" onClick={() => setArchiveConfirmId(null)}>
           <div role="dialog" aria-modal="true" aria-labelledby="archive-aperonix-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl" onClick={event => event.stopPropagation()}>
