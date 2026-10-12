@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText, Archive, LoaderCircle, AudioLines } from 'lucide-react'
+import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText, Archive, LoaderCircle, AudioLines, ArrowLeft } from 'lucide-react'
 import { useAperonixChats, AperonixMessage, AperonixConversation } from '@/lib/hooks/useAperonixChats'
 import { useUser } from '@/lib/hooks/useUser'
 import { getAvatarUrl } from '@/lib/utils/helpers'
@@ -703,8 +703,12 @@ export default function AperonixPage() {
 
       {/* Chat window */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <div className="sticky top-0 z-20 flex items-center gap-3 p-3 border-b bg-background shrink-0">
-          <button type="button" aria-label="Open chat history" aria-expanded={showHistory} onClick={() => setShowHistory(true)} className="relative z-10 md:hidden text-muted-foreground">
+        <div className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 p-3 border-b bg-background shrink-0">
+          <button type="button" aria-label="Go back" title="Go back" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.assign('/home') }} className="group relative inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/70 bg-background text-muted-foreground transition-all duration-200 hover:border-pink-500/50 hover:bg-pink-500/10 hover:text-foreground hover:shadow-[0_0_18px_rgba(236,72,153,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500">
+            <span aria-hidden="true" className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-pink-400/15 to-transparent transition-transform duration-500 group-hover:translate-x-full" />
+            <ArrowLeft className="relative h-[18px] w-[18px] transition-transform duration-200 group-hover:-translate-x-0.5" />
+          </button>
+          <button type="button" aria-label="Open chat history" aria-expanded={showHistory} onClick={() => setShowHistory(true)} className="relative z-10 md:hidden text-muted-foreground hover:text-foreground">
             <Menu className="h-5 w-5" />
           </button>
           <Image src="/images/aperonix-logo.png" alt="Aperonix" width={36} height={36} className="rounded-full" />
@@ -714,12 +718,12 @@ export default function AperonixPage() {
           </div>
           <Link
             href="/aperonix/voice"
-            className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-full border border-pink-500/30 bg-pink-500/10 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-pink-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+            className="group relative ml-auto inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-xl border border-transparent bg-transparent px-3 py-2 text-sm font-medium text-foreground transition-all duration-200 hover:border-border/70 hover:bg-accent/70 hover:shadow-[0_0_20px_rgba(168,85,247,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
             aria-label="Open Aperonix Voice Agent"
           >
-            <AudioLines className="h-4 w-4 text-pink-500" />
-            <span className="hidden sm:inline">Voice Agent</span>
-            <span className="sm:hidden">Voice</span>
+            <span aria-hidden="true" className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-pink-400/15 to-transparent transition-transform duration-500 group-hover:translate-x-full" />
+            <Image src="/images/aperonix-logo.png" alt="" width={20} height={20} className="relative h-5 w-5 shrink-0 object-contain" />
+            <span className="relative">Voice Agent</span>
           </Link>
         </div>
 
