@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText, Archive, LoaderCircle } from 'lucide-react'
+import { Send, Menu, Plus, Trash2, X, Sparkles, Copy, RefreshCw, ThumbsUp, ThumbsDown, Forward, Check, Volume2, Square, Mic, MicOff, MoreVertical, Pin, PencilLine, Link2, FileText, Archive, LoaderCircle, AudioLines } from 'lucide-react'
 import { useAperonixChats, AperonixMessage, AperonixConversation } from '@/lib/hooks/useAperonixChats'
 import { useUser } from '@/lib/hooks/useUser'
 import { getAvatarUrl } from '@/lib/utils/helpers'
@@ -709,6 +710,15 @@ export default function AperonixPage() {
             <p className="font-semibold text-sm">Aperonix</p>
             <p className="text-xs text-muted-foreground">SociaLens's official AI</p>
           </div>
+          <Link
+            href="/aperonix/voice"
+            className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-full border border-pink-500/30 bg-pink-500/10 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-pink-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+            aria-label="Open Aperonix Voice Agent"
+          >
+            <AudioLines className="h-4 w-4 text-pink-500" />
+            <span className="hidden sm:inline">Voice Agent</span>
+            <span className="sm:hidden">Voice</span>
+          </Link>
         </div>
 
         <div className="relative flex-1 min-h-0 overflow-y-auto p-4 space-y-4" style={wallpaper ? { backgroundImage: 'linear-gradient(rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.14)), url("' + wallpaper.dataUrl + '")', backgroundSize: 'cover, cover', backgroundPosition: 'center, ' + wallpaper.positionX + '% ' + wallpaper.positionY + '%', backgroundRepeat: 'no-repeat, no-repeat' } : undefined}>
