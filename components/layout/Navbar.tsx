@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Settings, AudioLines } from 'lucide-react'
+import { Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useUser } from '@/lib/hooks/useUser'
@@ -40,14 +40,6 @@ export function Navbar({ className }: { className?: string } = {}) {
             <Button variant="ghost" size="icon" className="gap-1 px-2 w-auto" title="Aperonix AI">
               <Image src="/images/aperonix-logo.png" alt="Aperonix" width={22} height={22} className="rounded-full" />
               <span className="text-xs font-medium hidden sm:inline">Aperonix</span>
-            </Button>
-          </Link>
-
-          {/* Aperonix Voice Agent */}
-          <Link href="/aperonix/voice">
-            <Button variant="ghost" size="icon" className="gap-1 px-2 w-auto" title="Aperonix Voice Agent" aria-label="Aperonix Voice Agent">
-              <AudioLines className="h-4 w-4 text-pink-500" />
-              <span className="text-xs font-medium hidden sm:inline">Voice Agent</span>
             </Button>
           </Link>
 
