@@ -1027,6 +1027,7 @@ export default function AperonixPage() {
               <Send className="h-4 w-4" />
             </button>
           </form>
+            <p className="pb-2 text-center text-[10px] text-muted-foreground/70">Aperonix is AI and can make mistakes. Check important info.</p>
         </div>
       </div>
 
