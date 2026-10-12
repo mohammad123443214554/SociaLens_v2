@@ -90,6 +90,7 @@ export default function AperonixPage() {
     togglePinConversation,
     connectAsNewConversation,
     addMessage,
+    updateConversationTitle,
     editUserMessage,
     replaceMessageContent,
     setMessageFeedback,
@@ -200,6 +201,7 @@ export default function AperonixPage() {
 
     let conversationId = activeId
     if (!conversationId) conversationId = createConversation()
+    const isFirstMessage = !(conversations.find(conversation => conversation.id === conversationId)?.messages.length)
     const messageId = crypto.randomUUID()
     setInput('')
     setSending(true)
@@ -257,6 +259,24 @@ export default function AperonixPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Aperonix could not analyze this message.')
       const modelMsgId = await addMessage(conversationId, { role: 'model', content: data.reply, timestamp: Date.now() })
+      if (isFirstMessage) {
+        // Generate a meaningful title from the whole first prompt (or attached
+        // file names), rather than copying the first few prompt words.
+        void fetch('/api/aperonix/title', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            attachmentNames: uploaded.map(file => file.name),
+          }),
+        }).then(async titleResponse => {
+          if (!titleResponse.ok) throw new Error('Title generation failed')
+          const titleData = await titleResponse.json()
+          if (typeof titleData.title === 'string' && titleData.title.trim()) {
+            updateConversationTitle(conversationId, titleData.title)
+          }
+        }).catch(error => console.error('Could not generate Aperonix chat title', error))
+      }
       if (viaVoice) {
         setSpeakingMessageId(modelMsgId)
         speakHandleRef.current = await speakText(data.reply, () => setSpeakingMessageId(null))
