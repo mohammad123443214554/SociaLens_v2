@@ -28,14 +28,16 @@ export async function POST() {
         'x-goog-api-key': apiKey,
       },
       body: JSON.stringify({
-        uses: 1,
-        expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
-        newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
-        liveConnectConstraints: {
-          model: 'models/gemini-3.8-live',
-          config: {
-            responseModalities: ['AUDIO'],
-            sessionResumption: {},
+        authToken: {
+          uses: 1,
+          expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
+          newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
+          liveConnectConstraints: {
+            model: 'models/gemini-3.8-live',
+            config: {
+              responseModalities: ['AUDIO'],
+              sessionResumption: {},
+            },
           },
         },
       }),
