@@ -190,6 +190,7 @@ export default function AperonixVoiceAgentPage() {
       recorder.ondataavailable = event => { if (event.data.size) chunksRef.current.push(event.data) }
       recorder.start(1000)
       const ai = new GoogleGenAI({ apiKey: tokenData.token })
+      startedRef.current = Date.now()
       const session = await ai.live.connect({
         model: 'gemini-3.8-live',
         config: {
@@ -233,7 +234,7 @@ export default function AperonixVoiceAgentPage() {
       }
       micSource.connect(processor)
       const mute = context.createGain(); mute.gain.value = 0; processor.connect(mute); mute.connect(context.destination)
-      startedRef.current = Date.now(); changeStatus('listening')
+      changeStatus('listening')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not start voice session.')
       try { sessionRef.current?.close() } catch {}
@@ -243,7 +244,7 @@ export default function AperonixVoiceAgentPage() {
       streamRef.current?.getTracks().forEach(track => track.stop()); streamRef.current = null
       const context = contextRef.current; contextRef.current = null; destinationRef.current = null
       if (context && context.state !== 'closed') await context.close().catch(() => undefined)
-      chunksRef.current = []; changeStatus('idle')
+      chunksRef.current = []; startedRef.current = null; changeStatus('idle')
     }
   }
 
