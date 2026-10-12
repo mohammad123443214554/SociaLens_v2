@@ -103,7 +103,6 @@ export default function AperonixVoiceAgentPage() {
     const supabase = createClient()
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
     if (authError || !currentUser) throw new Error('Please sign in to save voice conversations.')
-    const now = new Date()
     const title = 'Aperonix'
     const { data, error: insertError } = await supabase.from('aperonix_voice_conversations')
       .insert({ user_id: currentUser.id, title, pinned: false }).select('id,title,storage_path,mime_type,duration_ms,pinned,created_at,updated_at').single()
