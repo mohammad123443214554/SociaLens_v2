@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { GoogleGenAI, Modality } from '@google/genai'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
-import { AudioLines, Plus, Mic, PhoneOff, Play, Headphones, LoaderCircle, Trash2, AlertCircle, Radio, Menu, X } from 'lucide-react'
+import { AudioLines, Plus, Mic, PhoneOff, Play, Headphones, LoaderCircle, Trash2, AlertCircle, Radio, Menu } from 'lucide-react'
 
 type VoiceConversation = { id: string; title: string; storage_path: string | null; mime_type: string; duration_ms: number; created_at: string; updated_at: string }
 type VoiceStatus = 'idle' | 'preparing' | 'connecting' | 'listening' | 'saving'
@@ -279,7 +279,7 @@ export default function AperonixVoiceAgentPage() {
 
   return <div className="relative h-[100dvh] lg:h-[calc(100dvh-3.5rem)] min-h-[480px] flex w-full overflow-hidden bg-background text-foreground">
     {sidebarOpen && <button type="button" aria-label="Close conversation sidebar" className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-    <aside className={`${sidebarOpen ? "fixed inset-y-0 left-0 z-50 flex w-[min(86vw,320px)] shadow-2xl" : "hidden"} lg:static lg:z-auto lg:flex lg:w-[260px] xl:lg:w-[290px] shrink-0 border-r border-border flex-col bg-card/40`}
+    <aside className={`${sidebarOpen ? "fixed inset-y-0 left-0 z-50 flex w-[min(86vw,320px)] shadow-2xl" : "hidden"} lg:static lg:z-auto lg:flex lg:w-[260px] xl:w-[290px] shrink-0 border-r border-border flex-col bg-card/40`}>
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2 mb-4"><div className="h-9 w-9 rounded-xl bg-gradient-to-br from-pink-500 to-violet-600 flex items-center justify-center text-white"><AudioLines className="h-5 w-5" /></div><div><h1 className="font-semibold text-sm">Aperonix Voice</h1><p className="text-xs text-muted-foreground">Voice conversations</p></div></div>
         <button disabled={busy} onClick={() => { setSidebarOpen(false); void createConversation().catch(e => setError(e.message)) }} className="w-full flex items-center justify-center gap-2 rounded-xl border border-pink-500/50 bg-pink-500/10 hover:bg-pink-500/15 px-3 py-2.5 text-sm font-semibold text-pink-500 disabled:opacity-50"><Plus className="h-4 w-4" /> New conversation</button>
