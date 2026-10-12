@@ -111,16 +111,29 @@ export function useAperonixChats(options: { includeArchived?: boolean } = {}) {
     if (error) throw error
   }, [])
 
+  // A new chat is a client-side draft until the user sends the first message.
+  // Remove any previous empty draft and do not write this one to Supabase yet.
   const createConversation = useCallback(() => {
     const now = Date.now()
     const newConvo: AperonixConversation = {
       id: crypto.randomUUID(), title: 'New chat', messages: [],
       createdAt: now, updatedAt: now, pinned: false, archivedAt: null,
     }
-    setConversations(prev => [newConvo, ...prev])
+    setConversations(prev => [newConvo, ...prev.filter(c => c.messages.length > 0)])
     setActiveId(newConvo.id)
-    void persistConversation(newConvo).catch(error => console.error('Could not create Aperonix chat', error))
     return newConvo.id
+  }, [])
+
+  const updateConversationTitle = useCallback((id: string, title: string) => {
+    const trimmed = title.trim().replace(/^["'\s]+|["'\s]+$/g, '').slice(0, 80)
+    if (!trimmed) return
+    let updated: AperonixConversation | undefined
+    setConversations(prev => prev.map(c => {
+      if (c.id !== id) return c
+      updated = { ...c, title: trimmed, updatedAt: Date.now() }
+      return updated
+    }))
+    if (updated) void persistConversation(updated).catch(error => console.error('Could not save Aperonix chat title', error))
   }, [persistConversation])
 
   const deleteConversation = useCallback(async (id: string) => {
@@ -223,9 +236,7 @@ export function useAperonixChats(options: { includeArchived?: boolean } = {}) {
   const addMessage = useCallback(async (conversationId: string, message: Omit<AperonixMessage, 'id'> & { id?: string }): Promise<string> => {
     const withId: AperonixMessage = { ...message, id: message.id || crypto.randomUUID() }
     const now = new Date().toISOString()
-    const titleFromMessage = message.role === 'user'
-      ? (message.content.slice(0, 40) || message.attachments?.[0]?.name || 'File chat').slice(0, 40)
-      : 'New chat'
+    const fallbackTitle = message.attachments?.[0]?.name ? 'File chat' : 'New chat'
 
     // Persist first, then report success to the caller. This prevents a fast
     // refresh/close from racing an un-awaited background database write.
@@ -242,9 +253,9 @@ export function useAperonixChats(options: { includeArchived?: boolean } = {}) {
       .maybeSingle()
     if (convoReadError) throw new Error(`Could not read chat history: ${convoReadError.message}`)
 
-    const nextTitle = message.role === 'user' && (!convo || convo.title === 'New chat')
-      ? titleFromMessage
-      : (convo?.title || 'New chat')
+    // The title is generated separately by Aperonix. Never derive it from the
+    // first few words of the user's prompt.
+    const nextTitle = convo?.title || fallbackTitle
     const { error: convoError } = await supabase.from('aperonix_conversations').upsert({
       id: conversationId,
       user_id: user.id,
@@ -270,11 +281,9 @@ export function useAperonixChats(options: { includeArchived?: boolean } = {}) {
 
     setConversations(prev => prev.map(c => {
       if (c.id !== conversationId) return c
-      const title = c.messages.length === 0 && message.role === 'user' && c.title === 'New chat'
-        ? titleFromMessage : nextTitle
       return {
         ...c,
-        title,
+        title: nextTitle,
         messages: c.messages.some(m => m.id === withId.id)
           ? c.messages.map(m => m.id === withId.id ? withId : m)
           : [...c.messages, withId],
@@ -324,7 +333,7 @@ export function useAperonixChats(options: { includeArchived?: boolean } = {}) {
   return {
     conversations: sortedConversations, activeId, setActiveId, activeConversation,
     createConversation, deleteConversation, archiveConversation, renameConversation, togglePinConversation,
-    connectAsNewConversation, addMessage, editUserMessage, replaceMessageContent,
+    connectAsNewConversation, addMessage, updateConversationTitle, editUserMessage, replaceMessageContent,
     setMessageFeedback, loaded,
   }
 }
