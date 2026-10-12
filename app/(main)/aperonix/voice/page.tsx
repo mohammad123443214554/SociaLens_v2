@@ -40,6 +40,163 @@ function dateLabel(value: string) {
   return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
+function VoiceParticleAnimation() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    let frame = 0
+    let raf = 0
+    let width = 0
+    let height = 0
+    let dpr = 1
+    let particles: { x: number; y: number; z: number; size: number; phase: number }[] = []
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect()
+      dpr = Math.min(window.devicePixelRatio || 1, 2)
+      width = Math.max(1, rect.width)
+      height = Math.max(1, rect.height)
+      canvas.width = Math.round(width * dpr)
+      canvas.height = Math.round(height * dpr)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      const count = Math.round(Math.min(1050, Math.max(560, width * height / 55)))
+      particles = Array.from({ length: count }, (_, i) => {
+        const y = 1 - 2 * ((i + 0.5) / count)
+        const radius = Math.sqrt(Math.max(0, 1 - y * y))
+        const angle = i * Math.PI * (3 - Math.sqrt(5))
+        return { x: Math.cos(angle) * radius, y, z: Math.sin(angle) * radius, size: 0.45 + Math.random() * 1.15, phase: Math.random() * Math.PI * 2 }
+      })
+    }
+    resize()
+    const draw = () => {
+      frame += 1
+      ctx.clearRect(0, 0, width, height)
+      const cx = width / 2
+      const cy = height / 2
+      const radius = Math.min(width, height) * 0.325
+      const t = frame * 0.0065
+      const cos = Math.cos(t)
+      const sin = Math.sin(t)
+      const tilt = -0.22
+      const ct = Math.cos(tilt)
+      const st = Math.sin(tilt)
+
+      // Soft electric-blue aura behind the particle core.
+      const glow = ctx.createRadialGradient(cx, cy, radius * 0.04, cx, cy, radius * 1.3)
+      glow.addColorStop(0, 'rgba(0, 140, 255, 0.24)')
+      glow.addColorStop(0.48, 'rgba(0, 72, 255, 0.12)')
+      glow.addColorStop(1, 'rgba(0, 20, 120, 0)')
+      ctx.fillStyle = glow
+      ctx.beginPath()
+      ctx.arc(cx, cy, radius * 1.3, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Fine orbital filaments wrap around the glowing sphere.
+      for (let orbit = 0; orbit < 4; orbit++) {
+        ctx.save()
+        ctx.translate(cx, cy)
+        ctx.rotate(t * (orbit % 2 ? -0.38 : 0.52) + orbit * 1.31)
+        ctx.scale(1, 0.34 + (orbit % 3) * 0.13)
+        ctx.beginPath()
+        ctx.ellipse(0, 0, radius * (1.02 + orbit * 0.055), radius * (0.78 + orbit * 0.04), 0, 0, Math.PI * 2)
+        ctx.strokeStyle = orbit % 2 ? 'rgba(0, 100, 255, 0.44)' : 'rgba(24, 125, 255, 0.25)'
+        ctx.lineWidth = 0.7
+        ctx.stroke()
+        ctx.restore()
+      }
+
+      const projected = particles.map(p => {
+        const rx = p.x * cos - p.z * sin
+        const rz = p.x * sin + p.z * cos
+        const ry = p.y * ct - rz * st
+        const z = p.y * st + rz * ct
+        const perspective = 2.1 / (2.1 - z * 0.28)
+        return { x: cx + rx * radius * perspective, y: cy + ry * radius * perspective, z, size: p.size * perspective, phase: p.phase }
+      }).sort((a, b) => a.z - b.z)
+
+      // Connect nearby visible particles to create a living neural web.
+      ctx.lineWidth = 0.55
+      for (let i = 0; i < projected.length; i += 2) {
+        const a = projected[i]
+        if (a.z < -0.12) continue
+        for (let j = i + 1; j < Math.min(i + 15, projected.length); j++) {
+          const b = projected[j]
+          const dx = a.x - b.x
+          const dy = a.y - b.y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          if (dist < radius * 0.19) {
+            ctx.strokeStyle = 'rgba(0, 111, 255, ' + ((1 - dist / (radius * 0.19)) * (0.16 + Math.max(0, a.z) * 0.3)) + ')'
+            ctx.beginPath()
+            ctx.moveTo(a.x, a.y)
+            ctx.lineTo(b.x, b.y)
+            ctx.stroke()
+          }
+        }
+      }
+
+      for (const p of projected) {
+        const depth = Math.max(0.12, (p.z + 1) / 2)
+        const twinkle = 0.55 + 0.45 * Math.sin(frame * 0.075 + p.phase)
+        const alpha = (0.18 + depth * 0.82) * twinkle
+        const size = p.size * (0.7 + depth * 0.7)
+        if (depth > 0.55 && size > 1.05 && (Math.sin(p.phase * 4 + frame * 0.035) > 0.78)) {
+          ctx.strokeStyle = 'rgba(24, 125, 255, ' + alpha * 0.65 + ')'
+          ctx.lineWidth = 0.8
+          ctx.beginPath()
+          ctx.moveTo(p.x - size * 4, p.y)
+          ctx.lineTo(p.x + size * 4, p.y)
+          ctx.moveTo(p.x, p.y - size * 4)
+          ctx.lineTo(p.x, p.y + size * 4)
+          ctx.stroke()
+        }
+        ctx.fillStyle = 'rgba(22, 119, 255, ' + alpha + ')'
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, size, 0, Math.PI * 2)
+        ctx.fill()
+        if (depth > 0.72 && size > 0.8) {
+          ctx.fillStyle = 'rgba(130, 205, 255, ' + alpha * 0.65 + ')'
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, Math.max(0.35, size * 0.36), 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+
+      // Bright moving sparks give the orb the same energetic, electric feel.
+      for (let i = 0; i < 13; i++) {
+        const a = t * (i % 2 ? -0.75 : 0.9) + i * 2.399
+        const orbitR = radius * (0.78 + 0.28 * Math.sin(i * 3.1))
+        const x = cx + Math.cos(a) * orbitR
+        const y = cy + Math.sin(a * 1.19) * orbitR * 0.67
+        const spark = 1.1 + 1.6 * (0.5 + 0.5 * Math.sin(frame * 0.11 + i))
+        const sg = ctx.createRadialGradient(x, y, 0, x, y, spark * 4)
+        sg.addColorStop(0, 'rgba(190, 230, 255, 0.95)')
+        sg.addColorStop(0.25, 'rgba(0, 132, 255, 0.75)')
+        sg.addColorStop(1, 'rgba(0, 82, 255, 0)')
+        ctx.fillStyle = sg
+        ctx.beginPath()
+        ctx.arc(x, y, spark * 4, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = 'rgba(205, 239, 255, 0.95)'
+        ctx.beginPath()
+        ctx.arc(x, y, spark * 0.55, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      raf = window.requestAnimationFrame(draw)
+    }
+    raf = window.requestAnimationFrame(draw)
+    window.addEventListener('resize', resize)
+    return () => {
+      window.cancelAnimationFrame(raf)
+      window.removeEventListener('resize', resize)
+    }
+  }, [])
+
+  return <canvas ref={canvasRef} aria-label="Aperonix voice animation" role="img" className="h-64 w-64 sm:h-72 sm:w-72 max-w-full" />
+}
+
 export default function AperonixVoiceAgentPage() {
   const { user } = useUser()
   const [rows, setRows] = useState<VoiceConversation[]>([])
@@ -399,9 +556,9 @@ export default function AperonixVoiceAgentPage() {
     <main className="flex-1 min-w-0 w-full flex flex-col">
       <header className="min-h-14 border-b border-border px-3 sm:px-6 py-2 flex items-center gap-3"><button type="button" onClick={() => setSidebarOpen(true)} aria-label="Open voice conversation history" title="Conversation history" className="relative z-10 lg:hidden shrink-0 text-muted-foreground hover:text-foreground"><Menu className="h-5 w-5" /></button><Image src="/images/aperonix-logo.png" alt="Aperonix" width={36} height={36} className="h-9 w-9 shrink-0 rounded-full object-contain" /><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="font-semibold text-sm truncate">{active?.title || 'New conversation'}</h2>{active && titleGeneratingId === active.id && <LoaderCircle aria-label="Aperonix is generating the conversation title" className="h-3.5 w-3.5 shrink-0 animate-spin text-pink-500" />}</div><p className="text-xs text-muted-foreground truncate">{status === 'listening' ? 'Real-time voice conversation · recording' : status === 'saving' ? 'Saving recording to Supabase…' : status === 'connecting' ? 'Connecting to Gemini Live…' : status === 'preparing' ? 'Preparing microphone…' : 'Real-time voice conversation'}</p></div>{status === 'listening' && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{duration(elapsed)}</span>}</header>
       <section className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center justify-center px-4 sm:px-5 py-6 sm:py-8">
-        <div className={"relative flex h-36 w-36 sm:h-44 sm:w-44 items-center justify-center " + (status === 'listening' ? 'drop-shadow-[0_0_32px_rgba(217,70,239,0.25)]' : '')}><Image src="/images/aperonix-logo.png" alt="Aperonix" width={220} height={220} priority className={"h-full w-full object-contain " + (status === 'listening' ? 'animate-pulse' : '')} /></div>
+        {status === 'listening' ? <VoiceParticleAnimation /> : <div className="relative flex h-36 w-36 sm:h-44 sm:w-44 items-center justify-center"><Image src="/images/aperonix-logo.png" alt="Aperonix" width={220} height={220} priority className="h-full w-full object-contain" /></div>}
         <h3 className="mt-8 text-xl sm:text-2xl font-semibold text-center">{status === 'listening' ? 'I’m listening…' : status === 'saving' ? 'Saving your recording' : status === 'connecting' ? 'Connecting to Aperonix' : status === 'preparing' ? 'Getting your voice ready' : playbackUrl ? 'Saved recording' : 'Hey, I’m Aperonix'}</h3>
-        <p className="mt-2 max-w-md text-center text-sm text-muted-foreground leading-6">{status === 'listening' ? 'Speak naturally in Hindi, Hinglish, or English. You can interrupt Aperonix whenever you want.' : status === 'saving' ? 'Your combined conversation audio is being uploaded to private Supabase storage.' : playbackUrl ? 'Listen to your saved voice conversation below.' : 'Your curious companion for big ideas, everyday questions, and new discoveries. Let’s figure things out together.'}</p>
+        <p className="mt-2 max-w-md text-center text-sm text-muted-foreground leading-6">{status === 'listening' ? 'I’m listening. Go ahead whenever you’re ready.' : status === 'saving' ? 'Your combined conversation audio is being uploaded to private Supabase storage.' : playbackUrl ? 'Listen to your saved voice conversation below.' : 'Your curious companion for big ideas, everyday questions, and new discoveries. Let’s figure things out together.'}</p>
         {playbackUrl && status === 'idle' && playbackModal && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4" onClick={() => setPlaybackModal(false)}><div role="dialog" aria-modal="true" aria-label="Play voice conversation" className="w-full max-w-lg rounded-2xl border border-border bg-background p-5 shadow-2xl" onClick={e => e.stopPropagation()}><div className="flex items-center justify-between gap-3 mb-5"><div><h3 className="font-semibold text-base">{active?.title || 'Voice recording'}</h3><p className="text-xs text-muted-foreground mt-1">Full saved conversation audio</p></div><button onClick={() => setPlaybackModal(false)} aria-label="Close player" className="rounded-full p-2 hover:bg-accent"><X className="h-4 w-4" /></button></div><audio key={playbackUrl} controls autoPlay src={playbackUrl} className="w-full" /><p className="text-xs text-muted-foreground mt-3">Private recording · playback link expires after 10 minutes</p></div></div>}
         {error && <div role="alert" className="mt-6 max-w-xl w-full rounded-xl border border-red-500/30 bg-red-500/5 p-3 flex items-start gap-2 text-sm text-red-500"><AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span>{error}</span></div>}
       </section>
