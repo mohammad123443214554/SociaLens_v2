@@ -20,6 +20,9 @@ export async function POST() {
       }, { status: 503 })
     }
 
+    // The REST auth_tokens endpoint expects AuthToken fields at the top level.
+    // Keep the payload to universally supported token fields; Live model/config
+    // are supplied by the client when it opens the constrained Live API session.
     const now = Date.now()
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/auth_tokens', {
       method: 'POST',
@@ -28,27 +31,19 @@ export async function POST() {
         'x-goog-api-key': apiKey,
       },
       body: JSON.stringify({
-        authToken: {
-          uses: 1,
-          expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
-          newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
-          liveConnectConstraints: {
-            model: 'models/gemini-3.8-live',
-            config: {
-              responseModalities: ['AUDIO'],
-              sessionResumption: {},
-            },
-          },
-        },
+        uses: 1,
+        expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
+        newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
       }),
       cache: 'no-store',
     })
 
     const data = await response.json().catch(() => ({}))
     if (!response.ok || typeof data.name !== 'string') {
-      console.error('Gemini Live token provisioning failed:', response.status, data?.error?.message || 'Unknown error')
+      const message = data?.error?.message || 'Google could not start a Live voice session. Check your API key, model access, quota, and billing.'
+      console.error('Gemini Live token provisioning failed:', response.status, message)
       return NextResponse.json({
-        error: data?.error?.message || 'Google could not start a Live voice session. Check your API key, model access, quota, and billing.',
+        error: message,
         code: 'GEMINI_TOKEN_FAILED',
       }, { status: response.status === 429 ? 429 : 502 })
     }
