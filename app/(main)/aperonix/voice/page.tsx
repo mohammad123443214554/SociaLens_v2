@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GoogleGenAI, Modality } from '@google/genai'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { AudioLines, Plus, Mic, PhoneOff, Play, LoaderCircle, Trash2, AlertCircle, Radio, Menu, MoreHorizontal, Pin, Pencil, Copy, X } from 'lucide-react'
@@ -53,6 +54,7 @@ export default function AperonixVoiceAgentPage() {
   const [renameId, setRenameId] = useState<string | null>(null)
   const [renameTitle, setRenameTitle] = useState('')
   const [playbackModal, setPlaybackModal] = useState(false)
+  const [titleGeneratingId, setTitleGeneratingId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const sessionRef = useRef<any>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -65,6 +67,10 @@ export default function AperonixVoiceAgentPage() {
   const cursorRef = useRef(0)
   const activeRef = useRef<string | null>(null)
   const statusRef = useRef<VoiceStatus>('idle')
+  const pendingNewConversationRef = useRef(false)
+  const creatingConversationRef = useRef(false)
+  const titleStartedRef = useRef(false)
+  const firstUtteranceRef = useRef('')
 
   const changeStatus = (value: VoiceStatus) => { statusRef.current = value; setStatus(value) }
 
@@ -103,13 +109,39 @@ export default function AperonixVoiceAgentPage() {
     const supabase = createClient()
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
     if (authError || !currentUser) throw new Error('Please sign in to save voice conversations.')
-    const title = 'Aperonix'
+    const title = 'New conversation'
     const { data, error: insertError } = await supabase.from('aperonix_voice_conversations')
       .insert({ user_id: currentUser.id, title, pinned: false }).select('id,title,storage_path,mime_type,duration_ms,pinned,created_at,updated_at').single()
     if (insertError || !data) throw new Error(insertError?.message || 'Could not create conversation.')
     setRows(prev => [data as VoiceConversation, ...prev])
     setActiveId(data.id); activeRef.current = data.id; setPlaybackUrl(null); setPlaybackModal(false); setError(null)
     return data.id as string
+  }, [])
+
+  const generateVoiceTitle = useCallback(async (id: string, message: string) => {
+    setTitleGeneratingId(id)
+    try {
+      const response = await fetch('/api/aperonix/title', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      })
+      if (!response.ok) throw new Error('Title generation failed')
+      const data = await response.json()
+      if (typeof data.title !== 'string' || !data.title.trim()) throw new Error('Empty title')
+      const title = data.title.trim().slice(0, 80)
+      const supabase = createClient()
+      const { error: updateError } = await supabase.from('aperonix_voice_conversations')
+        .update({ title, updated_at: new Date().toISOString() }).eq('id', id)
+      if (updateError) throw updateError
+      const updatedAt = new Date().toISOString()
+      setRows(prev => prev.map(row => row.id === id ? { ...row, title, updated_at: updatedAt } : row)
+        .sort((a, b) => Number(b.pinned) - Number(a.pinned) || +new Date(b.updated_at) - +new Date(a.updated_at)))
+    } catch (e) {
+      console.error('Could not generate voice conversation title', e)
+    } finally {
+      setTitleGeneratingId(current => current === id ? null : current)
+    }
   }, [])
 
   const saveRecording = useCallback(async (id: string, blob: Blob, durationMs: number) => {
@@ -173,8 +205,11 @@ export default function AperonixVoiceAgentPage() {
     if (statusRef.current !== 'idle') return
     setError(null); setPlaybackUrl(null); setElapsed(0); changeStatus('preparing')
     let id = activeRef.current
+    pendingNewConversationRef.current = !id
+    creatingConversationRef.current = false
+    titleStartedRef.current = false
+    firstUtteranceRef.current = ''
     try {
-      if (!id) id = await createConversation()
       const response = await fetch('/api/aperonix/voice-token', { method: 'POST', cache: 'no-store' })
       const tokenData = await response.json()
       if (!response.ok || !tokenData.token) throw new Error(tokenData.error || 'Could not prepare Gemini Live.')
@@ -199,12 +234,31 @@ export default function AperonixVoiceAgentPage() {
         model: 'gemini-3.8-live',
         config: {
           responseModalities: [Modality.AUDIO],
+          inputAudioTranscription: {},
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } } },
           systemInstruction: { parts: [{ text: 'You are Aperonix, SociaLens official AI voice companion. Speak in a warm, sweet, calm, natural feminine voice. Be friendly, patient, and conversational rather than robotic. Respond naturally in the language the user speaks, including Hindi, Hinglish, and English. Keep replies concise unless asked for detail. Let the user interrupt. Never claim to have performed actions you did not perform.' }] },
         },
         callbacks: {
           onopen: () => changeStatus('listening'),
           onmessage: message => {
+            const transcript = message.serverContent?.inputTranscription?.text
+            if (typeof transcript === 'string' && transcript.trim()) {
+              firstUtteranceRef.current = (firstUtteranceRef.current + ' ' + transcript.trim()).trim().slice(0, 12000)
+            }
+            if (message.serverContent?.turnComplete && pendingNewConversationRef.current && !titleStartedRef.current && firstUtteranceRef.current.trim() && !creatingConversationRef.current) {
+              creatingConversationRef.current = true
+              titleStartedRef.current = true
+              pendingNewConversationRef.current = false
+              const utterance = firstUtteranceRef.current.trim()
+              void createConversation().then(id => {
+                void generateVoiceTitle(id, utterance)
+              }).catch(e => {
+                creatingConversationRef.current = false
+                titleStartedRef.current = false
+                pendingNewConversationRef.current = true
+                setError(e instanceof Error ? e.message : 'Could not save the new conversation.')
+              })
+            }
             const parts = message.serverContent?.modelTurn?.parts || []
             for (const part of parts) {
               if (!part.inlineData?.data || !part.inlineData.mimeType?.startsWith('audio/pcm')) continue
@@ -323,11 +377,11 @@ export default function AperonixVoiceAgentPage() {
     <aside className={`${sidebarOpen ? "fixed inset-y-0 left-0 z-[100] flex w-[min(86vw,320px)] shadow-2xl" : "hidden"} lg:static lg:z-auto lg:flex lg:w-[260px] xl:w-[290px] shrink-0 border-r border-border flex-col bg-background`}>
       <div className="p-4 border-b border-border">
         <div className="mb-4"><h1 className="font-semibold text-sm">All conversations</h1></div>
-        <button disabled={busy} onClick={() => { setSidebarOpen(false); void createConversation().catch(e => setError(e.message)) }} className="w-full flex items-center justify-center gap-2 rounded-xl border border-pink-500/50 bg-pink-500/10 hover:bg-pink-500/15 px-3 py-2.5 text-sm font-semibold text-pink-500 disabled:opacity-50"><Plus className="h-4 w-4" /> New conversation</button>
+        <button disabled={busy} onClick={() => { setSidebarOpen(false); setActiveId(null); activeRef.current = null; setPlaybackUrl(null); setPlaybackModal(false); setError(null); setTitleGeneratingId(null); pendingNewConversationRef.current = true; creatingConversationRef.current = false; titleStartedRef.current = false; firstUtteranceRef.current = '' }} className="w-full flex items-center justify-center gap-2 rounded-xl border border-pink-500/50 bg-pink-500/10 hover:bg-pink-500/15 px-3 py-2.5 text-sm font-semibold text-pink-500 disabled:opacity-50"><Plus className="h-4 w-4" /> New conversation</button>
       </div>
       <div className="flex-1 overflow-y-auto p-2">
         {loading ? <div className="flex justify-center py-8"><LoaderCircle className="h-5 w-5 animate-spin text-muted-foreground" /></div> : rows.length === 0 ? <p className="px-3 py-8 text-center text-xs leading-5 text-muted-foreground">No conversations yet.</p> : rows.map(row => <div key={row.id} className={'group relative rounded-lg mb-1 ' + (activeId === row.id ? 'bg-accent' : 'hover:bg-accent/60')}>
-          <div className="flex items-center gap-1 p-1"><button onClick={() => { setActiveId(row.id); activeRef.current = row.id; setPlaybackUrl(null); setPlaybackModal(false); setError(null); setSidebarOpen(false) }} className="min-w-0 flex-1 text-left px-2 py-2.5"><span className="flex items-center gap-2 min-w-0"><span className="block text-sm font-medium truncate">{row.title}</span>{row.pinned && <Pin className="h-3 w-3 shrink-0 text-muted-foreground fill-current" />}</span></button><button aria-label={'Conversation options for ' + row.title} onClick={() => setMenuId(menuId === row.id ? null : row.id)} className="p-2 rounded-md text-muted-foreground hover:bg-background hover:text-foreground"><MoreHorizontal className="h-4 w-4" /></button></div>
+          <div className="flex items-center gap-1 p-1"><button onClick={() => { setActiveId(row.id); activeRef.current = row.id; setPlaybackUrl(null); setPlaybackModal(false); setError(null); setSidebarOpen(false) }} className="min-w-0 flex-1 text-left px-2 py-2.5"><span className="flex items-center gap-2 min-w-0"><span className="block text-sm font-medium truncate">{row.title}</span>{titleGeneratingId === row.id && <LoaderCircle aria-label="Aperonix is generating the conversation title" className="h-3.5 w-3.5 shrink-0 animate-spin text-pink-500" />}{row.pinned && <Pin className="h-3 w-3 shrink-0 text-muted-foreground fill-current" />}</span></button><button aria-label={'Conversation options for ' + row.title} onClick={() => setMenuId(menuId === row.id ? null : row.id)} className="p-2 rounded-md text-muted-foreground hover:bg-background hover:text-foreground"><MoreHorizontal className="h-4 w-4" /></button></div>
           {menuId === row.id && <><button aria-label="Close conversation menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuId(null)} /><div className="absolute right-2 top-10 z-30 w-48 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
             <button onClick={() => void togglePin(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Pin className="h-4 w-4" />{row.pinned ? 'Unpin conversation' : 'Pin to top'}</button>
             <button onClick={() => { setRenameId(row.id); setRenameTitle(row.title); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Pencil className="h-4 w-4" />Rename</button>
@@ -342,7 +396,7 @@ export default function AperonixVoiceAgentPage() {
       <div className="p-3 border-t border-border text-[11px] text-muted-foreground">Recordings are stored privately in Supabase.</div>
     </aside>
     <main className="flex-1 min-w-0 w-full flex flex-col">
-      <header className="min-h-14 border-b border-border px-3 sm:px-6 py-2 flex items-center gap-3"><button type="button" onClick={() => setSidebarOpen(true)} aria-label="Open voice conversation history" title="Conversation history" className="relative z-10 lg:hidden shrink-0 text-muted-foreground hover:text-foreground"><Menu className="h-5 w-5" /></button><div className="min-w-0 flex-1"><h2 className="font-semibold text-sm truncate">{active?.title || 'Aperonix Voice Agent'}</h2><p className="text-xs text-muted-foreground truncate">{status === 'listening' ? 'Live conversation · recording' : status === 'saving' ? 'Saving recording to Supabase…' : status === 'connecting' ? 'Connecting to Gemini Live…' : status === 'preparing' ? 'Preparing microphone…' : 'Natural, real-time voice conversation'}</p></div>{status === 'listening' && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{duration(elapsed)}</span>}</header>
+      <header className="min-h-14 border-b border-border px-3 sm:px-6 py-2 flex items-center gap-3"><button type="button" onClick={() => setSidebarOpen(true)} aria-label="Open voice conversation history" title="Conversation history" className="relative z-10 lg:hidden shrink-0 text-muted-foreground hover:text-foreground"><Menu className="h-5 w-5" /></button><Image src="/images/aperonix-logo.png" alt="Aperonix" width={36} height={36} className="h-9 w-9 shrink-0 rounded-full object-contain" /><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="font-semibold text-sm truncate">{active?.title || 'New conversation'}</h2>{active && titleGeneratingId === active.id && <LoaderCircle aria-label="Aperonix is generating the conversation title" className="h-3.5 w-3.5 shrink-0 animate-spin text-pink-500" />}</div><p className="text-xs text-muted-foreground truncate">{status === 'listening' ? 'Real-time voice conversation · recording' : status === 'saving' ? 'Saving recording to Supabase…' : status === 'connecting' ? 'Connecting to Gemini Live…' : status === 'preparing' ? 'Preparing microphone…' : 'Real-time voice conversation'}</p></div>{status === 'listening' && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{duration(elapsed)}</span>}</header>
       <section className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center justify-center px-4 sm:px-5 py-6 sm:py-8">
         <div className={'relative h-36 w-36 sm:h-44 sm:w-44 rounded-full flex items-center justify-center ' + (status === 'listening' ? 'bg-gradient-to-br from-pink-500/25 via-violet-500/25 to-cyan-400/25 shadow-[0_0_80px_rgba(217,70,239,0.22)]' : 'bg-muted/70')}><div className="absolute inset-3 rounded-full border border-pink-500/30" /><div className="h-24 w-24 sm:h-28 sm:w-28 rounded-full bg-gradient-to-br from-pink-500 via-purple-600 to-cyan-500 flex items-center justify-center shadow-lg text-white">{busy && status !== 'listening' ? <LoaderCircle className="h-10 w-10 animate-spin" /> : status === 'listening' ? <Radio className="h-10 w-10 animate-pulse" /> : <AudioLines className="h-10 w-10" />}</div></div>
         <h3 className="mt-8 text-xl sm:text-2xl font-semibold text-center">{status === 'listening' ? 'I’m listening…' : status === 'saving' ? 'Saving your recording' : status === 'connecting' ? 'Connecting to Aperonix' : status === 'preparing' ? 'Getting your voice ready' : playbackUrl ? 'Saved recording' : 'Talk naturally with Aperonix'}</h3>
