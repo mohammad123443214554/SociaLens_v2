@@ -733,7 +733,7 @@ export default function AperonixPage() {
           {(!activeConversation || activeConversation.messages.length === 0) && !continuedFromTitle && (
             <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-muted-foreground">
               <div className="flex items-center justify-center">
-                <img src="/images/aperonix-logo.png" alt="Aperonix" className="h-36 w-36 sm:h-44 sm:w-44 object-contain" />
+                <img src="/images/aperonix-logo.png" alt="Aperonix" className="h-44 w-44 sm:h-52 sm:w-52 object-contain" />
               </div>
               <p className="text-xl font-semibold text-foreground">Hey, I'm Aperonix</p>
               <p className="text-base max-w-sm">Ask me anything about SociaLens, or just chat with me about whatever's on your mind.</p>
