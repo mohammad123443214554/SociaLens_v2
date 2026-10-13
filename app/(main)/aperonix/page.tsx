@@ -414,8 +414,11 @@ export default function AperonixPage() {
   }
 
   const handleConfirmRename = (id: string) => {
-    renameConversation(id, renameValue)
+    const title = renameValue.trim()
+    if (!title) return
+    renameConversation(id, title)
     setRenamingId(null)
+    setRenameValue('')
   }
 
   const handleConnectAsNewChat = (id: string) => {
@@ -618,22 +621,7 @@ export default function AperonixPage() {
             >
               {convo.pinned && <Pin className="h-3 w-3 shrink-0 fill-current" />}
 
-              {renamingId === convo.id ? (
-                <input
-                  autoFocus
-                  value={renameValue}
-                  onChange={e => setRenameValue(e.target.value)}
-                  onClick={e => e.stopPropagation()}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleConfirmRename(convo.id)
-                    if (e.key === 'Escape') setRenamingId(null)
-                  }}
-                  onBlur={() => handleConfirmRename(convo.id)}
-                  className="flex-1 min-w-0 bg-background border border-pink-500 rounded-lg px-2 py-0.5 text-sm outline-none"
-                />
-              ) : (
-                <span className="flex-1 min-w-0 text-sm truncate">{convo.title}</span>
-              )}
+              <span className="flex-1 min-w-0 text-sm truncate">{convo.title}</span>
               {titleGeneratingId === convo.id && (
                 <LoaderCircle aria-label="Aperonix is generating the chat title" className="h-3.5 w-3.5 shrink-0 animate-spin text-pink-500" />
               )}
@@ -1074,6 +1062,7 @@ export default function AperonixPage() {
         />
       )}
 
+      {renamingId && (() => { const convo = conversations.find(item => item.id === renamingId); if (!convo) return null; return <div className="fixed inset-0 z-[145] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]" onClick={() => setRenamingId(null)}><div role="dialog" aria-modal="true" aria-labelledby="rename-chat-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl" onClick={event => event.stopPropagation()}><div className="flex items-start gap-3 border-b border-border p-5"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><PencilLine className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h2 id="rename-chat-title" className="text-base font-semibold">Rename conversation</h2><p className="mt-1 text-sm text-muted-foreground">Choose a clear name so you can find this chat later.</p></div></div><form className="p-5" onSubmit={event => { event.preventDefault(); handleConfirmRename(convo.id) }}><label htmlFor="rename-chat-input" className="mb-2 block text-sm font-medium">Conversation name</label><input id="rename-chat-input" autoFocus value={renameValue} onChange={event => setRenameValue(event.target.value)} maxLength={80} placeholder="Enter conversation name" className="w-full rounded-xl border border-border bg-background px-3.5 py-3 text-sm outline-none transition-colors focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20" onKeyDown={event => { if (event.key === 'Escape') { setRenamingId(null); setRenameValue('') } }} /><div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => { setRenamingId(null); setRenameValue('') }} className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent">Cancel</button><button type="submit" disabled={!renameValue.trim()} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">Save changes</button></div></form></div></div> })()}
       {deleteConfirmId && (() => { const convo = conversations.find(item => item.id === deleteConfirmId); if (!convo) return null; return <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]" onClick={() => { if (!deleteBusy) setDeleteConfirmId(null) }}><div role="dialog" aria-modal="true" aria-labelledby="delete-chat-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl" onClick={event => event.stopPropagation()}><div className="flex items-start gap-3 border-b border-border p-5"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-500"><Trash2 className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h2 id="delete-chat-title" className="text-base font-semibold">Delete this conversation?</h2><p className="mt-1 text-sm text-muted-foreground">“{convo.title}” and its messages and attachments will be permanently deleted. This action cannot be undone.</p></div></div><div className="flex flex-col-reverse gap-2 p-4 sm:flex-row sm:justify-end"><button disabled={deleteBusy} onClick={() => setDeleteConfirmId(null)} className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-50">Cancel</button><button disabled={deleteBusy} onClick={async () => { setDeleteBusy(true); try { await deleteConversation(convo.id); setDeleteConfirmId(null) } catch (error) { alert(error instanceof Error ? error.message : 'Could not delete this chat and its files.') } finally { setDeleteBusy(false) } }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">{deleteBusy && <LoaderCircle className="h-4 w-4 animate-spin" />} {deleteBusy ? 'Deleting…' : 'Delete conversation'}</button></div></div></div> })()}
       {!isArchiveMode && archiveConfirmId && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]" onClick={() => setArchiveConfirmId(null)}>
