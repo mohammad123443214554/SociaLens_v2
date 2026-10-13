@@ -12,11 +12,14 @@ type SharedMessage = {
   attachments?: { name?: string }[]
 }
 type SharedPayload = {
-  type: 'prompt' | 'chat'
+  type: 'prompt' | 'chat' | 'voice'
   owner?: { username?: string; avatar_url?: string | null }
   prompt?: string
   title?: string
   messages?: SharedMessage[]
+  audioUrl?: string
+  mimeType?: string
+  durationMs?: number
 }
 
 export function SharedAperonixContentMessage({ content, isOwn }: { content: string; isOwn: boolean }) {
@@ -24,23 +27,24 @@ export function SharedAperonixContentMessage({ content, isOwn }: { content: stri
   let payload: SharedPayload
   try {
     const parsed = JSON.parse(content)
-    if (parsed?.__sociaLensShare !== 1 || !['prompt', 'chat'].includes(parsed.type)) return null
+    if (parsed?.__sociaLensShare !== 1 || !['prompt', 'chat', 'voice'].includes(parsed.type)) return null
     payload = parsed as SharedPayload
   } catch {
     return null
   }
 
   const isPrompt = payload.type === 'prompt'
+  const isVoice = payload.type === 'voice'
   const username = payload.owner?.username || 'User'
   const messages = Array.isArray(payload.messages) ? payload.messages : []
   const transcript = isPrompt
     ? payload.prompt || ''
-    : messages.map(message => {
+    : isVoice ? '' : messages.map(message => {
         const role = message.role === 'user' ? username : 'Aperonix'
         const attachments = message.attachments?.length ? `\n[Attachments: ${message.attachments.map(a => a.name || 'file').join(', ')}]` : ''
         return `${role}:\n${message.content || ''}${attachments}`
       }).join('\n\n')
-  const heading = isPrompt ? `${username} Prompt` : 'Aperonix Chat'
+  const heading = isVoice ? 'Aperonix Voice Conversation' : isPrompt ? `${username} Prompt` : 'Aperonix Chat'
 
   return (
     <div className={`max-w-[80%] overflow-hidden rounded-2xl border ${isOwn ? 'border-white/20 bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'border-border bg-muted'}`}>
@@ -56,7 +60,13 @@ export function SharedAperonixContentMessage({ content, isOwn }: { content: stri
         <span className="text-[11px] font-semibold">{heading}</span>
       </div>
       <div className="px-3 pb-2.5 pt-1">
-        <p className="whitespace-pre-wrap break-words text-sm leading-5 line-clamp-4">{transcript}</p>
+        {isVoice ? (
+          <div className="space-y-2.5">
+            <p className="text-sm font-semibold">{payload.title || 'Voice conversation'}</p>
+            {payload.audioUrl ? <audio controls preload="metadata" src={payload.audioUrl} className="w-full" /> : <p className="text-xs text-muted-foreground">Recording is unavailable.</p>}
+            {payload.durationMs ? <p className="text-xs text-muted-foreground">{Math.floor(payload.durationMs / 60000)}:{String(Math.floor(payload.durationMs / 1000) % 60).padStart(2, '0')} · Tap play to listen</p> : <p className="text-xs text-muted-foreground">Tap play to listen to the conversation</p>}
+          </div>
+        ) : <p className="whitespace-pre-wrap break-words text-sm leading-5 line-clamp-4">{transcript}</p>}
         {transcript.length > 120 && (
           <button onClick={() => setShowFull(true)} className={`mt-1 text-xs font-semibold ${isOwn ? 'text-white/90 underline' : 'text-pink-500'}`}>
             See more
