@@ -93,6 +93,7 @@ export default function AperonixPage() {
     archiveConversation,
     renameConversation,
     togglePinConversation,
+    duplicateConversation,
     connectAsNewConversation,
     addMessage,
     updateConversationTitle,
@@ -421,6 +422,17 @@ export default function AperonixPage() {
     setRenameValue('')
   }
 
+  const handleDuplicateChat = async (id: string) => {
+    setOpenMenuId(null)
+    try {
+      const duplicateId = await duplicateConversation(id)
+      setShowHistory(false)
+      if (duplicateId) setActiveId(duplicateId)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not duplicate this chat. Please try again.')
+    }
+  }
+
   const handleConnectAsNewChat = (id: string) => {
     setOpenMenuId(null)
     connectAsNewConversation(id)
@@ -655,6 +667,12 @@ export default function AperonixPage() {
                           <PencilLine className="h-3.5 w-3.5" /> Rename
                         </button>
                         <ChatWallpaperControls conversationId={convo.id} wallpaper={convo.id === activeId ? wallpaper : null} isActive={convo.id === activeId} onWallpaperChange={nextWallpaper => { cacheConversationWallpaper(convo.id, nextWallpaper); if (convo.id === activeId) setWallpaper(nextWallpaper) }} />
+                        <button
+                          onClick={() => void handleDuplicateChat(convo.id)}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
+                        >
+                          <Copy className="h-3.5 w-3.5" /> Duplicate
+                        </button>
                         {!isArchiveMode && <button
                           onClick={() => handleConnectAsNewChat(convo.id)}
                           className="w-full flex items-center gap-2.5 whitespace-nowrap px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
