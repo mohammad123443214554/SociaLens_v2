@@ -56,6 +56,8 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
   const [currentWallpaper, setCurrentWallpaper] = useState<ChatWallpaper | null>(wallpaper)
   const [open, setOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false)
+  const [removeBusy, setRemoveBusy] = useState(false)
   const [draft, setDraft] = useState<ChatWallpaper | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -285,8 +287,10 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
       setDraft(null)
       setOpen(false)
       setUploadOpen(false)
+      return true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not remove this wallpaper.')
+      return false
     }
   }
 
@@ -312,10 +316,29 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
         {currentWallpaper ? 'Edit wallpaper' : 'Add wallpaper'}
       </button>
       {currentWallpaper && (
-        <button type="button" onClick={() => void remove()} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-500/10 transition-colors">
+        <button type="button" onClick={() => { setOpen(false); setRemoveConfirmOpen(true); setError(null) }} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-500/10 transition-colors">
           <Trash2 className="h-3.5 w-3.5" /> Remove wallpaper
         </button>
       )}
+
+      {removeConfirmOpen && typeof document !== 'undefined' && createPortal((
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]" onClick={() => { if (!removeBusy) setRemoveConfirmOpen(false) }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="remove-wallpaper-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl" onClick={event => event.stopPropagation()}>
+            <div className="flex items-start gap-3 border-b border-border p-5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-500"><Trash2 className="h-5 w-5" /></div>
+              <div className="min-w-0 flex-1">
+                <h2 id="remove-wallpaper-title" className="text-base font-semibold">Remove wallpaper?</h2>
+                <p className="mt-1 text-sm text-muted-foreground">This will remove the wallpaper from this {wallpaperLabel}. You can add another one anytime.</p>
+                {error && <p role="alert" className="mt-3 text-sm text-red-500">{error}</p>}
+              </div>
+            </div>
+            <div className="flex flex-col-reverse gap-2 p-4 sm:flex-row sm:justify-end">
+              <button type="button" disabled={removeBusy} onClick={() => setRemoveConfirmOpen(false)} className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-50">Cancel</button>
+              <button type="button" disabled={removeBusy} onClick={async () => { setRemoveBusy(true); try { if (await remove()) setRemoveConfirmOpen(false) } finally { setRemoveBusy(false) } }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"><Trash2 className="h-4 w-4" />{removeBusy ? 'Removing…' : 'Remove wallpaper'}</button>
+            </div>
+          </section>
+        </div>
+      ), document.body)}
 
       {uploadOpen && typeof document !== 'undefined' && createPortal((
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/65 p-4" onClick={() => setUploadOpen(false)}>
