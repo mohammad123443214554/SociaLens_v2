@@ -679,12 +679,12 @@ export default function AperonixPage() {
                         >
                           <Link2 className="h-3.5 w-3.5 shrink-0" /> Connect with new chat
                         </button>}
-                        <button
+                        {!isArchiveMode && <button
                           onClick={() => handleShareChat(convo)}
                           className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
                         >
                           <Forward className="h-3.5 w-3.5" /> Share Chat
-                        </button>
+                        </button>}
                         <button
                           onClick={() => { if (isArchiveMode) void handleArchiveConversation(convo.id); else { setArchiveConfirmId(convo.id); setOpenMenuId(null) } }}
                           className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
