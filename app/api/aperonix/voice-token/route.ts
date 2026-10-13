@@ -1,15 +1,24 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 export const maxDuration = 15
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Please sign in to use Aperonix Voice Agent.' }, { status: 401 })
+    }
+
+    const body = await request.json().catch(() => ({}))
+    let contextSummary: string | null = null
+    if (typeof body.conversationId === 'string' && body.conversationId) {
+      const { data: conversation, error: contextError } = await supabase.from('aperonix_voice_conversations')
+        .select('context_summary').eq('id', body.conversationId).eq('user_id', user.id).maybeSingle()
+      if (contextError) return NextResponse.json({ error: 'Could not load the connected conversation context.' }, { status: 500 })
+      contextSummary = typeof conversation?.context_summary === 'string' ? conversation.context_summary : null
     }
 
     const apiKey = process.env.GEMINI_API_KEY
@@ -48,7 +57,7 @@ export async function POST() {
       }, { status: response.status === 429 ? 429 : 502 })
     }
 
-    return NextResponse.json({ token: data.name, expiresAt: data.expireTime }, {
+    return NextResponse.json({ token: data.name, expiresAt: data.expireTime, contextSummary }, {
       headers: { 'Cache-Control': 'no-store, max-age=0' },
     })
   } catch (error) {
