@@ -27,7 +27,6 @@ export default function ArchivePage() {
   const [chats, setChats] = useState<ChatRow[]>([])
   const [aperonixChats, setAperonixChats] = useState<{ id: string; title: string; updated_at: string; pinned: boolean }[]>([])
   const [voiceConversations, setVoiceConversations] = useState<{ id: string; title: string; updated_at: string; archived_at: string | null; pinned: boolean; storage_path: string | null; mime_type: string; duration_ms: number }[]>([])
-  const [aperonixSubSection, setAperonixSubSection] = useState<'chats' | 'conversations'>('chats')
   const [openVoiceMenuId, setOpenVoiceMenuId] = useState<string | null>(null)
   const [renamingVoiceId, setRenamingVoiceId] = useState<string | null>(null)
   const [renameVoiceValue, setRenameVoiceValue] = useState('')
@@ -45,7 +44,7 @@ export default function ArchivePage() {
   // Unlocking resets on every visit/reload - the whole point of the
   // password is that it re-asks each time, not just the first time.
   const [unlocked, setUnlocked] = useState(false)
-  const [activeSection, setActiveSection] = useState<'aperonix' | 'users'>('aperonix')
+  const [activeSection, setActiveSection] = useState<'aperonix-chat' | 'users' | 'voice'>('aperonix-chat')
 
   const { data: blockedRelations = new Set<string>() } = useBlockedRelations(user?.id)
   const { data: blockedByOthers = new Set<string>() } = useBlockedByOthers(user?.id)
@@ -94,8 +93,6 @@ export default function ArchivePage() {
       .order('archived_at', { ascending: false })
     if (voiceError) console.error('Could not load archived voice conversations', voiceError)
     else setVoiceConversations(archivedVoice || [])
-    if ((!archivedAperonix || archivedAperonix.length === 0) && (archivedVoice || []).length > 0) setAperonixSubSection('conversations')
-    else if ((archivedAperonix || []).length > 0) setAperonixSubSection('chats')
 
     // Archived chats are intentionally excluded from the unread badge
     // everywhere else, so this list doesn't show one either - it's a
@@ -152,17 +149,12 @@ export default function ArchivePage() {
         </div>
       ) : (
         <div className="space-y-4 px-4 py-4">
-          {chats.length > 0 && (aperonixChats.length > 0 || voiceConversations.length > 0) && <div className="grid grid-cols-2 rounded-xl bg-muted p-1" role="tablist" aria-label="Archived chat types">
-            <button role="tab" aria-selected={activeSection === 'aperonix'} onClick={() => setActiveSection('aperonix')} className={`rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${activeSection === 'aperonix' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Aperonix Chat <span className="ml-1 text-xs opacity-70">{aperonixChats.length + voiceConversations.length}</span></button>
-            <button role="tab" aria-selected={activeSection === 'users'} onClick={() => setActiveSection('users')} className={`rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${activeSection === 'users' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>User Chat <span className="ml-1 text-xs opacity-70">{chats.length}</span></button>
+          {(chats.length > 0 || aperonixChats.length > 0 || voiceConversations.length > 0) && <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1" role="tablist" aria-label="Archived items">
+            <button role="tab" aria-selected={activeSection === 'users'} onClick={() => setActiveSection('users')} className={`min-w-0 rounded-lg px-2 py-2.5 text-xs sm:text-sm font-semibold transition-colors ${activeSection === 'users' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>User Chat <span className="ml-1 text-xs opacity-70">{chats.length}</span></button>
+            <button role="tab" aria-selected={activeSection === 'aperonix-chat'} onClick={() => setActiveSection('aperonix-chat')} className={`min-w-0 rounded-lg px-2 py-2.5 text-xs sm:text-sm font-semibold transition-colors ${activeSection === 'aperonix-chat' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Aperonix Chat <span className="ml-1 text-xs opacity-70">{aperonixChats.length}</span></button>
+            <button role="tab" aria-selected={activeSection === 'voice'} onClick={() => setActiveSection('voice')} className={`min-w-0 rounded-lg px-2 py-2.5 text-xs sm:text-sm font-semibold transition-colors ${activeSection === 'voice' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Aperonix Voice Conversation <span className="ml-1 text-xs opacity-70">{voiceConversations.length}</span></button>
           </div>}
-          {(chats.length === 0 || (aperonixChats.length === 0 && voiceConversations.length === 0) || activeSection === 'aperonix') && (aperonixChats.length > 0 || voiceConversations.length > 0) && (
-            <>
-            <div className="mb-3 grid grid-cols-2 rounded-xl bg-muted p-1" role="tablist" aria-label="Aperonix archived items">
-              <button role="tab" aria-selected={aperonixSubSection === 'chats'} onClick={() => setAperonixSubSection('chats')} className={`rounded-lg px-3 py-2 text-sm font-semibold ${aperonixSubSection === 'chats' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Chats <span className="ml-1 text-xs opacity-70">{aperonixChats.length}</span></button>
-              <button role="tab" aria-selected={aperonixSubSection === 'conversations'} onClick={() => setAperonixSubSection('conversations')} className={`rounded-lg px-3 py-2 text-sm font-semibold ${aperonixSubSection === 'conversations' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Conversations <span className="ml-1 text-xs opacity-70">{voiceConversations.length}</span></button>
-            </div>
-            {aperonixSubSection === 'chats' && aperonixChats.length > 0 && (
+          {activeSection === 'aperonix-chat' && aperonixChats.length > 0 && (
             <section className="border-b border-border">
               {aperonixChats.map(conversation => (
                 <div key={conversation.id} role="button" tabIndex={0} onClick={() => router.push(`/aperonix?archive=1&chatId=${conversation.id}`)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); router.push(`/aperonix?archive=1&chatId=${conversation.id}`) } }} className="group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -241,7 +233,7 @@ export default function ArchivePage() {
               ))}
             </section>
             )}
-            {aperonixSubSection === 'conversations' && voiceConversations.length > 0 && <section className="border-b border-border">
+            {activeSection === 'voice' && voiceConversations.length > 0 && <section className="border-b border-border">
               {voiceConversations.map(conversation => <div key={conversation.id} role="button" tabIndex={0} onClick={() => router.push(`/aperonix/voice?archive=1&conversationId=${conversation.id}`)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); router.push(`/aperonix/voice?archive=1&conversationId=${conversation.id}`) } }} className="group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 <button onClick={event => { event.stopPropagation(); router.push(`/aperonix/voice?archive=1&conversationId=${conversation.id}`) }} aria-label="Open archived voice conversation" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><AudioLines className="h-5 w-5" /></button>
                 <div className="min-w-0 flex-1">
@@ -265,10 +257,8 @@ export default function ArchivePage() {
                 </div>
               </div>)}
             </section>}
-            </>
-          )}
           {voicePlayback && <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/65 p-4" onClick={() => setVoicePlayback(null)}><div role="dialog" aria-modal="true" aria-label="Play archived voice conversation" className="w-full max-w-lg rounded-2xl border border-border bg-background p-5 shadow-2xl" onClick={event => event.stopPropagation()}><div className="mb-5 flex items-center justify-between gap-3"><div><h3 className="font-semibold">{voicePlayback.title}</h3><p className="mt-1 text-xs text-muted-foreground">Full saved conversation audio</p></div><button onClick={() => setVoicePlayback(null)} aria-label="Close player" className="rounded-full p-2 hover:bg-accent"><X className="h-4 w-4" /></button></div><audio controls autoPlay src={voicePlayback.url} className="w-full" /></div></div>}
-          {(aperonixChats.length === 0 && voiceConversations.length === 0 || chats.length === 0 || activeSection === 'users') && chats.length > 0 && <div className="space-y-1">
+          {activeSection === 'users' && chats.length > 0 && <div className="space-y-1">
           {chats.map(chat => {
             const other = getOther(chat)
             const isPinned = chat.pinned_by?.includes(user.id) ?? false
