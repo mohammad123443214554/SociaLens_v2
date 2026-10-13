@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ChatWallpaperControls, ChatWallpaper } from '@/components/aperonix/ChatWallpaperControls'
 import { AperonixShareModal } from '@/components/aperonix/AperonixShareModal'
 import { useUser } from '@/lib/hooks/useUser'
-import { AudioLines, Plus, Mic, PhoneOff, Play, LoaderCircle, Trash2, AlertCircle, Radio, Menu, MoreHorizontal, Pin, Pencil, Copy, X, ArrowLeft, Forward } from 'lucide-react'
+import { AudioLines, Plus, Mic, PhoneOff, Play, LoaderCircle, Trash2, AlertCircle, Radio, Menu, MoreHorizontal, Pin, Pencil, Copy, X, ArrowLeft, Forward, Link2 } from 'lucide-react'
 
 type VoiceConversation = { id: string; title: string; storage_path: string | null; mime_type: string; duration_ms: number; pinned: boolean; context_summary: string | null; created_at: string; updated_at: string }
 type VoiceStatus = 'idle' | 'preparing' | 'connecting' | 'listening' | 'saving'
@@ -720,7 +720,7 @@ export default function AperonixVoiceAgentPage() {
             <button onClick={() => { setRenameId(row.id); setRenameTitle(row.title); setRenameError(null); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Pencil className="h-4 w-4" />Rename</button>
             <ChatWallpaperControls conversationId={row.id} wallpaper={row.id === activeId ? wallpaper : null} isActive={row.id === activeId} onWallpaperChange={nextWallpaper => { cacheVoiceWallpaper(row.id, nextWallpaper); if (row.id === activeId) setWallpaper(nextWallpaper) }} tableName="aperonix_voice_wallpapers" wallpaperLabel="voice conversation" />
             <button onClick={() => void duplicateConversation(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Copy className="h-4 w-4" />Duplicate</button>
-            <button disabled={!!connectingId || !row.storage_path} onClick={() => void connectNewConversation(row)} title="Connect New Conversation" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm whitespace-nowrap hover:bg-accent disabled:opacity-50"><Forward className="h-4 w-4 shrink-0" /><span>{connectingId === row.id ? 'Connecting…' : 'Connect New Conversation'}</span></button>
+            <button disabled={!!connectingId || !row.storage_path} onClick={() => void connectNewConversation(row)} title="Connect New Conversation" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm whitespace-nowrap hover:bg-accent disabled:opacity-50"><Link2 className="h-4 w-4 shrink-0" /><span>{connectingId === row.id ? 'Connecting…' : 'Connect New Conversation'}</span></button>
             <button disabled={!row.storage_path} onClick={() => void handleShareConversation(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-40"><Forward className="h-4 w-4" />Share conversation</button>
             <button disabled={!row.storage_path} onClick={() => { setMenuId(null); void playRecording(row) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-40"><Play className="h-4 w-4" />Play recording</button>
             <button onClick={() => { setDeleteId(row.id); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-accent"><Trash2 className="h-4 w-4" />Delete</button>
