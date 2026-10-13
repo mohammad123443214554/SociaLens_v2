@@ -725,14 +725,16 @@ export default function AperonixPage() {
             <p className="font-semibold text-sm">Aperonix</p>
             <p className="text-xs text-muted-foreground">SociaLens's official AI</p>
           </div>
-          <Link
-            href="/aperonix/voice"
-            className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-xl border border-transparent bg-transparent px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Open Aperonix Voice Agent"
-          >
-            <AudioLines aria-hidden="true" className="h-5 w-5 shrink-0 text-pink-500" />
-            <span className="relative hidden sm:inline">Voice Agent</span>
-          </Link>
+{!isArchiveMode && (
+            <Link
+              href="/aperonix/voice"
+              className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-xl border border-transparent bg-transparent px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Open Aperonix Voice Agent"
+            >
+              <AudioLines aria-hidden="true" className="h-5 w-5 shrink-0 text-pink-500" />
+              <span className="relative hidden sm:inline">Voice Agent</span>
+            </Link>
+          )}
         </div>
 
         <div className="relative flex-1 min-h-0 overflow-y-auto p-4 space-y-4" style={wallpaper ? { backgroundImage: 'linear-gradient(rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.14)), url("' + wallpaper.dataUrl + '")', backgroundSize: 'cover, cover', backgroundPosition: 'center, ' + wallpaper.positionX + '% ' + wallpaper.positionY + '%', backgroundRepeat: 'no-repeat, no-repeat' } : undefined}>
