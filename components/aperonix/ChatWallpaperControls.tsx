@@ -287,8 +287,10 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
       setDraft(null)
       setOpen(false)
       setUploadOpen(false)
+      return true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not remove this wallpaper.')
+      return false
     }
   }
 
@@ -332,7 +334,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
             </div>
             <div className="flex flex-col-reverse gap-2 p-4 sm:flex-row sm:justify-end">
               <button type="button" disabled={removeBusy} onClick={() => setRemoveConfirmOpen(false)} className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-50">Cancel</button>
-              <button type="button" disabled={removeBusy} onClick={async () => { setRemoveBusy(true); try { await remove(); if (!error) setRemoveConfirmOpen(false) } finally { setRemoveBusy(false) } }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"><Trash2 className="h-4 w-4" />{removeBusy ? 'Removing…' : 'Remove wallpaper'}</button>
+              <button type="button" disabled={removeBusy} onClick={async () => { setRemoveBusy(true); try { if (await remove()) setRemoveConfirmOpen(false) } finally { setRemoveBusy(false) } }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"><Trash2 className="h-4 w-4" />{removeBusy ? 'Removing…' : 'Remove wallpaper'}</button>
             </div>
           </section>
         </div>
