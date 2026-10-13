@@ -41,6 +41,49 @@ function dateLabel(value: string) {
   return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
+type VoiceWallpaperCacheEntry = { wallpaper: ChatWallpaper | null; expiresAt: number }
+const voiceWallpaperCache = new Map<string, VoiceWallpaperCacheEntry>()
+const voiceWallpaperLoads = new Map<string, Promise<ChatWallpaper | null>>()
+
+function cacheVoiceWallpaper(conversationId: string, wallpaper: ChatWallpaper | null) {
+  voiceWallpaperCache.set(conversationId, { wallpaper, expiresAt: Date.now() + (wallpaper ? 50 : 5) * 60 * 1000 })
+}
+
+async function loadVoiceWallpaper(conversationId: string): Promise<ChatWallpaper | null> {
+  const cached = voiceWallpaperCache.get(conversationId)
+  if (cached && cached.expiresAt > Date.now()) return cached.wallpaper
+  const inFlight = voiceWallpaperLoads.get(conversationId)
+  if (inFlight) return inFlight
+  const load = (async () => {
+    const supabase = createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError) throw authError
+    if (!user) return null
+    const { data, error } = await supabase.from('aperonix_voice_wallpapers' as 'aperonix_chat_wallpapers')
+      .select('original_storage_path,processed_storage_path,filter_index,zoom,position_x,position_y')
+      .eq('conversation_id', conversationId).eq('user_id', user.id).maybeSingle()
+    if (error) throw error
+    if (!data) { cacheVoiceWallpaper(conversationId, null); return null }
+    const [original, processed] = await Promise.all([
+      supabase.storage.from('aperonix-wallpapers').createSignedUrl(data.original_storage_path, 60 * 60),
+      supabase.storage.from('aperonix-wallpapers').createSignedUrl(data.processed_storage_path, 60 * 60),
+    ])
+    if (original.error || processed.error || !original.data?.signedUrl || !processed.data?.signedUrl) throw new Error('Could not load this voice wallpaper.')
+    const loaded: ChatWallpaper = { originalDataUrl: original.data.signedUrl, dataUrl: processed.data.signedUrl,
+      originalStoragePath: data.original_storage_path, processedStoragePath: data.processed_storage_path,
+      filterIndex: data.filter_index, zoom: data.zoom, positionX: data.position_x, positionY: data.position_y }
+    if (typeof window !== 'undefined') {
+      const image = new window.Image(); image.src = loaded.dataUrl
+      if (typeof image.decode === 'function') await image.decode().catch(() => undefined)
+      else await new Promise<void>(resolve => { image.onload = () => resolve(); image.onerror = () => resolve() })
+    }
+    cacheVoiceWallpaper(conversationId, loaded)
+    return loaded
+  })()
+  voiceWallpaperLoads.set(conversationId, load)
+  try { return await load } finally { voiceWallpaperLoads.delete(conversationId) }
+}
+
 function VoiceParticleAnimation() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
@@ -260,48 +303,11 @@ export default function AperonixVoiceAgentPage() {
   useEffect(() => { activeRef.current = activeId }, [activeId])
   useEffect(() => {
     let cancelled = false
-    if (!activeId) {
-      setWallpaper(null)
-      return () => { cancelled = true }
-    }
-    const loadWallpaper = async () => {
-      const supabase = createClient()
-      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
-      if (authError || !currentUser) {
-        if (!cancelled) setWallpaper(null)
-        return
-      }
-      const { data, error: queryError } = await supabase
-        .from('aperonix_voice_wallpapers' as 'aperonix_chat_wallpapers')
-        .select('original_storage_path,processed_storage_path,filter_index,zoom,position_x,position_y')
-        .eq('conversation_id', activeId)
-        .eq('user_id', currentUser.id)
-        .maybeSingle()
-      if (queryError) throw queryError
-      if (!data) {
-        if (!cancelled) setWallpaper(null)
-        return
-      }
-      const [original, processed] = await Promise.all([
-        supabase.storage.from('aperonix-wallpapers').createSignedUrl(data.original_storage_path, 60 * 60),
-        supabase.storage.from('aperonix-wallpapers').createSignedUrl(data.processed_storage_path, 60 * 60),
-      ])
-      if (original.error || processed.error || !original.data?.signedUrl || !processed.data?.signedUrl) {
-        throw new Error('Could not load this voice wallpaper.')
-      }
-      const loaded: ChatWallpaper = {
-        originalDataUrl: original.data.signedUrl,
-        dataUrl: processed.data.signedUrl,
-        originalStoragePath: data.original_storage_path,
-        processedStoragePath: data.processed_storage_path,
-        filterIndex: data.filter_index,
-        zoom: data.zoom,
-        positionX: data.position_x,
-        positionY: data.position_y,
-      }
+    if (!activeId) { setWallpaper(null); return () => { cancelled = true } }
+    // Cache signed URLs and decode images once, so switching conversations is immediate.
+    void loadVoiceWallpaper(activeId).then(loaded => {
       if (!cancelled) setWallpaper(loaded)
-    }
-    void loadWallpaper().catch(cause => {
+    }).catch(cause => {
       console.error('Could not load voice conversation wallpaper', cause)
       if (!cancelled) setWallpaper(null)
     })
@@ -557,12 +563,17 @@ export default function AperonixVoiceAgentPage() {
     const supabase = createClient()
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
     if (authError || !currentUser) { setError('Please sign in again.'); return }
-    if (row.storage_path && row.storage_path.startsWith(currentUser.id + '/')) {
-      const { error: storageError } = await supabase.storage.from('aperonix-voice-recordings').remove([row.storage_path])
-      if (storageError) { setError('Could not delete the recording.'); return }
-    }
-    const { error: deleteError } = await supabase.from('aperonix_voice_conversations').delete().eq('id', row.id).eq('user_id', currentUser.id)
-    if (deleteError) { setError('Could not delete conversation.'); return }
+    const storageCleanup = row.storage_path && row.storage_path.startsWith(currentUser.id + '/')
+      ? supabase.storage.from('aperonix-voice-recordings').remove([row.storage_path])
+      : Promise.resolve({ error: null })
+    const [deleteResult, storageResult] = await Promise.all([
+      supabase.from('aperonix_voice_conversations').delete().eq('id', row.id).eq('user_id', currentUser.id),
+      storageCleanup,
+    ])
+    if (deleteResult.error) { setError('Could not delete conversation: ' + deleteResult.error.message); return }
+    if (storageResult.error) console.error('Voice recording cleanup failed after conversation deletion', storageResult.error)
+    voiceWallpaperCache.delete(row.id)
+    voiceWallpaperLoads.delete(row.id)
     setRows(prev => prev.filter(item => item.id !== row.id))
     if (activeId === row.id) { setActiveId(null); activeRef.current = null; setPlaybackUrl(null); setPlaybackModal(false) }
     setDeleteId(null)
@@ -629,7 +640,7 @@ export default function AperonixVoiceAgentPage() {
           {menuId === row.id && <><button aria-label="Close conversation menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuId(null)} /><div className="absolute right-2 top-10 z-30 w-48 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
             <button onClick={() => void togglePin(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Pin className="h-4 w-4" />{row.pinned ? 'Unpin conversation' : 'Pin to top'}</button>
             <button onClick={() => { setRenameId(row.id); setRenameTitle(row.title); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Pencil className="h-4 w-4" />Rename</button>
-            <ChatWallpaperControls conversationId={row.id} wallpaper={row.id === activeId ? wallpaper : null} isActive={row.id === activeId} onWallpaperChange={nextWallpaper => { if (row.id === activeId) setWallpaper(nextWallpaper) }} tableName="aperonix_voice_wallpapers" wallpaperLabel="voice conversation" />
+            <ChatWallpaperControls conversationId={row.id} wallpaper={row.id === activeId ? wallpaper : null} isActive={row.id === activeId} onWallpaperChange={nextWallpaper => { cacheVoiceWallpaper(row.id, nextWallpaper); if (row.id === activeId) setWallpaper(nextWallpaper) }} tableName="aperonix_voice_wallpapers" wallpaperLabel="voice conversation" />
             <button onClick={() => void duplicateConversation(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Copy className="h-4 w-4" />Duplicate</button>
             <button disabled={!row.storage_path} onClick={() => { setMenuId(null); void playRecording(row) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-40"><Play className="h-4 w-4" />Play recording</button>
             <button onClick={() => { setDeleteId(row.id); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-accent"><Trash2 className="h-4 w-4" />Delete</button>
