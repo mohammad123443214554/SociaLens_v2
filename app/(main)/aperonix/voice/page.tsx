@@ -384,7 +384,7 @@ export default function AperonixVoiceAgentPage() {
     setError(null); setPlaybackUrl(null); setElapsed(0); changeStatus('preparing')
     let id = activeRef.current
     const selectedConversation = rows.find(row => row.id === id)
-    const isUntitledConversation = !!selectedConversation && /^New conversation(?: \\(\\d+\\))?$/.test(selectedConversation.title)
+    const isUntitledConversation = !!selectedConversation && /^New conversation(?: \(\d+\))?$/.test(selectedConversation.title)
     pendingNewConversationRef.current = !id || isUntitledConversation
     creatingConversationRef.current = false
     titleStartedRef.current = false
@@ -566,7 +566,7 @@ export default function AperonixVoiceAgentPage() {
         <button disabled={busy} onClick={() => {
           setSidebarOpen(false)
           const current = rows.find(row => row.id === activeRef.current)
-          const currentIsUntouched = !!current && /^New conversation(?: \\(\\d+\\))?$/.test(current.title) && !current.storage_path && !hasSpokenRef.current
+          const currentIsUntouched = !!current && /^New conversation(?: \(\d+\))?$/.test(current.title) && !current.storage_path && !hasSpokenRef.current
           if (currentIsUntouched) { setPlaybackUrl(null); setPlaybackModal(false); setError(null); return }
           setTitleGeneratingId(null)
           void createConversation().catch(e => setError(e instanceof Error ? e.message : 'Could not create conversation.'))
