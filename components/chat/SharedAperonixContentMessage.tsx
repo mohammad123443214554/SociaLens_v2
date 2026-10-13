@@ -47,7 +47,7 @@ export function SharedAperonixContentMessage({ content, isOwn }: { content: stri
   const heading = isVoice ? 'Aperonix Voice Conversation' : isPrompt ? `${username} Prompt` : 'Aperonix Chat'
 
   return (
-    <div className={`max-w-[80%] overflow-hidden rounded-2xl border ${isOwn ? 'border-white/20 bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'border-border bg-muted'}`}>
+    <div className={`${isVoice ? 'w-full max-w-[560px]' : 'max-w-[80%]'} overflow-hidden rounded-2xl border ${isOwn ? 'border-white/20 bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'border-border bg-muted'}`}>
       <div className={`flex items-center gap-1.5 px-3 pt-2.5 ${isOwn ? 'text-white/80' : 'text-muted-foreground'}`}>
         {isPrompt ? (
           <Avatar className="h-4 w-4 shrink-0">
@@ -61,8 +61,8 @@ export function SharedAperonixContentMessage({ content, isOwn }: { content: stri
       </div>
       <div className="px-3 pb-2.5 pt-1">
         {isVoice ? (
-          <div className="space-y-2.5">
-            <p className="text-sm font-semibold">{payload.title || 'Voice conversation'}</p>
+          <div className="space-y-1.5">
+            <p className="truncate text-sm font-semibold">{payload.title || 'Voice conversation'}</p>
             {payload.audioUrl ? <audio controls preload="metadata" src={payload.audioUrl} className="w-full" /> : <p className="text-xs text-muted-foreground">Recording is unavailable.</p>}
             {payload.durationMs ? <p className="text-xs text-muted-foreground">{Math.floor(payload.durationMs / 60000)}:{String(Math.floor(payload.durationMs / 1000) % 60).padStart(2, '0')} · Tap play to listen</p> : <p className="text-xs text-muted-foreground">Tap play to listen to the conversation</p>}
           </div>
