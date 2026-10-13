@@ -37,6 +37,8 @@ export default function ArchivePage() {
   const [renamingAperonixId, setRenamingAperonixId] = useState<string | null>(null)
   const [renameAperonixValue, setRenameAperonixValue] = useState('')
   const [savingAperonixId, setSavingAperonixId] = useState<string | null>(null)
+  const [unarchiveConfirm, setUnarchiveConfirm] = useState<{ kind: 'user' | 'aperonix' | 'voice'; id: string; title: string } | null>(null)
+  const [unarchiveBusy, setUnarchiveBusy] = useState(false)
   const [shareChatText, setShareChatText] = useState<string | null>(null)
   const [wallpaperChatId, setWallpaperChatId] = useState<string | null>(null)
   const [wallpaperValue, setWallpaperValue] = useState<ChatWallpaper | null>(null)
