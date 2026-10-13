@@ -612,21 +612,35 @@ export default function AperonixVoiceAgentPage() {
     const supabase = createClient()
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
     if (authError || !currentUser) { setError('Please sign in again.'); return }
+    setError(null)
     let copiedPath: string | null = null
     if (row.storage_path) {
-      const { data: source, error: downloadError } = await supabase.storage.from('aperonix-voice-recordings').download(row.storage_path)
-      if (downloadError || !source) { setError('Could not duplicate the recording.'); return }
       copiedPath = currentUser.id + '/' + crypto.randomUUID() + '/recording-copy-' + Date.now() + '.' + (row.storage_path.split('.').pop() || 'webm')
-      const { error: uploadError } = await supabase.storage.from('aperonix-voice-recordings').upload(copiedPath, source, { contentType: row.mime_type || 'audio/webm', upsert: false })
-      if (uploadError) { setError('Could not copy the recording.'); return }
+      // Storage-side copy avoids downloading the whole recording into the browser
+      // and uploading it again, making duplication much faster for large audio files.
+      const { error: copyError } = await supabase.storage.from('aperonix-voice-recordings').copy(row.storage_path, copiedPath)
+      if (copyError) { setError('Could not copy the recording.'); return }
     }
-    const { data, error: insertError } = await supabase.from('aperonix_voice_conversations').insert({ user_id: currentUser.id, title: row.title + ' (copy)', storage_path: copiedPath, mime_type: row.mime_type, duration_ms: row.duration_ms, pinned: false }).select('id,title,storage_path,mime_type,duration_ms,pinned,created_at,updated_at').single()
+    const { data, error: insertError } = await supabase.from('aperonix_voice_conversations').insert({
+      user_id: currentUser.id,
+      title: row.title + ' (copy)',
+      storage_path: copiedPath,
+      mime_type: row.mime_type,
+      duration_ms: row.duration_ms,
+      pinned: false,
+    }).select('id,title,storage_path,mime_type,duration_ms,pinned,created_at,updated_at').single()
     if (insertError || !data) {
       if (copiedPath) await supabase.storage.from('aperonix-voice-recordings').remove([copiedPath])
-      setError('Could not duplicate conversation.'); return
+      setError('Could not duplicate conversation.')
+      return
     }
-    setRows(prev => [data as VoiceConversation, ...prev]); setActiveId(data.id); activeRef.current = data.id
-    setPlaybackUrl(null); setPlaybackModal(false); setMenuId(null); setSidebarOpen(false)
+    setRows(prev => [data as VoiceConversation, ...prev])
+    setActiveId(data.id)
+    activeRef.current = data.id
+    setPlaybackUrl(null)
+    setPlaybackModal(false)
+    setMenuId(null)
+    setSidebarOpen(false)
   }
 
   const active = rows.find(row => row.id === activeId) || null
