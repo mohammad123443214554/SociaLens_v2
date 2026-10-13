@@ -211,6 +211,82 @@ export function useAperonixChats(options: { includeArchived?: boolean } = {}) {
     if (updated) void persistConversation(updated).catch(error => console.error('Could not update Aperonix chat', error))
   }, [persistConversation])
 
+  const duplicateConversation = useCallback(async (sourceId: string) => {
+    const source = conversations.find(c => c.id === sourceId)
+    if (!source) throw new Error('This chat is no longer available.')
+    const supabase = createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) throw new Error('Please sign in again to duplicate this chat.')
+
+    const now = new Date().toISOString()
+    const duplicateId = crypto.randomUUID()
+    const copiedPaths: string[] = []
+    const { error: conversationError } = await supabase.from('aperonix_conversations').insert({
+      id: duplicateId,
+      user_id: user.id,
+      title: source.title + ' (copy)',
+      pinned: false,
+      context_messages: source.contextMessages ?? [],
+      created_at: now,
+      updated_at: now,
+      archived_at: null,
+    })
+    if (conversationError) throw new Error(`Could not duplicate chat: ${conversationError.message}`)
+
+    try {
+      const clonedMessages = await Promise.all(source.messages.map(async message => {
+        const attachments = await Promise.all((message.attachments ?? []).map(async attachment => {
+          if (!attachment.path.startsWith(user.id + '/')) {
+            throw new Error('An attachment could not be copied because it does not belong to your account.')
+          }
+          const slash = attachment.path.lastIndexOf('/')
+          const fileName = attachment.path.slice(slash + 1)
+          const newPath = user.id + '/' + duplicateId + '/' + crypto.randomUUID() + '-' + fileName
+          const { error } = await supabase.storage.from('aperonix-files').copy(attachment.path, newPath)
+          if (error) throw new Error(`Could not copy attachment “${attachment.name}”.`)
+          copiedPaths.push(newPath)
+          return { ...attachment, path: newPath }
+        }))
+        return {
+          id: crypto.randomUUID(),
+          conversation_id: duplicateId,
+          user_id: user.id,
+          role: message.role,
+          content: message.content,
+          feedback: null,
+          attachments,
+          created_at: new Date(message.timestamp).toISOString(),
+        }
+      }))
+      if (clonedMessages.length) {
+        const { error } = await supabase.from('aperonix_messages').insert(clonedMessages)
+        if (error) throw new Error(`Could not copy chat messages: ${error.message}`)
+      }
+      const duplicate: AperonixConversation = {
+        ...source,
+        id: duplicateId,
+        title: source.title + ' (copy)',
+        messages: source.messages.map((message, index) => ({
+          ...message,
+          id: clonedMessages[index]?.id ?? crypto.randomUUID(),
+          attachments: clonedMessages[index]?.attachments ?? null,
+          feedback: null,
+        })),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        pinned: false,
+        archivedAt: null,
+      }
+      setConversations(prev => [duplicate, ...prev])
+      setActiveId(duplicateId)
+      return duplicateId
+    } catch (error) {
+      if (copiedPaths.length) await supabase.storage.from('aperonix-files').remove(copiedPaths)
+      await supabase.from('aperonix_conversations').delete().eq('id', duplicateId).eq('user_id', user.id)
+      throw error
+    }
+  }, [conversations])
+
   const connectAsNewConversation = useCallback((sourceId: string) => {
     const source = conversations.find(c => c.id === sourceId)
     if (!source) return null
@@ -344,7 +420,7 @@ export function useAperonixChats(options: { includeArchived?: boolean } = {}) {
 
   return {
     conversations: sortedConversations, activeId, setActiveId, activeConversation,
-    createConversation, deleteConversation, archiveConversation, renameConversation, togglePinConversation,
+    createConversation, deleteConversation, archiveConversation, renameConversation, togglePinConversation, duplicateConversation,
     connectAsNewConversation, addMessage, updateConversationTitle, editUserMessage, replaceMessageContent,
     setMessageFeedback, loaded,
   }
