@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArchiveRestore, Bot, MessageSquare, MoreVertical, Pin, PencilLine, Forward, Trash2, Check, X } from 'lucide-react'
+import { ArrowLeft, ArchiveRestore, Bot, MessageSquare, MoreVertical, Pin, PencilLine, Forward, Trash2, Check, X, AudioLines, Play, Copy } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { useBlockedRelations, useBlockedByOthers, useArchiveLockStatus } from '@/lib/hooks/useChatSettings'
@@ -26,6 +26,13 @@ export default function ArchivePage() {
   const supabase = createClient()
   const [chats, setChats] = useState<ChatRow[]>([])
   const [aperonixChats, setAperonixChats] = useState<{ id: string; title: string; updated_at: string; pinned: boolean }[]>([])
+  const [voiceConversations, setVoiceConversations] = useState<{ id: string; title: string; updated_at: string; archived_at: string | null; pinned: boolean; storage_path: string | null; mime_type: string; duration_ms: number }[]>([])
+  const [aperonixSubSection, setAperonixSubSection] = useState<'chats' | 'conversations'>('chats')
+  const [openVoiceMenuId, setOpenVoiceMenuId] = useState<string | null>(null)
+  const [renamingVoiceId, setRenamingVoiceId] = useState<string | null>(null)
+  const [renameVoiceValue, setRenameVoiceValue] = useState('')
+  const [voiceBusyId, setVoiceBusyId] = useState<string | null>(null)
+  const [voicePlayback, setVoicePlayback] = useState<{ title: string; url: string } | null>(null)
   const [restoringAperonixId, setRestoringAperonixId] = useState<string | null>(null)
   const [openAperonixMenuId, setOpenAperonixMenuId] = useState<string | null>(null)
   const [renamingAperonixId, setRenamingAperonixId] = useState<string | null>(null)
@@ -79,6 +86,15 @@ export default function ArchivePage() {
       setAperonixChats(archivedAperonix || [])
     }
 
+    const { data: archivedVoice, error: voiceError } = await supabase
+      .from('aperonix_voice_conversations')
+      .select('id,title,updated_at,archived_at,pinned,storage_path,mime_type,duration_ms')
+      .eq('user_id', user.id)
+      .not('archived_at', 'is', null)
+      .order('archived_at', { ascending: false })
+    if (voiceError) console.error('Could not load archived voice conversations', voiceError)
+    else setVoiceConversations(archivedVoice || [])
+
     // Archived chats are intentionally excluded from the unread badge
     // everywhere else, so this list doesn't show one either - it's a
     // private, quiet space, not a second inbox competing for attention.
@@ -92,6 +108,7 @@ export default function ArchivePage() {
       .channel('chat-archive-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, fetchArchivedChats)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'aperonix_conversations' }, fetchArchivedChats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'aperonix_voice_conversations' }, fetchArchivedChats)
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [user, unlocked, blockedByOthers])
@@ -126,18 +143,24 @@ export default function ArchivePage() {
         <h1 className="text-xl font-bold">Archive</h1>
       </div>
 
-      {chats.length === 0 && aperonixChats.length === 0 ? (
+      {chats.length === 0 && aperonixChats.length === 0 && voiceConversations.length === 0 ? (
         <div className="text-center py-20 text-muted-foreground">
-          <p className="font-medium">No archived chats</p>
-          <p className="text-sm mt-1">Chats you archive will show up here.</p>
+          <p className="font-medium">No archived chats or conversations</p>
+          <p className="text-sm mt-1">Items you archive will show up here.</p>
         </div>
       ) : (
         <div className="space-y-4 px-4 py-4">
-          {chats.length > 0 && aperonixChats.length > 0 && <div className="grid grid-cols-2 rounded-xl bg-muted p-1" role="tablist" aria-label="Archived chat types">
-            <button role="tab" aria-selected={activeSection === 'aperonix'} onClick={() => setActiveSection('aperonix')} className={`rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${activeSection === 'aperonix' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Aperonix Chat <span className="ml-1 text-xs opacity-70">{aperonixChats.length}</span></button>
+          {chats.length > 0 && (aperonixChats.length > 0 || voiceConversations.length > 0) && <div className="grid grid-cols-2 rounded-xl bg-muted p-1" role="tablist" aria-label="Archived chat types">
+            <button role="tab" aria-selected={activeSection === 'aperonix'} onClick={() => setActiveSection('aperonix')} className={`rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${activeSection === 'aperonix' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Aperonix Chat <span className="ml-1 text-xs opacity-70">{aperonixChats.length + voiceConversations.length}</span></button>
             <button role="tab" aria-selected={activeSection === 'users'} onClick={() => setActiveSection('users')} className={`rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${activeSection === 'users' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>User Chat <span className="ml-1 text-xs opacity-70">{chats.length}</span></button>
           </div>}
-          {(chats.length === 0 || aperonixChats.length === 0 || activeSection === 'aperonix') && aperonixChats.length > 0 && (
+          {(chats.length === 0 || (aperonixChats.length === 0 && voiceConversations.length === 0) || activeSection === 'aperonix') && (aperonixChats.length > 0 || voiceConversations.length > 0) && (
+            <>
+            <div className="mb-3 grid grid-cols-2 rounded-xl bg-muted p-1" role="tablist" aria-label="Aperonix archived items">
+              <button role="tab" aria-selected={aperonixSubSection === 'chats'} onClick={() => setAperonixSubSection('chats')} className={`rounded-lg px-3 py-2 text-sm font-semibold ${aperonixSubSection === 'chats' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Chats <span className="ml-1 text-xs opacity-70">{aperonixChats.length}</span></button>
+              <button role="tab" aria-selected={aperonixSubSection === 'conversations'} onClick={() => setAperonixSubSection('conversations')} className={`rounded-lg px-3 py-2 text-sm font-semibold ${aperonixSubSection === 'conversations' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Conversations <span className="ml-1 text-xs opacity-70">{voiceConversations.length}</span></button>
+            </div>
+            {aperonixSubSection === 'chats' && aperonixChats.length > 0 && (
             <section className="border-b border-border">
               {aperonixChats.map(conversation => (
                 <div key={conversation.id} role="button" tabIndex={0} onClick={() => router.push(`/aperonix?archive=1&chatId=${conversation.id}`)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); router.push(`/aperonix?archive=1&chatId=${conversation.id}`) } }} className="group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -215,8 +238,35 @@ export default function ArchivePage() {
                 </div>
               ))}
             </section>
+            )}
+            {aperonixSubSection === 'conversations' && voiceConversations.length > 0 && <section className="border-b border-border">
+              {voiceConversations.map(conversation => <div key={conversation.id} role="button" tabIndex={0} onClick={() => router.push(`/aperonix/voice?archive=1&conversationId=${conversation.id}`)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); router.push(`/aperonix/voice?archive=1&conversationId=${conversation.id}`) } }} className="group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <button onClick={event => { event.stopPropagation(); router.push(`/aperonix/voice?archive=1&conversationId=${conversation.id}`) }} aria-label="Open archived voice conversation" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><AudioLines className="h-5 w-5" /></button>
+                <div className="min-w-0 flex-1">
+                  {renamingVoiceId === conversation.id ? <form className="flex items-center gap-1.5" onSubmit={async event => { event.preventDefault(); const title = renameVoiceValue.trim(); if (!title) return; setVoiceBusyId(conversation.id); const { error } = await supabase.from('aperonix_voice_conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', conversation.id).eq('user_id', user.id); setVoiceBusyId(null); if (error) { alert('Could not rename this conversation.'); return }; setVoiceConversations(prev => prev.map(item => item.id === conversation.id ? { ...item, title } : item)); setRenamingVoiceId(null) }}>
+                    <input autoFocus value={renameVoiceValue} onChange={event => setRenameVoiceValue(event.target.value)} maxLength={80} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1 text-sm outline-none" aria-label="Conversation title" />
+                    <button type="submit" disabled={voiceBusyId === conversation.id} aria-label="Save title" className="rounded-lg p-1.5 text-primary hover:bg-accent"><Check className="h-4 w-4" /></button><button type="button" onClick={() => setRenamingVoiceId(null)} aria-label="Cancel rename" className="rounded-lg p-1.5 hover:bg-accent"><X className="h-4 w-4" /></button>
+                  </form> : <button onClick={() => router.push(`/aperonix/voice?archive=1&conversationId=${conversation.id}`)} className="block max-w-full truncate text-left text-sm font-medium hover:text-primary">{conversation.title || 'Voice conversation'}</button>}
+                  <p className="mt-0.5 text-xs text-muted-foreground">Archived {new Date(conversation.archived_at || conversation.updated_at).toLocaleDateString()}</p>
+                </div>
+                <div className="relative shrink-0" onClick={event => event.stopPropagation()}>
+                  <button onClick={() => setOpenVoiceMenuId(current => current === conversation.id ? null : conversation.id)} aria-label="Voice conversation options" aria-expanded={openVoiceMenuId === conversation.id} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"><MoreVertical className="h-4 w-4" /></button>
+                  {openVoiceMenuId === conversation.id && <><button aria-label="Close voice conversation menu" className="fixed inset-0 z-30 cursor-default" onClick={() => setOpenVoiceMenuId(null)} /><div className="absolute right-0 top-9 z-40 w-60 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xl">
+                    <button disabled={voiceBusyId === conversation.id} onClick={async () => { setVoiceBusyId(conversation.id); const { error } = await supabase.from('aperonix_voice_conversations').update({ pinned: !conversation.pinned, updated_at: new Date().toISOString() }).eq('id', conversation.id).eq('user_id', user.id); setVoiceBusyId(null); setOpenVoiceMenuId(null); if (error) { alert('Could not update pin.'); return }; setVoiceConversations(prev => prev.map(item => item.id === conversation.id ? { ...item, pinned: !conversation.pinned } : item)) }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"><Pin className="h-3.5 w-3.5" />{conversation.pinned ? 'Unpin conversation' : 'Pin to top'}</button>
+                    <button onClick={() => { setRenameVoiceValue(conversation.title); setRenamingVoiceId(conversation.id); setOpenVoiceMenuId(null) }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted"><PencilLine className="h-3.5 w-3.5" />Rename</button>
+                    <ChatWallpaperControls conversationId={conversation.id} wallpaper={null} isActive={false} onWallpaperChange={() => {}} tableName="aperonix_voice_wallpapers" wallpaperLabel="voice conversation" />
+                    <button disabled={voiceBusyId === conversation.id} onClick={async () => { setOpenVoiceMenuId(null); if (!window.confirm(`Create a copy of “${conversation.title}”?`)) return; setVoiceBusyId(conversation.id); const { data: { user: currentUser } } = await supabase.auth.getUser(); if (!currentUser) { setVoiceBusyId(null); return }; let copiedPath: string | null = null; if (conversation.storage_path) { copiedPath = currentUser.id + '/' + crypto.randomUUID() + '/recording-copy-' + Date.now() + '.' + (conversation.storage_path.split('.').pop() || 'webm'); const { error: copyError } = await supabase.storage.from('aperonix-voice-recordings').copy(conversation.storage_path, copiedPath); if (copyError) { setVoiceBusyId(null); alert('Could not copy the recording.'); return } }; const { data, error } = await supabase.from('aperonix_voice_conversations').insert({ user_id: currentUser.id, title: conversation.title + ' (copy)', storage_path: copiedPath, mime_type: conversation.mime_type, duration_ms: conversation.duration_ms, pinned: false, archived_at: new Date().toISOString() }).select('id,title,updated_at,archived_at,pinned,storage_path,mime_type,duration_ms').single(); setVoiceBusyId(null); if (error || !data) { if (copiedPath) await supabase.storage.from('aperonix-voice-recordings').remove([copiedPath]); alert('Could not duplicate conversation.'); return }; setVoiceConversations(prev => [data, ...prev]) }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"><Copy className="h-3.5 w-3.5" />Duplicate</button>
+                    <button disabled={!conversation.storage_path} onClick={async () => { setOpenVoiceMenuId(null); const { data, error } = await supabase.storage.from('aperonix-voice-recordings').createSignedUrl(conversation.storage_path!, 600); if (error || !data?.signedUrl) { alert('Could not play this recording.'); return }; setVoicePlayback({ title: conversation.title, url: data.signedUrl }) }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"><Play className="h-3.5 w-3.5" />Play recording</button>
+                    <button disabled={voiceBusyId === conversation.id} onClick={async () => { setVoiceBusyId(conversation.id); const { error } = await supabase.from('aperonix_voice_conversations').update({ archived_at: null, updated_at: new Date().toISOString() }).eq('id', conversation.id).eq('user_id', user.id); setVoiceBusyId(null); setOpenVoiceMenuId(null); if (error) { alert('Could not restore conversation.'); return }; setVoiceConversations(prev => prev.filter(item => item.id !== conversation.id)) }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"><ArchiveRestore className="h-3.5 w-3.5" />Unarchive conversation</button>
+                    <button disabled={voiceBusyId === conversation.id} onClick={async () => { setOpenVoiceMenuId(null); if (!window.confirm(`Permanently delete “${conversation.title}” and its recording? This cannot be undone.`)) return; setVoiceBusyId(conversation.id); const { error: removeError } = await supabase.from('aperonix_voice_conversations').delete().eq('id', conversation.id).eq('user_id', user.id); if (removeError) { setVoiceBusyId(null); alert('Could not delete conversation.'); return }; if (conversation.storage_path) { const { error: storageError } = await supabase.storage.from('aperonix-voice-recordings').remove([conversation.storage_path]); if (storageError) console.error('Could not remove archived voice recording', storageError) }; setVoiceBusyId(null); setVoiceConversations(prev => prev.filter(item => item.id !== conversation.id)) }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-red-500 hover:bg-red-500/10"><Trash2 className="h-3.5 w-3.5" />Delete</button>
+                  </div></>}
+                </div>
+              </div>)}
+            </section>}
+            </>
           )}
-          {(aperonixChats.length === 0 || chats.length === 0 || activeSection === 'users') && chats.length > 0 && <div className="space-y-1">
+          {voicePlayback && <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/65 p-4" onClick={() => setVoicePlayback(null)}><div role="dialog" aria-modal="true" aria-label="Play archived voice conversation" className="w-full max-w-lg rounded-2xl border border-border bg-background p-5 shadow-2xl" onClick={event => event.stopPropagation()}><div className="mb-5 flex items-center justify-between gap-3"><div><h3 className="font-semibold">{voicePlayback.title}</h3><p className="mt-1 text-xs text-muted-foreground">Full saved conversation audio</p></div><button onClick={() => setVoicePlayback(null)} aria-label="Close player" className="rounded-full p-2 hover:bg-accent"><X className="h-4 w-4" /></button></div><audio controls autoPlay src={voicePlayback.url} className="w-full" /></div></div>}
+          {(aperonixChats.length === 0 && voiceConversations.length === 0 || chats.length === 0 || activeSection === 'users') && chats.length > 0 && <div className="space-y-1">
           {chats.map(chat => {
             const other = getOther(chat)
             const isPinned = chat.pinned_by?.includes(user.id) ?? false
