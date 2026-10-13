@@ -164,13 +164,15 @@ export function useAperonixChats(options: { includeArchived?: boolean } = {}) {
       storageCleanup,
     ])
     if (deleteResult.error) throw new Error(`Could not delete chat: ${deleteResult.error.message}`)
+
+    // The database delete succeeded: update the UI immediately even if Storage
+    // reports a cleanup error, so the deleted chat never appears stuck in history.
+    setConversations(prev => prev.filter(c => c.id !== id))
+    setActiveId(prev => prev === id ? null : prev)
     if (storageResult.error) {
       console.error('Some Aperonix attachment files could not be removed after deleting the chat', storageResult.error)
       throw new Error('The chat was deleted, but some attachment files could not be cleaned up. Please try again later.')
     }
-
-    setConversations(prev => prev.filter(c => c.id !== id))
-    setActiveId(prev => prev === id ? null : prev)
   }, [])
 
   const archiveConversation = useCallback(async (id: string) => {
