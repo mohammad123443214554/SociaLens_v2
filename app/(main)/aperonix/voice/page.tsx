@@ -5,8 +5,9 @@ import { GoogleGenAI, Modality } from '@google/genai'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { ChatWallpaperControls, ChatWallpaper } from '@/components/aperonix/ChatWallpaperControls'
+import { AperonixShareModal } from '@/components/aperonix/AperonixShareModal'
 import { useUser } from '@/lib/hooks/useUser'
-import { AudioLines, Plus, Mic, PhoneOff, Play, LoaderCircle, Trash2, AlertCircle, Radio, Menu, MoreHorizontal, Pin, Pencil, Copy, X, ArrowLeft } from 'lucide-react'
+import { AudioLines, Plus, Mic, PhoneOff, Play, LoaderCircle, Trash2, AlertCircle, Radio, Menu, MoreHorizontal, Pin, Pencil, Copy, X, ArrowLeft, Forward } from 'lucide-react'
 
 type VoiceConversation = { id: string; title: string; storage_path: string | null; mime_type: string; duration_ms: number; pinned: boolean; created_at: string; updated_at: string }
 type VoiceStatus = 'idle' | 'preparing' | 'connecting' | 'listening' | 'saving'
@@ -258,6 +259,7 @@ export default function AperonixVoiceAgentPage() {
   const [renameBusy, setRenameBusy] = useState(false)
   const [renameError, setRenameError] = useState<string | null>(null)
   const [playbackModal, setPlaybackModal] = useState(false)
+  const [shareDialogContent, setShareDialogContent] = useState<string | null>(null)
   const [titleGeneratingId, setTitleGeneratingId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [wallpaper, setWallpaper] = useState<ChatWallpaper | null>(null)
@@ -561,6 +563,31 @@ export default function AperonixVoiceAgentPage() {
     setActiveId(row.id); activeRef.current = row.id; setPlaybackUrl(data.signedUrl); setPlaybackModal(true); setError(null)
   }
 
+  const handleShareConversation = async (row: VoiceConversation) => {
+    setMenuId(null)
+    if (!row.storage_path) { setError('This conversation does not have a saved recording yet.'); return }
+    try {
+      const supabase = createClient()
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
+      if (authError || !currentUser || !row.storage_path.startsWith(currentUser.id + '/')) throw new Error('Please sign in again to share this conversation.')
+      // The bucket remains private; the signed URL grants playback to people who have the share link.
+      const { data, error: signError } = await supabase.storage.from('aperonix-voice-recordings').createSignedUrl(row.storage_path, 31536000)
+      if (signError || !data?.signedUrl) throw new Error('Could not prepare a share link for this recording.')
+      setShareDialogContent(JSON.stringify({
+        version: 1,
+        type: 'voice',
+        title: row.title,
+        owner: { username: currentUser.email?.split('@')[0] || 'SociaLens user', avatar_url: null },
+        audioUrl: data.signedUrl,
+        mimeType: row.mime_type || 'audio/webm',
+        durationMs: row.duration_ms || 0,
+      }))
+      setError(null)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not share this conversation.')
+    }
+  }
+
   const removeConversation = async (row: VoiceConversation) => {
     const supabase = createClient()
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
@@ -668,6 +695,7 @@ export default function AperonixVoiceAgentPage() {
             <button onClick={() => { setRenameId(row.id); setRenameTitle(row.title); setRenameError(null); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Pencil className="h-4 w-4" />Rename</button>
             <ChatWallpaperControls conversationId={row.id} wallpaper={row.id === activeId ? wallpaper : null} isActive={row.id === activeId} onWallpaperChange={nextWallpaper => { cacheVoiceWallpaper(row.id, nextWallpaper); if (row.id === activeId) setWallpaper(nextWallpaper) }} tableName="aperonix_voice_wallpapers" wallpaperLabel="voice conversation" />
             <button onClick={() => void duplicateConversation(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Copy className="h-4 w-4" />Duplicate</button>
+            <button disabled={!row.storage_path} onClick={() => void handleShareConversation(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-40"><Forward className="h-4 w-4" />Share conversation</button>
             <button disabled={!row.storage_path} onClick={() => { setMenuId(null); void playRecording(row) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-40"><Play className="h-4 w-4" />Play recording</button>
             <button onClick={() => { setDeleteId(row.id); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-accent"><Trash2 className="h-4 w-4" />Delete</button>
           </div></>}
@@ -691,6 +719,7 @@ export default function AperonixVoiceAgentPage() {
       </div>
     </main>
     {renameId && (() => { const row = rows.find(item => item.id === renameId); if (!row) return null; return <div className="fixed inset-0 z-[145] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]" onClick={() => { if (!renameBusy) { setRenameId(null); setRenameError(null) } }}><div role="dialog" aria-modal="true" aria-labelledby="rename-voice-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl" onClick={event => event.stopPropagation()}><div className="flex items-start gap-3 border-b border-border p-5"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Pencil className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h2 id="rename-voice-title" className="text-base font-semibold">Rename conversation</h2><p className="mt-1 text-sm text-muted-foreground">Choose a clear name so you can find this conversation later.</p></div></div><form className="p-5" onSubmit={event => { event.preventDefault(); void saveRename() }}><label htmlFor="rename-voice-input" className="mb-2 block text-sm font-medium">Conversation name</label><input id="rename-voice-input" autoFocus value={renameTitle} onChange={event => { setRenameTitle(event.target.value); setRenameError(null) }} onKeyDown={event => { if (event.key === 'Escape' && !renameBusy) { setRenameId(null); setRenameError(null) } }} maxLength={80} placeholder="Enter conversation name" className="w-full rounded-xl border border-border bg-background px-3.5 py-3 text-sm outline-none transition-colors focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20" />{renameError && <p role="alert" className="mt-2 text-sm text-red-500">{renameError}</p>}<div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" disabled={renameBusy} onClick={() => { setRenameId(null); setRenameError(null) }} className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">Cancel</button><button type="submit" disabled={!renameTitle.trim() || renameBusy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{renameBusy && <LoaderCircle className="h-4 w-4 animate-spin" />}{renameBusy ? 'Saving…' : 'Save changes'}</button></div></form></div></div> })()}
+    {shareDialogContent !== null && <AperonixShareModal replyText={shareDialogContent} contentType="voice" onClose={() => setShareDialogContent(null)} />}
     {deleteId && (() => { const row = rows.find(item => item.id === deleteId); if (!row) return null; return <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]" onClick={() => { if (!deleteBusy) setDeleteId(null) }}><div role="dialog" aria-modal="true" aria-labelledby="delete-voice-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl" onClick={event => event.stopPropagation()}><div className="flex items-start gap-3 border-b border-border p-5"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-500"><Trash2 className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h2 id="delete-voice-title" className="text-base font-semibold">Delete this conversation?</h2><p className="mt-1 text-sm text-muted-foreground">“{row.title}” and its saved voice recording will be permanently deleted. This action cannot be undone.</p></div></div><div className="flex flex-col-reverse gap-2 p-4 sm:flex-row sm:justify-end"><button disabled={deleteBusy} onClick={() => setDeleteId(null)} className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-50">Cancel</button><button disabled={deleteBusy} onClick={async () => { setDeleteBusy(true); try { await removeConversation(row) } finally { setDeleteBusy(false) } }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">{deleteBusy && <LoaderCircle className="h-4 w-4 animate-spin" />} {deleteBusy ? 'Deleting…' : 'Delete conversation'}</button></div></div></div> })()}
   </div>
 }
