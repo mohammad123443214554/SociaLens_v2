@@ -408,7 +408,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
   try {
     const sharedPayload = JSON.parse(message.content)
     isSharedAperonixContent = sharedPayload?.__sociaLensShare === 1 &&
-      (sharedPayload.type === 'prompt' || sharedPayload.type === 'chat')
+      (sharedPayload.type === 'prompt' || sharedPayload.type === 'chat' || sharedPayload.type === 'voice')
   } catch {}
 
   if (isSharedAperonixContent) {
