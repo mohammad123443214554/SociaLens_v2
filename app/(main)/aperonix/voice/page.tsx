@@ -255,6 +255,8 @@ export default function AperonixVoiceAgentPage() {
   const [menuId, setMenuId] = useState<string | null>(null)
   const [renameId, setRenameId] = useState<string | null>(null)
   const [renameTitle, setRenameTitle] = useState('')
+  const [renameBusy, setRenameBusy] = useState(false)
+  const [renameError, setRenameError] = useState<string | null>(null)
   const [playbackModal, setPlaybackModal] = useState(false)
   const [titleGeneratingId, setTitleGeneratingId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -589,12 +591,22 @@ export default function AperonixVoiceAgentPage() {
   }
   const saveRename = async () => {
     const title = renameTitle.trim()
-    if (!renameId || !title) return
-    const supabase = createClient()
-    const { error: updateError } = await supabase.from('aperonix_voice_conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', renameId)
-    if (updateError) { setError('Could not rename conversation.'); return }
-    setRows(prev => prev.map(item => item.id === renameId ? { ...item, title, updated_at: new Date().toISOString() } : item).sort((a, b) => Number(b.pinned) - Number(a.pinned) || +new Date(b.updated_at) - +new Date(a.updated_at)))
-    setRenameId(null); setRenameTitle(''); setMenuId(null)
+    if (!renameId || !title || renameBusy) return
+    setRenameBusy(true)
+    setRenameError(null)
+    try {
+      const supabase = createClient()
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) throw new Error('Please sign in again to rename this conversation.')
+      const { error: updateError } = await supabase.from('aperonix_voice_conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', renameId).eq('user_id', user.id)
+      if (updateError) throw updateError
+      setRows(prev => prev.map(item => item.id === renameId ? { ...item, title, updated_at: new Date().toISOString() } : item).sort((a, b) => Number(b.pinned) - Number(a.pinned) || +new Date(b.updated_at) - +new Date(a.updated_at)))
+      setRenameId(null); setRenameTitle(''); setMenuId(null); setRenameError(null)
+    } catch (cause) {
+      setRenameError(cause instanceof Error ? cause.message : 'Could not rename conversation. Please try again.')
+    } finally {
+      setRenameBusy(false)
+    }
   }
   const duplicateConversation = async (row: VoiceConversation) => {
     const supabase = createClient()
@@ -639,13 +651,13 @@ export default function AperonixVoiceAgentPage() {
           <div className="flex items-center gap-1 p-1"><button onClick={() => { setActiveId(row.id); activeRef.current = row.id; setPlaybackUrl(null); setPlaybackModal(false); setError(null); setSidebarOpen(false) }} className="min-w-0 flex-1 text-left px-2 py-2.5"><span className="flex items-center gap-2 min-w-0"><span className="block text-sm font-medium truncate">{row.title}</span>{titleGeneratingId === row.id && <LoaderCircle aria-label="Aperonix is generating the conversation title" className="h-3.5 w-3.5 shrink-0 animate-spin text-pink-500" />}{row.pinned && <Pin className="h-3 w-3 shrink-0 text-muted-foreground fill-current" />}</span></button><button aria-label={'Conversation options for ' + row.title} onClick={() => setMenuId(menuId === row.id ? null : row.id)} className="p-2 rounded-md text-muted-foreground hover:bg-background hover:text-foreground"><MoreHorizontal className="h-4 w-4" /></button></div>
           {menuId === row.id && <><button aria-label="Close conversation menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuId(null)} /><div className="absolute right-2 top-10 z-30 w-48 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
             <button onClick={() => void togglePin(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Pin className="h-4 w-4" />{row.pinned ? 'Unpin conversation' : 'Pin to top'}</button>
-            <button onClick={() => { setRenameId(row.id); setRenameTitle(row.title); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Pencil className="h-4 w-4" />Rename</button>
+            <button onClick={() => { setRenameId(row.id); setRenameTitle(row.title); setRenameError(null); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Pencil className="h-4 w-4" />Rename</button>
             <ChatWallpaperControls conversationId={row.id} wallpaper={row.id === activeId ? wallpaper : null} isActive={row.id === activeId} onWallpaperChange={nextWallpaper => { cacheVoiceWallpaper(row.id, nextWallpaper); if (row.id === activeId) setWallpaper(nextWallpaper) }} tableName="aperonix_voice_wallpapers" wallpaperLabel="voice conversation" />
             <button onClick={() => void duplicateConversation(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Copy className="h-4 w-4" />Duplicate</button>
             <button disabled={!row.storage_path} onClick={() => { setMenuId(null); void playRecording(row) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-40"><Play className="h-4 w-4" />Play recording</button>
             <button onClick={() => { setDeleteId(row.id); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-accent"><Trash2 className="h-4 w-4" />Delete</button>
           </div></>}
-          {renameId === row.id && <div className="px-2 pb-2"><input autoFocus value={renameTitle} onChange={e => setRenameTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void saveRename(); if (e.key === 'Escape') setRenameId(null) }} className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" maxLength={80} /><div className="mt-2 flex justify-end gap-2"><button onClick={() => setRenameId(null)} className="rounded-md border border-border px-2 py-1 text-xs">Cancel</button><button onClick={() => void saveRename()} className="rounded-md bg-pink-600 px-2 py-1 text-xs text-white">Save</button></div></div>}
+
           
         </div>)}
       </div>
@@ -664,6 +676,7 @@ export default function AperonixVoiceAgentPage() {
       <footer className="shrink-0 border-t border-border/70 bg-transparent px-3 py-4 sm:p-6 flex flex-col items-center gap-3"><div className="flex items-center justify-center gap-3">{status === 'idle' ? <button onClick={() => void startSession()} className="max-w-full flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-violet-600 hover:brightness-110 px-4 sm:px-6 py-3 text-sm sm:text-base text-white font-semibold shadow-lg"><Mic className="h-5 w-5 shrink-0" /> Start voice conversation</button> : status === 'saving' ? <button disabled className="flex items-center gap-2 rounded-full bg-muted px-6 py-3 text-muted-foreground font-semibold"><LoaderCircle className="h-5 w-5 animate-spin" /> Saving recording…</button> : <button onClick={() => void stopSession()} className="max-w-full flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-violet-600 hover:brightness-110 px-4 sm:px-6 py-3 text-sm sm:text-base text-white font-semibold shadow-lg"><PhoneOff className="h-5 w-5 shrink-0" /> Stop</button>}</div><p className="mt-2 pb-2 text-center text-[10px] text-muted-foreground/70">Aperonix is AI and can make mistakes. Check important info.</p></footer>
       </div>
     </main>
+    {renameId && (() => { const row = rows.find(item => item.id === renameId); if (!row) return null; return <div className="fixed inset-0 z-[145] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]" onClick={() => { if (!renameBusy) { setRenameId(null); setRenameError(null) } }}><div role="dialog" aria-modal="true" aria-labelledby="rename-voice-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl" onClick={event => event.stopPropagation()}><div className="flex items-start gap-3 border-b border-border p-5"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Pencil className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h2 id="rename-voice-title" className="text-base font-semibold">Rename conversation</h2><p className="mt-1 text-sm text-muted-foreground">Choose a clear name so you can find this voice conversation later.</p></div></div><form className="p-5" onSubmit={event => { event.preventDefault(); void saveRename() }}><label htmlFor="rename-voice-input" className="mb-2 block text-sm font-medium">Conversation name</label><input id="rename-voice-input" autoFocus value={renameTitle} onChange={event => { setRenameTitle(event.target.value); setRenameError(null) }} onKeyDown={event => { if (event.key === 'Escape' && !renameBusy) { setRenameId(null); setRenameError(null) } }} maxLength={80} placeholder="Enter conversation name" className="w-full rounded-xl border border-border bg-background px-3.5 py-3 text-sm outline-none transition-colors focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20" />{renameError && <p role="alert" className="mt-2 text-sm text-red-500">{renameError}</p>}<div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" disabled={renameBusy} onClick={() => { setRenameId(null); setRenameError(null) }} className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">Cancel</button><button type="submit" disabled={!renameTitle.trim() || renameBusy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{renameBusy && <LoaderCircle className="h-4 w-4 animate-spin" />}{renameBusy ? 'Saving…' : 'Save changes'}</button></div></form></div></div> })()}
     {deleteId && (() => { const row = rows.find(item => item.id === deleteId); if (!row) return null; return <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]" onClick={() => { if (!deleteBusy) setDeleteId(null) }}><div role="dialog" aria-modal="true" aria-labelledby="delete-voice-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl" onClick={event => event.stopPropagation()}><div className="flex items-start gap-3 border-b border-border p-5"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-500"><Trash2 className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h2 id="delete-voice-title" className="text-base font-semibold">Delete this conversation?</h2><p className="mt-1 text-sm text-muted-foreground">“{row.title}” and its saved voice recording will be permanently deleted. This action cannot be undone.</p></div></div><div className="flex flex-col-reverse gap-2 p-4 sm:flex-row sm:justify-end"><button disabled={deleteBusy} onClick={() => setDeleteId(null)} className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-50">Cancel</button><button disabled={deleteBusy} onClick={async () => { setDeleteBusy(true); try { await removeConversation(row) } finally { setDeleteBusy(false) } }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">{deleteBusy && <LoaderCircle className="h-4 w-4 animate-spin" />} {deleteBusy ? 'Deleting…' : 'Delete conversation'}</button></div></div></div> })()}
   </div>
 }
