@@ -48,9 +48,11 @@ type Props = {
   wallpaper: ChatWallpaper | null
   onWallpaperChange: (wallpaper: ChatWallpaper | null) => void
   isActive: boolean
+  tableName?: 'aperonix_chat_wallpapers' | 'aperonix_voice_wallpapers'
+  wallpaperLabel?: 'chat' | 'voice conversation'
 }
 
-export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperChange, isActive }: Props) {
+export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperChange, isActive, tableName = 'aperonix_chat_wallpapers', wallpaperLabel = 'chat' }: Props) {
   const [currentWallpaper, setCurrentWallpaper] = useState<ChatWallpaper | null>(wallpaper)
   const [open, setOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -81,7 +83,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error('Please sign in to load this wallpaper.')
         const { data, error: queryError } = await supabase
-          .from('aperonix_chat_wallpapers')
+          .from(tableName as 'aperonix_chat_wallpapers')
           .select('original_storage_path,processed_storage_path,filter_index,zoom,position_x,position_y')
           .eq('conversation_id', conversationId)
           .eq('user_id', user.id)
@@ -118,7 +120,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
     }
     void load()
     return () => { cancelled = true }
-  }, [conversationId, isActive, wallpaper])
+  }, [conversationId, isActive, wallpaper, tableName])
 
   const pickFile = (file?: File) => {
     if (!file) return
@@ -202,13 +204,13 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
       if (processedUpload.error) throw new Error('Could not upload the filtered wallpaper. Please try again.')
       uploadedPaths.push(processedPath)
 
-      const { data: oldRow } = await supabase.from('aperonix_chat_wallpapers')
+      const { data: oldRow } = await supabase.from(tableName as 'aperonix_chat_wallpapers')
         .select('original_storage_path,processed_storage_path')
         .eq('conversation_id', conversationId)
         .eq('user_id', user.id)
         .maybeSingle()
 
-      const { error: saveError } = await supabase.from('aperonix_chat_wallpapers').upsert({
+      const { error: saveError } = await supabase.from(tableName as 'aperonix_chat_wallpapers').upsert({
         conversation_id: conversationId,
         user_id: user.id,
         original_storage_path: originalPath,
@@ -262,13 +264,13 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Please sign in to remove this wallpaper.')
-      const { data: row, error: queryError } = await supabase.from('aperonix_chat_wallpapers')
+      const { data: row, error: queryError } = await supabase.from(tableName as 'aperonix_chat_wallpapers')
         .select('original_storage_path,processed_storage_path')
         .eq('conversation_id', conversationId)
         .eq('user_id', user.id)
         .maybeSingle()
       if (queryError) throw queryError
-      const { error: deleteError } = await supabase.from('aperonix_chat_wallpapers')
+      const { error: deleteError } = await supabase.from(tableName as 'aperonix_chat_wallpapers')
         .delete().eq('conversation_id', conversationId).eq('user_id', user.id)
       if (deleteError) throw deleteError
       if (row) {
@@ -320,7 +322,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
           <section className="w-full max-w-md rounded-2xl border border-white/10 bg-card p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
             <div className="mb-4 flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-purple-500 text-white"><ImagePlus className="h-5 w-5" /></span>
-              <div className="min-w-0 flex-1"><h2 className="font-semibold">Add chat wallpaper</h2><p className="text-xs text-muted-foreground">Choose a photo from your device</p></div>
+              <div className="min-w-0 flex-1"><h2 className="font-semibold">{wallpaperLabel === 'chat' ? 'Add chat wallpaper' : 'Add voice wallpaper'}</h2><p className="text-xs text-muted-foreground">Choose a photo from your device</p></div>
               <button type="button" onClick={() => setUploadOpen(false)} aria-label="Close upload dialog" className="rounded-lg p-2 hover:bg-muted"><X className="h-4 w-4" /></button>
             </div>
             <button type="button" onClick={() => fileRef.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); pickFile(event.dataTransfer.files?.[0]) }} className="flex min-h-36 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-pink-500/40 bg-muted/40 p-5 text-center hover:bg-muted/70">
@@ -338,7 +340,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
           <section className="flex max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-card shadow-2xl" onClick={event => event.stopPropagation()}>
             <header className="flex items-center gap-3 border-b border-border px-5 py-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500/20 to-purple-500/20 text-pink-500"><ImagePlus className="h-5 w-5" /></div>
-              <div className="min-w-0 flex-1"><h2 className="font-semibold">Chat wallpaper editor</h2><p className="text-xs text-muted-foreground">Set the crop and preview each filter on your photo</p></div>
+              <div className="min-w-0 flex-1"><h2 className="font-semibold">{wallpaperLabel === 'chat' ? 'Chat wallpaper editor' : 'Voice conversation wallpaper editor'}</h2><p className="text-xs text-muted-foreground">Set the crop and preview each filter on your photo</p></div>
               <button type="button" disabled={saving} onClick={() => setOpen(false)} aria-label="Close wallpaper editor" className="rounded-xl p-2 hover:bg-muted disabled:opacity-40"><X className="h-4 w-4" /></button>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
@@ -359,7 +361,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={draft.originalDataUrl} alt="Wallpaper preview" className="absolute inset-0 h-full w-full object-cover" style={{ filter: FILTERS[draft.filterIndex]?.css || 'none', objectPosition: draft.positionX + '% ' + draft.positionY + '%', transform: 'scale(' + draft.zoom / 100 + ')' }} />
-                    <div className="absolute bottom-3 left-3 rounded-lg border border-white/20 bg-slate-950/55 px-3 py-2 text-xs text-white backdrop-blur-sm">Chat wallpaper preview</div>
+                    <div className="absolute bottom-3 left-3 rounded-lg border border-white/20 bg-slate-950/55 px-3 py-2 text-xs text-white backdrop-blur-sm">{wallpaperLabel === 'chat' ? 'Chat wallpaper preview' : 'Voice wallpaper preview'}</div>
                   </>
                 ) : <button type="button" onClick={() => fileRef.current?.click()} className="flex h-full w-full flex-col items-center justify-center gap-2 p-6"><ImagePlus className="h-8 w-8 text-pink-500" /><span className="text-sm">Choose a photo to start</span></button>}
               </div>
