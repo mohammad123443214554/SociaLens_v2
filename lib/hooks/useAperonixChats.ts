@@ -154,14 +154,20 @@ export function useAperonixChats(options: { includeArchived?: boolean } = {}) {
     const paths = (rows || []).flatMap((row: any) => Array.isArray(row.attachments) ? row.attachments : [])
       .map((attachment: any) => attachment?.path)
       .filter((path: unknown): path is string => typeof path === 'string' && path.startsWith(`${user.id}/`))
-    if (paths.length) {
-      const { error: storageError } = await supabase.storage.from('aperonix-files').remove([...new Set(paths)])
-      if (storageError) throw new Error(`Chat files could not be deleted, so the chat was kept: ${storageError.message}`)
+    // Run the cascading record delete and Storage cleanup concurrently to avoid
+    // making the user wait for two sequential network round-trips.
+    const storageCleanup = paths.length
+      ? supabase.storage.from('aperonix-files').remove([...new Set(paths)])
+      : Promise.resolve({ error: null })
+    const [deleteResult, storageResult] = await Promise.all([
+      supabase.from('aperonix_conversations').delete().eq('id', id).eq('user_id', user.id),
+      storageCleanup,
+    ])
+    if (deleteResult.error) throw new Error(`Could not delete chat: ${deleteResult.error.message}`)
+    if (storageResult.error) {
+      console.error('Some Aperonix attachment files could not be removed after deleting the chat', storageResult.error)
+      throw new Error('The chat was deleted, but some attachment files could not be cleaned up. Please try again later.')
     }
-
-    const { error: deleteError } = await supabase.from('aperonix_conversations')
-      .delete().eq('id', id).eq('user_id', user.id)
-    if (deleteError) throw new Error(`Could not delete chat: ${deleteError.message}`)
 
     setConversations(prev => prev.filter(c => c.id !== id))
     setActiveId(prev => prev === id ? null : prev)
