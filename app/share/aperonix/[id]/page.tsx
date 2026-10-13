@@ -15,8 +15,10 @@ export default function PublicAperonixReplyPage() {
   const contentType = searchParams.get('type')
   const isPrompt = contentType === 'prompt'
   const isChat = contentType === 'chat'
+  const isVoice = contentType === 'voice'
   const [content, setContent] = useState<string | null>(null)
   const [sharedChat, setSharedChat] = useState<any>(null)
+  const [sharedVoice, setSharedVoice] = useState<any>(null)
   const [owner, setOwner] = useState<{ username?: string; avatar_url?: string | null } | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'not-found'>('loading')
 
@@ -31,7 +33,18 @@ export default function PublicAperonixReplyPage() {
         .maybeSingle()
       if (cancelled) return
       if (!data) { setStatus('not-found'); return }
-      if (contentType === 'chat') {
+      if (contentType === 'voice') {
+        try {
+          const parsed = JSON.parse(data.content)
+          const voice = parsed?.type === 'voice' && typeof parsed.audioUrl === 'string' ? parsed : null
+          if (!voice) throw new Error('Invalid shared voice conversation')
+          setSharedVoice(voice)
+          setOwner(voice.owner || null)
+        } catch {
+          setStatus('not-found')
+          return
+        }
+      } else if (contentType === 'chat') {
         try {
           const parsed = JSON.parse(data.content)
           if (parsed?.type !== 'chat' || !Array.isArray(parsed.messages)) throw new Error('Invalid shared chat')
@@ -78,11 +91,11 @@ export default function PublicAperonixReplyPage() {
     )
   }
 
-  if (status === 'not-found' || (!content && !sharedChat)) {
+  if (status === 'not-found' || (!content && !sharedChat && !sharedVoice)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-6 text-center bg-background">
         <div className="flex items-center gap-2"><img src="/images/socialens-logo.png" alt="SociaLens" className="h-7 w-7 object-contain" /><span className="text-xl font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">SociaLens</span></div>
-        <p className="font-semibold mt-4">{isChat ? "This chat isn't available" : isPrompt ? "This prompt isn't available" : "This reply isn't available"}</p>
+        <p className="font-semibold mt-4">{isVoice ? "This voice conversation isn't available" : isChat ? "This chat isn't available" : isPrompt ? "This prompt isn't available" : "This reply isn't available"}</p>
         <p className="text-sm text-muted-foreground max-w-xs">The link may be broken, or the shared content is no longer available.</p>
         <Link href="/login" className="mt-3 px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white text-sm font-semibold">
           Open SociaLens
@@ -101,7 +114,15 @@ export default function PublicAperonixReplyPage() {
       </header>
 
       <main className="flex-1 max-w-lg w-full mx-auto p-5 space-y-4">
-        {isChat ? (
+        {isVoice ? (
+          <>
+            <div className="flex items-center gap-3 border-b pb-4">
+              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted flex items-center justify-center"><img src="/images/aperonix-logo.png" alt="Aperonix" className="h-8 w-8 object-contain" /></div>
+              <div className="min-w-0"><p className="text-xs text-muted-foreground">Shared voice conversation</p><h1 className="truncate text-lg font-semibold">{sharedVoice?.title || 'Voice conversation'}</h1><p className="text-xs text-muted-foreground">{owner?.username || 'SociaLens user'} · {sharedVoice?.durationMs ? `${Math.floor(sharedVoice.durationMs / 60000)}:${String(Math.floor(sharedVoice.durationMs / 1000) % 60).padStart(2, '0')}` : 'Audio recording'}</p></div>
+            </div>
+            <section className="rounded-2xl border bg-muted/30 p-5 space-y-3"><p className="text-sm font-medium">Listen to the full conversation</p><audio controls preload="metadata" src={sharedVoice?.audioUrl} className="w-full" /><p className="text-xs text-muted-foreground">Anyone with this link can listen to the shared recording.</p></section>
+          </>
+        ) : isChat ? (
           <>
             <div className="flex items-center gap-3 border-b pb-4">
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
