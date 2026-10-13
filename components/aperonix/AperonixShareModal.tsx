@@ -12,7 +12,7 @@ import { ExternalShareBar } from '@/components/shared/ExternalShareBar'
 
 interface AperonixShareModalProps {
   replyText: string
-  contentType?: 'reply' | 'prompt' | 'chat'
+  contentType?: 'reply' | 'prompt' | 'chat' | 'voice'
   onClose: () => void
 }
 
@@ -29,6 +29,8 @@ interface Person {
 export function AperonixShareModal({ replyText, contentType = 'reply', onClose }: AperonixShareModalProps) {
   const isPrompt = contentType === 'prompt'
   const isChat = contentType === 'chat'
+  const isVoice = contentType === 'voice'
+  const sharedVoice = (() => { if (!isVoice) return null; try { const parsed = JSON.parse(replyText); return parsed?.type === 'voice' && typeof parsed.audioUrl === 'string' ? parsed : null } catch { return null } })()
   const sharedChat = (() => {
     if (!isChat) return null
     try {
@@ -41,14 +43,16 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
   const chatTranscript = sharedChat
     ? sharedChat.messages.map((message: { role?: string; content?: string; attachments?: { name?: string }[] }) => `${message.role === 'user' ? (sharedChat.owner?.username || 'User') : 'Aperonix'}:\n${message.content || ''}${message.attachments?.length ? `\n[Attachments: ${message.attachments.map((a: { name?: string }) => a.name || 'file').join(', ')}]` : ''}`).join('\n\n')
     : ''
-  const shareLabel = isChat ? 'Chat' : isPrompt ? 'Your prompt' : 'Aperonix'
-  const shareTitle = isChat ? 'Share Chat' : isPrompt ? 'Share your prompt' : 'Share Aperonix reply'
-  const externalTitle = isChat ? `${sharedChat?.title || 'Chat'} - SociaLens` : isPrompt ? 'SociaLens prompt' : 'Aperonix - SociaLens'
-  const externalText = isChat
-    ? `Read this conversation, ${sharedChat?.title || 'shared chat'}, on SociaLens`
-    : isPrompt
-      ? 'Check out this prompt shared from SociaLens'
-      : 'Check out this reply from Aperonix on SociaLens'
+  const shareLabel = isVoice ? 'Voice conversation' : isChat ? 'Chat' : isPrompt ? 'Your prompt' : 'Aperonix'
+  const shareTitle = isVoice ? 'Share conversation' : isChat ? 'Share Chat' : isPrompt ? 'Share your prompt' : 'Share Aperonix reply'
+  const externalTitle = isVoice ? `${sharedVoice?.title || 'Voice conversation'} - SociaLens` : isChat ? `${sharedChat?.title || 'Chat'} - SociaLens` : isPrompt ? 'SociaLens prompt' : 'Aperonix - SociaLens'
+  const externalText = isVoice
+    ? `Listen to ${sharedVoice?.title || 'this voice conversation'} on SociaLens`
+    : isChat
+      ? `Read this conversation, ${sharedChat?.title || 'shared chat'}, on SociaLens`
+      : isPrompt
+        ? 'Check out this prompt shared from SociaLens'
+        : 'Check out this reply from Aperonix on SociaLens'
   const { user, profile } = useUser()
   const [people, setPeople] = useState<Person[]>([])
   const [selected, setSelected] = useState<string[]>([])
@@ -118,28 +122,30 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
         const { error: messageError } = await supabase.from('messages').insert({
           chat_id: chatId,
           sender_id: user.id,
-          content: isPrompt || isChat
+          content: isPrompt || isChat || isVoice
             ? JSON.stringify({
                 __sociaLensShare: 1,
-                type: isChat ? 'chat' : 'prompt',
+                type: isVoice ? 'voice' : isChat ? 'chat' : 'prompt',
                 owner: {
                   username: profile?.username || user.email?.split('@')[0] || 'SociaLens user',
                   avatar_url: profile?.avatar_url ?? null,
                 },
-                ...(isPrompt ? { prompt: replyText } : {
-                  title: sharedChat?.title || 'Shared chat',
-                  messages: sharedChat?.messages || [],
+                ...(isPrompt ? { prompt: replyText } : isVoice ? {
+                  title: sharedVoice?.title || 'Voice conversation', audioUrl: sharedVoice?.audioUrl,
+                  mimeType: sharedVoice?.mimeType || 'audio/webm', durationMs: sharedVoice?.durationMs || 0,
+                } : {
+                  title: sharedChat?.title || 'Shared chat', messages: sharedChat?.messages || [],
                 }),
               })
             : replyText,
-          is_aperonix_reply: !isPrompt && !isChat,
+          is_aperonix_reply: !isPrompt && !isChat && !isVoice,
         })
         if (messageError) continue
 
         await supabase.from('chats').update({
-          last_message: isChat ? `Shared a chat: ${sharedChat?.title || 'Chat'}` : isPrompt ? 'Shared a prompt' : '✨ Shared an Aperonix reply',
+          last_message: isVoice ? `Shared a voice conversation: ${sharedVoice?.title || 'Voice conversation'}` : isChat ? `Shared a chat: ${sharedChat?.title || 'Chat'}` : isPrompt ? 'Shared a prompt' : '✨ Shared an Aperonix reply',
           last_message_time: new Date().toISOString(),
-          last_message_type: isPrompt || isChat ? 'text' : 'aperonix',
+          last_message_type: isPrompt || isChat || isVoice ? 'text' : 'aperonix',
           last_message_sender_id: user.id,
         }).eq('id', chatId)
         successful += 1
@@ -174,6 +180,7 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
     const url = new URL(`/share/aperonix/${data.id}`, window.location.origin)
     if (isPrompt) url.searchParams.set('type', 'prompt')
     if (isChat) url.searchParams.set('type', 'chat')
+    if (isVoice) url.searchParams.set('type', 'voice')
     return url.toString()
   }
 
@@ -224,7 +231,13 @@ export function AperonixShareModal({ replyText, contentType = 'reply', onClose }
               <span className="text-sm font-semibold">{shareLabel}</span>
               <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-2 py-0.5 text-[10px] font-medium text-fuchsia-200">{isChat ? `${sharedChat?.messages?.length || 0} messages` : isPrompt ? 'User prompt' : 'AI reply'}</span>
             </div>
-            {isChat ? (
+            {isVoice ? (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-foreground">{sharedVoice?.title || 'Voice conversation'}</p>
+                <audio controls preload="metadata" src={sharedVoice?.audioUrl} className="w-full" />
+                <p className="text-xs text-muted-foreground">{sharedVoice?.durationMs ? `${Math.floor(sharedVoice.durationMs / 60000)}:${String(Math.floor(sharedVoice.durationMs / 1000) % 60).padStart(2, '0')} · ` : ''}Full conversation recording</p>
+              </div>
+            ) : isChat ? (
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-foreground">{sharedChat?.title || 'Shared chat'}</p>
                 <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] overflow-hidden">{chatTranscript}</p>
