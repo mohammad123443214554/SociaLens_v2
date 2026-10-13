@@ -704,9 +704,8 @@ export default function AperonixPage() {
       {/* Chat window */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <div className="sticky top-0 z-20 flex items-center gap-2 sm:gap-3 p-3 border-b bg-background shrink-0">
-          <button type="button" aria-label="Go back" title="Go back" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.assign('/home') }} className="group relative inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/70 bg-background text-muted-foreground transition-all duration-200 hover:border-pink-500/50 hover:bg-pink-500/10 hover:text-foreground hover:shadow-[0_0_18px_rgba(236,72,153,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500">
-            <span aria-hidden="true" className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-pink-400/15 to-transparent transition-transform duration-500 group-hover:translate-x-full" />
-            <ArrowLeft className="relative h-[18px] w-[18px] transition-transform duration-200 group-hover:-translate-x-0.5" />
+          <button type="button" aria-label="Go back" title="Go back" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.assign('/home') }} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <ArrowLeft className="h-[18px] w-[18px]" />
           </button>
           <button type="button" aria-label="Open chat history" aria-expanded={showHistory} onClick={() => setShowHistory(true)} className="relative z-10 md:hidden text-muted-foreground hover:text-foreground">
             <Menu className="h-5 w-5" />
@@ -718,11 +717,10 @@ export default function AperonixPage() {
           </div>
           <Link
             href="/aperonix/voice"
-            className="group relative ml-auto inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-xl border border-transparent bg-transparent px-3 py-2 text-sm font-medium text-foreground transition-all duration-200 hover:border-border/70 hover:bg-accent/70 hover:shadow-[0_0_20px_rgba(168,85,247,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+            className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-xl border border-transparent bg-transparent px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Open Aperonix Voice Agent"
           >
-            <span aria-hidden="true" className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-pink-400/15 to-transparent transition-transform duration-500 group-hover:translate-x-full" />
-            <AudioLines aria-hidden="true" className="relative h-5 w-5 shrink-0 text-pink-500 transition-transform duration-200 group-hover:scale-110" />
+            <AudioLines aria-hidden="true" className="h-5 w-5 shrink-0 text-pink-500" />
             <span className="relative hidden sm:inline">Voice Agent</span>
           </Link>
         </div>
