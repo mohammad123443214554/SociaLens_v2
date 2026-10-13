@@ -306,7 +306,7 @@ export default function AperonixVoiceAgentPage() {
         .sort((a, b) => Number(b.pinned) - Number(a.pinned) || +new Date(b.updated_at) - +new Date(a.updated_at)))
     } catch (e) {
       console.error('Could not generate voice conversation title; using spoken words as fallback', e)
-      const fallbackTitle = message.trim().replace(/[.!?。！？,，]+$/g, '').split(/\\s+/).slice(0, 7).join(' ').slice(0, 60).trim()
+      const fallbackTitle = message.trim().replace(/[.!?。！？,，]+$/g, '').split(/\s+/).slice(0, 7).join(' ').slice(0, 60).trim()
       if (fallbackTitle) {
         try {
           const supabase = createClient()
