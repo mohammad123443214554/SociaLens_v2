@@ -205,12 +205,9 @@ export default function ArchivePage() {
                           const shared = { version: 1, type: 'chat', title: conversation.title, owner: { username: user.email?.split('@')[0] || 'SociaLens user', avatar_url: null }, messages: (data || []).map((message: any) => ({ role: message.role === 'user' ? 'user' : 'model', content: message.content || '', timestamp: new Date(message.created_at).getTime(), attachments: (message.attachments || []).map((attachment: any) => ({ name: attachment.name, kind: attachment.kind, mimeType: attachment.mimeType })) })) }
                           setShareChatText(JSON.stringify(shared))
                         }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted"><Forward className="h-3.5 w-3.5" /> Share Chat</button>
-                        <button disabled={restoringAperonixId === conversation.id} onClick={async () => {
-                          setOpenAperonixMenuId(null); setRestoringAperonixId(conversation.id)
-                          const { error } = await supabase.from('aperonix_conversations').update({ archived_at: null, updated_at: new Date().toISOString() }).eq('id', conversation.id).eq('user_id', user.id)
-                          setRestoringAperonixId(null)
-                          if (error) { alert('Could not restore this conversation. Please try again.'); return }
-                          setAperonixChats(prev => prev.filter(item => item.id !== conversation.id))
+                        <button disabled={restoringAperonixId === conversation.id} onClick={() => {
+                          setOpenAperonixMenuId(null)
+                          setUnarchiveConfirm({ kind: 'aperonix', id: conversation.id, title: conversation.title || 'Aperonix conversation' })
                         }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"><ArchiveRestore className="h-3.5 w-3.5" /> Unarchive Chat</button>
                         <button onClick={async () => {
                           setOpenAperonixMenuId(null)
