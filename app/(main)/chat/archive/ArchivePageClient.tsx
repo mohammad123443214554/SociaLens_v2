@@ -94,6 +94,8 @@ export default function ArchivePage() {
       .order('archived_at', { ascending: false })
     if (voiceError) console.error('Could not load archived voice conversations', voiceError)
     else setVoiceConversations(archivedVoice || [])
+    if ((!archivedAperonix || archivedAperonix.length === 0) && (archivedVoice || []).length > 0) setAperonixSubSection('conversations')
+    else if ((archivedAperonix || []).length > 0) setAperonixSubSection('chats')
 
     // Archived chats are intentionally excluded from the unread badge
     // everywhere else, so this list doesn't show one either - it's a
