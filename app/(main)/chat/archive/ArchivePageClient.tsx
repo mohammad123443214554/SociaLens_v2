@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArchiveRestore, Bot, MessageSquare, MoreVertical, Pin, PencilLine, Forward, Trash2, Check, X, AudioLines, Play, Copy } from 'lucide-react'
+import { ArrowLeft, ArchiveRestore, Bot, MessageSquare, MoreVertical, Pin, PencilLine, Trash2, Check, X, AudioLines, Play, Copy } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { useBlockedRelations, useBlockedByOthers, useArchiveLockStatus } from '@/lib/hooks/useChatSettings'
@@ -198,13 +198,7 @@ export default function ArchivePage() {
                         }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted"><Pin className="h-3.5 w-3.5" /> {conversation.pinned ? "Unpin" : "Pin"}</button>
                         <button onClick={() => { setRenameAperonixValue(conversation.title); setRenamingAperonixId(conversation.id); setOpenAperonixMenuId(null) }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted"><PencilLine className="h-3.5 w-3.5" /> Rename</button>
                         <ChatWallpaperControls conversationId={conversation.id} wallpaper={wallpaperChatId === conversation.id ? wallpaperValue : null} isActive={false} onWallpaperChange={value => { setWallpaperChatId(conversation.id); setWallpaperValue(value) }} />
-                        <button onClick={async () => {
-                          setOpenAperonixMenuId(null)
-                          const { data, error } = await supabase.from('aperonix_messages').select('role,content,created_at,attachments').eq('conversation_id', conversation.id).eq('user_id', user.id).order('created_at', { ascending: true })
-                          if (error) { alert('Could not load this conversation for sharing. Please try again.'); return }
-                          const shared = { version: 1, type: 'chat', title: conversation.title, owner: { username: user.email?.split('@')[0] || 'SociaLens user', avatar_url: null }, messages: (data || []).map((message: any) => ({ role: message.role === 'user' ? 'user' : 'model', content: message.content || '', timestamp: new Date(message.created_at).getTime(), attachments: (message.attachments || []).map((attachment: any) => ({ name: attachment.name, kind: attachment.kind, mimeType: attachment.mimeType })) })) }
-                          setShareChatText(JSON.stringify(shared))
-                        }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted"><Forward className="h-3.5 w-3.5" /> Share Chat</button>
+
                         <button disabled={restoringAperonixId === conversation.id} onClick={() => {
                           setOpenAperonixMenuId(null)
                           setUnarchiveConfirm({ kind: 'aperonix', id: conversation.id, title: conversation.title || 'Aperonix conversation' })
