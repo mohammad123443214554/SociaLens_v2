@@ -229,6 +229,7 @@ export default function AperonixVoiceAgentPage() {
   const creatingConversationRef = useRef(false)
   const titleStartedRef = useRef(false)
   const firstUtteranceRef = useRef('')
+  const hasSpokenRef = useRef(false)
 
   const changeStatus = (value: VoiceStatus) => { statusRef.current = value; setStatus(value) }
 
@@ -267,14 +268,22 @@ export default function AperonixVoiceAgentPage() {
     const supabase = createClient()
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
     if (authError || !currentUser) throw new Error('Please sign in to save voice conversations.')
-    const title = 'New conversation'
+    const existingTitles = new Set(rows.map(row => row.title))
+    let title = 'New conversation'
+    let suffix = 1
+    while (existingTitles.has(title)) title = 'New conversation (' + suffix++ + ')'
     const { data, error: insertError } = await supabase.from('aperonix_voice_conversations')
       .insert({ user_id: currentUser.id, title, pinned: false }).select('id,title,storage_path,mime_type,duration_ms,pinned,created_at,updated_at').single()
     if (insertError || !data) throw new Error(insertError?.message || 'Could not create conversation.')
     setRows(prev => [data as VoiceConversation, ...prev])
     setActiveId(data.id); activeRef.current = data.id; setPlaybackUrl(null); setPlaybackModal(false); setError(null)
+    hasSpokenRef.current = false
+    pendingNewConversationRef.current = true
+    creatingConversationRef.current = false
+    titleStartedRef.current = false
+    firstUtteranceRef.current = ''
     return data.id as string
-  }, [])
+  }, [rows])
 
   const generateVoiceTitle = useCallback(async (id: string, message: string) => {
     setTitleGeneratingId(id)
@@ -296,7 +305,18 @@ export default function AperonixVoiceAgentPage() {
       setRows(prev => prev.map(row => row.id === id ? { ...row, title, updated_at: updatedAt } : row)
         .sort((a, b) => Number(b.pinned) - Number(a.pinned) || +new Date(b.updated_at) - +new Date(a.updated_at)))
     } catch (e) {
-      console.error('Could not generate voice conversation title', e)
+      console.error('Could not generate voice conversation title; using spoken words as fallback', e)
+      const fallbackTitle = message.trim().replace(/[.!?。！？,，]+$/g, '').split(/\\s+/).slice(0, 7).join(' ').slice(0, 60).trim()
+      if (fallbackTitle) {
+        try {
+          const supabase = createClient()
+          const updatedAt = new Date().toISOString()
+          const { error: fallbackError } = await supabase.from('aperonix_voice_conversations')
+            .update({ title: fallbackTitle, updated_at: updatedAt }).eq('id', id)
+          if (!fallbackError) setRows(prev => prev.map(row => row.id === id ? { ...row, title: fallbackTitle, updated_at: updatedAt } : row)
+            .sort((a, b) => Number(b.pinned) - Number(a.pinned) || +new Date(b.updated_at) - +new Date(a.updated_at)))
+        } catch (fallbackError) { console.error('Could not save fallback voice title', fallbackError) }
+      }
     } finally {
       setTitleGeneratingId(current => current === id ? null : current)
     }
@@ -363,7 +383,9 @@ export default function AperonixVoiceAgentPage() {
     if (statusRef.current !== 'idle') return
     setError(null); setPlaybackUrl(null); setElapsed(0); changeStatus('preparing')
     let id = activeRef.current
-    pendingNewConversationRef.current = !id
+    const selectedConversation = rows.find(row => row.id === id)
+    const isUntitledConversation = !!selectedConversation && /^New conversation(?: \\(\\d+\\))?$/.test(selectedConversation.title)
+    pendingNewConversationRef.current = !id || isUntitledConversation
     creatingConversationRef.current = false
     titleStartedRef.current = false
     firstUtteranceRef.current = ''
@@ -401,6 +423,7 @@ export default function AperonixVoiceAgentPage() {
           onmessage: message => {
             const transcript = message.serverContent?.inputTranscription?.text
             if (typeof transcript === 'string' && transcript.trim()) {
+              hasSpokenRef.current = true
               firstUtteranceRef.current = (firstUtteranceRef.current + ' ' + transcript.trim()).trim().slice(0, 12000)
             }
             if (message.serverContent?.turnComplete && pendingNewConversationRef.current && !titleStartedRef.current && firstUtteranceRef.current.trim() && !creatingConversationRef.current) {
@@ -408,8 +431,13 @@ export default function AperonixVoiceAgentPage() {
               titleStartedRef.current = true
               pendingNewConversationRef.current = false
               const utterance = firstUtteranceRef.current.trim()
-              void createConversation().then(id => {
-                void generateVoiceTitle(id, utterance)
+              const existingId = id || activeRef.current
+              const titleTarget = existingId
+                ? Promise.resolve(existingId)
+                : createConversation()
+              void titleTarget.then(conversationId => {
+                id = conversationId
+                void generateVoiceTitle(conversationId, utterance)
               }).catch(e => {
                 creatingConversationRef.current = false
                 titleStartedRef.current = false
@@ -535,7 +563,14 @@ export default function AperonixVoiceAgentPage() {
     <aside className={`${sidebarOpen ? "fixed inset-y-0 left-0 z-[100] flex w-[min(86vw,320px)] shadow-2xl" : "hidden"} lg:static lg:z-auto lg:flex lg:w-[260px] xl:w-[290px] shrink-0 border-r border-border flex-col bg-background`}>
       <div className="p-4 border-b border-border">
         <div className="mb-4"><h1 className="font-semibold text-sm">All conversations</h1></div>
-        <button disabled={busy} onClick={() => { setSidebarOpen(false); setActiveId(null); activeRef.current = null; setPlaybackUrl(null); setPlaybackModal(false); setError(null); setTitleGeneratingId(null); pendingNewConversationRef.current = true; creatingConversationRef.current = false; titleStartedRef.current = false; firstUtteranceRef.current = '' }} aria-label="New conversation" title="New conversation" className="m-3 flex w-[calc(100%-1.5rem)] items-center gap-2 px-3 py-2 rounded-xl border-2 border-dashed border-pink-500/30 hover:border-pink-500 hover:bg-pink-500/5 text-pink-500 text-sm font-medium transition-colors disabled:opacity-50"><Plus className="h-4 w-4" /> New conversation</button>
+        <button disabled={busy} onClick={() => {
+          setSidebarOpen(false)
+          const current = rows.find(row => row.id === activeRef.current)
+          const currentIsUntouched = !!current && /^New conversation(?: \\(\\d+\\))?$/.test(current.title) && !current.storage_path && !hasSpokenRef.current
+          if (currentIsUntouched) { setPlaybackUrl(null); setPlaybackModal(false); setError(null); return }
+          setTitleGeneratingId(null)
+          void createConversation().catch(e => setError(e instanceof Error ? e.message : 'Could not create conversation.'))
+        }} aria-label="New conversation" title="New conversation" className="m-3 flex w-[calc(100%-1.5rem)] items-center gap-2 px-3 py-2 rounded-xl border-2 border-dashed border-pink-500/30 hover:border-pink-500 hover:bg-pink-500/5 text-pink-500 text-sm font-medium transition-colors disabled:opacity-50"><Plus className="h-4 w-4" /> New conversation</button>
       </div>
       <div className="flex-1 overflow-y-auto p-2">
         {loading ? <div className="flex justify-center py-8"><LoaderCircle className="h-5 w-5 animate-spin text-muted-foreground" /></div> : rows.length === 0 ? <p className="px-3 py-8 text-center text-xs leading-5 text-muted-foreground">No conversations yet.</p> : rows.map(row => <div key={row.id} className={'group relative rounded-lg mb-1 ' + (activeId === row.id ? 'bg-accent' : 'hover:bg-accent/60')}>
