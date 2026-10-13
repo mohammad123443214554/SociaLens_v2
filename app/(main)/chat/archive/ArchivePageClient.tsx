@@ -272,6 +272,7 @@ export default function ArchivePage() {
                 isPinned={isPinned}
                 isArchived={true}
                 iBlockedThem={iBlockedThem}
+                onArchive={() => setUnarchiveConfirm({ kind: 'user', id: chat.id, title: other?.username ? 'Chat with ' + other.username : 'User chat' })}
               />
             )
           })}
