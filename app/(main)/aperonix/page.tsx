@@ -74,6 +74,10 @@ async function loadConversationWallpaper(conversationId: string): Promise<ChatWa
   try { return await load } finally { wallpaperLoads.delete(conversationId) }
 }
 
+function cacheConversationWallpaper(conversationId: string, wallpaper: ChatWallpaper | null) {
+  wallpaperCache.set(conversationId, { wallpaper, expiresAt: Date.now() + (wallpaper ? 50 : 5) * 60 * 1000 })
+}
+
 export default function AperonixPage() {
   const { user, profile } = useUser()
   const searchParams = useSearchParams()
@@ -662,7 +666,7 @@ export default function AperonixPage() {
                         >
                           <PencilLine className="h-3.5 w-3.5" /> Rename
                         </button>
-                        <ChatWallpaperControls conversationId={convo.id} wallpaper={convo.id === activeId ? wallpaper : null} isActive={convo.id === activeId} onWallpaperChange={setWallpaper} />
+                        <ChatWallpaperControls conversationId={convo.id} wallpaper={convo.id === activeId ? wallpaper : null} isActive={convo.id === activeId} onWallpaperChange={nextWallpaper => { cacheConversationWallpaper(convo.id, nextWallpaper); if (convo.id === activeId) setWallpaper(nextWallpaper) }} />
                         {!isArchiveMode && <button
                           onClick={() => handleConnectAsNewChat(convo.id)}
                           className="w-full flex items-center gap-2.5 whitespace-nowrap px-3.5 py-2.5 text-sm hover:bg-muted transition-colors"
