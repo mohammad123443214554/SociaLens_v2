@@ -9,7 +9,7 @@ import { AperonixShareModal } from '@/components/aperonix/AperonixShareModal'
 import { useUser } from '@/lib/hooks/useUser'
 import { AudioLines, Plus, Mic, PhoneOff, Play, LoaderCircle, Trash2, AlertCircle, Radio, Menu, MoreHorizontal, Pin, Pencil, Copy, X, ArrowLeft, Forward } from 'lucide-react'
 
-type VoiceConversation = { id: string; title: string; storage_path: string | null; mime_type: string; duration_ms: number; pinned: boolean; created_at: string; updated_at: string }
+type VoiceConversation = { id: string; title: string; storage_path: string | null; mime_type: string; duration_ms: number; pinned: boolean; context_summary: string | null; created_at: string; updated_at: string }
 type VoiceStatus = 'idle' | 'preparing' | 'connecting' | 'listening' | 'saving'
 
 function pcm16Base64(input: Float32Array, sampleRate: number) {
@@ -261,6 +261,7 @@ export default function AperonixVoiceAgentPage() {
   const [playbackModal, setPlaybackModal] = useState(false)
   const [shareDialogContent, setShareDialogContent] = useState<string | null>(null)
   const [titleGeneratingId, setTitleGeneratingId] = useState<string | null>(null)
+  const [connectingId, setConnectingId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [wallpaper, setWallpaper] = useState<ChatWallpaper | null>(null)
   const sessionRef = useRef<any>(null)
@@ -287,7 +288,7 @@ export default function AperonixVoiceAgentPage() {
     const { data: { user: currentUser } } = await supabase.auth.getUser()
     if (!currentUser) { setRows([]); return }
     const { data, error: queryError } = await supabase.from('aperonix_voice_conversations')
-      .select('id,title,storage_path,mime_type,duration_ms,pinned,created_at,updated_at')
+      .select('id,title,storage_path,mime_type,duration_ms,pinned,context_summary,created_at,updated_at')
       .eq('user_id', currentUser.id).order('pinned', { ascending: false }).order('updated_at', { ascending: false })
     if (queryError) throw queryError
     const list = (data || []) as VoiceConversation[]
@@ -451,7 +452,7 @@ export default function AperonixVoiceAgentPage() {
     titleStartedRef.current = false
     firstUtteranceRef.current = ''
     try {
-      const response = await fetch('/api/aperonix/voice-token', { method: 'POST', cache: 'no-store' })
+      const response = await fetch('/api/aperonix/voice-token', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: id }) })
       const tokenData = await response.json()
       if (!response.ok || !tokenData.token) throw new Error(tokenData.error || 'Could not prepare Gemini Live.')
       changeStatus('connecting')
@@ -477,7 +478,7 @@ export default function AperonixVoiceAgentPage() {
           responseModalities: [Modality.AUDIO],
           inputAudioTranscription: {},
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } } },
-          systemInstruction: { parts: [{ text: 'You are Aperonix, SociaLens official AI voice companion. Speak in a warm, sweet, calm, natural feminine voice. Be friendly, patient, and conversational rather than robotic. Respond naturally in the language the user speaks, including Hindi, Hinglish, and English. Keep replies concise unless asked for detail. Let the user interrupt. Never claim to have performed actions you did not perform.' }] },
+          systemInstruction: { parts: [{ text: 'You are Aperonix, SociaLens official AI voice companion. Speak in a warm, sweet, calm, natural feminine voice. Be friendly, patient, and conversational rather than robotic. Respond naturally in the language the user speaks, including Hindi, Hinglish, and English. Keep replies concise unless asked for detail. Let the user interrupt. Never claim to have performed actions you did not perform.' + (tokenData.contextSummary ? '\\n\\nCONTINUING A PREVIOUS VOICE CONVERSATION — use the following saved context as memory. Treat it as the prior dialogue, remember the user's facts, preferences, decisions, and unfinished tasks, and continue naturally without asking them to repeat it unless clarification is needed:\\n' + tokenData.contextSummary : '') }] },
         },
         callbacks: {
           onopen: () => changeStatus('listening'),
@@ -635,6 +636,30 @@ export default function AperonixVoiceAgentPage() {
       setRenameBusy(false)
     }
   }
+  const connectNewConversation = async (row: VoiceConversation) => {
+    if (connectingId) return
+    setMenuId(null)
+    setConnectingId(row.id)
+    setError(null)
+    try {
+      const response = await fetch('/api/aperonix/voice-continuation', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: row.id }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result.conversation) throw new Error(result.error || 'Could not connect a new conversation.')
+      const next = result.conversation as VoiceConversation
+      setRows(prev => [next, ...prev.filter(item => item.id !== next.id)])
+      setActiveId(next.id); activeRef.current = next.id
+      setPlaybackUrl(null); setPlaybackModal(false); setSidebarOpen(false)
+      setError(null)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not connect a new conversation. Please try again.')
+    } finally {
+      setConnectingId(null)
+    }
+  }
+
   const duplicateConversation = async (row: VoiceConversation) => {
     const supabase = createClient()
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
@@ -695,6 +720,7 @@ export default function AperonixVoiceAgentPage() {
             <button onClick={() => { setRenameId(row.id); setRenameTitle(row.title); setRenameError(null); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Pencil className="h-4 w-4" />Rename</button>
             <ChatWallpaperControls conversationId={row.id} wallpaper={row.id === activeId ? wallpaper : null} isActive={row.id === activeId} onWallpaperChange={nextWallpaper => { cacheVoiceWallpaper(row.id, nextWallpaper); if (row.id === activeId) setWallpaper(nextWallpaper) }} tableName="aperonix_voice_wallpapers" wallpaperLabel="voice conversation" />
             <button onClick={() => void duplicateConversation(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Copy className="h-4 w-4" />Duplicate</button>
+            <button disabled={!!connectingId || !row.storage_path} onClick={() => void connectNewConversation(row)} title="Connect with new conversation" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs whitespace-nowrap hover:bg-accent disabled:opacity-50"><Forward className="h-4 w-4 shrink-0" /><span>{connectingId === row.id ? 'Connecting…' : 'Connect with new conversation'}</span></button>
             <button disabled={!row.storage_path} onClick={() => void handleShareConversation(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-40"><Forward className="h-4 w-4" />Share conversation</button>
             <button disabled={!row.storage_path} onClick={() => { setMenuId(null); void playRecording(row) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-40"><Play className="h-4 w-4" />Play recording</button>
             <button onClick={() => { setDeleteId(row.id); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-accent"><Trash2 className="h-4 w-4" />Delete</button>
@@ -711,6 +737,7 @@ export default function AperonixVoiceAgentPage() {
       <section className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center justify-center px-4 sm:px-5 py-6 sm:py-8">
         {status === 'listening' ? <VoiceParticleAnimation /> : <div className="relative flex h-36 w-36 sm:h-44 sm:w-44 items-center justify-center"><Image src="/images/aperonix-logo.png" alt="Aperonix" width={220} height={220} priority className="h-full w-full object-contain" /></div>}
         <h3 className="mt-8 text-xl sm:text-2xl font-semibold text-center">{status === 'listening' ? 'I’m listening…' : status === 'saving' ? 'Saving your recording' : status === 'connecting' ? 'Connecting to Aperonix' : status === 'preparing' ? 'Getting your voice ready' : playbackUrl ? 'Saved recording' : 'Hey, I’m Aperonix'}</h3>
+        {active?.context_summary && status === 'idle' && !playbackUrl && <div className="mt-4 max-w-lg rounded-xl border border-pink-500/25 bg-background/80 px-4 py-3 text-center text-xs leading-5 text-foreground shadow-sm"><p className="font-semibold text-pink-500">Connected conversation</p><p className="mt-1 text-muted-foreground">Aperonix has the previous conversation context and will use it as you continue. You don’t need to repeat the earlier details.</p></div>}
         <p className="mt-2 max-w-md text-center text-sm text-muted-foreground leading-6">{status === 'listening' ? 'I’m listening. Go ahead whenever you’re ready.' : status === 'saving' ? 'Your combined conversation audio is being uploaded to private Supabase storage.' : playbackUrl ? 'Listen to your saved voice conversation below.' : 'Your curious companion for big ideas, everyday questions, and new discoveries. Let’s figure things out together.'}</p>
         {playbackUrl && status === 'idle' && playbackModal && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4" onClick={() => setPlaybackModal(false)}><div role="dialog" aria-modal="true" aria-label="Play voice conversation" className="w-full max-w-lg rounded-2xl border border-border bg-background p-5 shadow-2xl" onClick={e => e.stopPropagation()}><div className="flex items-center justify-between gap-3 mb-5"><div><h3 className="font-semibold text-base">{active?.title || 'Voice recording'}</h3><p className="text-xs text-muted-foreground mt-1">Full saved conversation audio</p></div><button onClick={() => setPlaybackModal(false)} aria-label="Close player" className="rounded-full p-2 hover:bg-accent"><X className="h-4 w-4" /></button></div><audio key={playbackUrl} controls autoPlay src={playbackUrl} className="w-full" /><p className="text-xs text-muted-foreground mt-3">Private recording · playback link expires after 10 minutes</p></div></div>}
         {error && <div role="alert" className="mt-6 max-w-xl w-full rounded-xl border border-red-500/30 bg-red-500/5 p-3 flex items-start gap-2 text-sm text-red-500"><AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span>{error}</span></div>}
