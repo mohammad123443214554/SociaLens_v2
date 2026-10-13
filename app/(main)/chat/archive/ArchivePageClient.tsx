@@ -279,6 +279,43 @@ export default function ArchivePage() {
           </div>}
         </div>
       )}
+      {unarchiveConfirm && <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/60 p-4" onClick={() => { if (!unarchiveBusy) setUnarchiveConfirm(null) }}>
+        <div role="dialog" aria-modal="true" aria-labelledby="unarchive-dialog-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-background text-foreground shadow-2xl" onClick={event => event.stopPropagation()}>
+          <div className="p-5 sm:p-6">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><ArchiveRestore className="h-6 w-6" /></div>
+            <h2 id="unarchive-dialog-title" className="text-lg font-semibold">Unarchive this {unarchiveConfirm.kind === "voice" ? "voice conversation" : "chat"}?</h2>
+            <p className="mt-2 break-words text-sm text-muted-foreground">“{unarchiveConfirm.title}” will be moved out of Archive and back to your conversations. You can archive it again anytime.</p>
+          </div>
+          <div className="flex flex-col-reverse gap-2 border-t border-border bg-muted/30 p-4 sm:flex-row sm:justify-end">
+            <button disabled={unarchiveBusy} onClick={() => setUnarchiveConfirm(null)} className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-50">Cancel</button>
+            <button disabled={unarchiveBusy} onClick={async () => {
+              if (!unarchiveConfirm) return
+              setUnarchiveBusy(true)
+              let error: { message: string } | null = null
+              if (unarchiveConfirm.kind === "user") {
+                const chat = chats.find(item => item.id === unarchiveConfirm.id)
+                const archivedBy = (chat?.archived_by || []).filter((id: string) => id !== user.id)
+                const result = await supabase.from("chats").update({ archived_by: archivedBy }).eq("id", unarchiveConfirm.id)
+                error = result.error
+                if (!error) setChats(prev => prev.filter(item => item.id !== unarchiveConfirm.id))
+              } else if (unarchiveConfirm.kind === "aperonix") {
+                const result = await supabase.from("aperonix_conversations").update({ archived_at: null, updated_at: new Date().toISOString() }).eq("id", unarchiveConfirm.id).eq("user_id", user.id)
+                error = result.error
+                if (!error) setAperonixChats(prev => prev.filter(item => item.id !== unarchiveConfirm.id))
+              } else {
+                const result = await supabase.from("aperonix_voice_conversations").update({ archived_at: null, updated_at: new Date().toISOString() }).eq("id", unarchiveConfirm.id).eq("user_id", user.id)
+                error = result.error
+                if (!error) setVoiceConversations(prev => prev.filter(item => item.id !== unarchiveConfirm.id))
+              }
+              setUnarchiveBusy(false)
+              if (error) { alert("Could not unarchive this item. Please try again."); return }
+              setUnarchiveConfirm(null)
+            }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50">
+              {unarchiveBusy ? "Unarchiving…" : <><ArchiveRestore className="h-4 w-4" /> Unarchive</>}
+            </button>
+          </div>
+        </div>
+      </div>}
       {shareChatText !== null && <AperonixShareModal replyText={shareChatText} contentType="chat" onClose={() => setShareChatText(null)} />}
     </div>
   )
