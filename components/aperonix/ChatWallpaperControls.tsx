@@ -275,18 +275,21 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
       const { error: deleteError } = await supabase.from(tableName as 'aperonix_chat_wallpapers')
         .delete().eq('conversation_id', conversationId).eq('user_id', user.id)
       if (deleteError) throw deleteError
-      if (row) {
-        const paths = [row.original_storage_path, row.processed_storage_path].filter((path): path is string => typeof path === 'string')
-        if (paths.length) {
-          const { error: storageError } = await supabase.storage.from(BUCKET).remove(paths)
-          if (storageError) console.error('Could not clean up removed wallpaper objects', storageError)
-        }
-      }
+      // The database row is the source of truth. Clear the wallpaper in the UI
+      // immediately after its removal, then clean up storage without blocking the dialog.
       setCurrentWallpaper(null)
       if (isActive) onWallpaperChange(null)
       setDraft(null)
       setOpen(false)
       setUploadOpen(false)
+      if (row) {
+        const paths = [row.original_storage_path, row.processed_storage_path].filter((path): path is string => typeof path === 'string')
+        if (paths.length) {
+          void supabase.storage.from(BUCKET).remove(paths).then(({ error: storageError }) => {
+            if (storageError) console.error('Could not clean up removed wallpaper objects', storageError)
+          }).catch(storageError => console.error('Could not clean up removed wallpaper objects', storageError))
+        }
+      }
       return true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not remove this wallpaper.')
