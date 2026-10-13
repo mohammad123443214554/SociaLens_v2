@@ -312,7 +312,7 @@ export default function AperonixVoiceAgentPage() {
     void loadHistory().catch(e => { if (alive) setError(e instanceof Error ? e.message : 'Could not load history.') })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [loadHistory, user?.id, isArchiveMode, requestedConversationId]
+  }, [loadHistory, user?.id, isArchiveMode, requestedConversationId])
   useEffect(() => { activeRef.current = activeId }, [activeId])
   useEffect(() => {
     let cancelled = false
