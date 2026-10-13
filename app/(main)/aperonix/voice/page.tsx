@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { GoogleGenAI, Modality } from '@google/genai'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { ChatWallpaperControls, ChatWallpaper } from '@/components/aperonix/ChatWallpaperControls'
 import { useUser } from '@/lib/hooks/useUser'
 import { AudioLines, Plus, Mic, PhoneOff, Play, LoaderCircle, Trash2, AlertCircle, Radio, Menu, MoreHorizontal, Pin, Pencil, Copy, X, ArrowLeft } from 'lucide-react'
 
@@ -214,6 +215,7 @@ export default function AperonixVoiceAgentPage() {
   const [playbackModal, setPlaybackModal] = useState(false)
   const [titleGeneratingId, setTitleGeneratingId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [wallpaper, setWallpaper] = useState<ChatWallpaper | null>(null)
   const sessionRef = useRef<any>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const contextRef = useRef<AudioContext | null>(null)
@@ -256,6 +258,55 @@ export default function AperonixVoiceAgentPage() {
     return () => { alive = false }
   }, [loadHistory, user?.id])
   useEffect(() => { activeRef.current = activeId }, [activeId])
+  useEffect(() => {
+    let cancelled = false
+    if (!activeId) {
+      setWallpaper(null)
+      return () => { cancelled = true }
+    }
+    const loadWallpaper = async () => {
+      const supabase = createClient()
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
+      if (authError || !currentUser) {
+        if (!cancelled) setWallpaper(null)
+        return
+      }
+      const { data, error: queryError } = await supabase
+        .from('aperonix_voice_wallpapers' as 'aperonix_chat_wallpapers')
+        .select('original_storage_path,processed_storage_path,filter_index,zoom,position_x,position_y')
+        .eq('conversation_id', activeId)
+        .eq('user_id', currentUser.id)
+        .maybeSingle()
+      if (queryError) throw queryError
+      if (!data) {
+        if (!cancelled) setWallpaper(null)
+        return
+      }
+      const [original, processed] = await Promise.all([
+        supabase.storage.from('aperonix-wallpapers').createSignedUrl(data.original_storage_path, 60 * 60),
+        supabase.storage.from('aperonix-wallpapers').createSignedUrl(data.processed_storage_path, 60 * 60),
+      ])
+      if (original.error || processed.error || !original.data?.signedUrl || !processed.data?.signedUrl) {
+        throw new Error('Could not load this voice wallpaper.')
+      }
+      const loaded: ChatWallpaper = {
+        originalDataUrl: original.data.signedUrl,
+        dataUrl: processed.data.signedUrl,
+        originalStoragePath: data.original_storage_path,
+        processedStoragePath: data.processed_storage_path,
+        filterIndex: data.filter_index,
+        zoom: data.zoom,
+        positionX: data.position_x,
+        positionY: data.position_y,
+      }
+      if (!cancelled) setWallpaper(loaded)
+    }
+    void loadWallpaper().catch(cause => {
+      console.error('Could not load voice conversation wallpaper', cause)
+      if (!cancelled) setWallpaper(null)
+    })
+    return () => { cancelled = true }
+  }, [activeId, user?.id])
   useEffect(() => {
     if (status !== 'listening' || !startedRef.current) return
     const tick = () => setElapsed(Date.now() - (startedRef.current || Date.now()))
@@ -578,6 +629,7 @@ export default function AperonixVoiceAgentPage() {
           {menuId === row.id && <><button aria-label="Close conversation menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuId(null)} /><div className="absolute right-2 top-10 z-30 w-48 rounded-xl border border-border bg-popover p-1.5 shadow-xl">
             <button onClick={() => void togglePin(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Pin className="h-4 w-4" />{row.pinned ? 'Unpin conversation' : 'Pin to top'}</button>
             <button onClick={() => { setRenameId(row.id); setRenameTitle(row.title); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Pencil className="h-4 w-4" />Rename</button>
+            <ChatWallpaperControls conversationId={row.id} wallpaper={row.id === activeId ? wallpaper : null} isActive={row.id === activeId} onWallpaperChange={nextWallpaper => { if (row.id === activeId) setWallpaper(nextWallpaper) }} tableName="aperonix_voice_wallpapers" wallpaperLabel="voice conversation" />
             <button onClick={() => void duplicateConversation(row)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent"><Copy className="h-4 w-4" />Duplicate</button>
             <button disabled={!row.storage_path} onClick={() => { setMenuId(null); void playRecording(row) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-40"><Play className="h-4 w-4" />Play recording</button>
             <button onClick={() => { setDeleteId(row.id); setMenuId(null) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-accent"><Trash2 className="h-4 w-4" />Delete</button>
@@ -590,7 +642,7 @@ export default function AperonixVoiceAgentPage() {
     </aside>
     <main className="flex-1 min-w-0 w-full flex flex-col">
       <header className="min-h-14 border-b border-border px-3 sm:px-6 py-2 flex items-center gap-2 sm:gap-3"><button type="button" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.assign('/home') }} aria-label="Go back" title="Go back" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ArrowLeft className="h-[18px] w-[18px]" /></button><button type="button" onClick={() => setSidebarOpen(true)} aria-label="Open voice conversation history" title="Conversation history" className="relative z-10 lg:hidden shrink-0 text-muted-foreground hover:text-foreground"><Menu className="h-5 w-5" /></button><Image src="/images/aperonix-logo.png" alt="Aperonix" width={36} height={36} className="h-9 w-9 shrink-0 rounded-full object-contain" /><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="font-semibold text-sm truncate">{active?.title || 'New conversation'}</h2>{active && titleGeneratingId === active.id && <LoaderCircle aria-label="Aperonix is generating the conversation title" className="h-3.5 w-3.5 shrink-0 animate-spin text-pink-500" />}</div><p className="text-xs text-muted-foreground truncate">{status === 'listening' ? 'Real-time voice conversation · recording' : status === 'saving' ? 'Saving recording to Supabase…' : status === 'connecting' ? 'Connecting to Gemini Live…' : status === 'preparing' ? 'Preparing microphone…' : 'Real-time voice conversation'}</p></div>{status === 'listening' && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{duration(elapsed)}</span>}</header>
-      <section className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center justify-center px-4 sm:px-5 py-6 sm:py-8">
+      <section className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center justify-center px-4 sm:px-5 py-6 sm:py-8" style={wallpaper ? { backgroundImage: 'linear-gradient(rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.14)), url("' + wallpaper.dataUrl + '")', backgroundSize: 'cover, cover', backgroundPosition: 'center, ' + wallpaper.positionX + '% ' + wallpaper.positionY + '%', backgroundRepeat: 'no-repeat, no-repeat' } : undefined}>
         {status === 'listening' ? <VoiceParticleAnimation /> : <div className="relative flex h-36 w-36 sm:h-44 sm:w-44 items-center justify-center"><Image src="/images/aperonix-logo.png" alt="Aperonix" width={220} height={220} priority className="h-full w-full object-contain" /></div>}
         <h3 className="mt-8 text-xl sm:text-2xl font-semibold text-center">{status === 'listening' ? 'I’m listening…' : status === 'saving' ? 'Saving your recording' : status === 'connecting' ? 'Connecting to Aperonix' : status === 'preparing' ? 'Getting your voice ready' : playbackUrl ? 'Saved recording' : 'Hey, I’m Aperonix'}</h3>
         <p className="mt-2 max-w-md text-center text-sm text-muted-foreground leading-6">{status === 'listening' ? 'I’m listening. Go ahead whenever you’re ready.' : status === 'saving' ? 'Your combined conversation audio is being uploaded to private Supabase storage.' : playbackUrl ? 'Listen to your saved voice conversation below.' : 'Your curious companion for big ideas, everyday questions, and new discoveries. Let’s figure things out together.'}</p>
