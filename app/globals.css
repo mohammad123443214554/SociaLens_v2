@@ -195,9 +195,11 @@ html:not(.dark) body .bg-slate-950\/75 {
   100% { opacity: 0.25; }
 }
 .aperonix-status-shimmer {
-  background-image: linear-gradient(90deg, currentColor 0%, currentColor 38%, #ffffff 50%, currentColor 62%, currentColor 100%);
-  background-size: 220% auto;
-  animation: aperonix-status-shine 2s linear infinite;
+  /* Keep every glyph opaque throughout the sweep so the full status word stays readable. */
+  background-image: linear-gradient(90deg, #e879f9 0%, #e879f9 42%, #ffffff 50%, #e879f9 58%, #e879f9 100%);
+  background-size: 200% 100%;
+  background-position: 100% center;
+  animation: aperonix-status-shine 2s ease-in-out infinite;
 }
 .aperonix-status-dots {
   animation: aperonix-status-dots 1.2s ease-in-out infinite;
