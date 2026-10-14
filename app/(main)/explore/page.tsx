@@ -215,11 +215,7 @@ export default function ExplorePage() {
           <Input placeholder="Search people, posts, #hashtags..." value={query} onChange={e => setQuery(e.target.value)} className="h-11 rounded-2xl border-border/80 bg-card/80 pl-10 pr-10 shadow-sm focus-visible:ring-pink-500/50 sm:h-12" />
           {query && <button onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" /></button>}
         </div>
-        {!isSearching && (
-          <nav aria-label="Explore categories" className="mt-4 flex gap-2 overflow-x-auto pb-1">
-            {tabs.map(tab => <button key={tab.id} onClick={() => setActiveSection(tab.id)} className={cn('inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-full border px-4 text-sm font-semibold transition-all', activeSection === tab.id ? 'border-transparent bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white shadow-md shadow-pink-500/15' : 'border-border bg-card/70 text-muted-foreground hover:border-pink-500/40 hover:text-foreground')}>{tab.icon}{tab.label}</button>)}
-          </nav>
-        )}
+
         {isSearching && (
           <div className="mt-3 flex gap-1 overflow-x-auto rounded-xl border border-border/70 bg-card/60 p-1">
             {[{ id: 'all', label: 'All' }, { id: 'profiles', label: `People (${searchProfiles.length})` }, { id: 'posts', label: `Posts (${searchPosts.length})` }, { id: 'hashtags', label: `Hashtags (${searchHashtags.length})` }].map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id as Tab)} className={cn('flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition-all sm:text-sm', activeTab === tab.id ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-muted-foreground hover:bg-accent')}>{tab.label}</button>)}
@@ -264,7 +260,7 @@ export default function ExplorePage() {
                 icon={<Hash className="h-4 w-4" />}
                 title="Trending Hashtags"
                 subtitle={activeSection === 'hashtags' ? 'Hashtag views across real posts and reels' : 'Top hashtags by combined post and reel views'}
-                action={activeSection !== 'hashtags' ? <button type="button" onClick={() => setActiveSection('hashtags')} className="shrink-0 text-xs font-semibold text-pink-400 transition-colors hover:text-fuchsia-400">See All <ArrowUpRight className="ml-1 inline h-3.5 w-3.5" /></button> : undefined}
+                action={<Link href="/explore/hashtags" className="shrink-0 text-xs font-semibold text-pink-400 transition-colors hover:text-fuchsia-400">See All <ArrowUpRight className="ml-1 inline h-3.5 w-3.5" /></Link>}
               />
               {popularHashtags.length ? activeSection === 'hashtags' ? (
                 <div className="max-h-[520px] space-y-1 overflow-y-auto pr-1 [scrollbar-width:thin]">
