@@ -78,6 +78,97 @@ function cacheConversationWallpaper(conversationId: string, wallpaper: ChatWallp
   wallpaperCache.set(conversationId, { wallpaper, expiresAt: Date.now() + (wallpaper ? 50 : 5) * 60 * 1000 })
 }
 
+
+type ReplyBlock =
+  | { type: 'paragraph' | 'heading'; text: string; level?: number }
+  | { type: 'list'; ordered: boolean; items: string[] }
+  | { type: 'quote'; text: string }
+
+function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[] {
+  const tokenPattern = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)|\*\*(.+?)\*\*|__(.+?)__|\*(?!\s)(.+?)(?<!\s)\*|_(?!\s)(.+?)(?<!\s)_|\x60([^\x60]+)\x60)/g
+  const nodes: React.ReactNode[] = []
+  let cursor = 0
+  let match: RegExpExecArray | null
+  let index = 0
+  while ((match = tokenPattern.exec(text)) !== null) {
+    if (match.index > cursor) nodes.push(text.slice(cursor, match.index))
+    const key = keyPrefix + '-' + index++
+    if (match[2] && match[3]) {
+      nodes.push(<a key={key} href={match[3]} target="_blank" rel="noopener noreferrer" className="text-pink-500 underline underline-offset-2 hover:text-purple-500 break-all">{renderInlineMarkdown(match[2], key)}</a>)
+    } else if (match[4] || match[5]) {
+      nodes.push(<strong key={key} className="font-semibold">{match[4] || match[5]}</strong>)
+    } else if (match[6] || match[7]) {
+      nodes.push(<em key={key}>{match[6] || match[7]}</em>)
+    } else if (match[8]) {
+      nodes.push(<code key={key} className="rounded bg-muted px-1.5 py-0.5 text-[0.92em] font-mono">{match[8]}</code>)
+    }
+    cursor = match.index + match[0].length
+  }
+  if (cursor < text.length) nodes.push(text.slice(cursor))
+  return nodes
+}
+
+function AperonixFormattedReply({ content }: { content: string }) {
+  const lines = content.replace(/\r\n?/g, '\n').split('\n')
+  const blocks: ReplyBlock[] = []
+  let paragraph: string[] = []
+  const flushParagraph = () => {
+    const text = paragraph.join(' ').trim()
+    if (text) blocks.push({ type: 'paragraph', text })
+    paragraph = []
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line) { flushParagraph(); continue }
+    const heading = line.match(/^#{1,3}\s+(.+)$/)
+    if (heading) {
+      flushParagraph()
+      blocks.push({ type: 'heading', text: heading[1], level: line.match(/^#+/)?.[0].length || 2 })
+      continue
+    }
+    const ordered = line.match(/^(?:\d+[.)]|[①②③④⑤⑥⑦⑧⑨⑩])\s*(?:\*\*)?(.+?)$/)
+    const unordered = line.match(/^(?:[-*•]\s+)(.+)$/)
+    if (ordered || unordered) {
+      flushParagraph()
+      const isOrdered = Boolean(ordered)
+      const current = blocks[blocks.length - 1]
+      const item = (ordered?.[1] || unordered?.[1] || '').replace(/\*\*([^*]+)\*\*/g, '$1').trim()
+      if (current?.type === 'list' && current.ordered === isOrdered) current.items.push(item)
+      else blocks.push({ type: 'list', ordered: isOrdered, items: [item] })
+      continue
+    }
+    const quote = line.match(/^>\s?(.*)$/)
+    if (quote) {
+      flushParagraph()
+      blocks.push({ type: 'quote', text: quote[1] })
+      continue
+    }
+    paragraph.push(line)
+  }
+  flushParagraph()
+
+  return (
+    <div className="w-full space-y-3 leading-relaxed">
+      {blocks.map((block, index) => {
+        if (block.type === 'heading') {
+          const Tag = block.level === 1 ? 'h3' : 'h4'
+          return <Tag key={index} className="font-semibold text-foreground">{renderInlineMarkdown(block.text, 'heading-' + index)}</Tag>
+        }
+        if (block.type === 'list') {
+          const ListTag = block.ordered ? 'ol' : 'ul'
+          const listClass = (block.ordered ? 'list-decimal' : 'list-disc') + ' pl-6 space-y-1.5 marker:text-pink-500'
+          return <ListTag key={index} className={listClass}>
+            {block.items.map((item, itemIndex) => <li key={itemIndex} className="pl-1">{renderInlineMarkdown(item, 'list-' + index + '-' + itemIndex)}</li>)}
+          </ListTag>
+        }
+        if (block.type === 'quote') return <blockquote key={index} className="border-l-2 border-pink-500/60 pl-3 text-muted-foreground">{renderInlineMarkdown(block.text, 'quote-' + index)}</blockquote>
+        return <p key={index}>{renderInlineMarkdown(block.text, 'paragraph-' + index)}</p>
+      })}
+    </div>
+  )
+}
+
 export default function AperonixPage() {
   const { user, profile } = useUser()
   const searchParams = useSearchParams()
@@ -848,7 +939,7 @@ export default function AperonixPage() {
                                   style={{ animationDuration: '1.2s' }}
                                 />
                               </span>
-                            ) : msg.content}
+                            ) : <AperonixFormattedReply content={msg.content} />}
                           </div>
                         </div>
                       )
