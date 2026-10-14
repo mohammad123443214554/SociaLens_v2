@@ -85,7 +85,7 @@ type ReplyBlock =
   | { type: 'quote'; text: string }
 
 function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[] {
-  const tokenPattern = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)|\*\*(.+?)\*\*|__(.+?)__|\*(?!\s)(.+?)(?<!\s)\*|_(?!\s)(.+?)(?<!\s)_|\x60([^\x60]+)\x60)/g
+  const tokenPattern = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)|\*\*(.+?)\*\*|__(.+?)__|\*(?!\s)(.+?)(?<!\s)\*|_(?!\s)(.+?)(?<!\s)_|\x60([^\x60]+)\x60)|(https?:\/\/[^\s<>)]+)/g
   const nodes: React.ReactNode[] = []
   let cursor = 0
   let match: RegExpExecArray | null
@@ -95,6 +95,8 @@ function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[
     const key = keyPrefix + '-' + index++
     if (match[2] && match[3]) {
       nodes.push(<a key={key} href={match[3]} target="_blank" rel="noopener noreferrer" className="text-pink-500 underline underline-offset-2 hover:text-purple-500 break-all">{renderInlineMarkdown(match[2], key)}</a>)
+    } else if (match[9]) {
+      nodes.push(<a key={key} href={match[9]} target="_blank" rel="noopener noreferrer" className="text-pink-500 underline underline-offset-2 hover:text-purple-500 break-all">{match[9]}</a>)
     } else if (match[4] || match[5]) {
       nodes.push(<strong key={key} className="font-semibold">{match[4] || match[5]}</strong>)
     } else if (match[6] || match[7]) {
@@ -127,13 +129,13 @@ function AperonixFormattedReply({ content }: { content: string }) {
       blocks.push({ type: 'heading', text: heading[1], level: line.match(/^#+/)?.[0].length || 2 })
       continue
     }
-    const ordered = line.match(/^(?:\d+[.)]|[①②③④⑤⑥⑦⑧⑨⑩])\s*(?:\*\*)?(.+?)$/)
+    const ordered = line.match(/^(?:\d+[.)]\s+|[①②③④⑤⑥⑦⑧⑨⑩]\s*)(.+)$/)
     const unordered = line.match(/^(?:[-*•]\s+)(.+)$/)
     if (ordered || unordered) {
       flushParagraph()
       const isOrdered = Boolean(ordered)
       const current = blocks[blocks.length - 1]
-      const item = (ordered?.[1] || unordered?.[1] || '').replace(/\*\*([^*]+)\*\*/g, '$1').trim()
+      const item = (ordered?.[1] || unordered?.[1] || '').trim()
       if (current?.type === 'list' && current.ordered === isOrdered) current.items.push(item)
       else blocks.push({ type: 'list', ordered: isOrdered, items: [item] })
       continue
