@@ -233,7 +233,13 @@ export async function POST(request: NextRequest) {
       parts: [{ text: String(m.content || '').slice(0, 20000) }],
     }))
     const contents: GeminiMessage[] = [...trimmedHistory, { role: 'user', parts: userParts }]
-    const content = await callGemini('chat', APERONIX_SYSTEM_PROMPT, contents)
+    const wantsWebSearch = /\b(search|search the web|web search|look up|latest|current|news|sources|find online|internet|google karo|search karo|internet par|online dhoondo|dhundho|dhundh|link do|website ka link|kahan milega|recent)\b/i.test(newMessage)
+    const content = await callGemini(
+      'chat',
+      APERONIX_SYSTEM_PROMPT,
+      contents,
+      wantsWebSearch ? [{ google_search: {} }] : undefined,
+    )
     const reply = extractText(content) || "Sorry, I couldn't come up with a reply. Try again?"
     return NextResponse.json({ reply })
   } catch (error: any) {
