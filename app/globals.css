@@ -195,7 +195,7 @@ html:not(.dark) body .bg-slate-950\/75 {
   100% { opacity: 0.25; }
 }
 .aperonix-status-shimmer {
-  background-image: linear-gradient(90deg, #a855f7 0%, #ec4899 28%, #ffffff 50%, #06b6d4 72%, #a855f7 100%);
+  background-image: linear-gradient(90deg, currentColor 0%, currentColor 38%, #ffffff 50%, currentColor 62%, currentColor 100%);
   background-size: 220% auto;
   animation: aperonix-status-shine 2s linear infinite;
 }
