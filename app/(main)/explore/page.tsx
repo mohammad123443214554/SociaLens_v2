@@ -194,7 +194,7 @@ export default function ExplorePage() {
     <main className="mx-auto w-full max-w-7xl px-3 pb-24 pt-3 sm:px-5 sm:pt-5">
       <header className="mb-5">
         <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center text-pink-400"><Search className="h-6 w-6" /></div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-pink-500/15 text-pink-400"><Search className="h-6 w-6" /></div>
           <div className="min-w-0 flex-1"><h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">Explore</h1><p className="text-xs text-muted-foreground sm:text-sm">Discover real posts, reels and conversations on SociaLens</p></div>
         </div>
         <div className="relative">
