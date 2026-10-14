@@ -182,3 +182,29 @@ html:not(.dark) body .bg-slate-950\/95 {
 html:not(.dark) body .bg-slate-950\/75 {
   background-color: rgb(15 23 42 / 0.35);
 }
+
+
+/* Aperonix activity indicator: a subtle moving highlight while the assistant works. */
+@keyframes aperonix-status-shine {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+@keyframes aperonix-status-dots {
+  0%, 20% { opacity: 0.25; }
+  50% { opacity: 1; }
+  100% { opacity: 0.25; }
+}
+.aperonix-status-shimmer {
+  background-image: linear-gradient(90deg, #a855f7 0%, #ec4899 28%, #ffffff 50%, #06b6d4 72%, #a855f7 100%);
+  background-size: 220% auto;
+  animation: aperonix-status-shine 2s linear infinite;
+}
+.aperonix-status-dots {
+  animation: aperonix-status-dots 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .aperonix-status-shimmer,
+  .aperonix-status-dots {
+    animation: none;
+  }
+}
