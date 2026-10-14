@@ -85,7 +85,7 @@ type ReplyBlock =
   | { type: 'quote'; text: string }
 
 function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[] {
-  const tokenPattern = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)|\*\*(.+?)\*\*|__(.+?)__|\*(?!\s)(.+?)(?<!\s)\*|_(?!\s)(.+?)(?<!\s)_|\x60([^\x60]+)\x60)|(https?:\/\/[^\s<>)]+)/g
+  const tokenPattern = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)|\{\{color:(#[0-9a-fA-F]{6})\|([\s\S]+?)\}\}|\*\*(.+?)\*\*|__(.+?)__|\*(?!\s)(.+?)(?<!\s)\*|_(?!\s)(.+?)(?<!\s)_|\x60([^\x60]+)\x60)|(https?:\/\/[^\s<>)]+)/g
   const nodes: React.ReactNode[] = []
   let cursor = 0
   let match: RegExpExecArray | null
@@ -95,14 +95,16 @@ function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[
     const key = keyPrefix + '-' + index++
     if (match[2] && match[3]) {
       nodes.push(<a key={key} href={match[3]} target="_blank" rel="noopener noreferrer" className="text-pink-500 underline underline-offset-2 hover:text-purple-500 break-all">{renderInlineMarkdown(match[2], key)}</a>)
-    } else if (match[9]) {
-      nodes.push(<a key={key} href={match[9]} target="_blank" rel="noopener noreferrer" className="text-pink-500 underline underline-offset-2 hover:text-purple-500 break-all">{match[9]}</a>)
-    } else if (match[4] || match[5]) {
-      nodes.push(<strong key={key} className="font-semibold">{match[4] || match[5]}</strong>)
+    } else if (match[4] && match[5]) {
+      nodes.push(<span key={key} style={{ color: match[4] }}>{renderInlineMarkdown(match[5], key)}</span>)
+    } else if (match[10]) {
+      nodes.push(<a key={key} href={match[10]} target="_blank" rel="noopener noreferrer" className="text-pink-500 underline underline-offset-2 hover:text-purple-500 break-all">{match[10]}</a>)
     } else if (match[6] || match[7]) {
-      nodes.push(<em key={key}>{match[6] || match[7]}</em>)
-    } else if (match[8]) {
-      nodes.push(<code key={key} className="rounded bg-muted px-1.5 py-0.5 text-[0.92em] font-mono">{match[8]}</code>)
+      nodes.push(<strong key={key} className="font-semibold">{match[6] || match[7]}</strong>)
+    } else if (match[8] || match[9]) {
+      nodes.push(<em key={key}>{match[8] || match[9]}</em>)
+    } else if (match[11]) {
+      nodes.push(<code key={key} className="rounded bg-muted px-1.5 py-0.5 text-[0.92em] font-mono">{match[11]}</code>)
     }
     cursor = match.index + match[0].length
   }
@@ -154,8 +156,9 @@ function AperonixFormattedReply({ content }: { content: string }) {
     <div className="w-full space-y-3 leading-relaxed">
       {blocks.map((block, index) => {
         if (block.type === 'heading') {
-          const Tag = block.level === 1 ? 'h3' : 'h4'
-          return <Tag key={index} className="font-semibold text-foreground">{renderInlineMarkdown(block.text, 'heading-' + index)}</Tag>
+          const Tag = block.level === 1 ? 'h2' : block.level === 2 ? 'h3' : 'h4'
+          const headingClass = block.level === 1 ? 'text-2xl md:text-3xl' : block.level === 2 ? 'text-xl md:text-2xl' : 'text-lg md:text-xl'
+          return <Tag key={index} className={headingClass + ' font-semibold text-foreground leading-tight'}>{renderInlineMarkdown(block.text, 'heading-' + index)}</Tag>
         }
         if (block.type === 'list') {
           const ListTag = block.ordered ? 'ol' : 'ul'
