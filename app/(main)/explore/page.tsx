@@ -5,14 +5,14 @@ import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import {
   Search, Users, Grid3x3, Hash, X, AlertCircle, Play,
-  Film, Image as ImageIcon, ArrowUpRight,
+  Film, Image as ImageIcon, ArrowUpRight, Heart, MessageCircle,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { PostCard } from '@/components/feed/PostCard'
 import { PostSkeleton } from '@/components/feed/PostSkeleton'
 import { AdPostSlot } from '@/components/ads/AdPostSlot'
 import { interleaveAds, dedupeById } from '@/lib/utils/adInsertion'
-import { useExplorePosts, useReelsPosts } from '@/lib/hooks/usePosts'
+import { useExplorePosts } from '@/lib/hooks/usePosts'
 import { useUser } from '@/lib/hooks/useUser'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -76,13 +76,8 @@ export default function ExplorePage() {
   } = useExplorePosts(user?.id)
 
   // Keep using the existing personalized reels pipeline; no ranking code is changed here.
-  const { data: reelPages, isLoading: reelsLoading, isError: reelsError } = useReelsPosts(user?.id)
   const posts = explorePages?.pages.flatMap(page => page.posts) ?? []
-  const reels = useMemo(
-    () => dedupeById((reelPages?.pages.flatMap(page => page.posts) ?? []).filter(post => post.media_type === 'video' && !!post.media_url)),
-    [reelPages],
-  )
-  const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [posts])
+const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [posts])
   const isSearching = query.trim().length > 1
 
   const { data: searchProfiles = [] } = useQuery({
@@ -179,6 +174,21 @@ export default function ExplorePage() {
     staleTime: 60_000,
   })
 
+  const { data: topReels = [], isLoading: topReelsLoading, isError: topReelsError } = useQuery({
+    queryKey: ['explore-top-reels'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('posts').select(POST_SELECT)
+        .eq('media_type', 'video').not('media_url', 'is', null)
+        .order('likes_count', { ascending: false }).limit(100)
+      if (error) throw error
+      return ((data || []) as PostWithProfile[])
+        .sort((a, b) => ((Number(b.likes_count) || 0) + (Number(b.comments_count) || 0) + (Number(b.views_count) || 0)) -
+          ((Number(a.likes_count) || 0) + (Number(a.comments_count) || 0) + (Number(a.views_count) || 0)))
+        .slice(0, 10)
+    },
+    staleTime: 60_000,
+  })
+
   if (selectedHashtag) {
     return (
       <div className="mx-auto w-full max-w-4xl px-3 pb-20 sm:px-5">
@@ -250,7 +260,7 @@ export default function ExplorePage() {
             <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
               <SectionHeading
                 icon={<Hash className="h-4 w-4" />}
-                title="Trending Hashtags"
+                title="All Hashtags"
                 
                 action={<Link href="/explore/hashtags" className="shrink-0 text-xs font-semibold text-pink-400 transition-colors hover:text-fuchsia-400">See All <ArrowUpRight className="ml-1 inline h-3.5 w-3.5" /></Link>}
               />
@@ -272,19 +282,19 @@ export default function ExplorePage() {
             </section>
           )}
 
-          {(true || false) && (
-            <section>
-              <SectionHeading icon={<Film className="h-4 w-4" />} title="Reels" subtitle="Real videos from SociaLens" action={<Link href="/reels" className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">Open Reels <ArrowUpRight className="h-3.5 w-3.5" /></Link>} />
-              {reelsLoading ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-muted" />)}</div> :
-                reelsError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Reels could not be loaded. Please try again.</div> :
-                reels.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {reels.slice(0, false ? reels.length : 8).map(reel => <article key={reel.id} className="group min-w-0 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-pink-500/40">
-                    <div className="relative aspect-[3/4] overflow-hidden bg-black"><video src={reel.media_url ?? undefined} muted playsInline controls preload="metadata" className="h-full w-full object-cover" aria-label={`Video post by @${reel.profiles?.username ?? 'user'}`} /><span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[10px] font-semibold text-white"><Play className="h-3 w-3 fill-current" /> Reel</span></div>
-                    <div className="p-3"><Link href={`/profile/${reel.profiles?.username ?? ''}`} className="block truncate text-xs font-semibold hover:text-pink-400">@{reel.profiles?.username ?? 'user'}</Link><p className="mt-1 line-clamp-2 min-h-8 text-xs text-muted-foreground">{reel.content?.trim() || 'Video post'}</p><Link href="/reels" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">Watch in Reels <ArrowUpRight className="h-3 w-3" /></Link></div>
-                  </article>)}
-                </div> : <div className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-muted-foreground"><Film className="mx-auto mb-2 h-8 w-8 opacity-40" /><p className="text-sm font-semibold">No reels available yet</p><p className="mt-1 text-xs">Real video posts will appear here when available.</p></div>}
-            </section>
-          )}
+          <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
+            <SectionHeading icon={<Film className="h-4 w-4" />} title="Reels" action={<Link href="/explore/reels" className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">See All <ArrowUpRight className="h-3.5 w-3.5" /></Link>} />
+            {topReelsLoading ? <div className="flex gap-2 overflow-hidden">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[3/4] w-28 shrink-0 animate-pulse rounded-xl bg-muted sm:w-36" />)}</div> :
+              topReelsError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Reels could not be loaded. Please try again.</div> :
+              topReels.length ? <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {topReels.map(reel => <article key={reel.id} className="group w-[118px] shrink-0 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm transition-all hover:border-pink-500/40 sm:w-[160px] sm:rounded-2xl">
+                  <Link href="/explore/reels" className="block">
+                    <div className="relative aspect-[3/4] overflow-hidden bg-black"><video src={reel.media_url ?? undefined} muted playsInline preload="metadata" className="h-full w-full object-cover" aria-label={`Video post by @${reel.profiles?.username ?? 'user'}`} /><span className="pointer-events-none absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-black/65 px-1.5 py-1 text-[9px] font-semibold text-white"><Play className="h-2.5 w-2.5 fill-current" /> Reel</span></div>
+                    <div className="p-2 sm:p-2.5"><p className="truncate text-[11px] font-semibold sm:text-xs">@{reel.profiles?.username ?? 'user'}</p><p className="mt-1 line-clamp-2 min-h-7 text-[10px] text-muted-foreground sm:text-[11px]">{reel.content?.trim() || 'Video post'}</p><div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground"><span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" />{formatCount(reel.likes_count)}</span><span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" />{formatCount(reel.comments_count)}</span></div></div>
+                  </Link>
+                </article>)}
+              </div> : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-muted-foreground"><Film className="mx-auto mb-2 h-8 w-8 opacity-40" /><p className="text-sm font-semibold">No reels available yet</p></div>}
+          </section>
 
           {(true || false) && (
             <section>
