@@ -70,9 +70,9 @@ export interface GeminiFunctionDeclaration {
   }
 }
 
-export interface GeminiTool {
-  functionDeclarations: GeminiFunctionDeclaration[]
-}
+export type GeminiTool =
+  | { functionDeclarations: GeminiFunctionDeclaration[] }
+  | { google_search: Record<string, never> }
 
 export type GeminiRole = 'chat' | 'generate'
 
