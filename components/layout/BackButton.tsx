@@ -10,6 +10,7 @@ import { ChevronLeft } from 'lucide-react'
 const EXACT_EXCLUDE = new Set([
   '/feed',
   '/explore',
+  '/explore/hashtags',
   '/chat',
   '/chat/archive',
   '/delete-account',
