@@ -201,6 +201,7 @@ export default function AperonixPage() {
 
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [activityLabel, setActivityLabel] = useState<'Thinking' | 'Researching'>('Thinking')
   const [titleGeneratingId, setTitleGeneratingId] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
@@ -309,6 +310,7 @@ export default function AperonixPage() {
     const isFirstMessage = !(conversations.find(conversation => conversation.id === conversationId)?.messages.length)
     const messageId = crypto.randomUUID()
     setInput('')
+    setActivityLabel(/\b(search|research|look up|find online|internet|latest|news|sources|youtube|video|horror|drama|movie|film|series|episode|watch|recommend|recommendation|review|price|buy|weather|today|website|site|official link|trailer|song|music|download)\b|search karo|research karo|internet par|dhoondh|dhundh/i.test(text) ? 'Researching' : 'Thinking')
     setSending(true)
 
     try {
@@ -1031,15 +1033,20 @@ export default function AperonixPage() {
           ))}
 
           {sending && (
-            <div className="flex justify-start items-center py-1">
+            <div className="flex justify-start items-center gap-2.5 py-1" role="status" aria-live="polite">
               <Image
                 src="/images/aperonix-logo.png"
-                alt="Aperonix is thinking"
+                alt=""
+                aria-hidden="true"
                 width={30}
                 height={30}
-                className="rounded-full animate-spin"
+                className="rounded-full animate-spin shrink-0"
                 style={{ animationDuration: '1.2s' }}
               />
+              <span className="aperonix-status-shimmer text-sm font-medium bg-clip-text text-transparent">
+                {activityLabel}
+                <span className="inline-block w-5 text-left aperonix-status-dots">...</span>
+              </span>
             </div>
           )}
           <div ref={messagesEndRef} />
