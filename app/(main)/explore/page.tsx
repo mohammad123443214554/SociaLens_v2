@@ -246,15 +246,15 @@ export default function ExplorePage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {(activeSection === 'for-you' || activeSection === 'hashtags') && (
+          {(true || false) && (
             <section className="rounded-2xl border border-border/70 bg-card/30 p-3 sm:p-4">
               <SectionHeading
                 icon={<Hash className="h-4 w-4" />}
                 title="Trending Hashtags"
-                subtitle={activeSection === 'hashtags' ? 'Hashtag views across real posts and reels' : 'Top hashtags by combined post and reel views'}
+                subtitle={false ? 'Hashtag views across real posts and reels' : 'Top hashtags by combined post and reel views'}
                 action={<Link href="/explore/hashtags" className="shrink-0 text-xs font-semibold text-pink-400 transition-colors hover:text-fuchsia-400">See All <ArrowUpRight className="ml-1 inline h-3.5 w-3.5" /></Link>}
               />
-              {popularHashtags.length ? activeSection === 'hashtags' ? (
+              {popularHashtags.length ? false ? (
                 <div className="max-h-[520px] space-y-1 overflow-y-auto pr-1 [scrollbar-width:thin]">
                   {popularHashtags.map(({ tag, views }) => <button key={tag.toLocaleLowerCase()} onClick={() => setSelectedHashtag(tag)} className="group flex w-full items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/50 px-4 py-3 text-left transition-colors hover:border-pink-500/50 hover:bg-pink-500/5">
                     <span className="min-w-0 truncate text-sm font-semibold text-pink-400 group-hover:text-fuchsia-400">{tag}</span>
@@ -272,13 +272,13 @@ export default function ExplorePage() {
             </section>
           )}
 
-          {(activeSection === 'for-you' || activeSection === 'reels') && (
+          {(true || false) && (
             <section>
               <SectionHeading icon={<Film className="h-4 w-4" />} title="Reels" subtitle="Real videos from SociaLens" action={<Link href="/reels" className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">Open Reels <ArrowUpRight className="h-3.5 w-3.5" /></Link>} />
               {reelsLoading ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-muted" />)}</div> :
                 reelsError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Reels could not be loaded. Please try again.</div> :
                 reels.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {reels.slice(0, activeSection === 'reels' ? reels.length : 8).map(reel => <article key={reel.id} className="group min-w-0 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-pink-500/40">
+                  {reels.slice(0, false ? reels.length : 8).map(reel => <article key={reel.id} className="group min-w-0 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-pink-500/40">
                     <div className="relative aspect-[3/4] overflow-hidden bg-black"><video src={reel.media_url ?? undefined} muted playsInline controls preload="metadata" className="h-full w-full object-cover" aria-label={`Video post by @${reel.profiles?.username ?? 'user'}`} /><span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[10px] font-semibold text-white"><Play className="h-3 w-3 fill-current" /> Reel</span></div>
                     <div className="p-3"><Link href={`/profile/${reel.profiles?.username ?? ''}`} className="block truncate text-xs font-semibold hover:text-pink-400">@{reel.profiles?.username ?? 'user'}</Link><p className="mt-1 line-clamp-2 min-h-8 text-xs text-muted-foreground">{reel.content?.trim() || 'Video post'}</p><Link href="/reels" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">Watch in Reels <ArrowUpRight className="h-3 w-3" /></Link></div>
                   </article>)}
@@ -286,17 +286,17 @@ export default function ExplorePage() {
             </section>
           )}
 
-          {(activeSection === 'for-you' || activeSection === 'posts') && (
+          {(true || false) && (
             <section>
-              <SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title={activeSection === 'for-you' ? 'Posts' : 'Explore Posts'} subtitle="Real community posts" />
+              <SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title={true ? 'Posts' : 'Explore Posts'} subtitle="Real community posts" />
               {postsLoading ? <div className="grid gap-4 xl:grid-cols-2">{Array.from({ length: 4 }).map((_, i) => <PostSkeleton key={i} />)}</div> :
                 postsError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm"><div className="flex items-start gap-2 text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="font-semibold">Posts could not be loaded</p><p className="mt-1 opacity-80">{exploreError instanceof Error ? exploreError.message : 'Please refresh and try again.'}</p></div></div></div> :
-                posts.length ? <div className="grid items-start gap-4 xl:grid-cols-2">{(activeSection === 'posts' ? exploreItems : exploreItems.slice(0, 6)).map((item, i) => item === 'ad' ? <AdPostSlot key={`ad-${i}`} /> : <PostCard key={item.id} post={item} />)}</div> :
+                posts.length ? <div className="grid items-start gap-4 xl:grid-cols-2">{(false ? exploreItems : exploreItems.slice(0, 6)).map((item, i) => item === 'ad' ? <AdPostSlot key={`ad-${i}`} /> : <PostCard key={item.id} post={item} />)}</div> :
                 <div className="rounded-2xl border border-dashed border-border px-4 py-12 text-center text-muted-foreground"><Grid3x3 className="mx-auto mb-2 h-8 w-8 opacity-40" /><p className="text-sm font-semibold">No posts to show right now</p></div>}
-              <InfiniteScrollSentinel onIntersect={fetchNextExplorePage} hasMore={!!hasMoreExplore && activeSection === 'posts'} isLoading={isFetchingMoreExplore} />
+              <InfiniteScrollSentinel onIntersect={fetchNextExplorePage} hasMore={!!hasMoreExplore && false} isLoading={isFetchingMoreExplore} />
             </section>
           )}
-          {activeSection === 'hashtags' && <p className="text-center text-xs text-muted-foreground">Hashtag totals are calculated from real post captions. Capitalization differences are merged.</p>}
+          {false && <p className="text-center text-xs text-muted-foreground">Hashtag totals are calculated from real post captions. Capitalization differences are merged.</p>}
         </div>
       )}
     </main>
