@@ -234,13 +234,32 @@ export async function POST(request: NextRequest) {
     }))
     const contents: GeminiMessage[] = [...trimmedHistory, { role: 'user', parts: userParts }]
     const wantsWebSearch = /\b(search|search the web|web search|look up|latest|current|news|sources|find online|internet|google karo|search karo|internet par|online dhoondo|dhundho|dhundh|link do|website ka link|kahan milega|recent|youtube|video|horror|drama|movie|film|series|episode|watch|recommend|recommendation|review|price|buy|weather|today|2026|website|site|official link|trailer|song|music|download)\b/i.test(newMessage)
-    const content = await callGemini(
+    let content = await callGemini(
       'chat',
       APERONIX_SYSTEM_PROMPT,
       contents,
       wantsWebSearch ? [{ google_search: {} }] : undefined,
     )
-    const reply = extractText(content) || "Sorry, I couldn't come up with a reply. Try again?"
+    let reply = extractText(content)
+
+    // Grounded-search responses can occasionally return a candidate without
+    // user-facing text. Retry once without the search tool instead of showing
+    // the generic "couldn't come up with a reply" response.
+    if (!reply) {
+      console.warn('Aperonix received an empty Gemini response; retrying without web search.', {
+        finishReason: content?.finishReason || content?.candidates?.[0]?.finishReason || 'unknown',
+        searched: wantsWebSearch,
+      })
+      content = await callGemini('chat', APERONIX_SYSTEM_PROMPT, contents)
+      reply = extractText(content)
+    }
+
+    if (!reply) {
+      console.error('Aperonix received an empty response after retry.')
+      return NextResponse.json({
+        reply: 'I’m sorry, I couldn’t generate a complete answer just now. Please try sending your message once more.',
+      })
+    }
     return NextResponse.json({ reply })
   } catch (error: any) {
     console.error('Aperonix chat error:', error)
