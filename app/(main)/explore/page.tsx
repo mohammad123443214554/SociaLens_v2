@@ -90,7 +90,7 @@ export default function ExplorePage() {
     queryKey: ['search-profiles', query, user?.id],
     queryFn: async () => {
       if (!query.trim()) return []
-      const { data, error } = await supabase.from('profiles').select('*').ilike('username', \`%\${query}%\`).limit(20)
+      const { data, error } = await supabase.from('profiles').select('*').ilike('username', `%${query}%`).limit(20)
       if (error) throw error
       const candidates = (data as Profile[]) || []
       if (!user) return candidates.filter(p => p.search_privacy === 'everyone').slice(0, 10)
@@ -100,7 +100,7 @@ export default function ExplorePage() {
         supabase.from('follows').select('following_id').eq('follower_id', user.id).eq('status', 'accepted').in('following_id', ids),
         supabase.from('follows').select('follower_id').eq('following_id', user.id).eq('status', 'accepted').in('follower_id', ids),
         supabase.from('privacy_selected_users').select('owner_id').eq('category', 'search').eq('selected_user_id', user.id).in('owner_id', ids),
-        supabase.from('blocks').select('blocker_id, blocked_id').or(\`blocker_id.eq.\${user.id},blocked_id.eq.\${user.id}\`),
+        supabase.from('blocks').select('blocker_id, blocked_id').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`),
       ])
       const iFollowSet = new Set((iFollow || []).map((r: any) => r.following_id))
       const followsMeSet = new Set((followMe || []).map((r: any) => r.follower_id))
@@ -126,7 +126,7 @@ export default function ExplorePage() {
     queryKey: ['search-posts', query],
     queryFn: async () => {
       if (!query.trim()) return []
-      const { data, error } = await supabase.from('posts').select(POST_SELECT).ilike('content', \`%\${query}%\`).order('created_at', { ascending: false }).limit(20)
+      const { data, error } = await supabase.from('posts').select(POST_SELECT).ilike('content', `%${query}%`).order('created_at', { ascending: false }).limit(20)
       if (error) throw error
       return (data || []) as PostWithProfile[]
     },
@@ -137,7 +137,7 @@ export default function ExplorePage() {
     queryKey: ['search-hashtags', query],
     queryFn: async () => {
       const needle = query.toLocaleLowerCase().replace(/^#/, '')
-      const { data, error } = await supabase.from('posts').select('content').ilike('content', \`%#\${needle}%\`).limit(500)
+      const { data, error } = await supabase.from('posts').select('content').ilike('content', `%#${needle}%`).limit(500)
       if (error) throw error
       return countHashtags((data || []).map(p => p.content || ''))
         .filter(item => item.tag.toLocaleLowerCase().replace(/^#/, '').includes(needle))
@@ -150,7 +150,7 @@ export default function ExplorePage() {
     queryKey: ['hashtag-posts', selectedHashtag],
     queryFn: async () => {
       if (!selectedHashtag) return []
-      const { data, error } = await supabase.from('posts').select(POST_SELECT).ilike('content', \`%\${selectedHashtag}%\`).order('likes_count', { ascending: false }).limit(100)
+      const { data, error } = await supabase.from('posts').select(POST_SELECT).ilike('content', `%${selectedHashtag}%`).order('likes_count', { ascending: false }).limit(100)
       if (error) throw error
       return (data || []) as PostWithProfile[]
     },
@@ -209,7 +209,7 @@ export default function ExplorePage() {
         )}
         {isSearching && (
           <div className="mt-3 flex gap-1 overflow-x-auto rounded-xl border border-border/70 bg-card/60 p-1">
-            {[{ id: 'all', label: 'All' }, { id: 'profiles', label: \`People (\${searchProfiles.length})\` }, { id: 'posts', label: \`Posts (\${searchPosts.length})\` }, { id: 'hashtags', label: \`Hashtags (\${searchHashtags.length})\` }].map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id as Tab)} className={cn('flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition-all sm:text-sm', activeTab === tab.id ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-muted-foreground hover:bg-accent')}>{tab.label}</button>)}
+            {[{ id: 'all', label: 'All' }, { id: 'profiles', label: `People (${searchProfiles.length})` }, { id: 'posts', label: `Posts (${searchPosts.length})` }, { id: 'hashtags', label: `Hashtags (${searchHashtags.length})` }].map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id as Tab)} className={cn('flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition-all sm:text-sm', activeTab === tab.id ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-muted-foreground hover:bg-accent')}>{tab.label}</button>)}
           </div>
         )}
       </header>
@@ -220,7 +220,7 @@ export default function ExplorePage() {
             <section className="rounded-2xl border border-border/70 bg-card/40 p-3 sm:p-4">
               <SectionHeading icon={<Users className="h-4 w-4" />} title="People" subtitle="Profiles matching your search" />
               <div className="grid gap-1 sm:grid-cols-2">
-                {searchProfiles.map(profile => <Link key={profile.id} href={\`/profile/\${profile.username}\`} className="flex min-w-0 items-center gap-3 rounded-xl p-3 transition-colors hover:bg-accent/70">
+                {searchProfiles.map(profile => <Link key={profile.id} href={`/profile/${profile.username}`} className="flex min-w-0 items-center gap-3 rounded-xl p-3 transition-colors hover:bg-accent/70">
                   <Avatar className="h-11 w-11 shrink-0 ring-1 ring-border"><AvatarImage src={getAvatarUrl(profile.avatar_url)} /><AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-500 font-bold text-white">{profile.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
                   <div className="min-w-0 flex-1"><p className="flex items-center gap-1 truncate text-sm font-semibold">{profile.username}{profile.is_verified && <VerifiedBadge type={profile.verification_type} className="text-xs" />}</p>{profile.full_name && <p className="truncate text-xs text-muted-foreground">{profile.full_name}</p>}</div>
                   <p className="shrink-0 text-xs text-muted-foreground">{formatCount(profile.followers_count)} followers</p>
@@ -239,7 +239,7 @@ export default function ExplorePage() {
             </section>
           )}
           {(activeTab === 'all' || activeTab === 'posts') && searchPosts.length > 0 && (
-            <section><SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title="Posts" subtitle="Real posts matching your search" /><div className="grid gap-4 xl:grid-cols-2">{interleaveAds(dedupeById(searchPosts), 3, 8).map((item, i) => item === 'ad' ? <AdPostSlot key={\`ad-\${i}\`} /> : <PostCard key={item.id} post={item} />)}</div></section>
+            <section><SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title="Posts" subtitle="Real posts matching your search" /><div className="grid gap-4 xl:grid-cols-2">{interleaveAds(dedupeById(searchPosts), 3, 8).map((item, i) => item === 'ad' ? <AdPostSlot key={`ad-${i}`} /> : <PostCard key={item.id} post={item} />)}</div></section>
           )}
           {!searchProfiles.length && !searchPosts.length && !searchHashtags.length && <div className="rounded-2xl border border-border/70 bg-card/40 px-4 py-16 text-center text-muted-foreground"><Search className="mx-auto mb-3 h-10 w-10 opacity-40" /><p className="font-semibold">No results for “{query}”</p><p className="mt-1 text-sm">Try a different name, keyword or hashtag.</p></div>}
         </div>
@@ -261,8 +261,8 @@ export default function ExplorePage() {
                 reelsError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Reels could not be loaded. Please try again.</div> :
                 reels.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {reels.slice(0, activeSection === 'reels' ? reels.length : 8).map(reel => <article key={reel.id} className="group min-w-0 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-pink-500/40">
-                    <div className="relative aspect-[3/4] overflow-hidden bg-black"><video src={reel.media_url ?? undefined} muted playsInline controls preload="metadata" className="h-full w-full object-cover" aria-label={\`Video post by @\${reel.profiles?.username ?? 'user'}\`} /><span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[10px] font-semibold text-white"><Play className="h-3 w-3 fill-current" /> Reel</span></div>
-                    <div className="p-3"><Link href={\`/profile/\${reel.profiles?.username ?? ''}\`} className="block truncate text-xs font-semibold hover:text-pink-400">@{reel.profiles?.username ?? 'user'}</Link><p className="mt-1 line-clamp-2 min-h-8 text-xs text-muted-foreground">{reel.content?.trim() || 'Video post'}</p><Link href="/reels" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">Watch in Reels <ArrowUpRight className="h-3 w-3" /></Link></div>
+                    <div className="relative aspect-[3/4] overflow-hidden bg-black"><video src={reel.media_url ?? undefined} muted playsInline controls preload="metadata" className="h-full w-full object-cover" aria-label={`Video post by @${reel.profiles?.username ?? 'user'}`} /><span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[10px] font-semibold text-white"><Play className="h-3 w-3 fill-current" /> Reel</span></div>
+                    <div className="p-3"><Link href={`/profile/${reel.profiles?.username ?? ''}`} className="block truncate text-xs font-semibold hover:text-pink-400">@{reel.profiles?.username ?? 'user'}</Link><p className="mt-1 line-clamp-2 min-h-8 text-xs text-muted-foreground">{reel.content?.trim() || 'Video post'}</p><Link href="/reels" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">Watch in Reels <ArrowUpRight className="h-3 w-3" /></Link></div>
                   </article>)}
                 </div> : <div className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-muted-foreground"><Film className="mx-auto mb-2 h-8 w-8 opacity-40" /><p className="text-sm font-semibold">No reels available yet</p><p className="mt-1 text-xs">Real video posts will appear here when available.</p></div>}
             </section>
@@ -273,7 +273,7 @@ export default function ExplorePage() {
               <SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title={activeSection === 'for-you' ? 'Posts' : 'Explore Posts'} subtitle="Real community posts" />
               {postsLoading ? <div className="grid gap-4 xl:grid-cols-2">{Array.from({ length: 4 }).map((_, i) => <PostSkeleton key={i} />)}</div> :
                 postsError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm"><div className="flex items-start gap-2 text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="font-semibold">Posts could not be loaded</p><p className="mt-1 opacity-80">{exploreError instanceof Error ? exploreError.message : 'Please refresh and try again.'}</p></div></div></div> :
-                posts.length ? <div className="grid items-start gap-4 xl:grid-cols-2">{(activeSection === 'posts' ? exploreItems : exploreItems.slice(0, 6)).map((item, i) => item === 'ad' ? <AdPostSlot key={\`ad-\${i}\`} /> : <PostCard key={item.id} post={item} />)}</div> :
+                posts.length ? <div className="grid items-start gap-4 xl:grid-cols-2">{(activeSection === 'posts' ? exploreItems : exploreItems.slice(0, 6)).map((item, i) => item === 'ad' ? <AdPostSlot key={`ad-${i}`} /> : <PostCard key={item.id} post={item} />)}</div> :
                 <div className="rounded-2xl border border-dashed border-border px-4 py-12 text-center text-muted-foreground"><Grid3x3 className="mx-auto mb-2 h-8 w-8 opacity-40" /><p className="text-sm font-semibold">No posts to show right now</p></div>}
               <InfiniteScrollSentinel onIntersect={fetchNextExplorePage} hasMore={!!hasMoreExplore && activeSection === 'posts'} isLoading={isFetchingMoreExplore} />
             </section>
