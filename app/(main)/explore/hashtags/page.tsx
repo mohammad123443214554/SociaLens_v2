@@ -12,7 +12,7 @@ import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentin
 const PAGE_SIZE = 500
 
 function extractHashtags(content: string): string[] {
-  return content.match(/#[\\w\\u0600-\\u06FF]+/g) || []
+  return content.match(/#[\w\u0600-\u06FF]+/g) || []
 }
 
 export default function ExploreHashtagsPage() {
