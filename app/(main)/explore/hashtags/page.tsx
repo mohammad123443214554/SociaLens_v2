@@ -85,9 +85,8 @@ export default function ExploreHashtagsPage() {
       </header>
 
       <section className="overflow-hidden rounded-xl border border-border/80 bg-card/40 sm:rounded-2xl">
-        <div className="flex items-center justify-between gap-3 border-b border-border/70 px-3 py-2.5 sm:px-5 sm:py-3">
+        <div className="border-b border-border/70 px-3 py-2.5 sm:px-5 sm:py-3">
           <h2 className="text-xs font-bold sm:text-sm">All hashtags</h2>
-          <span className="text-xs text-muted-foreground">{filteredHashtags.length} found</span>
         </div>
         {isLoading ? (
           <div className="space-y-3 p-5">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-xl bg-muted/70" />)}</div>
