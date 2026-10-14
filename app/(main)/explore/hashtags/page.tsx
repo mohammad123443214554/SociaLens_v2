@@ -19,29 +19,37 @@ export default function ExploreHashtagsPage() {
   const { data: hashtags = [], isLoading, isError } = useQuery({
     queryKey: ['all-explore-hashtags'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('posts')
-        .select('content, views_count')
-        .order('created_at', { ascending: false })
-        .limit(500)
-      if (error) throw error
-
+      // Page through the complete posts table: Supabase applies a row cap per request,
+      // so a single unbounded select would still miss older posts.
+      const pageSize = 500
+      let from = 0
       const totals = new Map<string, { tag: string; views: number; posts: number }>()
-      ;(data || []).forEach(post => {
-        const seenInPost = new Set<string>()
-        extractHashtags(post.content || '').forEach(tag => {
-          const key = tag.toLocaleLowerCase()
-          if (seenInPost.has(key)) return
-          seenInPost.add(key)
-          const current = totals.get(key)
-          if (current) {
-            current.views += Number(post.views_count) || 0
-            current.posts += 1
-          } else {
-            totals.set(key, { tag, views: Number(post.views_count) || 0, posts: 1 })
-          }
+      while (true) {
+        const { data, error } = await supabase
+          .from('posts')
+          .select('content, views_count')
+          .order('created_at', { ascending: false })
+          .range(from, from + pageSize - 1)
+        if (error) throw error
+        const page = data || []
+        page.forEach(post => {
+          const seenInPost = new Set<string>()
+          extractHashtags(post.content || '').forEach(tag => {
+            const key = tag.toLocaleLowerCase()
+            if (seenInPost.has(key)) return
+            seenInPost.add(key)
+            const current = totals.get(key)
+            if (current) {
+              current.views += Number(post.views_count) || 0
+              current.posts += 1
+            } else {
+              totals.set(key, { tag, views: Number(post.views_count) || 0, posts: 1 })
+            }
+          })
         })
-      })
+        if (page.length < pageSize) break
+        from += pageSize
+      }
       return Array.from(totals.values()).sort((a, b) => b.views - a.views || b.posts - a.posts)
     },
     staleTime: 60_000,
@@ -55,31 +63,30 @@ export default function ExploreHashtagsPage() {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-3 pb-24 pt-4 sm:px-5 sm:pt-7">
-      <Link href="/explore" className="mb-5 inline-flex items-center gap-2 rounded-full border border-border/80 bg-card/70 px-3 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:border-pink-500/40 hover:text-pink-400">
+      <Link href="/explore" className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/70 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-pink-500/40 hover:text-pink-400 sm:mb-5 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm">
         <ArrowLeft className="h-4 w-4" /> Back to Explore
       </Link>
 
-      <header className="mb-6 overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-pink-500/10 via-card/70 to-purple-500/10 p-5 sm:p-7">
-        <div className="flex items-start gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-pink-500/15 text-pink-400">
-            <Hash className="h-6 w-6" />
+      <header className="mb-4 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-pink-500/10 via-card/70 to-purple-500/10 p-3.5 sm:mb-6 sm:rounded-3xl sm:p-7">
+        <div className="flex items-center gap-2.5 sm:items-start sm:gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400 sm:h-12 sm:w-12 sm:rounded-2xl">
+            <Hash className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-pink-400"><TrendingUp className="h-3.5 w-3.5" /> Explore</p>
-            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Trending Hashtags</h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Discover the hashtags getting views across real SociaLens posts and reels.</p>
+            <p className="mb-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-pink-400 sm:mb-1 sm:gap-2 sm:text-xs sm:tracking-[0.18em]"><TrendingUp className="h-3.5 w-3.5" /> Explore</p>
+            <h1 className="text-lg font-extrabold leading-tight tracking-tight sm:text-3xl">Trending Hashtags</h1>
           </div>
         </div>
-        <div className="relative mt-6">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search hashtags..." aria-label="Search hashtags" className="h-12 rounded-2xl border-border/80 bg-background/80 pl-10 pr-10 focus-visible:ring-pink-500/50" />
+        <div className="relative mt-3 sm:mt-6">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground sm:left-3.5" />
+          <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search hashtags..." aria-label="Search hashtags" className="h-10 rounded-xl border-border/80 bg-background/80 pl-9 pr-9 text-sm focus-visible:ring-pink-500/50 sm:h-12 sm:rounded-2xl sm:pl-10 sm:pr-10" />
           {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear hashtag search" className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" /></button>}
         </div>
       </header>
 
-      <section className="overflow-hidden rounded-2xl border border-border/80 bg-card/40">
-        <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3 sm:px-5">
-          <h2 className="text-sm font-bold">All hashtags</h2>
+      <section className="overflow-hidden rounded-xl border border-border/80 bg-card/40 sm:rounded-2xl">
+        <div className="flex items-center justify-between gap-3 border-b border-border/70 px-3 py-2.5 sm:px-5 sm:py-3">
+          <h2 className="text-xs font-bold sm:text-sm">All hashtags</h2>
           <span className="text-xs text-muted-foreground">{filteredHashtags.length} found</span>
         </div>
         {isLoading ? (
@@ -89,9 +96,9 @@ export default function ExploreHashtagsPage() {
         ) : filteredHashtags.length ? (
           <div className="divide-y divide-border/60">
             {filteredHashtags.map(item => (
-              <div key={item.tag.toLocaleLowerCase()} className="flex min-w-0 items-center justify-between gap-4 px-4 py-3.5 sm:px-5">
-                <span className="min-w-0 truncate text-sm font-semibold text-pink-400">{item.tag}</span>
-                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{formatCount(item.views)} views</span>
+              <div key={item.tag.toLocaleLowerCase()} className="flex min-w-0 items-center justify-between gap-3 px-3 py-3 sm:gap-4 sm:px-5 sm:py-3.5">
+                <span className="min-w-0 truncate text-xs font-semibold text-pink-400 sm:text-sm">{item.tag}</span>
+                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground sm:text-xs">{formatCount(item.views)} views</span>
               </div>
             ))}
           </div>
@@ -103,7 +110,6 @@ export default function ExploreHashtagsPage() {
           </div>
         )}
       </section>
-      <p className="mt-3 text-center text-xs text-muted-foreground">Hashtag capitalization variants are combined. Views are summed from posts containing each hashtag.</p>
     </main>
   )
 }
