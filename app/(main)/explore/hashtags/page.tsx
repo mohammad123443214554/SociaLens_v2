@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCount } from '@/lib/utils/helpers'
 
 function extractHashtags(content: string): string[] {
-  return content.match(/#[\\w\\u0600-\\u06FF]+/g) || []
+  return content.match(/#[\w\u0600-\u06FF]+/g) || []
 }
 
 export default function ExploreHashtagsPage() {
