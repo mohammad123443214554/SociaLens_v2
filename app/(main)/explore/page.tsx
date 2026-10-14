@@ -52,7 +52,7 @@ function SectionHeading({ icon, title, subtitle, action }: {
   return (
     <div className="mb-3 flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="flex shrink-0 items-center justify-center text-pink-400 [&_svg]:h-5 [&_svg]:w-5">{icon}</span>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400 [&_svg]:h-5 [&_svg]:w-5">{icon}</span>
         <div className="min-w-0">
           <h2 className="text-sm font-bold tracking-wide text-foreground sm:text-base">{title}</h2>
           {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
@@ -233,7 +233,7 @@ export default function ExplorePage() {
               <SectionHeading icon={<Hash className="h-4 w-4" />} title="Hashtags" subtitle="Capitalization variants are merged" />
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {searchHashtags.map(({ tag, count }) => <button key={tag.toLocaleLowerCase()} onClick={() => setSelectedHashtag(tag)} className="flex min-w-0 items-center gap-3 rounded-xl border border-border/70 bg-background/50 p-3 text-left transition-colors hover:border-pink-500/40 hover:bg-pink-500/5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center text-pink-400"><Hash className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{tag}</span><span className="text-xs text-muted-foreground">{formatCount(count)} posts</span></span><ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400"><Hash className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{tag}</span><span className="text-xs text-muted-foreground">{formatCount(count)} posts</span></span><ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>)}
               </div>
             </section>
