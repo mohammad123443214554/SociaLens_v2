@@ -160,9 +160,22 @@ export default function ExplorePage() {
   const { data: popularHashtags = [] } = useQuery({
     queryKey: ['popular-hashtags'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('posts').select('content').order('created_at', { ascending: false }).limit(500)
+      const { data, error } = await supabase.from('posts').select('content, views_count').order('created_at', { ascending: false }).limit(500)
       if (error) throw error
-      return countHashtags((data || []).map(p => p.content || '')).slice(0, 8)
+      const viewTotals = new Map<string, number>()
+      const tagCounts = new Map<string, { tag: string; count: number }>()
+      ;(data || []).forEach(post => {
+        extractHashtags(post.content || '').forEach(tag => {
+          const key = tag.toLocaleLowerCase()
+          const existing = tagCounts.get(key)
+          if (existing) existing.count += 1
+          else tagCounts.set(key, { tag, count: 1 })
+          viewTotals.set(key, (viewTotals.get(key) || 0) + (Number(post.views_count) || 0))
+        })
+      })
+      return Array.from(tagCounts.values())
+        .map(item => ({ ...item, views: viewTotals.get(item.tag.toLocaleLowerCase()) || 0 }))
+        .sort((a, b) => b.views - a.views || b.count - a.count)
     },
     staleTime: 60_000,
   })
@@ -247,10 +260,27 @@ export default function ExplorePage() {
         <div className="space-y-6">
           {(activeSection === 'for-you' || activeSection === 'hashtags') && (
             <section className="rounded-2xl border border-border/70 bg-card/30 p-3 sm:p-4">
-              <SectionHeading icon={<Hash className="h-4 w-4" />} title="Trending Hashtags" subtitle="Counted from real posts on SociaLens" />
-              {popularHashtags.length ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
-                {popularHashtags.map(({ tag, count }) => <button key={tag.toLocaleLowerCase()} onClick={() => setSelectedHashtag(tag)} className="group min-w-0 rounded-xl border border-border/80 bg-background/60 px-3 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-pink-500/50 hover:bg-pink-500/5"><span className="block truncate text-sm font-bold text-pink-400 group-hover:text-fuchsia-400">{tag}</span><span className="mt-1 block text-[11px] text-muted-foreground">{formatCount(count)} {count === 1 ? 'post' : 'posts'}</span></button>)}
-              </div> : <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No hashtags found in posts yet.</p>}
+              <SectionHeading
+                icon={<Hash className="h-4 w-4" />}
+                title="Trending Hashtags"
+                subtitle={activeSection === 'hashtags' ? 'Hashtag views across real posts and reels' : 'Top hashtags by combined post and reel views'}
+                action={activeSection !== 'hashtags' ? <button type="button" onClick={() => setActiveSection('hashtags')} className="shrink-0 text-xs font-semibold text-pink-400 transition-colors hover:text-fuchsia-400">See All <ArrowUpRight className="ml-1 inline h-3.5 w-3.5" /></button> : undefined}
+              />
+              {popularHashtags.length ? activeSection === 'hashtags' ? (
+                <div className="max-h-[520px] space-y-1 overflow-y-auto pr-1 [scrollbar-width:thin]">
+                  {popularHashtags.map(({ tag, views }) => <button key={tag.toLocaleLowerCase()} onClick={() => setSelectedHashtag(tag)} className="group flex w-full items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/50 px-4 py-3 text-left transition-colors hover:border-pink-500/50 hover:bg-pink-500/5">
+                    <span className="min-w-0 truncate text-sm font-semibold text-pink-400 group-hover:text-fuchsia-400">{tag}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{formatCount(views)} views</span>
+                  </button>)}
+                </div>
+              ) : (
+                <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {popularHashtags.slice(0, 10).map(({ tag, views }) => <button key={tag.toLocaleLowerCase()} onClick={() => setSelectedHashtag(tag)} className="group w-[124px] shrink-0 rounded-xl border border-border/80 bg-background/60 px-3 py-3 text-left transition-all hover:border-pink-500/50 hover:bg-pink-500/5 sm:w-[142px]">
+                    <span className="block truncate text-sm font-bold text-pink-400 group-hover:text-fuchsia-400">{tag}</span>
+                    <span className="mt-1 block text-[11px] text-muted-foreground">{formatCount(views)} views</span>
+                  </button>)}
+                </div>
+              ) : <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No hashtags found in posts yet.</p>}
             </section>
           )}
 
