@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Hash, Search, TrendingUp, X } from 'lucide-react'
+import { Hash, Search, TrendingUp, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
 import { formatCount } from '@/lib/utils/helpers'
@@ -64,7 +64,7 @@ export default function ExploreHashtagsPage() {
   return (
     <main className="mx-auto w-full max-w-4xl px-3 pb-24 pt-4 sm:px-5 sm:pt-7">
       <Link href="/explore" className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/70 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-pink-500/40 hover:text-pink-400 sm:mb-5 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm">
-        <ArrowLeft className="h-4 w-4" /> Back to Explore
+        Back to Explore
       </Link>
 
       <header className="mb-4 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-pink-500/10 via-card/70 to-purple-500/10 p-3.5 sm:mb-6 sm:rounded-3xl sm:p-7">
