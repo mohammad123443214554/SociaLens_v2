@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import {
   Search, Users, Grid3x3, Hash, X, AlertCircle, Play,
-  Sparkles, Film, Image as ImageIcon, ArrowUpRight,
+  Film, Image as ImageIcon, ArrowUpRight,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { PostCard } from '@/components/feed/PostCard'
@@ -22,7 +22,6 @@ import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
 
 type Tab = 'all' | 'profiles' | 'posts' | 'hashtags'
-type ExploreSection = 'for-you' | 'reels' | 'posts' | 'hashtags'
 const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
 
 function extractHashtags(content: string): string[] {
@@ -66,7 +65,7 @@ function SectionHeading({ icon, title, subtitle, action }: {
 export default function ExplorePage() {
   const [query, setQuery] = useState('')
   const [activeTab, setActiveTab] = useState<Tab>('all')
-  const [activeSection, setActiveSection] = useState<ExploreSection>('for-you')
+  const activeSection = 'for-you' as const
   const [selectedHashtag, setSelectedHashtag] = useState<string | null>(null)
   const { user } = useUser()
   const supabase = createClient()
@@ -179,13 +178,6 @@ export default function ExplorePage() {
     },
     staleTime: 60_000,
   })
-
-  const tabs: { id: ExploreSection; label: string; icon: React.ReactNode }[] = [
-    { id: 'for-you', label: 'For You', icon: <Sparkles className="h-4 w-4" /> },
-    { id: 'reels', label: 'Reels', icon: <Film className="h-4 w-4" /> },
-    { id: 'posts', label: 'Posts', icon: <ImageIcon className="h-4 w-4" /> },
-    { id: 'hashtags', label: 'Hashtags', icon: <Hash className="h-4 w-4" /> },
-  ]
 
   if (selectedHashtag) {
     return (
