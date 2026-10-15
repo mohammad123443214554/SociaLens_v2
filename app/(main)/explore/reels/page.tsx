@@ -63,7 +63,7 @@ export default function AllReelsPage() {
 
       <header className="mb-4 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-pink-500/10 via-card/70 to-purple-500/10 p-3.5 sm:mb-6 sm:rounded-3xl sm:p-7">
         <div className="flex items-center gap-2.5 sm:gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400 sm:h-12 sm:w-12 sm:rounded-2xl"><Film className="h-5 w-5 sm:h-6 sm:w-6" /></div>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400 sm:h-12 sm:w-12 sm:rounded-2xl"><ReelsMark className="h-5 w-5 sm:h-6 sm:w-6" /></div>
           <div className="min-w-0 flex-1">
             <p className="mb-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-pink-400 sm:text-xs"><Play className="h-3 w-3" /> Explore</p>
             <h1 className="text-lg font-extrabold leading-tight tracking-tight sm:text-3xl">All Reels</h1>
