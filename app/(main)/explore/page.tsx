@@ -22,6 +22,7 @@ import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
 import { PostCaption } from '@/components/shared/PostCaption'
 import { ReelViewer } from '@/components/shared/ReelViewer'
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 
 type Tab = 'all' | 'profiles' | 'posts' | 'hashtags'
 const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
@@ -307,16 +308,40 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
               </div> : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-muted-foreground"><ReelsMark className="mx-auto mb-2 h-8 w-8 opacity-40" /><p className="text-sm font-semibold">No reels available yet</p></div>}
           </section>
 
-          {(true || false) && (
-            <section>
-              <SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title={true ? 'Posts' : 'Explore Posts'} subtitle="Real community posts" />
-              {postsLoading ? <div className="grid gap-4 xl:grid-cols-2">{Array.from({ length: 4 }).map((_, i) => <PostSkeleton key={i} />)}</div> :
-                postsError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm"><div className="flex items-start gap-2 text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="font-semibold">Posts could not be loaded</p><p className="mt-1 opacity-80">{exploreError instanceof Error ? exploreError.message : 'Please refresh and try again.'}</p></div></div></div> :
-                posts.length ? <div className="grid items-start gap-4 xl:grid-cols-2">{(false ? exploreItems : exploreItems.slice(0, 6)).map((item, i) => item === 'ad' ? <AdPostSlot key={`ad-${i}`} /> : <PostCard key={item.id} post={item} />)}</div> :
-                <div className="rounded-2xl border border-dashed border-border px-4 py-12 text-center text-muted-foreground"><Grid3x3 className="mx-auto mb-2 h-8 w-8 opacity-40" /><p className="text-sm font-semibold">No posts to show right now</p></div>}
-              <InfiniteScrollSentinel onIntersect={fetchNextExplorePage} hasMore={!!hasMoreExplore && false} isLoading={isFetchingMoreExplore} />
-            </section>
-          )}
+          <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
+            <SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title="Posts" subtitle="Real community posts" />
+            {postsLoading ? (
+              <div className="flex gap-2 overflow-hidden">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[3/4] w-[118px] shrink-0 animate-pulse rounded-xl bg-muted sm:w-[160px]" />)}</div>
+            ) : postsError ? (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm"><div className="flex items-start gap-2 text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="font-semibold">Posts could not be loaded</p><p className="mt-1 opacity-80">{exploreError instanceof Error ? exploreError.message : 'Please refresh and try again.'}</p></div></div></div>
+            ) : posts.length ? (
+              <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {exploreItems.slice(0, 10).map((item, i) => item === 'ad' ? (
+                  <div key={`post-ad-${i}`} className="w-[118px] shrink-0 sm:w-[160px]"><AdPostSlot /></div>
+                ) : (
+                  <article key={item.id} className="w-[118px] shrink-0 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:w-[160px] sm:rounded-2xl">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <button type="button" aria-label={`Open post by @${item.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left">
+                          {item.media_url ? (item.media_type === 'video' ? <video src={item.media_url} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" /> : <img src={item.media_url} alt="" loading="lazy" className="pointer-events-none h-full w-full object-cover" />) : <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-card to-muted p-3 text-center text-xs text-muted-foreground"><Grid3x3 className="mr-1 h-4 w-4 shrink-0" />Text post</div>}
+                          {item.media_type === 'video' && <span className="absolute left-1.5 top-1.5 rounded-full bg-black/65 px-1.5 py-1 text-[9px] font-semibold text-white"><Play className="mr-1 inline h-2.5 w-2.5 fill-current" />Reel</span>}
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl border-border/80 bg-background p-0 sm:w-[calc(100%-2rem)]">
+                        <PostCard post={item} />
+                      </DialogContent>
+                    </Dialog>
+                    <div className="p-2 sm:p-2.5">
+                      <Link href={`/profile/${item.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{item.profiles?.username ?? 'user'}</Link>
+                      {item.content?.trim() && <PostCaption content={item.content} expandMode="dialog" titleClassName="text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}
+                      <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground"><span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" />{formatCount(item.likes_count)}</span><span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" />{formatCount(item.comments_count)}</span></div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-muted-foreground"><Grid3x3 className="mx-auto mb-2 h-8 w-8 opacity-40" /><p className="text-sm font-semibold">No posts available yet</p></div>}
+            <InfiniteScrollSentinel onIntersect={fetchNextExplorePage} hasMore={!!hasMoreExplore && false} isLoading={isFetchingMoreExplore} />
+          </section>
           {false && <p className="text-center text-xs text-muted-foreground">Hashtag totals are calculated from real post captions. Capitalization differences are merged.</p>}
         </div>
       )}
