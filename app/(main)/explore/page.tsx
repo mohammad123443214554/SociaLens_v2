@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import {
   Search, Users, Grid3x3, Hash, X, AlertCircle, Play,
-  Film, Image as ImageIcon, ArrowUpRight, Heart, MessageCircle,
+  Image as ImageIcon, ArrowUpRight, Heart, MessageCircle,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { PostCard } from '@/components/feed/PostCard'
@@ -40,6 +40,16 @@ function countHashtags(contents: string[]) {
     })
   })
   return Array.from(counts.values()).sort((a, b) => b.count - a.count)
+}
+
+function ReelsMark({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden="true" className={className} fill="none">
+      <rect x="4" y="7" width="24" height="21" rx="6" stroke="currentColor" strokeWidth="2.2" />
+      <path d="M9 7 13 3M17 7l4-4M5 13h22" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="m14 16 6 3.5-6 3.5V16Z" fill="currentColor" stroke="currentColor" strokeLinejoin="round" />
+    </svg>
+  )
 }
 
 function SectionHeading({ icon, title, subtitle, action }: {
@@ -283,7 +293,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
           )}
 
           <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
-            <SectionHeading icon={<Film className="h-4 w-4" />} title="Reels" action={<Link href="/explore/reels" className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">See All <ArrowUpRight className="h-3.5 w-3.5" /></Link>} />
+            <SectionHeading icon={<ReelsMark className="h-5 w-5" />} title="Reels" action={<Link href="/explore/reels" className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">See All <ArrowUpRight className="h-3.5 w-3.5" /></Link>} />
             {topReelsLoading ? <div className="flex gap-2 overflow-hidden">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[3/4] w-28 shrink-0 animate-pulse rounded-xl bg-muted sm:w-36" />)}</div> :
               topReelsError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Reels could not be loaded. Please try again.</div> :
               topReels.length ? <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -293,7 +303,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
                     <div className="p-2 sm:p-2.5"><p className="truncate text-[11px] font-semibold sm:text-xs">@{reel.profiles?.username ?? 'user'}</p><p className="mt-1 line-clamp-2 min-h-7 text-[10px] text-muted-foreground sm:text-[11px]">{reel.content?.trim() || 'Video post'}</p><div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground"><span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" />{formatCount(reel.likes_count)}</span><span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" />{formatCount(reel.comments_count)}</span></div></div>
                   </Link>
                 </article>)}
-              </div> : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-muted-foreground"><Film className="mx-auto mb-2 h-8 w-8 opacity-40" /><p className="text-sm font-semibold">No reels available yet</p></div>}
+              </div> : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-muted-foreground"><ReelsMark className="mx-auto mb-2 h-8 w-8 opacity-40" /><p className="text-sm font-semibold">No reels available yet</p></div>}
           </section>
 
           {(true || false) && (
