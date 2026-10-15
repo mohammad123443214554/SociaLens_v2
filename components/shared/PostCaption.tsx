@@ -3,8 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 
-// Post content is stored as "**title**\n\ndescription\n\n#hashtags" (title is optional).
-// This pulls the title out separately from the rest (description + hashtags).
+// Captions may be stored as **title** followed by a bio and/or hashtags.
 function parseCaption(content: string) {
   const match = content.match(/^\*\*(.+?)\*\*(?:\s+([\s\S]*))?$/)
   if (match) return { title: match[1].trim(), rest: (match[2] || '').trim() }
@@ -13,25 +12,13 @@ function parseCaption(content: string) {
 
 interface PostCaptionProps {
   content: string
-  /**
-   * 'full' (default): shows the title and a "See more" toggle that reveals the
-   * description + hashtags underneath.
-   * 'titleOnly': just shows the title (or a short preview if there's no title) with
-   * no toggle - use this inside thumbnails/cards that already open a full view on click.
-   */
   variant?: 'full' | 'titleOnly'
   expandMode?: 'inline' | 'dialog'
-  /**
-   * When true, always shows the full title + description + hashtags with no
-   * "See more" toggle at all - used for text-only posts (no photo/video), so
-   * the text itself is the whole post and shouldn't be collapsed.
-   */
   forceExpanded?: boolean
   className?: string
   titleClassName?: string
   captionClassName?: string
   buttonClassName?: string
-  /** Rendered inline right before the title, e.g. a bolded username */
   prefix?: ReactNode
 }
 
@@ -53,17 +40,22 @@ export function PostCaption({
   const { title, rest } = parseCaption(content)
   const hashtagMatches = rest.match(/#[\w\u0600-\u06FF]+/g) || []
   const bio = rest.replace(/#[\w\u0600-\u06FF]+/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
-  const truncatedRest = rest.length > 60 ? rest.slice(0, 60).trimEnd() + '\u2026' : rest
-  const hasMore = !forceExpanded && (expandMode === 'dialog' ? !!(bio || hashtagMatches.length) : (title ? rest.length > 0 : rest.length > truncatedRest.length))
+  const truncatedRest = rest.length > 60 ? rest.slice(0, 60).trimEnd() + '…' : rest
+  const hasMore = !forceExpanded && (expandMode === 'dialog'
+    ? !!(bio || hashtagMatches.length)
+    : (title ? rest.length > 0 : rest.length > truncatedRest.length))
 
   if (variant === 'titleOnly') {
-    if (expandMode === 'dialog') {
+    return <p className={`${titleClassName} ${className}`}>{prefix}{title || truncatedRest}</p>
+  }
+
+  if (expandMode === 'dialog') {
     return (
       <div className={className}>
         {title ? (
-          <p className={titleClassName}><span className="font-semibold">{title}</span></p>
+          <p className={titleClassName}>{prefix}<span className="font-semibold">{title}</span></p>
         ) : bio ? (
-          <p className={titleClassName}>{bio.length > 60 ? truncatedRest : bio}</p>
+          <p className={titleClassName}>{prefix}{bio.length > 60 ? truncatedRest : bio}</p>
         ) : null}
         {hasMore && (
           <Dialog>
@@ -77,7 +69,11 @@ export function PostCaption({
               </div>
               <div className="space-y-4 px-5 py-5 sm:px-6">
                 {bio && <p className="whitespace-pre-wrap break-words text-sm leading-7 text-muted-foreground">{bio}</p>}
-                {hashtagMatches.length > 0 && <div className="flex flex-wrap gap-2">{hashtagMatches.map((tag, index) => <span key={tag + index} className="rounded-full border border-pink-500/20 bg-pink-500/10 px-3 py-1.5 text-xs font-medium text-pink-400">{tag}</span>)}</div>}
+                {hashtagMatches.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {hashtagMatches.map((tag, index) => <span key={tag + index} className="rounded-full border border-pink-500/20 bg-pink-500/10 px-3 py-1.5 text-xs font-medium text-pink-400">{tag}</span>)}
+                  </div>
+                )}
               </div>
             </DialogContent>
           </Dialog>
@@ -87,33 +83,17 @@ export function PostCaption({
   }
 
   return (
-      <p className={`${titleClassName} ${className}`}>
-        {prefix}
-        {title || truncatedRest}
-      </p>
-    )
-  }
-
-  return (
     <div className={className}>
       {title ? (
         <>
           <p className={titleClassName}>{prefix}<span className="font-semibold">{title}</span></p>
-          {expanded && rest && (
-            <p className={`${captionClassName} whitespace-pre-wrap mt-0.5`}>{rest}</p>
-          )}
+          {expanded && rest && <p className={`${captionClassName} whitespace-pre-wrap mt-0.5`}>{rest}</p>}
         </>
       ) : (
-        <p className={`${titleClassName} ${expanded ? 'whitespace-pre-wrap' : ''}`}>
-          {prefix}{expanded ? rest : truncatedRest}
-        </p>
+        <p className={`${titleClassName} ${expanded ? 'whitespace-pre-wrap' : ''}`}>{prefix}{expanded ? rest : truncatedRest}</p>
       )}
       {hasMore && (
-        <button
-          type="button"
-          onClick={e => { e.stopPropagation(); e.preventDefault(); setExpanded(v => !v) }}
-          className={buttonClassName}
-        >
+        <button type="button" onClick={e => { e.stopPropagation(); e.preventDefault(); setExpanded(v => !v) }} className={buttonClassName}>
           {expanded ? 'See less' : 'See more'}
         </button>
       )}
