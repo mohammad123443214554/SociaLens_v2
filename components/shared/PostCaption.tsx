@@ -60,7 +60,7 @@ export function PostCaption({
         {hasMore && (
           <Dialog>
             <DialogTrigger asChild>
-              <button type="button" className={buttonClassName} onClick={e => { e.stopPropagation(); e.preventDefault() }}>See more</button>
+              <button type="button" className={buttonClassName} onClick={e => { e.stopPropagation() }}>See more</button>
             </DialogTrigger>
             <DialogContent className="max-h-[80vh] max-w-lg overflow-y-auto rounded-2xl border-border/80 bg-background p-0 shadow-2xl sm:rounded-2xl">
               <div className="border-b border-border/70 bg-gradient-to-r from-pink-500/10 via-background to-purple-500/10 px-5 py-5 pr-12 sm:px-6">
