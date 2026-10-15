@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { ArrowLeft, Heart, MessageCircle, Play, Search, X, Loader2 } from 'lucide-react'
+import { ArrowLeft, Heart, MessageCircle, Play, Search, X, Loader2, TrendingUp } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
 import { PostWithProfile } from '@/lib/types/database.types'
