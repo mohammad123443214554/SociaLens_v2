@@ -3,12 +3,22 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { ArrowLeft, Film, Heart, MessageCircle, Play, Search, X, Loader2 } from 'lucide-react'
+import { ArrowLeft, Heart, MessageCircle, Play, Search, X, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
 import { PostWithProfile } from '@/lib/types/database.types'
 import { formatCount } from '@/lib/utils/helpers'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
+
+function ReelsMark({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden="true" className={className} fill="none">
+      <rect x="4" y="7" width="24" height="21" rx="6" stroke="currentColor" strokeWidth="2.2" />
+      <path d="M9 7 13 3M17 7l4-4M5 13h22" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="m14 16 6 3.5-6 3.5V16Z" fill="currentColor" stroke="currentColor" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 const PAGE_SIZE = 12
 const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
@@ -95,7 +105,7 @@ export default function AllReelsPage() {
             ))}
           </div>
         ) : (
-          <div className="px-4 py-14 text-center"><Film className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" /><p className="text-sm font-semibold">{searchTerm ? 'No matching reels' : 'No reels found yet'}</p><p className="mt-1 text-xs text-muted-foreground">{searchTerm ? 'Try another search.' : 'Videos from real posts will appear here.'}</p></div>
+          <div className="px-4 py-14 text-center"><ReelsMark className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" /><p className="text-sm font-semibold">{searchTerm ? 'No matching reels' : 'No reels found yet'}</p><p className="mt-1 text-xs text-muted-foreground">{searchTerm ? 'Try another search.' : 'Videos from real posts will appear here.'}</p></div>
         )}
         <InfiniteScrollSentinel onIntersect={fetchNextPage} hasMore={!!hasNextPage} isLoading={isFetchingNextPage} />
         {isFetchingNextPage && <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>}
