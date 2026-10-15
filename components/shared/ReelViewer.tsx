@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Flag, Heart, MessageCircle, MoreHorizontal, Repeat2, Share2, EyeOff } from 'lucide-react'
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
@@ -30,6 +31,9 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
   const [showShare, setShowShare] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
+  const [optionsPosition, setOptionsPosition] = useState({ top: 0, right: 0 })
+  const [portalReady, setPortalReady] = useState(false)
+  const optionsButtonRef = useRef<HTMLButtonElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const dialogScrollRef = useRef<HTMLDivElement>(null)
   const { user, profile } = useUser()
@@ -39,6 +43,33 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
   const toggleRepost = useToggleRepost()
   const isOwner = user?.id === post.user_id
   const mediaLabel = post.media_type === 'video' ? 'reel' : 'post'
+
+  useEffect(() => setPortalReady(true), [])
+
+  useEffect(() => {
+    if (!showOptions) return
+    const updatePosition = () => {
+      const rect = optionsButtonRef.current?.getBoundingClientRect()
+      if (!rect) return
+      setOptionsPosition({ top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) })
+    }
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setShowOptions(false) }
+    const closeOnOutside = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (!optionsButtonRef.current?.contains(target) && !document.getElementById(`post-options-${post.id}`)?.contains(target)) setShowOptions(false)
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    document.addEventListener('pointerdown', closeOnOutside)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+      document.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('pointerdown', closeOnOutside)
+    }
+  }, [showOptions, post.id])
 
   useEffect(() => {
     const video = videoRef.current
@@ -110,13 +141,9 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
           <div ref={dialogScrollRef} className="flex min-h-0 flex-col overflow-y-auto">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
               <Link href={`/profile/${post.profiles?.username ?? ''}`} onClick={() => setOpen(false)} className="min-w-0 truncate text-sm font-semibold hover:text-pink-400">@{post.profiles?.username ?? 'user'}</Link>
-              <div className="relative mr-8 shrink-0">
-                <button type="button" aria-label="More post options" aria-expanded={showOptions} onClick={() => setShowOptions(value => !value)} className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"><MoreHorizontal className="h-5 w-5" /></button>
-                {showOptions && !isOwner && <div role="menu" className="absolute right-0 top-full z-[100] mt-1 min-w-[168px] overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl">
-                  <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setOpen(false); onNotInterested?.(post.id) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><EyeOff className="mr-2 h-4 w-4" />Not interested</button>
-                  {user && <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setShowReport(true) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><Flag className="mr-2 h-4 w-4" />Report</button>}
-                </div>}
-              </div>
+              {!isOwner && <div className="mr-8 shrink-0">
+                <button ref={optionsButtonRef} type="button" aria-label="More post options" aria-expanded={showOptions} onClick={() => setShowOptions(value => !value)} className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"><MoreHorizontal className="h-5 w-5" /></button>
+              </div>}
             </div>
             <div className={`flex w-full items-center justify-center ${post.media_type === 'video' ? 'bg-black' : 'bg-background'}`}>
               {post.media_type === 'video' ? (
@@ -143,6 +170,13 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
           </div>
         </DialogContent>
       </Dialog>
+      {portalReady && showOptions && !isOwner && createPortal(
+        <div id={`post-options-${post.id}`} role="menu" aria-label="Post options" style={{ position: 'fixed', top: optionsPosition.top, right: optionsPosition.right }} className="z-[9999] min-w-[180px] overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl">
+          <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setOpen(false); onNotInterested?.(post.id) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><EyeOff className="mr-2 h-4 w-4" />Not interested</button>
+          {user && <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setShowReport(true) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><Flag className="mr-2 h-4 w-4" />Report</button>}
+        </div>,
+        document.body
+      )}
       {showShare && <ShareModal post={post} onClose={() => setShowShare(false)} />}
       {showReport && user && <ReportModal reporterId={user.id} reportedUserId={post.user_id} targetType="post" targetId={post.id} onClose={() => setShowReport(false)} />}
     </>
