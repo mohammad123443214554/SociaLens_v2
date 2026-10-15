@@ -309,7 +309,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
           </section>
 
           <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
-            <SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title="Posts" subtitle="Real community posts" />
+            <SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title="Posts" subtitle="Real community posts" action={<Link href="/explore/posts" className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">See All <ArrowUpRight className="h-3.5 w-3.5" /></Link>} />
             {postsLoading ? (
               <div className="flex gap-2 overflow-hidden">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[3/4] w-[118px] shrink-0 animate-pulse rounded-xl bg-muted sm:w-[160px]" />)}</div>
             ) : postsError ? (
@@ -317,7 +317,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
             ) : posts.some(post => post.media_type !== 'video' && !!post.media_url) ? (
               <div className="flex items-start gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {posts.filter(post => post.media_type !== 'video' && !!post.media_url).slice(0, 10).map(item => (
-                  <article key={item.id} className="w-[118px] shrink-0 self-start overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:w-[160px] sm:rounded-2xl">
+                  <article key={item.id} className="flex h-[300px] w-[118px] shrink-0 flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:h-[360px] sm:w-[160px] sm:rounded-2xl">
                     <Dialog>
                       <DialogTrigger asChild>
                         <button type="button" aria-label={`Open post by @${item.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left">
@@ -331,7 +331,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
                     <div className="p-2 sm:p-2.5">
                       <Link href={`/profile/${item.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{item.profiles?.username ?? 'user'}</Link>
                       {item.content?.trim() && <PostCaption content={item.content} expandMode="dialog" titleClassName="line-clamp-2 text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}
-                      <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground"><span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" />{formatCount(item.likes_count)}</span><span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" />{formatCount(item.comments_count)}</span></div>
+                      <div className="mt-auto flex items-center gap-2 pt-2 text-[10px] text-muted-foreground"><span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" />{formatCount(item.likes_count)}</span><span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" />{formatCount(item.comments_count)}</span></div>
                     </div>
                   </article>
                 ))}
