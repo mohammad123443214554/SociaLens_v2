@@ -74,7 +74,7 @@ export default function ExploreHashtagsPage() {
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400 sm:h-12 sm:w-12 sm:rounded-2xl"><Hash className="h-5 w-5 sm:h-6 sm:w-6" /></div>
           <div className="min-w-0 flex-1">
             <p className="mb-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-pink-400 sm:mb-1 sm:gap-2 sm:text-xs sm:tracking-[0.18em]"><TrendingUp className="h-3.5 w-3.5" /> Explore</p>
-            <h1 className="text-lg font-extrabold leading-tight tracking-tight sm:text-3xl">All Hashtags</h1>
+            <h1 className="text-lg font-extrabold leading-tight tracking-tight sm:text-3xl">Hashtags</h1>
           </div>
         </div>
         <div className="relative mt-3 sm:mt-6">
@@ -85,7 +85,7 @@ export default function ExploreHashtagsPage() {
       </header>
 
       <section className="overflow-hidden rounded-xl border border-border/80 bg-card/40 sm:rounded-2xl">
-        <div className="border-b border-border/70 px-3 py-2.5 sm:px-5 sm:py-3"><h2 className="text-xs font-bold sm:text-sm">All hashtags</h2></div>
+        <div className="border-b border-border/70 px-3 py-2.5 sm:px-5 sm:py-3"><h2 className="text-xs font-bold sm:text-sm">Hashtags</h2></div>
         {isLoading ? (
           <div className="space-y-3 p-5">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-xl bg-muted/70" />)}</div>
         ) : isError ? (
