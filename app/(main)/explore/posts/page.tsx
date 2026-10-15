@@ -18,6 +18,7 @@ const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
 
 export default function AllExplorePostsPage() {
   const [query, setQuery] = useState('')
+  const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([])
   const supabase = createClient()
   const searchTerm = query.trim()
 
@@ -73,9 +74,9 @@ export default function AllExplorePostsPage() {
           <div className="px-4 py-12 text-center text-sm text-muted-foreground">Posts could not be loaded. Please try again.</div>
         ) : posts.length ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
-            {posts.map(post => (
+            {posts.filter(post => !hiddenPostIds.includes(post.id)).map(post => (
               <article key={post.id} className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:rounded-2xl">
-                <ReelViewer post={post} trigger={<button type="button" aria-label={`Open post by @${post.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-muted text-left"><img src={post.media_url!} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.02]" /></button>} />
+                <ReelViewer post={post} onNotInterested={id => setHiddenPostIds(previous => [...previous, id])} trigger={<button type="button" aria-label={`Open post by @${post.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-muted text-left"><img src={post.media_url!} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.02]" /></button>} />
                 <div className="flex min-h-[104px] flex-1 flex-col p-2 sm:min-h-[124px] sm:p-3">
                   <Link href={`/profile/${post.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{post.profiles?.username ?? 'user'}</Link>
                   {post.content?.trim() && <PostCaption content={post.content} expandMode="dialog" titleClassName="line-clamp-2 text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}
