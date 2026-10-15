@@ -10,6 +10,7 @@ import { PostWithProfile } from '@/lib/types/database.types'
 import { formatCount } from '@/lib/utils/helpers'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
 import { PostCaption } from '@/components/shared/PostCaption'
+import { ReelViewer } from '@/components/shared/ReelViewer'
 
 function ReelsMark({ className = 'h-5 w-5' }: { className?: string }) {
   return (
@@ -26,6 +27,7 @@ const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
 
 export default function AllReelsPage() {
   const [query, setQuery] = useState('')
+  const [hiddenReelIds, setHiddenReelIds] = useState<string[]>([])
   const supabase = createClient()
   const searchTerm = query.trim()
 
@@ -54,7 +56,7 @@ export default function AllReelsPage() {
     staleTime: 30_000,
   })
 
-  const reels = data?.pages.flatMap(page => page.reels) ?? []
+  const reels = (data?.pages.flatMap(page => page.reels) ?? []).filter(reel => !hiddenReelIds.includes(reel.id))
 
   return (
     <main className="mx-auto w-full max-w-6xl px-3 pb-24 pt-4 sm:px-5 sm:pt-7">
@@ -90,13 +92,10 @@ export default function AllReelsPage() {
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
             {reels.map(reel => (
               <article key={reel.id} className="min-w-0 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:rounded-2xl">
-                <div className="relative aspect-[3/4] overflow-hidden bg-black">
-                  <video src={reel.media_url ?? undefined} controls playsInline preload="metadata" className="h-full w-full object-cover" aria-label={`Video by @${reel.profiles?.username ?? 'user'}`} />
-                  <span className="pointer-events-none absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-black/65 px-1.5 py-1 text-[9px] font-semibold text-white"><Play className="h-2.5 w-2.5 fill-current" /> Reel</span>
-                </div>
+<ReelViewer post={reel} onNotInterested={id => setHiddenReelIds(previous => [...previous, id])} trigger={<button type="button" aria-label={`Play reel by @${reel.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left"><video src={reel.media_url ?? undefined} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" aria-label={`Video by @${reel.profiles?.username ?? 'user'}`} /><span className="pointer-events-none absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-black/65 px-1.5 py-1 text-[9px] font-semibold text-white"><Play className="h-2.5 w-2.5 fill-current" /> Reel</span></button>} />
                 <div className="p-2 sm:p-3">
                   <Link href={`/profile/${reel.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{reel.profiles?.username ?? 'user'}</Link>
-                  {reel.content?.trim() && <PostCaption content={reel.content} expandMode="dialog" titleClassName="text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}
+                  {reel.content?.trim() && <PostCaption content={reel.content} expandMode="inline" titleClassName="text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}
                   <div className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground sm:text-xs">
                     <span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" />{formatCount(reel.likes_count)}</span>
                     <span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" />{formatCount(reel.comments_count)}</span>
