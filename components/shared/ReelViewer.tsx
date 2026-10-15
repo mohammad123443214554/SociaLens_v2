@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Bookmark, Copy, Flag, Heart, MessageCircle, MoreHorizontal, Repeat2, Share2, EyeOff, Check } from 'lucide-react'
+import { Copy, Flag, Heart, MessageCircle, MoreHorizontal, Repeat2, Share2, EyeOff, Check } from 'lucide-react'
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ShareModal } from '@/components/shared/ShareModal'
@@ -42,18 +42,22 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
+    let onCanPlay: (() => void) | undefined
     if (open) {
       const play = () => video.play().catch(() => {})
       if (video.readyState >= 2) play()
       else {
-        video.addEventListener('canplay', play, { once: true })
+        onCanPlay = play
+        video.addEventListener('canplay', onCanPlay, { once: true })
         video.load()
       }
     } else {
       video.pause()
       video.currentTime = 0
     }
-    return () => video.removeEventListener('canplay', () => {})
+    return () => {
+      if (onCanPlay) video.removeEventListener('canplay', onCanPlay)
+    }
   }, [open, post.media_url])
 
   useEffect(() => {
