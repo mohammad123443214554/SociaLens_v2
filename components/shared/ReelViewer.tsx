@@ -110,7 +110,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
           <div ref={dialogScrollRef} className="flex min-h-0 flex-col overflow-y-auto">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
               <Link href={`/profile/${post.profiles?.username ?? ''}`} onClick={() => setOpen(false)} className="min-w-0 truncate text-sm font-semibold hover:text-pink-400">@{post.profiles?.username ?? 'user'}</Link>
-              <DropdownMenu>
+              <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild><button type="button" aria-label="More post options" className="mr-8 flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"><MoreHorizontal className="h-5 w-5" /></button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="z-[70]">
                   {!isOwner && <DropdownMenuItem onSelect={() => { setOpen(false); onNotInterested?.(post.id) }}><EyeOff className="mr-2 h-4 w-4" />Not interested</DropdownMenuItem>}
