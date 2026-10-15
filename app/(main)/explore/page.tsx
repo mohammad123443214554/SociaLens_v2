@@ -193,7 +193,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
     queryFn: async () => {
       const { data, error } = await supabase.from('posts').select(POST_SELECT)
         .neq('media_type', 'video').not('media_url', 'is', null)
-        .order('likes_count', { ascending: false }).order('created_at', { ascending: false }).limit(10)
+        .order('likes_count', { ascending: false }).order('created_at', { ascending: false }).limit(30)
       if (error) throw error
       return (data || []) as PostWithProfile[]
     },
