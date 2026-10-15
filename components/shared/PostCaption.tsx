@@ -5,7 +5,7 @@ import { useState, type ReactNode } from 'react'
 // Post content is stored as "**title**\n\ndescription\n\n#hashtags" (title is optional).
 // This pulls the title out separately from the rest (description + hashtags).
 function parseCaption(content: string) {
-  const match = content.match(/^\*\*(.+?)\*\*\n\n([\s\S]*)$/)
+  const match = content.match(/^\*\*(.+?)\*\*(?:\s+|\n+)([\s\S]*)$/)
   if (match) return { title: match[1].trim(), rest: match[2].trim() }
   return { title: null as string | null, rest: content.trim() }
 }
