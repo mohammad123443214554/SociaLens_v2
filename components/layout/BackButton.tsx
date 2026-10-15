@@ -12,6 +12,7 @@ const EXACT_EXCLUDE = new Set([
   '/explore',
   '/explore/hashtags',
   '/explore/reels',
+  '/explore/posts',
   '/chat',
   '/chat/archive',
   '/delete-account',
