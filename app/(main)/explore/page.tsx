@@ -22,7 +22,6 @@ import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
 import { PostCaption } from '@/components/shared/PostCaption'
 import { ReelViewer } from '@/components/shared/ReelViewer'
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 
 type Tab = 'all' | 'profiles' | 'posts' | 'hashtags'
 const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
@@ -318,16 +317,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
               <div className="flex items-start gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {posts.filter(post => post.media_type !== 'video' && !!post.media_url).slice(0, 10).map(item => (
                   <article key={item.id} className="flex h-[300px] w-[118px] shrink-0 flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:h-[360px] sm:w-[160px] sm:rounded-2xl">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <button type="button" aria-label={`Open post by @${item.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left">
-                          <img src={item.media_url!} alt="" loading="lazy" className="pointer-events-none h-full w-full object-cover" />
-                        </button>
-                      </DialogTrigger>
-                      <DialogContent className="max-h-[92dvh] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl border-border/80 bg-background p-0 sm:w-[calc(100%-2rem)]">
-                        <PostCard post={item} />
-                      </DialogContent>
-                    </Dialog>
+                    <ReelViewer post={item} trigger={<button type="button" aria-label={`Open post by @${item.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left"><img src={item.media_url!} alt="" loading="lazy" className="pointer-events-none h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" /></button>} />
                     <div className="p-2 sm:p-2.5">
                       <Link href={`/profile/${item.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{item.profiles?.username ?? 'user'}</Link>
                       {item.content?.trim() && <PostCaption content={item.content} expandMode="dialog" titleClassName="line-clamp-2 text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}
