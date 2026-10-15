@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { PostWithProfile } from '@/lib/types/database.types'
 import { formatCount } from '@/lib/utils/helpers'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
+import { PostCaption } from '@/components/shared/PostCaption'
 
 function ReelsMark({ className = 'h-5 w-5' }: { className?: string }) {
   return (
@@ -95,7 +96,7 @@ export default function AllReelsPage() {
                 </div>
                 <div className="p-2 sm:p-3">
                   <Link href={`/profile/${reel.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{reel.profiles?.username ?? 'user'}</Link>
-                  <p className="mt-1 line-clamp-2 min-h-8 text-[10px] text-muted-foreground sm:text-xs">{reel.content?.trim() || 'Video post'}</p>
+                  {reel.content?.trim() && <PostCaption content={reel.content} titleClassName="text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}
                   <div className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground sm:text-xs">
                     <span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" />{formatCount(reel.likes_count)}</span>
                     <span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" />{formatCount(reel.comments_count)}</span>
