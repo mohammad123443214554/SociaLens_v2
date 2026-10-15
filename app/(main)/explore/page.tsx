@@ -80,6 +80,7 @@ export default function ExplorePage() {
   const activeSection = 'for-you' as const
   const [selectedHashtag, setSelectedHashtag] = useState<string | null>(null)
   const [hiddenReelIds, setHiddenReelIds] = useState<string[]>([])
+  const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([])
   const { user } = useUser()
   const supabase = createClient()
 
@@ -187,6 +188,17 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
     staleTime: 60_000,
   })
 
+  const { data: explorePhotoPosts = [], isLoading: photoPostsLoading, isError: photoPostsError } = useQuery({
+    queryKey: ['explore-photo-posts-top10'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('posts').select(POST_SELECT)
+        .neq('media_type', 'video').not('media_url', 'is', null)
+        .order('likes_count', { ascending: false }).order('created_at', { ascending: false }).limit(10)
+      if (error) throw error
+      return (data || []) as PostWithProfile[]
+    },
+    staleTime: 60_000,
+  })
   const { data: topReels = [], isLoading: topReelsLoading, isError: topReelsError } = useQuery({
     queryKey: ['explore-top-reels'],
     queryFn: async () => {
@@ -308,16 +320,16 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
           </section>
 
           <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
-            <SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title="Posts" subtitle="Real community posts" action={<Link href="/explore/posts" className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">See All <ArrowUpRight className="h-3.5 w-3.5" /></Link>} />
-            {postsLoading ? (
+            <SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title="Posts" action={<Link href="/explore/posts" className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">See All <ArrowUpRight className="h-3.5 w-3.5" /></Link>} />
+            {photoPostsLoading ? (
               <div className="flex gap-2 overflow-hidden">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[3/4] w-[118px] shrink-0 animate-pulse rounded-xl bg-muted sm:w-[160px]" />)}</div>
-            ) : postsError ? (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm"><div className="flex items-start gap-2 text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="font-semibold">Posts could not be loaded</p><p className="mt-1 opacity-80">{exploreError instanceof Error ? exploreError.message : 'Please refresh and try again.'}</p></div></div></div>
-            ) : posts.some(post => post.media_type !== 'video' && !!post.media_url) ? (
+            ) : photoPostsError ? (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm"><div className="flex items-start gap-2 text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="font-semibold">Posts could not be loaded</p><p className="mt-1 opacity-80">Please refresh and try again.</p></div></div></div>
+            ) : explorePhotoPosts.length > 0 ? (
               <div className="flex items-start gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {posts.filter(post => post.media_type !== 'video' && !!post.media_url).slice(0, 10).map(item => (
+                {explorePhotoPosts.filter(item => !hiddenPostIds.includes(item.id)).slice(0, 10).map(item => (
                   <article key={item.id} className="flex h-[300px] w-[118px] shrink-0 flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:h-[360px] sm:w-[160px] sm:rounded-2xl">
-                    <ReelViewer post={item} trigger={<button type="button" aria-label={`Open post by @${item.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left"><img src={item.media_url!} alt="" loading="lazy" className="pointer-events-none h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" /></button>} />
+                    <ReelViewer post={item} onNotInterested={id => setHiddenPostIds(previous => [...previous, id])} trigger={<button type="button" aria-label={`Open post by @${item.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left"><img src={item.media_url!} alt="" loading="lazy" className="pointer-events-none h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" /></button>} />
                     <div className="p-2 sm:p-2.5">
                       <Link href={`/profile/${item.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{item.profiles?.username ?? 'user'}</Link>
                       {item.content?.trim() && <PostCaption content={item.content} expandMode="dialog" titleClassName="line-clamp-2 text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}
