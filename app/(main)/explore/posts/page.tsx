@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { ArrowLeft, ArrowUpRight, Grid3x3, Heart, MessageCircle, Search, X, Loader2 } from 'lucide-react'
+import { ArrowLeft, TrendingUp, Grid3x3, Heart, MessageCircle, Search, X, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
 import { PostWithProfile } from '@/lib/types/database.types'
@@ -51,7 +51,7 @@ export default function AllExplorePostsPage() {
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400 sm:h-12 sm:w-12 sm:rounded-2xl"><Grid3x3 className="h-5 w-5 sm:h-6 sm:w-6" /></div>
           <div className="min-w-0 flex-1">
-            <p className="mb-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-pink-400 sm:text-xs"><ArrowUpRight className="h-3.5 w-3.5" /> Explore</p>
+            <p className="mb-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-pink-400 sm:text-xs"><TrendingUp className="h-3.5 w-3.5" /> Explore</p>
             <h1 className="text-lg font-extrabold leading-tight tracking-tight sm:text-3xl">Posts</h1>
             <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">Photos shared by the SociaLens community</p>
           </div>
