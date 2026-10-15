@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Copy, Flag, Heart, MessageCircle, MoreHorizontal, Repeat2, Share2, EyeOff, Check } from 'lucide-react'
+import { Flag, Heart, MessageCircle, MoreHorizontal, Repeat2, Share2, EyeOff } from 'lucide-react'
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ShareModal } from '@/components/shared/ShareModal'
 import { ReportModal } from '@/components/shared/ReportModal'
 import { CommentThread } from '@/components/shared/CommentThread'
@@ -30,6 +29,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
   const [showComments, setShowComments] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const [showOptions, setShowOptions] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const dialogScrollRef = useRef<HTMLDivElement>(null)
   const { user, profile } = useUser()
@@ -110,13 +110,13 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
           <div ref={dialogScrollRef} className="flex min-h-0 flex-col overflow-y-auto">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
               <Link href={`/profile/${post.profiles?.username ?? ''}`} onClick={() => setOpen(false)} className="min-w-0 truncate text-sm font-semibold hover:text-pink-400">@{post.profiles?.username ?? 'user'}</Link>
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild><button type="button" aria-label="More post options" className="mr-8 flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"><MoreHorizontal className="h-5 w-5" /></button></DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-[70]">
-                  {!isOwner && <DropdownMenuItem onSelect={() => { setOpen(false); onNotInterested?.(post.id) }}><EyeOff className="mr-2 h-4 w-4" />Not interested</DropdownMenuItem>}
-                  {!isOwner && user && <DropdownMenuItem onSelect={() => setShowReport(true)}><Flag className="mr-2 h-4 w-4" />Report</DropdownMenuItem>}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="relative mr-8 shrink-0">
+                <button type="button" aria-label="More post options" aria-expanded={showOptions} onClick={() => setShowOptions(value => !value)} className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"><MoreHorizontal className="h-5 w-5" /></button>
+                {showOptions && !isOwner && <div role="menu" className="absolute right-0 top-full z-[100] mt-1 min-w-[168px] overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl">
+                  <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setOpen(false); onNotInterested?.(post.id) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><EyeOff className="mr-2 h-4 w-4" />Not interested</button>
+                  {user && <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setShowReport(true) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><Flag className="mr-2 h-4 w-4" />Report</button>}
+                </div>}
+              </div>
             </div>
             <div className={`flex w-full items-center justify-center ${post.media_type === 'video' ? 'bg-black' : 'bg-background'}`}>
               {post.media_type === 'video' ? (
