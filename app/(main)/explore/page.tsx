@@ -270,7 +270,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
             <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
               <SectionHeading
                 icon={<Hash className="h-4 w-4" />}
-                title="All Hashtags"
+                title="Hashtags"
                 
                 action={<Link href="/explore/hashtags" className="shrink-0 text-xs font-semibold text-pink-400 transition-colors hover:text-fuchsia-400">See All <ArrowUpRight className="ml-1 inline h-3.5 w-3.5" /></Link>}
               />
