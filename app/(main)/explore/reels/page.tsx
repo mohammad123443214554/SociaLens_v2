@@ -96,7 +96,7 @@ export default function AllReelsPage() {
                 </div>
                 <div className="p-2 sm:p-3">
                   <Link href={`/profile/${reel.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{reel.profiles?.username ?? 'user'}</Link>
-                  {reel.content?.trim() && <PostCaption content={reel.content} titleClassName="text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}
+                  {reel.content?.trim() && <PostCaption content={reel.content} expandMode="dialog" titleClassName="text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}
                   <div className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground sm:text-xs">
                     <span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" />{formatCount(reel.likes_count)}</span>
                     <span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" />{formatCount(reel.comments_count)}</span>
