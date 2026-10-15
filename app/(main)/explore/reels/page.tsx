@@ -65,8 +65,8 @@ export default function AllReelsPage() {
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400 sm:h-12 sm:w-12 sm:rounded-2xl"><ReelsMark className="h-5 w-5 sm:h-6 sm:w-6" /></div>
           <div className="min-w-0 flex-1">
-            <p className="mb-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-pink-400 sm:text-xs"><Play className="h-3 w-3" /> Explore</p>
-            <h1 className="text-lg font-extrabold leading-tight tracking-tight sm:text-3xl">All Reels</h1>
+            <p className="mb-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-pink-400 sm:text-xs"><TrendingUp className="h-3.5 w-3.5" /> Explore</p>
+            <h1 className="text-lg font-extrabold leading-tight tracking-tight sm:text-3xl">Reels</h1>
           </div>
         </div>
         <div className="relative mt-3 sm:mt-6">
@@ -78,7 +78,7 @@ export default function AllReelsPage() {
 
       <section className="overflow-hidden rounded-xl border border-border/80 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
         <div className="mb-3 flex items-center justify-between border-b border-border/70 pb-2.5 sm:mb-4 sm:pb-3">
-          <h2 className="text-xs font-bold sm:text-sm">{searchTerm ? 'Search results' : 'All reels'}</h2>
+          <h2 className="text-xs font-bold sm:text-sm">{searchTerm ? 'Search results' : 'Reels'}</h2>
           <span className="text-[10px] text-muted-foreground sm:text-xs">Scroll to load more</span>
         </div>
         {isLoading ? (
