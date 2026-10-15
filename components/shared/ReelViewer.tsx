@@ -105,38 +105,37 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>{trigger}</DialogTrigger>
-        <DialogContent className="flex max-h-[94dvh] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border-border/80 bg-background p-0 shadow-2xl sm:max-h-[88vh] sm:w-[calc(100%-2rem)] sm:rounded-3xl">
-          <div className="grid min-h-0 flex-1 overflow-y-auto sm:grid-cols-[minmax(0,1.7fr)_minmax(240px,1fr)] sm:overflow-hidden">
-            <div className="relative flex max-h-[58dvh] min-h-[220px] items-center justify-center bg-black sm:max-h-[82vh] sm:min-h-0">
-              <video ref={videoRef} src={post.media_url ?? undefined} controls playsInline autoPlay preload="auto" className="max-h-[58dvh] w-full object-contain sm:max-h-[82vh]" aria-label={`Reel by @${post.profiles?.username ?? 'user'}`} />
+        <DialogContent className="flex max-h-[94dvh] w-[calc(100%-1rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl border-border/80 bg-background p-0 shadow-2xl sm:max-h-[92vh] sm:w-[calc(100%-2rem)] sm:rounded-2xl">
+          <div className="flex min-h-0 flex-col overflow-y-auto">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
+              <Link href={`/profile/${post.profiles?.username ?? ''}`} onClick={() => setOpen(false)} className="min-w-0 truncate text-sm font-semibold hover:text-pink-400">@{post.profiles?.username ?? 'user'}</Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild><button type="button" aria-label="More reel options" className="mr-8 flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"><MoreHorizontal className="h-5 w-5" /></button></DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="z-[70]">
+                  {!isOwner && <DropdownMenuItem onSelect={() => { setOpen(false); onNotInterested?.(post.id) }}><EyeOff className="mr-2 h-4 w-4" />Not interested</DropdownMenuItem>}
+                  {!isOwner && user && <DropdownMenuItem onSelect={() => { setShowReport(true) }}><Flag className="mr-2 h-4 w-4" />Report</DropdownMenuItem>}
+                  <DropdownMenuItem onSelect={copyLink}>{copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}{copied ? 'Link copied' : 'Copy link'}</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <div className="flex min-h-0 flex-col sm:max-h-[78vh]">
-              <div className="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-2.5 sm:px-4 sm:py-3">
-                <Link href={`/profile/${post.profiles?.username ?? ''}`} onClick={() => setOpen(false)} className="min-w-0 truncate text-sm font-semibold hover:text-pink-400">@{post.profiles?.username ?? 'user'}</Link>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild><button type="button" aria-label="More reel options" className="mr-8 flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"><MoreHorizontal className="h-5 w-5" /></button></DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="z-[70]">
-                    {!isOwner && <DropdownMenuItem onSelect={() => { setOpen(false); onNotInterested?.(post.id) }}><EyeOff className="mr-2 h-4 w-4" />Not interested</DropdownMenuItem>}
-                    {!isOwner && user && <DropdownMenuItem onSelect={() => { setShowReport(true) }}><Flag className="mr-2 h-4 w-4" />Report</DropdownMenuItem>}
-                    <DropdownMenuItem onSelect={copyLink}>{copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}{copied ? 'Link copied' : 'Copy link'}</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4">
-                {post.content?.trim() && <PostCaption content={post.content} expandMode="inline" titleClassName="text-sm leading-relaxed" captionClassName="mt-1 text-sm leading-6 text-muted-foreground" buttonClassName="mt-1 text-xs font-semibold text-pink-400 hover:underline" />}
-                {showComments && <div className="mt-4 border-t border-border/70 pt-3"><p className="mb-2 text-xs font-semibold text-muted-foreground">Comments</p><CommentThread target="post" targetId={post.id} currentUserId={user?.id} ownerId={post.user_id} commentRestrictedUntil={profile?.restrict_comment_until} variant="compact" listClassName="max-h-44 mb-2" /></div>}
-              </div>
-              <div className="border-t border-border/70 px-2.5 py-2.5 sm:px-3">
-                <div className="flex items-center justify-between gap-1.5">
-                  <div className="mr-3 flex min-w-0 flex-1 items-center justify-around gap-1">
-                    <button type="button" onClick={handleLike} aria-label="Like reel" className="flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-1 text-foreground transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-muted-foreground"><span className="flex h-8 w-8 items-center justify-center"><Heart className={`h-[19px] w-[19px] ${liked ? 'fill-red-500 text-red-500' : ''}`} /></span><span className="text-[10px] leading-none text-muted-foreground">{formatCount(likesCount)}</span></button>
-                    <button type="button" onClick={() => setShowComments(v => !v)} aria-label="Comments" className="flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-1 text-foreground transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-muted-foreground"><span className={`flex h-8 w-8 items-center justify-center ${showComments ? 'ring-1 ring-pink-500' : ''}`}><MessageCircle className="h-[19px] w-[19px]" /></span><span className="text-[10px] leading-none text-muted-foreground">{formatCount(post.comments_count)}</span></button>
-                    <button type="button" onClick={() => setShowShare(true)} aria-label="Share reel" className="flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-1 text-foreground transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-muted-foreground"><span className="flex h-8 w-8 items-center justify-center"><Share2 className="h-[19px] w-[19px]" /></span><span className="text-[10px] leading-none text-muted-foreground">Share</span></button>
-                    <button type="button" onClick={handleRepost} disabled={!user || toggleRepost.isPending} aria-label="Repost" className="flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-1 text-foreground transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-muted-foreground"><span className={`flex h-8 w-8 items-center justify-center ${isReposted ? 'text-emerald-400' : ''}`}><Repeat2 className="h-[19px] w-[19px]" /></span><span className="text-[10px] leading-none text-muted-foreground">Repost</span></button>
-                  </div>
-                  <SaveButton postId={post.id} className="flex h-8 w-8 shrink-0 items-center justify-center text-foreground transition-colors hover:text-foreground/80" iconClassName="h-[19px] w-[19px]" />
+            <div className="flex w-full items-center justify-center bg-black">
+              <video ref={videoRef} src={post.media_url ?? undefined} controls playsInline autoPlay preload="auto" className="max-h-[58dvh] w-full object-contain sm:max-h-[62vh]" aria-label={`Reel by @${post.profiles?.username ?? 'user'}`} />
+            </div>
+            {post.content?.trim() && <div className="border-b border-border/60 px-4 py-3">
+              <PostCaption content={post.content} expandMode="inline" titleClassName="text-sm leading-relaxed font-semibold" captionClassName="mt-1 text-sm leading-6 text-muted-foreground" buttonClassName="mt-1 text-xs font-semibold text-pink-400 hover:underline" />
+            </div>}
+            {showComments && <div className="max-h-48 overflow-y-auto border-b border-border/70 px-4 py-3"><p className="mb-2 text-xs font-semibold text-muted-foreground">Comments</p><CommentThread target="post" targetId={post.id} currentUserId={user?.id} ownerId={post.user_id} commentRestrictedUntil={profile?.restrict_comment_until} variant="compact" listClassName="max-h-44 mb-2" /></div>}
+            <div className="shrink-0 px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center justify-start gap-3 sm:gap-4">
+                  <button type="button" onClick={handleLike} aria-label="Like reel" className="flex flex-col items-center justify-center gap-1 text-foreground transition-colors hover:text-foreground/80"><span className="flex h-8 w-8 items-center justify-center"><Heart className={`h-[19px] w-[19px] ${liked ? 'fill-red-500 text-red-500' : ''}`} /></span><span className="text-[10px] leading-none text-muted-foreground">{formatCount(likesCount)}</span></button>
+                  <button type="button" onClick={() => setShowComments(v => !v)} aria-label="Comments" className="flex flex-col items-center justify-center gap-1 text-foreground transition-colors hover:text-foreground/80"><span className={`flex h-8 w-8 items-center justify-center ${showComments ? 'text-pink-500' : ''}`}><MessageCircle className="h-[19px] w-[19px]" /></span><span className="text-[10px] leading-none text-muted-foreground">{formatCount(post.comments_count)}</span></button>
+                  <button type="button" onClick={() => setShowShare(true)} aria-label="Share reel" className="flex flex-col items-center justify-center gap-1 text-foreground transition-colors hover:text-foreground/80"><span className="flex h-8 w-8 items-center justify-center"><Share2 className="h-[19px] w-[19px]" /></span><span className="text-[10px] leading-none text-muted-foreground">Share</span></button>
+                  <button type="button" onClick={handleRepost} disabled={!user || toggleRepost.isPending} aria-label="Repost" className="flex flex-col items-center justify-center gap-1 text-foreground transition-colors hover:text-foreground/80"><span className={`flex h-8 w-8 items-center justify-center ${isReposted ? 'text-emerald-400' : ''}`}><Repeat2 className="h-[19px] w-[19px]" /></span><span className="text-[10px] leading-none text-muted-foreground">Repost</span></button>
                 </div>
+                <SaveButton postId={post.id} className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center text-foreground transition-colors hover:text-foreground/80" iconClassName="h-[19px] w-[19px]" />
               </div>
+              <p className="mt-1 text-xs text-muted-foreground">{formatCount(likesCount)} {likesCount === 1 ? 'like' : 'likes'}</p>
             </div>
           </div>
         </DialogContent>
