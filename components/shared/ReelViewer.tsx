@@ -124,7 +124,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
             {post.content?.trim() && <div className="border-b border-border/60 px-4 py-3">
               <PostCaption content={post.content} expandMode="inline" titleClassName="text-sm leading-relaxed font-semibold" captionClassName="mt-1 text-sm leading-6 text-muted-foreground" buttonClassName="mt-1 text-xs font-semibold text-pink-400 hover:underline" />
             </div>}
-            {showComments && <div className="max-h-48 overflow-y-auto border-b border-border/70 px-4 py-3"><p className="mb-2 text-xs font-semibold text-muted-foreground">Comments</p><CommentThread target="post" targetId={post.id} currentUserId={user?.id} ownerId={post.user_id} commentRestrictedUntil={profile?.restrict_comment_until} variant="compact" listClassName="max-h-44 mb-2" /></div>}
+            {showComments && <div className="min-h-[180px] max-h-[42dvh] shrink-0 overflow-y-auto border-b border-border/70 px-4 py-3 sm:min-h-[220px]"><p className="mb-3 text-xs font-semibold text-muted-foreground">Comments</p><CommentThread target="post" targetId={post.id} currentUserId={user?.id} ownerId={post.user_id} commentRestrictedUntil={profile?.restrict_comment_until} variant="compact" listClassName="max-h-[36dvh] min-h-[130px] mb-2" /></div>}
             <div className="shrink-0 px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <div className="flex min-w-0 flex-1 items-center justify-start gap-3 sm:gap-4">
