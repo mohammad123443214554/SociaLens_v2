@@ -105,10 +105,10 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>{trigger}</DialogTrigger>
-        <DialogContent className="flex max-h-[88dvh] w-[calc(100%-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border-border/80 bg-background p-0 shadow-2xl sm:max-h-[88vh] sm:w-[calc(100%-2rem)] sm:rounded-3xl">
-          <div className="grid min-h-0 flex-1 overflow-y-auto sm:grid-cols-[minmax(0,1.2fr)_minmax(240px,0.8fr)] sm:overflow-hidden">
-            <div className="relative flex max-h-[38dvh] min-h-[180px] items-center justify-center bg-black sm:max-h-[78vh] sm:min-h-0">
-              <video ref={videoRef} src={post.media_url ?? undefined} controls playsInline autoPlay preload="auto" className="max-h-[38dvh] w-full object-contain sm:max-h-[78vh]" aria-label={`Reel by @${post.profiles?.username ?? 'user'}`} />
+        <DialogContent className="flex max-h-[94dvh] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border-border/80 bg-background p-0 shadow-2xl sm:max-h-[88vh] sm:w-[calc(100%-2rem)] sm:rounded-3xl">
+          <div className="grid min-h-0 flex-1 overflow-y-auto sm:grid-cols-[minmax(0,1.7fr)_minmax(240px,1fr)] sm:overflow-hidden">
+            <div className="relative flex max-h-[58dvh] min-h-[220px] items-center justify-center bg-black sm:max-h-[82vh] sm:min-h-0">
+              <video ref={videoRef} src={post.media_url ?? undefined} controls playsInline autoPlay preload="auto" className="max-h-[58dvh] w-full object-contain sm:max-h-[82vh]" aria-label={`Reel by @${post.profiles?.username ?? 'user'}`} />
             </div>
             <div className="flex min-h-0 flex-col sm:max-h-[78vh]">
               <div className="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-2.5 sm:px-4 sm:py-3">
