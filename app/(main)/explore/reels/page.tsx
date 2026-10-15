@@ -79,7 +79,7 @@ export default function AllReelsPage() {
       <section className="overflow-hidden rounded-xl border border-border/80 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
         <div className="mb-3 flex items-center justify-between border-b border-border/70 pb-2.5 sm:mb-4 sm:pb-3">
           <h2 className="text-xs font-bold sm:text-sm">{searchTerm ? 'Search results' : 'Reels'}</h2>
-          <span className="text-[10px] text-muted-foreground sm:text-xs">Scroll to load more</span>
+          
         </div>
         {isLoading ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[3/4] animate-pulse rounded-xl bg-muted sm:rounded-2xl" />)}</div>
