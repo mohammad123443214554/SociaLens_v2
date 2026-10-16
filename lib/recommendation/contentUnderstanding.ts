@@ -229,7 +229,7 @@ function buildNormalizedLabels(analysis: ContentAnalysisResult): NormalizedLabel
 }
 
 async function storeNormalizedLabels(
-  admin: ReturnType<typeof createSupabaseClient>,
+  admin: any,
   postId: string,
   analysis: ContentAnalysisResult,
 ): Promise<string | null> {
