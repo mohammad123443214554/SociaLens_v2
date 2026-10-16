@@ -13,7 +13,7 @@ import { scorePost, diversify, FEED_WEIGHTS } from './scoring'
  */
 export function rankFeedPosts(candidates: PostWithProfile[], ctx: ViewerContext): PostWithProfile[] {
   const safe = candidates.filter((p) => !ctx.blockedUserIds.has(p.user_id) && !ctx.notInterestedPostIds.has(p.id))
-  if (safe.length === 0) return candidates
+  if (safe.length === 0) return []
 
   const scored = safe
     .map((post) => ({ post, score: scorePost(post, ctx.creatorAffinity, ctx.hashtagAffinity, FEED_WEIGHTS, 30) }))
