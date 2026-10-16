@@ -19,6 +19,33 @@ const REELS_CANDIDATE_WINDOW = REELS_PAGE_SIZE * 4
 const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
 const REPOST_POST_SELECT = 'posts(*, profiles!posts_user_id_fkey(*))'
 
+async function attachRecommendationLabels(posts: PostWithProfile[], userId?: string): Promise<PostWithProfile[]> {
+  if (!userId || posts.length === 0) return posts
+  const supabase = createClient()
+  const ids = Array.from(new Set(posts.map(post => post.id)))
+  const { data, error } = await supabase
+    .from('post_content_analysis_labels')
+    .select('post_id, label_type, label_slug, relevance')
+    .in('post_id', ids)
+
+  if (error) {
+    // AI labels are an enhancement, not a reason to break the feed.
+    console.warn('Recommendation labels unavailable; using engagement ranking', error.message)
+    return posts
+  }
+
+  const labelsByPost = new Map<string, any[]>()
+  for (const label of data ?? []) {
+    const current = labelsByPost.get(label.post_id) ?? []
+    current.push(label)
+    labelsByPost.set(label.post_id, current)
+  }
+  return posts.map(post => ({
+    ...post,
+    recommendation_labels: labelsByPost.get(post.id) ?? [],
+  }))
+}
+
 async function fetchPostsWithLikes(posts: PostWithProfile[], userId: string) {
   const supabase = createClient()
   if (!posts.length || !userId) return posts
@@ -152,6 +179,7 @@ export function useExplorePosts(userId?: string) {
       if (error) throw error
       let candidates = (data ?? []) as PostWithProfile[]
       if (userId) candidates = await fetchPostsWithLikes(candidates, userId)
+      candidates = await attachRecommendationLabels(candidates, userId)
 
       let posts = candidates.slice(0, EXPLORE_PAGE_SIZE)
       try {
@@ -198,6 +226,7 @@ export function useReelsPosts(userId?: string) {
       if (error) throw error
       let posts = (data ?? []) as PostWithProfile[]
       if (userId) posts = await fetchPostsWithLikes(posts, userId)
+      posts = await attachRecommendationLabels(posts, userId)
       const nextCursor = posts.length === REELS_CANDIDATE_WINDOW ? (posts[posts.length - 1]?.created_at ?? null) : null
 
       if (userId) {
