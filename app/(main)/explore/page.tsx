@@ -23,7 +23,6 @@ import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentin
 import { PostCaption } from '@/components/shared/PostCaption'
 import { ReelViewer } from '@/components/shared/ReelViewer'
 import { getViewerContext } from '@/lib/recommendation/viewerContext'
-import { rankFeedPosts } from '@/lib/recommendation/rankFeedPosts'
 import { rankExplorePosts } from '@/lib/recommendation/rankExplorePosts'
 import { rankReels } from '@/lib/recommendation/rankReels'
 
