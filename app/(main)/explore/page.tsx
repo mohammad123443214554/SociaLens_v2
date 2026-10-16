@@ -189,22 +189,36 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
   })
 
   const { data: explorePhotoPosts = [], isLoading: photoPostsLoading, isError: photoPostsError } = useQuery({
-    queryKey: ['explore-photo-posts-top10'],
+    queryKey: ['explore-photo-posts-top10', user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('posts').select(POST_SELECT)
+      let request = supabase.from('posts').select(POST_SELECT)
         .neq('media_type', 'video').not('media_url', 'is', null)
-        .order('likes_count', { ascending: false }).order('created_at', { ascending: false }).limit(30)
+        .order('likes_count', { ascending: false }).order('created_at', { ascending: false })
+      if (user) {
+        const { data: hiddenRows, error: hiddenError } = await supabase.from('post_not_interested').select('post_id').eq('user_id', user.id)
+        if (hiddenError) throw hiddenError
+        const hiddenIds = (hiddenRows || []).map(row => row.post_id)
+        if (hiddenIds.length) request = request.not('id', 'in', `(${hiddenIds.join(',')})`)
+      }
+      const { data, error } = await request.limit(30)
       if (error) throw error
       return (data || []) as PostWithProfile[]
     },
     staleTime: 60_000,
   })
   const { data: topReels = [], isLoading: topReelsLoading, isError: topReelsError } = useQuery({
-    queryKey: ['explore-top-reels'],
+    queryKey: ['explore-top-reels', user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('posts').select(POST_SELECT)
+      let request = supabase.from('posts').select(POST_SELECT)
         .eq('media_type', 'video').not('media_url', 'is', null)
-        .order('likes_count', { ascending: false }).limit(100)
+        .order('likes_count', { ascending: false })
+      if (user) {
+        const { data: hiddenRows, error: hiddenError } = await supabase.from('post_not_interested').select('post_id').eq('user_id', user.id)
+        if (hiddenError) throw hiddenError
+        const hiddenIds = (hiddenRows || []).map(row => row.post_id)
+        if (hiddenIds.length) request = request.not('id', 'in', `(${hiddenIds.join(',')})`)
+      }
+      const { data, error } = await request.limit(100)
       if (error) throw error
       return ((data || []) as PostWithProfile[])
         .sort((a, b) => ((Number(b.likes_count) || 0) + (Number(b.comments_count) || 0) + (Number(b.views_count) || 0)) -
