@@ -1,12 +1,36 @@
 'use client'
 
+import { useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useReelsPosts } from '@/lib/hooks/usePosts'
 import { ReelsFeed } from '@/components/reels/ReelsFeed'
 import { useUser } from '@/lib/hooks/useUser'
 
 export default function ReelsPage() {
   const { user } = useUser()
+  const queryClient = useQueryClient()
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useReelsPosts(user?.id)
+
+  // Older reels predate the recommendation classifier. Each signed-in visit
+  // repairs a small bounded batch, then refreshes rankings with the new labels.
+  useEffect(() => {
+    if (!user?.id) return
+    let cancelled = false
+    fetch('/api/recommendation/backfill-content', { method: 'POST' })
+      .then(async response => {
+        if (!response.ok) return
+        const result = await response.json()
+        if (!cancelled && result?.processed > 0) {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['reels-posts', user.id] }),
+            queryClient.invalidateQueries({ queryKey: ['all-explore-reels', user.id] }),
+            queryClient.invalidateQueries({ queryKey: ['explore-top-reels', user.id] }),
+          ])
+        }
+      })
+      .catch(error => console.warn('Reel recommendation backfill unavailable', error))
+    return () => { cancelled = true }
+  }, [user?.id, queryClient])
   const reels = data?.pages.flatMap(page => page.posts) ?? []
 
   return (
