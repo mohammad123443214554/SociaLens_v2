@@ -22,6 +22,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { useQueryClient } from '@tanstack/react-query'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
 import { BLANK_VIDEO_POSTER, getMediaProxyUrl } from '@/lib/utils/media'
+import { useTrackEvent } from '@/lib/hooks/useTrackEvent'
 
 interface PostCardProps {
   post: PostWithProfile
@@ -38,6 +39,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const supabase = createClient()
   const queryClient = useQueryClient()
+  const track = useTrackEvent()
   const articleRef = useRef<HTMLElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const hasCountedViewRef = useRef(false)
@@ -67,6 +69,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
         if (entries[0]?.isIntersecting && !hasCountedViewRef.current) {
           hasCountedViewRef.current = true
           supabase.rpc('increment_post_views', { post_id: post.id }).then(() => {})
+          if (user) track({ target_type: post.media_type === 'video' ? 'reel' : 'post', target_id: post.id, event_type: 'view' })
           observer.disconnect()
         }
       },
@@ -74,7 +77,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [post.id])
+  }, [post.id, user?.id, post.media_type, track])
 
   // Pauses this post's video the moment it scrolls mostly out of view -
   // otherwise a video someone started playing keeps running (and making
@@ -162,6 +165,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
     setLiked(newLiked)
     setLikesCount(prev => newLiked ? prev + 1 : prev - 1)
     if (newLiked) {
+      track({ target_type: post.media_type === 'video' ? 'reel' : 'post', target_id: post.id, event_type: 'like' })
       await supabase.from('likes').insert({ post_id: post.id, user_id: user.id })
       await supabase.rpc('increment_likes', { post_id: post.id })
       if (user.id !== post.user_id) {
