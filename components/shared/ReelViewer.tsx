@@ -126,6 +126,39 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
     queryClient.invalidateQueries({ queryKey: ['explore-posts'] })
   }
 
+  const handleNotInterested = async (postId: string) => {
+    if (user) {
+      const { error } = await supabase.from('post_not_interested').upsert(
+        { user_id: user.id, post_id: postId },
+        { onConflict: 'user_id,post_id', ignoreDuplicates: true }
+      )
+      if (error) {
+        console.error('Could not save not-interested preference', error)
+        return
+      }
+      const { error: eventError } = await supabase.from('content_events').insert({
+        user_id: user.id,
+        target_type: post.media_type === 'video' ? 'reel' : 'post',
+        target_id: postId,
+        creator_id: post.user_id,
+        event_type: 'not_interested',
+      })
+      if (eventError) console.error('Could not record not-interested event', eventError)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['feed-posts', user.id] }),
+        queryClient.invalidateQueries({ queryKey: ['explore-posts', user.id] }),
+        queryClient.invalidateQueries({ queryKey: ['reels-posts', user.id] }),
+        queryClient.invalidateQueries({ queryKey: ['explore-top-reels'] }),
+        queryClient.invalidateQueries({ queryKey: ['explore-photo-posts-top10'] }),
+        queryClient.invalidateQueries({ queryKey: ['all-explore-reels'] }),
+        queryClient.invalidateQueries({ queryKey: ['all-explore-photo-posts'] }),
+      ])
+    }
+    setShowOptions(false)
+    setOpen(false)
+    onNotInterested?.(postId)
+  }
+
   const handleRepost = () => {
     if (!user) return
     toggleRepost.mutate({ postId: post.id, userId: user.id, postOwnerId: post.user_id, repost: !isReposted })
@@ -179,7 +212,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
       </Dialog>
       {portalReady && showOptions && optionsPosition && createPortal(
         <div id={`post-options-${post.id}`} role="menu" aria-label="Post options" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} style={{ position: 'fixed', top: optionsPosition.top, right: optionsPosition.right }} className="z-[9999] min-w-[180px] overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl">
-          <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setOpen(false); onNotInterested?.(post.id) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><EyeOff className="mr-2 h-4 w-4" />Not interested</button>
+          <button type="button" role="menuitem" onClick={() => { void handleNotInterested(post.id) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><EyeOff className="mr-2 h-4 w-4" />Not interested</button>
           <button type="button" role="menuitem" onClick={() => { setShowOptions(false); if (user) setShowReport(true) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><Flag className="mr-2 h-4 w-4" />Report</button>
         </div>,
         document.body
