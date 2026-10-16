@@ -81,10 +81,13 @@ export default function AllReelsPage() {
       if (error) throw error
       let candidates = (rows || []) as PostWithProfile[]
       candidates = await attachRecommendationLabels(candidates, supabase)
-      let reels = candidates.slice(0, PAGE_SIZE)
+      // Return the full ranked candidate window. If we only returned PAGE_SIZE
+      // but advanced the offset by CANDIDATE_WINDOW, the other candidates were
+      // permanently skipped whenever the total reel count was below 48.
+      let reels = candidates
       try {
         const ctx = await getViewerContext(supabase, user?.id)
-        reels = rankReels(candidates, ctx, PAGE_SIZE)
+        reels = rankReels(candidates, ctx, CANDIDATE_WINDOW)
       } catch (err) {
         console.error('All Explore Reels ranking failed, showing recent reels', err)
       }
