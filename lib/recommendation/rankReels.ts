@@ -29,6 +29,8 @@ export function rankReels(candidates: PostWithProfile[], ctx: ViewerContext, pag
   const chosenIds = new Set(topRanked.map((p) => p.id))
   const exploration = pickExplorationSlots(safe, chosenIds, explorationCount).filter((p) => !chosenIds.has(p.id))
 
-  const combined = diversify([...topRanked, ...exploration], 1)
+  const includedIds = new Set([...topRanked, ...exploration].map(post => post.id))
+  const fill = scored.filter(post => !includedIds.has(post.id))
+  const combined = diversify([...topRanked, ...exploration, ...fill], 1)
   return combined.slice(0, pageSize)
 }
