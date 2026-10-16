@@ -14,7 +14,6 @@ import { PostCard } from '@/components/feed/PostCard'
 import { ReelViewer } from '@/components/shared/ReelViewer'
 import { useUser } from '@/lib/hooks/useUser'
 import { getViewerContext } from '@/lib/recommendation/viewerContext'
-import { rankFeedPosts } from '@/lib/recommendation/rankFeedPosts'
 import { rankExplorePosts } from '@/lib/recommendation/rankExplorePosts'
 
 const PAGE_SIZE = 12
