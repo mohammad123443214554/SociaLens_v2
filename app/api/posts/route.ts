@@ -1,6 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { postSchema } from '@/lib/utils/validation'
+import { analyzeAndStorePostContent } from '@/lib/recommendation/contentUnderstanding'
+
+export const maxDuration = 60
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -44,5 +47,16 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Analyse after returning the successful post response. AI/provider or
+  // media-fetch failures must never block a user's post from being created.
+  after(async () => {
+    try {
+      await analyzeAndStorePostContent(data)
+    } catch (analysisError) {
+      console.error('SociaLens post content analysis failed after create', analysisError)
+    }
+  })
+
   return NextResponse.json(data, { status: 201 })
 }
