@@ -256,17 +256,14 @@ export function useReelsPosts(userId?: string) {
         }
       }
 
-      // Safety/Spam Filter -> Feature Calc -> Personalization -> Ranking ->
-      // Freshness/Exploration -> Diversity (see rankReels). Falls back to
-      // plain chronological (trimmed to one page) if the ranking pipeline
-      // itself throws for any reason - a reel must never simply fail to
-      // appear because of a bug or a not-yet-run migration in the
-      // personalization layer.
-      let ranked = posts.slice(0, REELS_PAGE_SIZE)
+      // Rank the entire fetched candidate window and return every candidate
+      // from it. Returning only REELS_PAGE_SIZE here while advancing the cursor
+      // past the whole window silently discarded the remaining reels (e.g. 29
+      // available videos became only 8 visible with no next page).
+      let ranked = posts
       try {
         const ctx = await getViewerContext(supabase, userId)
-        const result = rankReels(posts, ctx, REELS_PAGE_SIZE)
-        ranked = result
+        ranked = rankReels(posts, ctx, REELS_CANDIDATE_WINDOW)
       } catch (err) {
         console.error('reels ranking failed, showing chronological order', err)
       }
