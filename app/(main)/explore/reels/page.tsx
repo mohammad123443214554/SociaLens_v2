@@ -11,6 +11,7 @@ import { formatCount } from '@/lib/utils/helpers'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
 import { PostCaption } from '@/components/shared/PostCaption'
 import { ReelViewer } from '@/components/shared/ReelViewer'
+import { useUser } from '@/lib/hooks/useUser'
 
 function ReelsMark({ className = 'h-5 w-5' }: { className?: string }) {
   return (
@@ -29,6 +30,7 @@ export default function AllReelsPage() {
   const [query, setQuery] = useState('')
   const [hiddenReelIds, setHiddenReelIds] = useState<string[]>([])
   const supabase = createClient()
+  const { user } = useUser()
   const searchTerm = query.trim()
 
   const {
@@ -39,14 +41,20 @@ export default function AllReelsPage() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['all-explore-reels', searchTerm.toLocaleLowerCase()],
+    queryKey: ['all-explore-reels', user?.id, searchTerm.toLocaleLowerCase()],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       let request = supabase.from('posts').select(POST_SELECT)
         .eq('media_type', 'video').not('media_url', 'is', null)
         .order('created_at', { ascending: false })
-        .range(pageParam, pageParam + PAGE_SIZE - 1)
+      if (user) {
+        const { data: hiddenRows, error: hiddenError } = await supabase.from('post_not_interested').select('post_id').eq('user_id', user.id)
+        if (hiddenError) throw hiddenError
+        const hiddenIds = (hiddenRows || []).map(row => row.post_id)
+        if (hiddenIds.length) request = request.not('id', 'in', `(${hiddenIds.join(',')})`)
+      }
       if (searchTerm) request = request.ilike('content', `%${searchTerm}%`)
+      request = request.range(pageParam, pageParam + PAGE_SIZE - 1)
       const { data: rows, error } = await request
       if (error) throw error
       const reels = (rows || []) as PostWithProfile[]
