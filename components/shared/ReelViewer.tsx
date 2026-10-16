@@ -136,14 +136,16 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
         console.error('Could not save not-interested preference', error)
         return
       }
-      const { error: eventError } = await supabase.from('content_events').insert({
-        user_id: user.id,
-        target_type: post.media_type === 'video' ? 'reel' : 'post',
-        target_id: postId,
-        creator_id: post.user_id,
-        event_type: 'not_interested',
+      // Use the database event RPC so this preference also updates creator
+      // and hashtag affinities, not just the raw event log.
+      const { error: eventError } = await supabase.rpc('record_content_event', {
+        p_user_id: user.id,
+        p_target_type: post.media_type === 'video' ? 'reel' : 'post',
+        p_target_id: postId,
+        p_creator_id: post.user_id,
+        p_event_type: 'not_interested',
       })
-      if (eventError) console.error('Could not record not-interested event', eventError)
+      if (eventError) console.error('Could not record not-interested learning signal', eventError)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['feed-posts', user.id] }),
         queryClient.invalidateQueries({ queryKey: ['explore-posts', user.id] }),
