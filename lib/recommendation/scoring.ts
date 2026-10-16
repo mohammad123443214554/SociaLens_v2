@@ -1,4 +1,4 @@
-import { PostWithProfile } from '@/lib/types/database.types'
+import type { PostWithProfile } from '@/lib/types/database.types'
 
 // ---- Freshness -------------------------------------------------------
 // Exponential decay - a brand-new post starts at 1.0 and fades toward 0
