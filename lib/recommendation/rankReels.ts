@@ -20,7 +20,7 @@ export function rankReels(candidates: PostWithProfile[], ctx: ViewerContext, pag
   if (safe.length === 0) return []
 
   const scored = safe
-    .map((post) => ({ post, score: scorePost(post, ctx.creatorAffinity, ctx.hashtagAffinity, REELS_WEIGHTS, 36) }))
+    .map((post) => ({ post, score: scorePost(post, ctx.creatorAffinity, ctx.hashtagAffinity, REELS_WEIGHTS, ctx.contentAffinity, 36) }))
     .sort((a, b) => b.score - a.score)
     .map((s) => s.post)
 
