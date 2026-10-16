@@ -12,6 +12,7 @@ import { PostCaption } from '@/components/shared/PostCaption'
 import { SaveButton } from '@/components/shared/SaveButton'
 import { useUser } from '@/lib/hooks/useUser'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
+import { useTrackEvent } from '@/lib/hooks/useTrackEvent'
 import { createClient } from '@/lib/supabase/client'
 import { useQueryClient } from '@tanstack/react-query'
 import { PostWithProfile } from '@/lib/types/database.types'
@@ -35,10 +36,14 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
   const [portalReady, setPortalReady] = useState(false)
   const optionsButtonRef = useRef<HTMLButtonElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const trackedOpenRef = useRef(false)
+  const lastVideoTimeRef = useRef<number | null>(null)
+  const watchedSecondsRef = useRef(0)
   const dialogScrollRef = useRef<HTMLDivElement>(null)
   const { user, profile } = useUser()
   const supabase = createClient()
   const queryClient = useQueryClient()
+  const track = useTrackEvent()
   const { data: isReposted = false } = useIsReposted(post.id, user?.id, post.is_reposted)
   const toggleRepost = useToggleRepost()
   const mediaLabel = post.media_type === 'video' ? 'reel' : 'post'
@@ -101,6 +106,59 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
   }, [showComments, open])
 
   useEffect(() => {
+    if (!open) {
+      trackedOpenRef.current = false
+      lastVideoTimeRef.current = null
+      watchedSecondsRef.current = 0
+      return
+    }
+    if (!trackedOpenRef.current) {
+      track({
+        target_type: post.media_type === 'video' ? 'reel' : 'post',
+        target_id: post.id,
+        creator_id: post.user_id,
+        event_type: 'view',
+      })
+      trackedOpenRef.current = true
+    }
+  }, [open, post.id, post.user_id, post.media_type, track])
+
+  const trackVideoProgress = () => {
+    const video = videoRef.current
+    if (!video) return
+    const current = video.currentTime
+    const previous = lastVideoTimeRef.current
+    if (previous !== null) {
+      const delta = current - previous
+      // Ignore seeks and tab-resume jumps; count only normal playback progress.
+      if (delta > 0 && delta <= 2.5) watchedSecondsRef.current += delta
+    }
+    lastVideoTimeRef.current = current
+  }
+
+  const flushVideoWatchTime = () => {
+    const video = videoRef.current
+    const seconds = Math.floor(watchedSecondsRef.current)
+    if (seconds >= 1) {
+      track({
+        target_type: 'reel',
+        target_id: post.id,
+        creator_id: post.user_id,
+        event_type: 'watch_time',
+        watch_seconds: seconds,
+        video_duration: Number.isFinite(video?.duration) ? video?.duration : undefined,
+      })
+    }
+    watchedSecondsRef.current = 0
+    lastVideoTimeRef.current = video?.currentTime ?? null
+  }
+
+  const handleVideoEnded = () => {
+    flushVideoWatchTime()
+    track({ target_type: 'reel', target_id: post.id, creator_id: post.user_id, event_type: 'completion' })
+  }
+
+  useEffect(() => {
     if (!user || !open) return
     if (post.is_liked !== undefined) { setLiked(post.is_liked); return }
     supabase.from('likes').select('id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle()
@@ -114,7 +172,10 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
     setLikesCount(count => Math.max(0, count + (next ? 1 : -1)))
     if (next) {
       const { error } = await supabase.from('likes').insert({ post_id: post.id, user_id: user.id })
-      if (!error) await supabase.rpc('increment_likes', { post_id: post.id })
+      if (!error) {
+        await supabase.rpc('increment_likes', { post_id: post.id })
+        track({ target_type: post.media_type === 'video' ? 'reel' : 'post', target_id: post.id, creator_id: post.user_id, event_type: 'like' })
+      }
       if (!error && user.id !== post.user_id) {
         await supabase.from('notifications').insert({ user_id: post.user_id, actor_id: user.id, type: 'like', post_id: post.id })
       }
@@ -189,7 +250,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
             </div>
             <div className={`flex w-full items-center justify-center ${post.media_type === 'video' ? 'bg-black' : 'bg-background'}`}>
               {post.media_type === 'video' ? (
-                <video ref={videoRef} src={post.media_url ?? undefined} controls playsInline autoPlay preload="auto" className="max-h-[58dvh] w-full object-contain sm:max-h-[62vh]" aria-label={`Video post by @${post.profiles?.username ?? 'user'}`} />
+                <video ref={videoRef} src={post.media_url ?? undefined} controls playsInline autoPlay preload="auto" onTimeUpdate={trackVideoProgress} onPause={flushVideoWatchTime} onEnded={handleVideoEnded} className="max-h-[58dvh] w-full object-contain sm:max-h-[62vh]" aria-label={`Video post by @${post.profiles?.username ?? 'user'}`} />
               ) : (
                 <img src={post.media_url ?? undefined} alt={`Post by @${post.profiles?.username ?? 'user'}`} className="max-h-[58dvh] w-full object-contain sm:max-h-[62vh]" />
               )}
@@ -203,7 +264,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
                 <div className="flex min-w-0 flex-1 items-center justify-start gap-3 sm:gap-4">
                   <button type="button" onClick={handleLike} aria-label={`Like ${mediaLabel}`} className="flex flex-col items-center justify-center gap-1 text-foreground transition-colors hover:text-foreground/80"><span className="flex h-8 w-8 items-center justify-center"><Heart className={`h-[19px] w-[19px] ${liked ? 'fill-red-500 text-red-500' : ''}`} /></span><span className="whitespace-nowrap text-[10px] leading-none text-muted-foreground">{formatCount(likesCount)} {likesCount === 1 ? 'like' : 'likes'}</span></button>
                   <button type="button" onClick={() => setShowComments(true)} aria-label="Comments" className="flex flex-col items-center justify-center gap-1 text-foreground transition-colors hover:text-foreground/80"><span className={`flex h-8 w-8 items-center justify-center ${showComments ? 'text-pink-500' : ''}`}><MessageCircle className="h-[19px] w-[19px]" /></span><span className="text-[10px] leading-none text-muted-foreground">Comment</span></button>
-                  <button type="button" onClick={() => setShowShare(true)} aria-label={`Share ${mediaLabel}`} className="flex flex-col items-center justify-center gap-1 text-foreground transition-colors hover:text-foreground/80"><span className="flex h-8 w-8 items-center justify-center"><Share2 className="h-[19px] w-[19px]" /></span><span className="text-[10px] leading-none text-muted-foreground">Share</span></button>
+                  <button type="button" onClick={() => { setShowShare(true); track({ target_type: post.media_type === 'video' ? 'reel' : 'post', target_id: post.id, creator_id: post.user_id, event_type: 'share' }) }} aria-label={`Share ${mediaLabel}`} className="flex flex-col items-center justify-center gap-1 text-foreground transition-colors hover:text-foreground/80"><span className="flex h-8 w-8 items-center justify-center"><Share2 className="h-[19px] w-[19px]" /></span><span className="text-[10px] leading-none text-muted-foreground">Share</span></button>
                   <button type="button" onClick={handleRepost} disabled={!user || toggleRepost.isPending} aria-label="Repost" className="flex flex-col items-center justify-center gap-1 text-foreground transition-colors hover:text-foreground/80"><span className={`flex h-8 w-8 items-center justify-center ${isReposted ? 'text-emerald-400' : ''}`}><Repeat2 className="h-[19px] w-[19px]" /></span><span className="text-[10px] leading-none text-muted-foreground">Repost</span></button>
                 </div>
                 <SaveButton postId={post.id} className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center text-foreground transition-colors hover:text-foreground/80" iconClassName="h-[19px] w-[19px]" />
