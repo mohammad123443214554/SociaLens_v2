@@ -229,7 +229,7 @@ export function useReelsPosts(userId?: string) {
       try {
         const ctx = await getViewerContext(supabase, userId)
         const result = rankReels(posts, ctx, REELS_PAGE_SIZE)
-        if (result.length > 0) ranked = result
+        ranked = result
       } catch (err) {
         console.error('reels ranking failed, showing chronological order', err)
       }
