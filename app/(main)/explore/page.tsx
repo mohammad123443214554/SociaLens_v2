@@ -24,6 +24,7 @@ import { PostCaption } from '@/components/shared/PostCaption'
 import { ReelViewer } from '@/components/shared/ReelViewer'
 import { getViewerContext } from '@/lib/recommendation/viewerContext'
 import { rankFeedPosts } from '@/lib/recommendation/rankFeedPosts'
+import { rankExplorePosts } from '@/lib/recommendation/rankExplorePosts'
 import { rankReels } from '@/lib/recommendation/rankReels'
 
 type Tab = 'all' | 'profiles' | 'posts' | 'hashtags'
@@ -256,7 +257,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
       const candidates = (data || []) as PostWithProfile[]
       try {
         const ctx = await getViewerContext(supabase, user?.id)
-        return rankFeedPosts(candidates, ctx).slice(0, 10)
+        return rankExplorePosts(candidates, ctx, 10)
       } catch (err) {
         console.error('Explore photo ranking failed, showing recent candidates', err)
         return candidates.slice(0, 10)
