@@ -15,6 +15,7 @@ import { ReelViewer } from '@/components/shared/ReelViewer'
 import { useUser } from '@/lib/hooks/useUser'
 import { getViewerContext } from '@/lib/recommendation/viewerContext'
 import { rankFeedPosts } from '@/lib/recommendation/rankFeedPosts'
+import { rankExplorePosts } from '@/lib/recommendation/rankExplorePosts'
 
 const PAGE_SIZE = 12
 const CANDIDATE_WINDOW = PAGE_SIZE * 4
@@ -48,7 +49,7 @@ export default function AllExplorePostsPage() {
       let posts = candidates.slice(0, PAGE_SIZE)
       try {
         const ctx = await getViewerContext(supabase, user?.id)
-        posts = rankFeedPosts(candidates, ctx).slice(0, PAGE_SIZE)
+        posts = rankExplorePosts(candidates, ctx, PAGE_SIZE)
       } catch (err) {
         console.error('All Explore Posts ranking failed, showing recent posts', err)
       }
