@@ -23,7 +23,7 @@ export async function getViewerContext(supabase: SupabaseClient, userId: string 
     supabase.from('user_creator_affinity').select('creator_id, score').eq('user_id', userId).order('score', { ascending: false }).limit(200),
     supabase.from('user_hashtag_affinity').select('hashtag, score').eq('user_id', userId).order('score', { ascending: false }).limit(200),
     supabase.from('blocks').select('blocker_id, blocked_id').or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
-    supabase.from('post_not_interested').select('post_id').eq('user_id', userId).limit(500),
+    supabase.from('post_not_interested').select('post_id').eq('user_id', userId),
   ])
 
   return {
