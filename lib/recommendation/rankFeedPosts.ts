@@ -16,7 +16,7 @@ export function rankFeedPosts(candidates: PostWithProfile[], ctx: ViewerContext)
   if (safe.length === 0) return []
 
   const scored = safe
-    .map((post) => ({ post, score: scorePost(post, ctx.creatorAffinity, ctx.hashtagAffinity, FEED_WEIGHTS, 30) }))
+    .map((post) => ({ post, score: scorePost(post, ctx.creatorAffinity, ctx.hashtagAffinity, FEED_WEIGHTS, ctx.contentAffinity, 30) }))
     .sort((a, b) => b.score - a.score)
     .map((s) => s.post)
 
