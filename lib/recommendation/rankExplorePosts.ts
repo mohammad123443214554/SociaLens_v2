@@ -32,5 +32,7 @@ export function rankExplorePosts(
   const chosenIds = new Set(chosen.map(post => post.id))
   const discovery = pickExplorationSlots(safe, chosenIds, discoveryCount)
     .filter(post => !chosenIds.has(post.id))
-  return diversify([...chosen, ...discovery], 1).slice(0, pageSize)
+  const includedIds = new Set([...chosen, ...discovery].map(post => post.id))
+  const fill = ranked.filter(post => !includedIds.has(post.id))
+  return diversify([...chosen, ...discovery, ...fill], 1).slice(0, pageSize)
 }
