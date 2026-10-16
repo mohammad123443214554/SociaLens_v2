@@ -170,6 +170,115 @@ function parseAnalysis(raw: string, mediaAnalyzed: boolean): ContentAnalysisResu
   }
 }
 
+type NormalizedLabel = {
+  label_type: 'topic' | 'language' | 'region' | 'format'
+  label_slug: string
+  display_name: string
+  is_primary: boolean
+  relevance: number
+}
+
+function labelSlug(value: string): string {
+  return value.trim().toLowerCase().normalize('NFKD')
+    .replace(/[\\u0300-\\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64)
+}
+
+function humanizeLabel(value: string): string {
+  return value.split(/[-_\\s]+/).filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function buildNormalizedLabels(analysis: ContentAnalysisResult): NormalizedLabel[] {
+  const labels: NormalizedLabel[] = []
+  const add = (
+    label_type: NormalizedLabel['label_type'],
+    rawValue: string,
+    displayName: string,
+    is_primary = false,
+    relevance = analysis.confidence,
+  ) => {
+    const label_slug = labelSlug(rawValue)
+    if (!label_slug) return
+    labels.push({
+      label_type,
+      label_slug,
+      display_name: displayName.trim().slice(0, 100) || humanizeLabel(label_slug),
+      is_primary,
+      relevance: Math.max(0, Math.min(1, relevance)),
+    })
+  }
+
+  for (const topic of analysis.topic_labels) {
+    add('topic', topic, humanizeLabel(topic), topic === analysis.primary_topic)
+  }
+  add('language', analysis.language_code, analysis.language_name, true)
+  for (const region of analysis.cultural_regions) add('region', region, humanizeLabel(region))
+  for (const format of analysis.format_labels) add('format', format, humanizeLabel(format))
+
+  const unique = new Map<string, NormalizedLabel>()
+  for (const label of labels) {
+    const key = label.label_type + ':' + label.label_slug
+    const existing = unique.get(key)
+    if (!existing || label.is_primary || label.relevance > existing.relevance) unique.set(key, label)
+  }
+  return Array.from(unique.values())
+}
+
+async function storeNormalizedLabels(
+  admin: ReturnType<typeof createSupabaseClient>,
+  postId: string,
+  analysis: ContentAnalysisResult,
+): Promise<string | null> {
+  const labels = buildNormalizedLabels(analysis)
+  if (labels.length === 0) return 'no_normalized_labels'
+
+  const taxonomyRows = labels.map(({ label_type, label_slug, display_name }) => ({
+    label_type,
+    label_slug,
+    display_name,
+    is_active: true,
+    updated_at: new Date().toISOString(),
+  }))
+
+  const { error: taxonomyError } = await admin
+    .from('recommendation_content_taxonomy')
+    .upsert(taxonomyRows, { onConflict: 'label_type,label_slug' })
+  if (taxonomyError) {
+    console.error('SociaLens recommendation taxonomy write failed', taxonomyError.message)
+    return 'taxonomy_write_failed'
+  }
+
+  const { error: deleteError } = await admin
+    .from('post_content_analysis_labels')
+    .delete()
+    .eq('post_id', postId)
+  if (deleteError) {
+    console.error('SociaLens old normalized label cleanup failed', deleteError.message)
+    return 'label_cleanup_failed'
+  }
+
+  const labelRows = labels.map(({ label_type, label_slug, is_primary, relevance }) => ({
+    post_id: postId,
+    label_type,
+    label_slug,
+    is_primary,
+    relevance,
+  }))
+  const { error: labelsError } = await admin
+    .from('post_content_analysis_labels')
+    .insert(labelRows)
+  if (labelsError) {
+    console.error('SociaLens normalized label write failed', labelsError.message)
+    return 'label_write_failed'
+  }
+
+  return null
+}
+
 export async function analyzeAndStorePostContent(
   post: ContentAnalysisPost,
 ): Promise<{ ok: boolean; skipped?: boolean; reason?: string; analysis?: ContentAnalysisResult }> {
@@ -229,6 +338,11 @@ export async function analyzeAndStorePostContent(
   const payload = await response.json()
   const rawText = extractOutputText(payload)
   const analysis = parseAnalysis(rawText, Boolean(media))
+
+  // Persist normalized taxonomy labels before the snapshot row. If any step fails,
+  // no matching fingerprint is committed, so a later retry can repair partial writes.
+  const labelError = await storeNormalizedLabels(admin, post.id, analysis)
+  if (labelError) return { ok: false, reason: labelError }
 
   const { error } = await admin.from('post_content_analysis').upsert({
     post_id: post.id,
