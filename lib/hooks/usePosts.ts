@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { PostWithProfile } from '@/lib/types/database.types'
 import { getViewerContext } from '@/lib/recommendation/viewerContext'
 import { rankFeedPosts } from '@/lib/recommendation/rankFeedPosts'
+import { rankExplorePosts } from '@/lib/recommendation/rankExplorePosts'
 import { rankReels } from '@/lib/recommendation/rankReels'
 
 const FEED_PAGE_SIZE = 10
@@ -155,7 +156,7 @@ export function useExplorePosts(userId?: string) {
       let posts = candidates.slice(0, EXPLORE_PAGE_SIZE)
       try {
         const ctx = await getViewerContext(supabase, userId)
-        posts = rankFeedPosts(candidates, ctx).slice(0, EXPLORE_PAGE_SIZE)
+        posts = rankExplorePosts(candidates, ctx, EXPLORE_PAGE_SIZE)
       } catch (err) {
         // Keep Explore usable if personalization data is temporarily unavailable.
         console.error('Explore post ranking failed, showing recent posts', err)
