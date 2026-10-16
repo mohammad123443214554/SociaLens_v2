@@ -4,8 +4,10 @@ import { PostWithProfile } from '@/lib/types/database.types'
 // Exponential decay - a brand-new post starts at 1.0 and fades toward 0
 // over `halfLifeHours`, so recency matters without a hard cliff.
 export function freshnessScore(createdAt: string, halfLifeHours = 48): number {
-  const ageHours = (Date.now() - new Date(createdAt).getTime()) / 3_600_000
-  return Math.pow(0.5, ageHours / halfLifeHours)
+  const timestamp = new Date(createdAt).getTime()
+  if (!Number.isFinite(timestamp)) return 0
+  const ageHours = Math.max(0, (Date.now() - timestamp) / 3_600_000)
+  return Math.pow(0.5, ageHours / Math.max(halfLifeHours, 1))
 }
 
 // ---- Engagement --------------------------------------------------------
@@ -14,12 +16,16 @@ export function freshnessScore(createdAt: string, halfLifeHours = 48): number {
 // and outweigh a like, which costs nothing. Watch behavior counts too,
 // For video.
 export function engagementScore(post: PostWithProfile): number {
-  const views = Math.max(post.views_count || 0, 1)
-  const likeRate = (post.likes_count || 0) / views
-  const commentRate = (post.comments_count || 0) / views
-  const shareRate = (post.shares_count || 0) / views
+  const views = Math.max(Number(post.views_count) || 0, 0)
+  // Bayesian-style shrinkage: a post with 2 views and 1 like must not
+  // outrank a post with hundreds of views purely because of a tiny sample.
+  const priorImpressions = 50
+  const confidence = views / (views + priorImpressions)
+  const likeRate = ((Number(post.likes_count) || 0) / Math.max(views, 1)) * confidence + 0.02 * (1 - confidence)
+  const commentRate = ((Number(post.comments_count) || 0) / Math.max(views, 1)) * confidence + 0.002 * (1 - confidence)
+  const shareRate = ((Number(post.shares_count) || 0) / Math.max(views, 1)) * confidence + 0.003 * (1 - confidence)
   const savedCount = (post as any).saved_count || 0
-  const saveRate = savedCount / views
+  const saveRate = (savedCount / Math.max(views, 1)) * confidence + 0.004 * (1 - confidence)
 
   const watchSessions = (post as any).watch_sessions || 0
   const avgWatchSeconds = watchSessions > 0 ? ((post as any).total_watch_seconds || 0) / watchSessions : 0
@@ -29,7 +35,7 @@ export function engagementScore(post: PostWithProfile): number {
   // Negative feedback pulls the score down hard - a handful of
   // Not-Interested/skips on a small-reach post should matter a lot more
   // than the same count on something with huge reach.
-  const negativeRate = (((post as any).not_interested_count || 0) * 3 + ((post as any).skip_count || 0)) / views
+  const negativeRate = ((((post as any).not_interested_count || 0) * 3 + ((post as any).skip_count || 0)) / Math.max(views, 1)) * confidence
 
   return (
     likeRate * 1.0 +
@@ -49,8 +55,8 @@ export function engagementScore(post: PostWithProfile): number {
 // a video that's had real exposure (a common bot/spam fingerprint:
 // lots of raw views, ~nobody actually watches).
 export function computeQualityScore(post: PostWithProfile): number {
-  const views = Math.max(post.views_count || 0, 1)
-  const reportRate = (post.report_count || 0) / views
+  const views = Math.max(Number(post.views_count) || 0, 0)
+  const reportRate = ((Number(post.report_count) || 0) / Math.max(views, 1)) * (views / (views + 50))
   const watchSessions = (post as any).watch_sessions || 0
   const completionRate = watchSessions > 5 ? ((post as any).completion_count || 0) / watchSessions : 0.5
 
@@ -99,7 +105,13 @@ export function scorePost(
   weights: ScoreWeights,
   halfLifeHours = 48
 ): number {
-  const quality = (post as any).quality_score ?? computeQualityScore(post)
+  const computedQuality = computeQualityScore(post)
+  const storedQuality = (post as any).quality_score
+  // Treat stored moderation/quality data as a signal, not an unconditional
+  // override: a default 0.5 must not mask fresh watch/report evidence.
+  const quality = typeof storedQuality === 'number'
+    ? Math.max(0, Math.min(1, storedQuality * 0.5 + computedQuality * 0.5))
+    : computedQuality
   return (
     engagementScore(post) * weights.engagement +
     personalizationScore(post, creatorAffinity, hashtagAffinity) * weights.personalization +
@@ -145,11 +157,11 @@ export function pickExplorationSlots<T extends PostWithProfile>(
   const fresh = candidates.filter((p) => !alreadyChosenIds.has(p.id) && (p.views_count || 0) < 20)
   // Newest-first among the low-exposure pool, then a light shuffle so
   // it's not always the exact same handful in the exact same order.
-  const sorted = fresh.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  const pool = sorted.slice(0, count * 4)
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[pool[i], pool[j]] = [pool[j], pool[i]]
-  }
-  return pool.slice(0, count)
+  const sorted = fresh.sort((a, b) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime() ||
+    a.id.localeCompare(b.id)
+  )
+  // Stable candidate ordering avoids a feed jumping around on every refetch.
+  // Rotation can be added later once impressions are recorded reliably.
+  return sorted.slice(0, count)
 }
