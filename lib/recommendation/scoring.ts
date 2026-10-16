@@ -69,7 +69,8 @@ export function computeQualityScore(post: PostWithProfile): number {
 export function personalizationScore(
   post: PostWithProfile,
   creatorAffinity: Map<string, number>,
-  hashtagAffinity: Map<string, number>
+  hashtagAffinity: Map<string, number>,
+  contentAffinity: Map<string, number> = new Map()
 ): number {
   const creatorScore = creatorAffinity.get(post.user_id) ?? 0
   const tags = extractHashtags(post.content)
@@ -78,7 +79,18 @@ export function personalizationScore(
     : 0
   // Squash with tanh so one extreme outlier (e.g. a single mega-share)
   // can't dominate the whole ranking on its own.
-  return Math.tanh(creatorScore / 10) * 3 + Math.tanh(tagScore / 10) * 2
+  const labels = Array.isArray((post as any).recommendation_labels) ? (post as any).recommendation_labels : []
+  const contentScore = labels.length
+    ? labels.reduce((sum: number, label: any) => {
+        const key = `${label.label_type}:${label.label_slug}`
+        const affinity = contentAffinity.get(key) ?? 0
+        const relevance = Math.max(0, Math.min(1, Number(label.relevance) || 0.5))
+        return sum + affinity * relevance
+      }, 0) / labels.length
+    : 0
+  // AI-derived topic/language/region/format preference is the main personal
+  // taste signal, while creator and hashtag affinities remain useful context.
+  return Math.tanh(creatorScore / 10) * 2 + Math.tanh(tagScore / 10) * 1.5 + Math.tanh(contentScore / 6) * 4
 }
 
 export function extractHashtags(content: string | null): string[] {
@@ -103,6 +115,7 @@ export function scorePost(
   creatorAffinity: Map<string, number>,
   hashtagAffinity: Map<string, number>,
   weights: ScoreWeights,
+  contentAffinity: Map<string, number> = new Map(),
   halfLifeHours = 48
 ): number {
   const computedQuality = computeQualityScore(post)
@@ -114,7 +127,7 @@ export function scorePost(
     : computedQuality
   return (
     engagementScore(post) * weights.engagement +
-    personalizationScore(post, creatorAffinity, hashtagAffinity) * weights.personalization +
+    personalizationScore(post, creatorAffinity, hashtagAffinity, contentAffinity) * weights.personalization +
     freshnessScore(post.created_at, halfLifeHours) * weights.freshness +
     quality * weights.quality
   )
