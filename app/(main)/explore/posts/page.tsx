@@ -13,8 +13,11 @@ import { PostCaption } from '@/components/shared/PostCaption'
 import { PostCard } from '@/components/feed/PostCard'
 import { ReelViewer } from '@/components/shared/ReelViewer'
 import { useUser } from '@/lib/hooks/useUser'
+import { getViewerContext } from '@/lib/recommendation/viewerContext'
+import { rankFeedPosts } from '@/lib/recommendation/rankFeedPosts'
 
 const PAGE_SIZE = 12
+const CANDIDATE_WINDOW = PAGE_SIZE * 4
 const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
 
 export default function AllExplorePostsPage() {
@@ -38,11 +41,18 @@ export default function AllExplorePostsPage() {
         if (hiddenIds.length) request = request.not('id', 'in', `(${hiddenIds.join(',')})`)
       }
       if (searchTerm) request = request.ilike('content', `%${searchTerm}%`)
-      request = request.range(pageParam, pageParam + PAGE_SIZE - 1)
+      request = request.range(pageParam, pageParam + CANDIDATE_WINDOW - 1)
       const { data: rows, error } = await request
       if (error) throw error
-      const posts = (rows || []) as PostWithProfile[]
-      return { posts, nextCursor: posts.length === PAGE_SIZE ? pageParam + PAGE_SIZE : null }
+      const candidates = (rows || []) as PostWithProfile[]
+      let posts = candidates.slice(0, PAGE_SIZE)
+      try {
+        const ctx = await getViewerContext(supabase, user?.id)
+        posts = rankFeedPosts(candidates, ctx).slice(0, PAGE_SIZE)
+      } catch (err) {
+        console.error('All Explore Posts ranking failed, showing recent posts', err)
+      }
+      return { posts, nextCursor: candidates.length === CANDIDATE_WINDOW ? pageParam + CANDIDATE_WINDOW : null }
     },
     getNextPageParam: lastPage => lastPage.nextCursor,
     staleTime: 30_000,
