@@ -138,25 +138,33 @@ export function useExplorePosts(userId?: string) {
     queryKey: ['explore-posts', userId],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
-      let request = supabase
+      // Fetch a wider, fresh candidate window, then personalize and rank it.
+      // Pagination advances by the candidate window (not the displayed 15),
+      // so re-ranking never repeats the same candidates across pages.
+      const candidateWindow = EXPLORE_PAGE_SIZE * 4
+      const { data, error } = await supabase
         .from('posts')
         .select(POST_SELECT)
-        .order('likes_count', { ascending: false })
-      if (userId) {
-        const { data: hiddenRows, error: hiddenError } = await supabase
-          .from('post_not_interested').select('post_id').eq('user_id', userId)
-        if (hiddenError) throw hiddenError
-        const hiddenIds = (hiddenRows || []).map(row => row.post_id)
-        if (hiddenIds.length) request = request.not('id', 'in', `(${hiddenIds.join(',')})`)
-      }
-      const { data, error } = await request.range(pageParam, pageParam + EXPLORE_PAGE_SIZE - 1)
+        .not('media_url', 'is', null)
+        .order('created_at', { ascending: false })
+        .range(pageParam, pageParam + candidateWindow - 1)
 
       if (error) throw error
-      const rows = (data ?? []) as PostWithProfile[]
-      const posts = userId ? await fetchPostsWithLikes(rows, userId) : rows
+      let candidates = (data ?? []) as PostWithProfile[]
+      if (userId) candidates = await fetchPostsWithLikes(candidates, userId)
+
+      let posts = candidates.slice(0, EXPLORE_PAGE_SIZE)
+      try {
+        const ctx = await getViewerContext(supabase, userId)
+        posts = rankFeedPosts(candidates, ctx).slice(0, EXPLORE_PAGE_SIZE)
+      } catch (err) {
+        // Keep Explore usable if personalization data is temporarily unavailable.
+        console.error('Explore post ranking failed, showing recent posts', err)
+      }
+
       return {
         posts,
-        nextCursor: rows.length === EXPLORE_PAGE_SIZE ? pageParam + EXPLORE_PAGE_SIZE : null,
+        nextCursor: candidates.length === candidateWindow ? pageParam + candidateWindow : null,
       }
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
