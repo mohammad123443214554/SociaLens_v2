@@ -29,6 +29,25 @@ const PAGE_SIZE = 12
 const CANDIDATE_WINDOW = PAGE_SIZE * 4
 const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
 
+async function attachRecommendationLabels(posts: PostWithProfile[], supabase: ReturnType<typeof createClient>) {
+  if (!posts.length) return posts
+  const { data, error } = await (supabase as any)
+    .from('post_content_analysis_labels')
+    .select('post_id, label_type, label_slug, relevance')
+    .in('post_id', posts.map(post => post.id))
+  if (error) {
+    console.warn('Reel content labels unavailable; using available ranking signals', error.message)
+    return posts
+  }
+  const byPost = new Map<string, any[]>()
+  for (const label of data ?? []) {
+    const list = byPost.get(label.post_id) ?? []
+    list.push(label)
+    byPost.set(label.post_id, list)
+  }
+  return posts.map(post => ({ ...post, recommendation_labels: byPost.get(post.id) ?? [] }))
+}
+
 export default function AllReelsPage() {
   const [query, setQuery] = useState('')
   const [hiddenReelIds, setHiddenReelIds] = useState<string[]>([])
@@ -60,7 +79,8 @@ export default function AllReelsPage() {
       request = request.range(pageParam, pageParam + CANDIDATE_WINDOW - 1)
       const { data: rows, error } = await request
       if (error) throw error
-      const candidates = (rows || []) as PostWithProfile[]
+      let candidates = (rows || []) as PostWithProfile[]
+      candidates = await attachRecommendationLabels(candidates, supabase)
       let reels = candidates.slice(0, PAGE_SIZE)
       try {
         const ctx = await getViewerContext(supabase, user?.id)
@@ -110,7 +130,7 @@ export default function AllReelsPage() {
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
             {reels.map(reel => (
               <article key={reel.id} className="min-w-0 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:rounded-2xl">
-<ReelViewer post={reel} onNotInterested={id => setHiddenReelIds(previous => [...previous, id])} trigger={<button type="button" aria-label={`Play reel by @${reel.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left"><video src={reel.media_url ?? undefined} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" aria-label={`Video by @${reel.profiles?.username ?? 'user'}`} /><span className="pointer-events-none absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-black/65 px-1.5 py-1 text-[9px] font-semibold text-white"><Play className="h-2.5 w-2.5 fill-current" /> Reel</span></button>} />
+<ReelViewer post={reel} onNotInterested={id => setHiddenReelIds(previous => [...previous, id])} trigger={<button type="button" aria-label={`Play reel by @${reel.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left"><video src={reel.media_url ?? undefined} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-contain" aria-label={`Video by @${reel.profiles?.username ?? 'user'}`} /><span className="pointer-events-none absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-black/65 px-1.5 py-1 text-[9px] font-semibold text-white"><Play className="h-2.5 w-2.5 fill-current" /> Reel</span></button>} />
                 <div className="p-2 sm:p-3">
                   <Link href={`/profile/${reel.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{reel.profiles?.username ?? 'user'}</Link>
                   {reel.content?.trim() && <PostCaption content={reel.content} expandMode="dialog" titleClassName="text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}
@@ -127,6 +147,13 @@ export default function AllReelsPage() {
         )}
         <InfiniteScrollSentinel onIntersect={fetchNextPage} hasMore={!!hasNextPage} isLoading={isFetchingNextPage} />
         {isFetchingNextPage && <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>}
+        {hasNextPage && !isFetchingNextPage && !isLoading && (
+          <div className="flex justify-center py-4">
+            <button type="button" onClick={() => fetchNextPage()} className="rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-pink-500/50 hover:text-pink-400">
+              Load more reels
+            </button>
+          </div>
+        )}
       </section>
     </main>
   )
