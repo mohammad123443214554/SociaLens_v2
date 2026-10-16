@@ -161,7 +161,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
     queryKey: ['hashtag-posts', selectedHashtag],
     queryFn: async () => {
       if (!selectedHashtag) return []
-      const { data, error } = await supabase.from('posts').select(POST_SELECT).ilike('content', `%${selectedHashtag}%`).order('likes_count', { ascending: false }).limit(100)
+      const { data, error } = await supabase.from('posts').select(POST_SELECT).ilike('content', `%${selectedHashtag}%`).order('created_at', { ascending: false }).limit(100)
       if (error) throw error
       return (data || []) as PostWithProfile[]
     },
@@ -196,7 +196,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
     queryFn: async () => {
       let request = supabase.from('posts').select(POST_SELECT)
         .neq('media_type', 'video').not('media_url', 'is', null)
-        .order('likes_count', { ascending: false }).order('created_at', { ascending: false })
+        .order('created_at', { ascending: false })
       if (user) {
         const { data: hiddenRows, error: hiddenError } = await supabase.from('post_not_interested').select('post_id').eq('user_id', user.id)
         if (hiddenError) throw hiddenError
