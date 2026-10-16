@@ -12,6 +12,7 @@ import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentin
 import { PostCaption } from '@/components/shared/PostCaption'
 import { PostCard } from '@/components/feed/PostCard'
 import { ReelViewer } from '@/components/shared/ReelViewer'
+import { useUser } from '@/lib/hooks/useUser'
 
 const PAGE_SIZE = 12
 const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
@@ -20,17 +21,24 @@ export default function AllExplorePostsPage() {
   const [query, setQuery] = useState('')
   const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([])
   const supabase = createClient()
+  const { user } = useUser()
   const searchTerm = query.trim()
 
   const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ['all-explore-photo-posts', searchTerm.toLocaleLowerCase()],
+    queryKey: ['all-explore-photo-posts', user?.id, searchTerm.toLocaleLowerCase()],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       let request = supabase.from('posts').select(POST_SELECT)
         .neq('media_type', 'video').not('media_url', 'is', null)
         .order('created_at', { ascending: false })
-        .range(pageParam, pageParam + PAGE_SIZE - 1)
+      if (user) {
+        const { data: hiddenRows, error: hiddenError } = await supabase.from('post_not_interested').select('post_id').eq('user_id', user.id)
+        if (hiddenError) throw hiddenError
+        const hiddenIds = (hiddenRows || []).map(row => row.post_id)
+        if (hiddenIds.length) request = request.not('id', 'in', `(${hiddenIds.join(',')})`)
+      }
       if (searchTerm) request = request.ilike('content', `%${searchTerm}%`)
+      request = request.range(pageParam, pageParam + PAGE_SIZE - 1)
       const { data: rows, error } = await request
       if (error) throw error
       const posts = (rows || []) as PostWithProfile[]
