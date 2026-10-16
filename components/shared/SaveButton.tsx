@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Bookmark, X, FolderPlus, Folder } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
+import { useTrackEvent } from '@/lib/hooks/useTrackEvent'
 import {
   useSavedFolders,
   useSavedPostIds,
@@ -20,6 +21,7 @@ interface SaveButtonProps {
 
 export function SaveButton({ postId, className = '', iconClassName = 'h-5 w-5' }: SaveButtonProps) {
   const { user } = useUser()
+  const track = useTrackEvent()
   const { data: folders = [] } = useSavedFolders(user?.id)
   const { data: savedPosts = [] } = useSavedPostIds(user?.id)
   const savePost = useSavePost()
@@ -47,6 +49,7 @@ export function SaveButton({ postId, className = '', iconClassName = 'h-5 w-5' }
       setShowCreate(true)
     } else if (folders.length === 1) {
       await savePost.mutateAsync({ userId: user.id, postId, folderId: folders[0].id })
+      track({ target_type: 'post', target_id: postId, event_type: 'save' })
     } else {
       setShowChooser(true)
     }
@@ -60,6 +63,7 @@ export function SaveButton({ postId, className = '', iconClassName = 'h-5 w-5' }
     try {
       const folder = await createFolder.mutateAsync({ userId: user.id, name: folderName.trim() })
       await savePost.mutateAsync({ userId: user.id, postId, folderId: folder.id })
+      track({ target_type: 'post', target_id: postId, event_type: 'save' })
       setShowCreate(false)
       setFolderName('')
     } catch (err: any) {
@@ -70,6 +74,7 @@ export function SaveButton({ postId, className = '', iconClassName = 'h-5 w-5' }
   const handleChoose = async (folderId: string) => {
     if (!user) return
     await savePost.mutateAsync({ userId: user.id, postId, folderId })
+    track({ target_type: 'post', target_id: postId, event_type: 'save' })
     setShowChooser(false)
   }
 
