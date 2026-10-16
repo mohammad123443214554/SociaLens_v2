@@ -23,7 +23,7 @@ async function attachRecommendationLabels(posts: PostWithProfile[], userId?: str
   if (!userId || posts.length === 0) return posts
   const supabase = createClient()
   const ids = Array.from(new Set(posts.map(post => post.id)))
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('post_content_analysis_labels')
     .select('post_id, label_type, label_slug, relevance')
     .in('post_id', ids)
