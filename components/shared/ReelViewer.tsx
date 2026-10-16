@@ -141,9 +141,9 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
           <div ref={dialogScrollRef} className="flex min-h-0 flex-col overflow-y-auto">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
               <Link href={`/profile/${post.profiles?.username ?? ''}`} onClick={() => setOpen(false)} className="min-w-0 truncate text-sm font-semibold hover:text-pink-400">@{post.profiles?.username ?? 'user'}</Link>
-              {!isOwner && <div className="mr-8 shrink-0">
+              <div className="mr-8 shrink-0">
                 <button ref={optionsButtonRef} type="button" aria-label="More post options" aria-expanded={showOptions} onClick={() => setShowOptions(value => !value)} className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"><MoreHorizontal className="h-5 w-5" /></button>
-              </div>}
+              </div>
             </div>
             <div className={`flex w-full items-center justify-center ${post.media_type === 'video' ? 'bg-black' : 'bg-background'}`}>
               {post.media_type === 'video' ? (
@@ -170,10 +170,12 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
           </div>
         </DialogContent>
       </Dialog>
-      {portalReady && showOptions && !isOwner && createPortal(
+      {portalReady && showOptions && createPortal(
         <div id={`post-options-${post.id}`} role="menu" aria-label="Post options" style={{ position: 'fixed', top: optionsPosition.top, right: optionsPosition.right }} className="z-[9999] min-w-[180px] overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl">
-          <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setOpen(false); onNotInterested?.(post.id) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><EyeOff className="mr-2 h-4 w-4" />Not interested</button>
-          {user && <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setShowReport(true) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><Flag className="mr-2 h-4 w-4" />Report</button>}
+          {isOwner ? <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setShowShare(true) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><Share2 className="mr-2 h-4 w-4" />Share post</button> : <>
+            <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setOpen(false); onNotInterested?.(post.id) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><EyeOff className="mr-2 h-4 w-4" />Not interested</button>
+            {user && <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setShowReport(true) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><Flag className="mr-2 h-4 w-4" />Report</button>}
+          </>}
         </div>,
         document.body
       )}
