@@ -145,7 +145,6 @@ export function useExplorePosts(userId?: string) {
       const { data, error } = await supabase
         .from('posts')
         .select(POST_SELECT)
-        .not('media_url', 'is', null)
         .order('created_at', { ascending: false })
         .range(pageParam, pageParam + candidateWindow - 1)
 
