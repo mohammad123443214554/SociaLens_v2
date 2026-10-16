@@ -138,11 +138,18 @@ export function useExplorePosts(userId?: string) {
     queryKey: ['explore-posts', userId],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
-      const { data, error } = await supabase
+      let request = supabase
         .from('posts')
         .select(POST_SELECT)
         .order('likes_count', { ascending: false })
-        .range(pageParam, pageParam + EXPLORE_PAGE_SIZE - 1)
+      if (userId) {
+        const { data: hiddenRows, error: hiddenError } = await supabase
+          .from('post_not_interested').select('post_id').eq('user_id', userId)
+        if (hiddenError) throw hiddenError
+        const hiddenIds = (hiddenRows || []).map(row => row.post_id)
+        if (hiddenIds.length) request = request.not('id', 'in', `(${hiddenIds.join(',')})`)
+      }
+      const { data, error } = await request.range(pageParam, pageParam + EXPLORE_PAGE_SIZE - 1)
 
       if (error) throw error
       const rows = (data ?? []) as PostWithProfile[]
@@ -169,7 +176,14 @@ export function useReelsPosts(userId?: string) {
         .select(POST_SELECT)
         .eq('media_type', 'video')
         .order('created_at', { ascending: false })
-        .limit(REELS_CANDIDATE_WINDOW)
+      if (userId) {
+        const { data: hiddenRows, error: hiddenError } = await supabase
+          .from('post_not_interested').select('post_id').eq('user_id', userId)
+        if (hiddenError) throw hiddenError
+        const hiddenIds = (hiddenRows || []).map(row => row.post_id)
+        if (hiddenIds.length) query = query.not('id', 'in', `(${hiddenIds.join(',')})`)
+      }
+      query = query.limit(REELS_CANDIDATE_WINDOW)
       if (pageParam) query = query.lt('created_at', pageParam)
       const { data, error } = await query
 
