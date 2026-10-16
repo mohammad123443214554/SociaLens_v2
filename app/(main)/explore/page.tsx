@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Search, Users, Grid3x3, Hash, X, AlertCircle, Play,
+  Search, Users, UserPlus, Grid3x3, Hash, X, AlertCircle, Play,
   Image as ImageIcon, ArrowUpRight, Heart, MessageCircle,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -131,6 +131,54 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
       }).slice(0, 10)
     },
     enabled: isSearching,
+  })
+
+  const { data: suggestedPeople = [] } = useQuery({
+    queryKey: ['explore-suggested-people', user?.id],
+    enabled: !!user && !query.trim(),
+    staleTime: 60_000,
+    queryFn: async () => {
+      if (!user) return []
+      const [{ data: profiles, error: profilesError }, { data: outgoing, error: outgoingError }, { data: incoming, error: incomingError }, { data: blockRows, error: blocksError }] = await Promise.all([
+        supabase.from('profiles').select('*').neq('id', user.id).eq('search_privacy', 'everyone').limit(100),
+        supabase.from('follows').select('following_id').eq('follower_id', user.id).eq('status', 'accepted'),
+        supabase.from('follows').select('follower_id').eq('following_id', user.id).eq('status', 'accepted'),
+        supabase.from('blocks').select('blocker_id, blocked_id').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`),
+      ])
+      if (profilesError) throw profilesError
+      if (outgoingError) throw outgoingError
+      if (incomingError) throw incomingError
+      if (blocksError) throw blocksError
+
+      const followingIds = (outgoing || []).map(row => row.following_id)
+      const alreadyConnected = new Set([...followingIds, ...(incoming || []).map(row => row.follower_id)])
+      const blockedIds = new Set((blockRows || []).flatMap(row => [row.blocker_id, row.blocked_id]).filter(id => id !== user.id))
+      const candidates = ((profiles || []) as Profile[]).filter(profile =>
+        !alreadyConnected.has(profile.id) && !blockedIds.has(profile.id)
+      )
+      const mutualCounts = new Map<string, number>()
+      if (followingIds.length && candidates.length) {
+        const { data: mutualEdges, error: mutualError } = await supabase
+          .from('follows').select('follower_id, following_id')
+          .in('follower_id', followingIds).eq('status', 'accepted')
+          .in('following_id', candidates.map(profile => profile.id))
+        if (mutualError) throw mutualError
+        for (const edge of mutualEdges || []) {
+          mutualCounts.set(edge.following_id, (mutualCounts.get(edge.following_id) || 0) + 1)
+        }
+      }
+
+      const ctx = await getViewerContext(supabase, user.id)
+      return candidates
+        .map(profile => ({
+          profile,
+          mutualCount: mutualCounts.get(profile.id) || 0,
+          affinity: ctx.creatorAffinity.get(profile.id) || 0,
+        }))
+        .sort((a, b) => (b.mutualCount * 4 + b.affinity) - (a.mutualCount * 4 + a.affinity)
+          || (Number(b.profile.followers_count) || 0) - (Number(a.profile.followers_count) || 0))
+        .slice(0, 8)
+    },
   })
 
   const { data: searchPosts = [] } = useQuery({
@@ -309,6 +357,22 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
         </div>
       ) : (
         <div className="space-y-4 sm:space-y-6">
+          {user && suggestedPeople.length > 0 && (
+            <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
+              <SectionHeading icon={<UserPlus className="h-4 w-4" />} title="People you may know" subtitle="Based on mutual connections and your interests" />
+              <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {suggestedPeople.map(({ profile, mutualCount }) => (
+                  <Link key={profile.id} href={`/profile/${profile.username}`} className="flex w-[150px] shrink-0 flex-col items-center rounded-xl border border-border/70 bg-background/60 p-3 text-center transition-colors hover:border-pink-500/40 hover:bg-pink-500/5 sm:w-[180px] sm:p-4">
+                    <Avatar className="mb-2 h-12 w-12 ring-1 ring-border sm:h-14 sm:w-14"><AvatarImage src={getAvatarUrl(profile.avatar_url)} /><AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-500 font-bold text-white">{profile.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
+                    <p className="flex max-w-full items-center gap-1 truncate text-xs font-semibold sm:text-sm">{profile.username}{profile.is_verified && <VerifiedBadge type={profile.verification_type} className="text-xs" />}</p>
+                    {profile.full_name && <p className="mt-0.5 max-w-full truncate text-[10px] text-muted-foreground sm:text-xs">{profile.full_name}</p>}
+                    <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">{mutualCount > 0 ? `${mutualCount} mutual ${mutualCount === 1 ? 'connection' : 'connections'}` : `${formatCount(profile.followers_count)} followers`}</p>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
           {(true || false) && (
             <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
               <SectionHeading
