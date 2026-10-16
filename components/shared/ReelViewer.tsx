@@ -134,7 +134,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
 
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog modal={false} open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>{trigger}</DialogTrigger>
         <DialogContent className="flex max-h-[94dvh] w-[calc(100%-1rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl border-border/80 bg-background p-0 shadow-2xl sm:max-h-[92vh] sm:w-[calc(100%-2rem)] sm:rounded-2xl">
           <div ref={dialogScrollRef} className="flex min-h-0 flex-col overflow-y-auto">
@@ -178,7 +178,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
         </DialogContent>
       </Dialog>
       {portalReady && showOptions && optionsPosition && createPortal(
-        <div id={`post-options-${post.id}`} role="menu" aria-label="Post options" style={{ position: 'fixed', top: optionsPosition.top, right: optionsPosition.right }} className="z-[9999] min-w-[180px] overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl">
+        <div id={`post-options-${post.id}`} role="menu" aria-label="Post options" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} style={{ position: 'fixed', top: optionsPosition.top, right: optionsPosition.right }} className="z-[9999] min-w-[180px] overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl">
           <button type="button" role="menuitem" onClick={() => { setShowOptions(false); setOpen(false); onNotInterested?.(post.id) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><EyeOff className="mr-2 h-4 w-4" />Not interested</button>
           <button type="button" role="menuitem" onClick={() => { setShowOptions(false); if (user) setShowReport(true) }} className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"><Flag className="mr-2 h-4 w-4" />Report</button>
         </div>,
