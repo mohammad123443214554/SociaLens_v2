@@ -8,11 +8,9 @@ const VALID_EVENT_TYPES = new Set([
 const VALID_TARGET_TYPES = new Set(['post', 'reel', 'story'])
 const MAX_BATCH = 100
 
-// Receives a batch of recommendation-signal events from useTrackEvent and
-// folds them into the ranking aggregates via one database round trip
-// (record_content_events_batch). sendBeacon posts a Blob with no
-// Content-Type header control, so this reads the raw body as text rather
-// than trusting request.json()'s content-type sniffing.
+// Batch incoming behavior signals. Post/reel events go through the trusted
+// personal-taste RPC, which also updates legacy creator/hashtag aggregates.
+// Story events retain the existing event pipeline.
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -24,8 +22,6 @@ export async function POST(request: NextRequest) {
     const events = Array.isArray(body?.events) ? body.events : []
     if (events.length === 0) return NextResponse.json({ ok: true, processed: 0 })
 
-    // Never trust the client for whose event this is, or for anything
-    // outside the known event/target vocab.
     const clean = events
       .filter((e: any) =>
         VALID_EVENT_TYPES.has(e?.event_type) &&
@@ -34,25 +30,46 @@ export async function POST(request: NextRequest) {
       )
       .slice(0, MAX_BATCH)
       .map((e: any) => ({
-        user_id: user.id,
         target_type: e.target_type,
         target_id: e.target_id,
-        creator_id: e.creator_id || null,
         event_type: e.event_type,
-        watch_seconds: typeof e.watch_seconds === 'number' ? e.watch_seconds : null,
-        video_duration: typeof e.video_duration === 'number' ? e.video_duration : null,
+        watch_seconds: typeof e.watch_seconds === 'number' && Number.isFinite(e.watch_seconds) ? Math.max(0, e.watch_seconds) : null,
+        video_duration: typeof e.video_duration === 'number' && Number.isFinite(e.video_duration) ? Math.max(0, e.video_duration) : null,
       }))
 
     if (clean.length === 0) return NextResponse.json({ ok: true, processed: 0 })
 
-    const { error } = await supabase.rpc('record_content_events_batch', { p_events: clean })
-    if (error) throw error
+    const contentEvents = clean.filter((event: any) => event.target_type === 'post' || event.target_type === 'reel')
+    const storyEvents = clean.filter((event: any) => event.target_type === 'story')
+    let processed = 0
 
-    return NextResponse.json({ ok: true, processed: clean.length })
+    if (contentEvents.length > 0) {
+      const { data, error } = await supabase.rpc('record_personal_taste_events_batch', {
+        p_events: contentEvents,
+      })
+      if (error) throw error
+      processed += Number(data) || 0
+    }
+
+    if (storyEvents.length > 0) {
+      const legacyStoryEvents = storyEvents.map((event: any) => ({
+        user_id: user.id,
+        target_type: event.target_type,
+        target_id: event.target_id,
+        creator_id: null,
+        event_type: event.event_type,
+        watch_seconds: event.watch_seconds,
+        video_duration: event.video_duration,
+      }))
+      const { error } = await supabase.rpc('record_content_events_batch', { p_events: legacyStoryEvents })
+      if (error) throw error
+      processed += storyEvents.length
+    }
+
+    return NextResponse.json({ ok: true, processed })
   } catch (err) {
-    // Best-effort telemetry - never let a broken batch surface as a user-
-    // facing error (a like/save/share elsewhere already has its own
-    // direct write; this is only the ranking signal on top of that).
+    // Telemetry is best-effort; don't surface signal-collection failures as
+    // user-facing errors for likes, comments, or playback.
     console.error('event track error', err)
     return NextResponse.json({ ok: false }, { status: 200 })
   }
