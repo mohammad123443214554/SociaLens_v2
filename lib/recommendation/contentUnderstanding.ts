@@ -244,7 +244,7 @@ async function storeNormalizedLabels(
     updated_at: new Date().toISOString(),
   }))
 
-  const { error: taxonomyError } = await admin
+  const { error: taxonomyError } = await (admin as any)
     .from('recommendation_content_taxonomy')
     .upsert(taxonomyRows, { onConflict: 'label_type,label_slug' })
   if (taxonomyError) {
@@ -252,7 +252,7 @@ async function storeNormalizedLabels(
     return 'taxonomy_write_failed'
   }
 
-  const { error: deleteError } = await admin
+  const { error: deleteError } = await (admin as any)
     .from('post_content_analysis_labels')
     .delete()
     .eq('post_id', postId)
@@ -268,7 +268,7 @@ async function storeNormalizedLabels(
     is_primary,
     relevance,
   }))
-  const { error: labelsError } = await admin
+  const { error: labelsError } = await (admin as any)
     .from('post_content_analysis_labels')
     .insert(labelRows)
   if (labelsError) {
