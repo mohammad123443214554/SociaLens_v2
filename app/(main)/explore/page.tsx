@@ -22,6 +22,9 @@ import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
 import { PostCaption } from '@/components/shared/PostCaption'
 import { ReelViewer } from '@/components/shared/ReelViewer'
+import { getViewerContext } from '@/lib/recommendation/viewerContext'
+import { rankFeedPosts } from '@/lib/recommendation/rankFeedPosts'
+import { rankReels } from '@/lib/recommendation/rankReels'
 
 type Tab = 'all' | 'profiles' | 'posts' | 'hashtags'
 const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
@@ -200,9 +203,16 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
         const hiddenIds = (hiddenRows || []).map(row => row.post_id)
         if (hiddenIds.length) request = request.not('id', 'in', `(${hiddenIds.join(',')})`)
       }
-      const { data, error } = await request.limit(30)
+      const { data, error } = await request.limit(100)
       if (error) throw error
-      return (data || []) as PostWithProfile[]
+      const candidates = (data || []) as PostWithProfile[]
+      try {
+        const ctx = await getViewerContext(supabase, user?.id)
+        return rankFeedPosts(candidates, ctx).slice(0, 10)
+      } catch (err) {
+        console.error('Explore photo ranking failed, showing recent candidates', err)
+        return candidates.slice(0, 10)
+      }
     },
     staleTime: 60_000,
   })
@@ -220,10 +230,14 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
       }
       const { data, error } = await request.limit(100)
       if (error) throw error
-      return ((data || []) as PostWithProfile[])
-        .sort((a, b) => ((Number(b.likes_count) || 0) + (Number(b.comments_count) || 0) + (Number(b.views_count) || 0)) -
-          ((Number(a.likes_count) || 0) + (Number(a.comments_count) || 0) + (Number(a.views_count) || 0)))
-        .slice(0, 10)
+      const candidates = (data || []) as PostWithProfile[]
+      try {
+        const ctx = await getViewerContext(supabase, user?.id)
+        return rankReels(candidates, ctx, 10).slice(0, 10)
+      } catch (err) {
+        console.error('Explore reel ranking failed, showing recent candidates', err)
+        return candidates.slice(0, 10)
+      }
     },
     staleTime: 60_000,
   })
