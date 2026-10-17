@@ -19,7 +19,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, reason: 'content_analysis_not_configured' }, { status: 503 })
   }
 
-  let interactionId: string | undefined\n  try {\n    const body = await request.json()\n    if (typeof body?.interactionId === 'string' && /^v1_[A-Za-z0-9_-]+$/.test(body.interactionId)) {\n      interactionId = body.interactionId\n    }\n  } catch {\n    // Initial request has no body; start a new background interaction.\n  }\n\n  const admin = createSupabaseClient(url, serviceRoleKey, {
+  let interactionId: string | undefined
+  try {
+    const body = await request.json()
+    if (typeof body?.interactionId === 'string' && /^v1_[A-Za-z0-9_-]+$/.test(body.interactionId)) {
+      interactionId = body.interactionId
+    }
+  } catch {
+    // Initial request has no body; start a new background interaction.
+  }
+
+  const admin = createSupabaseClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
