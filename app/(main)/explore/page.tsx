@@ -217,7 +217,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
     queryKey: ['hashtag-posts', selectedHashtag, user?.id],
     queryFn: async () => {
       if (!selectedHashtag) return []
-      const { data, error } = await supabase.from('posts').select(POST_SELECT).ilike('content', `%${selectedHashtag}%`).order('created_at', { ascending: false }).limit(100)
+      const { data, error } = await supabase.from('posts').select(POST_SELECT).ilike('content', `%${selectedHashtag}%`).not('media_url', 'is', null).order('created_at', { ascending: false }).limit(100)
       if (error) throw error
       let candidates = (data || []) as PostWithProfile[]
       candidates = await attachRecommendationLabels(candidates, user?.id)
@@ -313,7 +313,6 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
 
   if (selectedHashtag) {
     const hashtagMediaPosts = hashtagPosts.filter(post => Boolean(post.media_url))
-    const hashtagTextPosts = hashtagPosts.filter(post => !post.media_url)
     return (
       <main className="mx-auto w-full max-w-6xl px-3 pb-24 pt-4 sm:px-5 sm:pt-7">
         <Link href="/explore" onClick={() => setSelectedHashtag(null)} className="mb-4 inline-flex items-center gap-2 rounded-full border border-border/80 bg-card/70 px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-pink-500/40 hover:text-pink-400 sm:mb-5 sm:text-sm">
@@ -330,7 +329,6 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
         ) : (
           <div className="space-y-6">
             {hashtagMediaPosts.length > 0 && <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{hashtagMediaPosts.map(post => <article key={post.id} className="min-w-0 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:rounded-2xl"><ReelViewer post={post} trigger={<button type="button" aria-label={`Open ${post.media_type === 'video' ? 'reel' : 'post'} by @${post.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-muted text-left">{post.media_type === 'video' ? <video src={post.media_url ?? undefined} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" /> : <img src={post.media_url!} alt="" loading="lazy" className="h-full w-full object-cover" />}</button>} /><div className="p-2 sm:p-3"><Link href={`/profile/${post.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{post.profiles?.username ?? 'user'}</Link>{post.content?.trim() && <PostCaption content={post.content} expandMode="dialog" titleClassName="line-clamp-2 text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}</div></article>)}</div>}
-            {hashtagTextPosts.length > 0 && <div className="space-y-4">{hashtagTextPosts.map(post => <PostCard key={post.id} post={post} />)}</div>}
           </div>
         )}
       </main>
