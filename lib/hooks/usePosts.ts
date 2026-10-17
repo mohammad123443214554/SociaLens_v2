@@ -135,6 +135,10 @@ export function useFeedPosts(userId?: string) {
         }
       }
 
+      // Attach trusted AI content labels before ranking so Home learns from
+      // the same durable topic/language/format preferences as Reels.
+      merged = await attachRecommendationLabels(merged, userId)
+
       const gotFullPage = ownPosts.length === FEED_PAGE_SIZE || repostedWithLikes.length === FEED_PAGE_SIZE
       const oldest = merged.length > 0 ? merged[merged.length - 1].created_at : null
 
