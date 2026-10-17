@@ -245,7 +245,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
                   const rect = optionsButtonRef.current?.getBoundingClientRect()
                   if (rect) setOptionsPosition({ top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) })
                   setShowOptions(true)
-                }} className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"><MoreHorizontal className="h-5 w-5" /></button>
+                }} className="flex h-8 w-8 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition-colors hover:text-white/80"><MoreHorizontal className="h-5 w-5" /></button>
               </div>
             </div>
             <div className={`flex w-full items-center justify-center ${post.media_type === 'video' ? 'bg-black' : 'bg-background'}`}>
@@ -262,12 +262,12 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
             <div className="shrink-0 px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <div className="flex min-w-0 flex-1 items-center justify-start gap-3 sm:gap-4">
-                  <button type="button" onClick={handleLike} aria-label={`Like ${mediaLabel}`} className="flex flex-col items-center justify-center gap-1 text-foreground transition-colors hover:text-foreground/80"><span className="flex h-8 w-8 items-center justify-center"><Heart className={`h-[19px] w-[19px] ${liked ? 'fill-red-500 text-red-500' : ''}`} /></span><span className="whitespace-nowrap text-[10px] leading-none text-muted-foreground">{formatCount(likesCount)} {likesCount === 1 ? 'like' : 'likes'}</span></button>
-                  <button type="button" onClick={() => setShowComments(true)} aria-label="Comments" className="flex flex-col items-center justify-center gap-1 text-foreground transition-colors hover:text-foreground/80"><span className={`flex h-8 w-8 items-center justify-center ${showComments ? 'text-pink-500' : ''}`}><MessageCircle className="h-[19px] w-[19px]" /></span><span className="text-[10px] leading-none text-muted-foreground">Comment</span></button>
-                  <button type="button" onClick={() => { setShowShare(true); track({ target_type: post.media_type === 'video' ? 'reel' : 'post', target_id: post.id, creator_id: post.user_id, event_type: 'share' }) }} aria-label={`Share ${mediaLabel}`} className="flex flex-col items-center justify-center gap-1 text-foreground transition-colors hover:text-foreground/80"><span className="flex h-8 w-8 items-center justify-center"><Share2 className="h-[19px] w-[19px]" /></span><span className="text-[10px] leading-none text-muted-foreground">Share</span></button>
+                  <button type="button" onClick={handleLike} aria-label={`Like ${mediaLabel}`} className="flex flex-col items-center gap-0.5"><div className={`p-1.5 rounded-full backdrop-blur-sm ${liked ? 'bg-red-500/20' : 'bg-black/30'}`}><Heart className={`h-5 w-5 ${liked ? 'fill-red-500 text-red-500' : 'text-white'}`} /></div><span className="text-white text-[10px] font-semibold drop-shadow">{formatCount(likesCount)}</span></button>
+                  <button type="button" onClick={() => setShowComments(true)} aria-label="Comments" className="flex flex-col items-center gap-0.5"><div className="p-1.5 rounded-full bg-black/30 backdrop-blur-sm"><MessageCircle className="h-5 w-5 text-white" /></div><span className="text-white text-[10px] font-semibold drop-shadow">{formatCount(post.comments_count)}</span></button>
+                  <button type="button" onClick={() => { setShowShare(true); track({ target_type: post.media_type === 'video' ? 'reel' : 'post', target_id: post.id, creator_id: post.user_id, event_type: 'share' }) }} aria-label={`Share ${mediaLabel}`} className="flex flex-col items-center gap-0.5"><div className="p-1.5 rounded-full bg-black/30 backdrop-blur-sm"><Share2 className="h-5 w-5 text-white" /></div><span className="text-white text-[10px] font-semibold drop-shadow">Share</span></button>
                   <button type="button" onClick={handleRepost} disabled={!user || toggleRepost.isPending} aria-label="Repost" className="flex flex-col items-center justify-center gap-0.5 disabled:cursor-not-allowed"><div className={`p-1.5 rounded-full backdrop-blur-sm ${isReposted ? 'bg-green-500/20' : 'bg-black/30'}`}><Repeat2 className={`h-5 w-5 ${isReposted ? 'text-green-500 animate-repost-spin' : 'text-white'}`} /></div><span className="text-white text-[10px] font-semibold drop-shadow">Repost</span></button>
                 </div>
-                <SaveButton postId={post.id} className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center text-foreground transition-colors hover:text-foreground/80" iconClassName="h-[19px] w-[19px]" />
+                <SaveButton postId={post.id} className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center p-1.5 rounded-full bg-black/30 backdrop-blur-sm" iconClassName="h-5 w-5 text-white" />
               </div>
             </div>
           </div>
