@@ -28,6 +28,11 @@ export default function ReelsPage() {
         const result = await response.json()
         if (cancelled) return
         if (!response.ok || result?.ok !== true) {
+          if (result?.retryable && Number.isFinite(result.retryAfterMs)) {
+            console.warn('Gemini analysis temporarily unavailable; retrying after backoff', result.reason)
+            pauseTimer = setTimeout(() => { void processNext() }, Math.max(15_000, Math.min(120_000, result.retryAfterMs)))
+            return
+          }
           console.warn('Reel recommendation backfill stopped', result?.reason || response.status)
           return
         }
