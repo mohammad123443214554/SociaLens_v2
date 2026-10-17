@@ -9,9 +9,10 @@ interface FollowButtonProps {
   targetUsername: string
   isPrivate: boolean
   currentUserId?: string
+  className?: string
 }
 
-export function FollowButton({ targetUserId, targetUsername, isPrivate, currentUserId }: FollowButtonProps) {
+export function FollowButton({ targetUserId, targetUsername, isPrivate, currentUserId, className }: FollowButtonProps) {
   const { data: followStatus } = useFollowStatus(currentUserId, targetUserId)
   const followUser = useFollowUser()
   const unfollowUser = useUnfollowUser()
@@ -61,7 +62,7 @@ export function FollowButton({ targetUserId, targetUsername, isPrivate, currentU
       onClick={handleFollow}
       disabled={followUser.isPending || unfollowUser.isPending || isFollowingProtected}
       title={isFollowingProtected ? "You can't unfollow this account" : undefined}
-      className={label === 'Follow' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:opacity-90 border-0' : ''}
+      className={`${label === 'Follow' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:opacity-90 border-0' : ''} ${className ?? ''}`}
     >
       {label}
     </Button>
