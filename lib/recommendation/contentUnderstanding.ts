@@ -332,7 +332,7 @@ export async function analyzeAndStorePostContent(
     'Allowed broad topics include comedy, memes, relationships, lifestyle, gaming, sports, cricket, education, technology, business, news, entertainment, music, dance, fashion, beauty, fitness, food, travel, pets, art, politics, religion, health, other.',
     'format_labels should describe the format such as funny-skit, relatable-meme, reaction, tutorial, vlog, dance, music-performance, gameplay, interview, news-clip, promotional, educational, cinematic, other.',
     'cultural_regions should contain only clearly supported contexts such as india, south-asia, north-america, latin-america, middle-east, east-asia, europe, global. Do not guess based only on language.',
-    'Return only valid JSON with this exact shape: {"primary_topic":"string","topic_labels":["string"],"language_code":"string","language_name":"string","cultural_regions":["string"],"format_labels":["string"],"content_summary":"short neutral summary","confidence":0.0}. confidence must be between 0 and 1.',
+    'Return only a JSON object matching the response schema. confidence must be between 0 and 1.',
     'Caption and hashtags:',
     (post.content || '').slice(0, 4000) || '(no caption)',
     'Declared media type:',
@@ -341,7 +341,7 @@ export async function analyzeAndStorePostContent(
 
   const input: Array<Record<string, unknown>> = [{ type: 'text', text: prompt }]
   if (media?.type === 'image') input.push({ type: 'image', data: media.data, mime_type: media.mime_type })
-  if (media?.type === 'video') input.push({ type: 'video', uri: media.uri, mime_type: media.mime_type })
+  if (media?.type === 'video') input.push({ type: 'video', uri: media.uri, mime_type: media.mime_type, processing: { type: 'static', fps: 1 } })
 
   const endpoint = interactionId
     ? `https://generativelanguage.googleapis.com/v1beta/interactions/${encodeURIComponent(interactionId)}`
@@ -353,7 +353,7 @@ export async function analyzeAndStorePostContent(
       'x-goog-api-key': apiKey,
       'Api-Revision': '2026-05-20',
     },
-    ...(interactionId ? {} : { body: JSON.stringify({ model, input, background: true }) }),
+    ...(interactionId ? {} : { body: JSON.stringify({ model, input, background: true, response_format: { type: 'text', mime_type: 'application/json', schema: { type: 'object', properties: { primary_topic: { type: 'string' }, topic_labels: { type: 'array', items: { type: 'string' } }, language_code: { type: 'string' }, language_name: { type: 'string' }, cultural_regions: { type: 'array', items: { type: 'string' } }, format_labels: { type: 'array', items: { type: 'string' } }, content_summary: { type: 'string' }, confidence: { type: 'number' } }, required: ['primary_topic', 'topic_labels', 'language_code', 'language_name', 'cultural_regions', 'format_labels', 'content_summary', 'confidence'], additionalProperties: false } } }) }),
     signal: AbortSignal.timeout(12_000),
   })
 
