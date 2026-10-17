@@ -276,6 +276,7 @@ async function storeNormalizedLabels(
 
 export async function analyzeAndStorePostContent(
   post: ContentAnalysisPost,
+  interactionId?: string,
 ): Promise<{ ok: boolean; skipped?: boolean; pending?: boolean; interactionId?: string; reason?: string; analysis?: ContentAnalysisResult }> {
   const apiKey = process.env.SOCIALENS_ALGORITHM_GEMINI_API_KEY
   const model = process.env.SOCIALENS_ALGORITHM_GEMINI_MODEL || DEFAULT_MODEL
@@ -315,14 +316,17 @@ export async function analyzeAndStorePostContent(
   if (media?.type === 'image') input.push({ type: 'image', data: media.data, mime_type: media.mime_type })
   if (media?.type === 'video') input.push({ type: 'video', uri: media.uri, mime_type: media.mime_type })
 
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
-    method: 'POST',
+  const endpoint = interactionId
+    ? `https://generativelanguage.googleapis.com/v1beta/interactions/${encodeURIComponent(interactionId)}`
+    : 'https://generativelanguage.googleapis.com/v1beta/interactions'
+  const response = await fetch(endpoint, {
+    method: interactionId ? 'GET' : 'POST',
     headers: {
       'content-type': 'application/json',
       'x-goog-api-key': apiKey,
       'Api-Revision': '2026-05-20',
     },
-    body: JSON.stringify({ model, input, background: true }),
+    ...(interactionId ? {} : { body: JSON.stringify({ model, input, background: true }) }),
     signal: AbortSignal.timeout(12_000),
   })
 
@@ -333,8 +337,10 @@ export async function analyzeAndStorePostContent(
   }
 
   const payload = await response.json()
-  // Background interactions return quickly. The client polls the interaction
-  // separately so video processing cannot exceed Vercel's function time limit.
+  if (payload?.status === 'failed' || payload?.status === 'cancelled') {
+    console.error('SociaLens background content analysis ended unsuccessfully', payload?.status, payload?.error)
+    return { ok: false, reason: 'gemini_background_failed' }
+  }
   if (payload?.id && payload?.status !== 'completed') {
     return { ok: false, pending: true, interactionId: String(payload.id) }
   }
