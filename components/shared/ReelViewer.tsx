@@ -232,7 +232,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
     <>
       <Dialog modal={false} open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>{trigger}</DialogTrigger>
-        <DialogContent className="flex max-h-[94dvh] w-[calc(100%-1rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl border-border/80 bg-background p-0 shadow-2xl sm:max-h-[92vh] sm:w-[calc(100%-2rem)] sm:rounded-2xl">
+        <DialogContent onInteractOutside={(event) => event.preventDefault()} onEscapeKeyDown={(event) => event.preventDefault()} className="flex max-h-[94dvh] w-[calc(100%-1rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl border-border/80 bg-background p-0 shadow-2xl sm:max-h-[92vh] sm:w-[calc(100%-2rem)] sm:rounded-2xl">
           <div ref={dialogScrollRef} className="flex min-h-0 flex-col overflow-y-auto">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
               <Link href={`/profile/${post.profiles?.username ?? ''}`} onClick={() => setOpen(false)} className="min-w-0 truncate text-sm font-semibold hover:text-pink-400">@{post.profiles?.username ?? 'user'}</Link>
