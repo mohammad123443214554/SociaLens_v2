@@ -19,6 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl, formatCount, cn } from '@/lib/utils/helpers'
 import { Profile, PostWithProfile } from '@/lib/types/database.types'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
+import { FollowButton } from '@/components/profile/FollowButton'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
 import { PostCaption } from '@/components/shared/PostCaption'
 import { ReelViewer } from '@/components/shared/ReelViewer'
@@ -361,15 +362,24 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
         <div className="space-y-4 sm:space-y-6">
           {user && suggestedPeople.length > 0 && (
             <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
-              <SectionHeading icon={<UserPlus className="h-4 w-4" />} title="People you may know" subtitle="Based on mutual connections and your interests" />
-              <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {suggestedPeople.map(({ profile, mutualCount }) => (
-                  <Link key={profile.id} href={`/profile/${profile.username}`} className="flex w-[150px] shrink-0 flex-col items-center rounded-xl border border-border/70 bg-background/60 p-3 text-center transition-colors hover:border-pink-500/40 hover:bg-pink-500/5 sm:w-[180px] sm:p-4">
-                    <Avatar className="mb-2 h-12 w-12 ring-1 ring-border sm:h-14 sm:w-14"><AvatarImage src={getAvatarUrl(profile.avatar_url)} /><AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-500 font-bold text-white">{profile.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
-                    <p className="flex max-w-full items-center gap-1 truncate text-xs font-semibold sm:text-sm">{profile.username}{profile.is_verified && <VerifiedBadge type={profile.verification_type} className="text-xs" />}</p>
-                    {profile.full_name && <p className="mt-0.5 max-w-full truncate text-[10px] text-muted-foreground sm:text-xs">{profile.full_name}</p>}
-                    <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">{mutualCount > 0 ? `${mutualCount} mutual ${mutualCount === 1 ? 'connection' : 'connections'}` : `${formatCount(profile.followers_count)} followers`}</p>
-                  </Link>
+              <SectionHeading icon={<UserPlus className="h-4 w-4" />} title="Suggested People" />
+              <div className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {suggestedPeople.map(({ profile }) => (
+                  <article key={profile.id} className="flex w-[172px] shrink-0 flex-col items-center rounded-xl border border-border/70 bg-background/60 p-3 text-center transition-colors hover:border-pink-500/40 sm:w-[200px] sm:p-4">
+                    <Link href={`/profile/${profile.username}`} aria-label={`Open @${profile.username}'s profile`} className="flex w-full flex-col items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-pink-500">
+                      <Avatar className="mb-2 h-12 w-12 ring-1 ring-border sm:h-14 sm:w-14"><AvatarImage src={getAvatarUrl(profile.avatar_url)} /><AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-500 font-bold text-white">{profile.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
+                      <p className="flex max-w-full items-center gap-1 truncate text-xs font-semibold sm:text-sm">{profile.username}{profile.is_verified && <VerifiedBadge type={profile.verification_type} className="text-xs" />}</p>
+                      {profile.full_name && <p className="mt-0.5 max-w-full truncate text-[10px] text-muted-foreground sm:text-xs">{profile.full_name}</p>}
+                    </Link>
+                    <div className="mt-2 grid w-full grid-cols-2 gap-1 text-[10px] text-muted-foreground sm:text-xs">
+                      <span>{formatCount(profile.followers_count)} followers</span>
+                      <span>{formatCount(profile.following_count)} following</span>
+                    </div>
+                    {profile.bio && <p className="mt-2 line-clamp-2 w-full text-left text-[11px] leading-relaxed text-muted-foreground sm:text-xs">{profile.bio}</p>}
+                    <div className="mt-auto w-full pt-3">
+                      <FollowButton targetUserId={profile.id} targetUsername={profile.username} isPrivate={Boolean(profile.is_private)} currentUserId={user.id} />
+                    </div>
+                  </article>
                 ))}
               </div>
             </section>
