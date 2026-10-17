@@ -4,7 +4,8 @@ import { diversify, pickExplorationSlots } from './scoring'
 import { rankFeedPosts } from './rankFeedPosts'
 import { dedupeById } from '@/lib/utils/adInsertion'
 
-const EXPLORE_DISCOVERY_RATIO = 0.2
+// Keep some room for discovery, while letting recent interests guide most slots.
+const EXPLORE_DISCOVERY_RATIO = 0.1
 
 /**
  * Explore ranking balances known interests with discovery.
