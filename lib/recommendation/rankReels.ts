@@ -1,5 +1,6 @@
 import { PostWithProfile } from '@/lib/types/database.types'
 import { ViewerContext } from './viewerContext'
+import { dedupeById } from '@/lib/utils/adInsertion'
 import { scorePost, diversify, pickExplorationSlots, REELS_WEIGHTS } from './scoring'
 
 const HARD_HIDE_REPORT_COUNT = 8 // heavily-reported content is hidden pending moderation, regardless of score
@@ -12,7 +13,7 @@ const EXPLORATION_RATIO = 0.2 // ~1 in 5 slots reserved for fair discovery of ne
  * Personalization -> Ranking -> Freshness/Exploration -> Diversity.
  */
 export function rankReels(candidates: PostWithProfile[], ctx: ViewerContext, pageSize: number): PostWithProfile[] {
-  const safe = candidates.filter((p) =>
+  const safe = dedupeById(candidates).filter((p) =>
     !ctx.blockedUserIds.has(p.user_id) &&
     !ctx.notInterestedPostIds.has(p.id) &&
     ((p as any).report_count || 0) < HARD_HIDE_REPORT_COUNT
