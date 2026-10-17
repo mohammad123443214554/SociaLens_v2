@@ -93,7 +93,7 @@ export default function ExploreHashtagsPage() {
         ) : filteredHashtags.length ? (
           <div className="divide-y divide-border/60">
             {filteredHashtags.map(item => <div key={item.tag.toLocaleLowerCase()} className="flex min-w-0 items-center justify-between gap-3 px-3 py-3 sm:gap-4 sm:px-5 sm:py-3.5">
-              <span className="min-w-0 truncate text-xs font-semibold text-pink-400 sm:text-sm">{item.tag}</span>
+              <Link href={`/explore?hashtag=${encodeURIComponent(item.tag)}`} className="min-w-0 truncate text-xs font-semibold text-pink-400 transition-colors hover:text-fuchsia-400 hover:underline sm:text-sm">{item.tag}</Link>
               <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground sm:text-xs">{formatCount(item.views)} views</span>
             </div>)}
           </div>
