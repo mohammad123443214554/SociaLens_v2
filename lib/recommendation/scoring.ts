@@ -108,7 +108,8 @@ export interface ScoreWeights {
 }
 
 export const REELS_WEIGHTS: ScoreWeights = { engagement: 1.0, personalization: 1.4, freshness: 0.8, quality: 1.2 }
-export const FEED_WEIGHTS: ScoreWeights = { engagement: 1.2, personalization: 1.0, freshness: 1.3, quality: 1.0 }
+// Home and Explore should learn from the same content-taste signals as Reels.
+export const FEED_WEIGHTS: ScoreWeights = { engagement: 1.2, personalization: 1.4, freshness: 1.3, quality: 1.0 }
 
 export function scorePost(
   post: PostWithProfile,
