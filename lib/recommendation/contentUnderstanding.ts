@@ -125,7 +125,7 @@ function extractOutputText(payload: any): string {
       if (typeof item?.text === 'string') collected.push(item.text)
     }
   }
-  return collected.join('\\n').trim()
+  return collected.join('\n').trim()
 }
 
 function cleanStringArray(value: unknown, limit = 5): string[] {
