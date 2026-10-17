@@ -12,7 +12,7 @@ import { PostCard } from '@/components/feed/PostCard'
 import { PostSkeleton } from '@/components/feed/PostSkeleton'
 import { AdPostSlot } from '@/components/ads/AdPostSlot'
 import { interleaveAds, dedupeById } from '@/lib/utils/adInsertion'
-import { useExplorePosts } from '@/lib/hooks/usePosts'
+import { useExplorePosts, attachRecommendationLabels } from '@/lib/hooks/usePosts'
 import { useUser } from '@/lib/hooks/useUser'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -253,7 +253,8 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
       }
       const { data, error } = await request.limit(100)
       if (error) throw error
-      const candidates = (data || []) as PostWithProfile[]
+      let candidates = (data || []) as PostWithProfile[]
+      candidates = await attachRecommendationLabels(candidates, user?.id)
       try {
         const ctx = await getViewerContext(supabase, user?.id)
         return rankExplorePosts(candidates, ctx, 10)
@@ -278,7 +279,8 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
       }
       const { data, error } = await request.limit(100)
       if (error) throw error
-      const candidates = (data || []) as PostWithProfile[]
+      let candidates = (data || []) as PostWithProfile[]
+      candidates = await attachRecommendationLabels(candidates, user?.id)
       try {
         const ctx = await getViewerContext(supabase, user?.id)
         return rankReels(candidates, ctx, 10).slice(0, 10)
