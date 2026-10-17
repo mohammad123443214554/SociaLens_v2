@@ -66,7 +66,7 @@ export default function AllExplorePostsPage() {
         <ArrowLeft className="h-3.5 w-3.5" /> Back to Explore
       </Link>
 
-      <header className="mb-4 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-pink-500/10 via-card/70 to-purple-500/10 p-3.5 sm:mb-6 sm:rounded-3xl sm:p-7">
+      <header className="mb-4 px-1 py-1 sm:mb-6 sm:px-2 sm:py-2">
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400 sm:h-12 sm:w-12 sm:rounded-2xl"><Grid3x3 className="h-5 w-5 sm:h-6 sm:w-6" /></div>
           <div className="min-w-0 flex-1">
