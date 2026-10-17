@@ -8,7 +8,7 @@ export const maxDuration = 60
 
 // Process exactly one unanalysed video per request. Concurrent Gemini calls
 // were exceeding the free-tier requests-per-minute quota.
-export async function POST() {
+export async function POST(request: Request) {
   const sessionClient = await createClient()
   const { data: { user } } = await sessionClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -19,7 +19,7 @@ export async function POST() {
     return NextResponse.json({ ok: false, reason: 'content_analysis_not_configured' }, { status: 503 })
   }
 
-  const admin = createSupabaseClient(url, serviceRoleKey, {
+  let interactionId: string | undefined\n  try {\n    const body = await request.json()\n    if (typeof body?.interactionId === 'string' && /^v1_[A-Za-z0-9_-]+$/.test(body.interactionId)) {\n      interactionId = body.interactionId\n    }\n  } catch {\n    // Initial request has no body; start a new background interaction.\n  }\n\n  const admin = createSupabaseClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
@@ -54,7 +54,7 @@ export async function POST() {
   const post = missing[0]
   let result: Awaited<ReturnType<typeof analyzeAndStorePostContent>>
   try {
-    result = await analyzeAndStorePostContent(post)
+    result = await analyzeAndStorePostContent(post, interactionId)
   } catch (error) {
     console.error('Recommendation backfill analysis failed', post.id, error)
     return NextResponse.json({ ok: false, processed: 0, failed: 1, remaining: missing.length, reason: 'analysis_failed' }, { status: 502 })
