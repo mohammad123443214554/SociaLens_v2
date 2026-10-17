@@ -21,14 +21,21 @@ export default function ReelsPage() {
     const processNext = async (interactionId?: string) => {
       if (cancelled) return
       try {
-        const response = await fetch('/api/recommendation/backfill-content', {\n          method: 'POST',\n          ...(interactionId ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ interactionId }) } : {}),\n        })
+        const response = await fetch('/api/recommendation/backfill-content', {
+          method: 'POST',
+          ...(interactionId ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ interactionId }) } : {}),
+        })
         const result = await response.json()
         if (cancelled) return
         if (!response.ok || result?.ok !== true) {
           console.warn('Reel recommendation backfill stopped', result?.reason || response.status)
           return
         }
-        if (result.pending && result.interactionId) {\n          pauseTimer = setTimeout(() => { void processNext(result.interactionId) }, 4_000)\n          return\n        }\n        if (result.processed > 0) {
+        if (result.pending && result.interactionId) {
+          pauseTimer = setTimeout(() => { void processNext(result.interactionId) }, 4_000)
+          return
+        }
+        if (result.processed > 0) {
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ['reels-posts', user.id] }),
             queryClient.invalidateQueries({ queryKey: ['all-explore-reels', user.id] }),
