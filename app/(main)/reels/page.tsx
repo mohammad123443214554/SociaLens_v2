@@ -18,24 +18,24 @@ export default function ReelsPage() {
     let cancelled = false
     let pauseTimer: ReturnType<typeof setTimeout> | undefined
 
-    const processNext = async () => {
+    const processNext = async (interactionId?: string) => {
       if (cancelled) return
       try {
-        const response = await fetch('/api/recommendation/backfill-content', { method: 'POST' })
+        const response = await fetch('/api/recommendation/backfill-content', {\n          method: 'POST',\n          ...(interactionId ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ interactionId }) } : {}),\n        })
         const result = await response.json()
         if (cancelled) return
         if (!response.ok || result?.ok !== true) {
           console.warn('Reel recommendation backfill stopped', result?.reason || response.status)
           return
         }
-        if (result.processed > 0) {
+        if (result.pending && result.interactionId) {\n          pauseTimer = setTimeout(() => { void processNext(result.interactionId) }, 4_000)\n          return\n        }\n        if (result.processed > 0) {
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ['reels-posts', user.id] }),
             queryClient.invalidateQueries({ queryKey: ['all-explore-reels', user.id] }),
             queryClient.invalidateQueries({ queryKey: ['explore-top-reels', user.id] }),
           ])
         }
-        if (result.remaining === 0 || !result.processed) return
+        if (result.remaining === 0 || result.processed === 0) return
         // Leave enough space between Gemini requests to respect the free-tier quota.
         pauseTimer = setTimeout(() => { void processNext() }, BACKFILL_PAUSE_MS)
       } catch (error) {
