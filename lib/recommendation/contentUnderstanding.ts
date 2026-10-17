@@ -304,7 +304,7 @@ async function storeNormalizedLabels(
 export async function analyzeAndStorePostContent(
   post: ContentAnalysisPost,
   interactionId?: string,
-): Promise<{ ok: boolean; skipped?: boolean; pending?: boolean; interactionId?: string; reason?: string; analysis?: ContentAnalysisResult }> {
+): Promise<{ ok: boolean; skipped?: boolean; pending?: boolean; interactionId?: string; reason?: string; retryable?: boolean; retryAfterMs?: number; analysis?: ContentAnalysisResult }> {
   const apiKey = process.env.SOCIALENS_ALGORITHM_GEMINI_API_KEY
   const model = process.env.SOCIALENS_ALGORITHM_GEMINI_MODEL || DEFAULT_MODEL
   const admin = getAdminClient()
