@@ -20,7 +20,7 @@ const REELS_CANDIDATE_WINDOW = REELS_PAGE_SIZE * 4
 const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
 const REPOST_POST_SELECT = 'posts(*, profiles!posts_user_id_fkey(*))'
 
-async function attachRecommendationLabels(posts: PostWithProfile[], userId?: string): Promise<PostWithProfile[]> {
+export async function attachRecommendationLabels(posts: PostWithProfile[], userId?: string): Promise<PostWithProfile[]> {
   if (!userId || posts.length === 0) return posts
   const supabase = createClient()
   const ids = Array.from(new Set(posts.map(post => post.id)))
