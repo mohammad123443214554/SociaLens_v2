@@ -1,16 +1,15 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { useReelsPosts } from '@/lib/hooks/usePosts'
 import { ReelsFeed } from '@/components/reels/ReelsFeed'
 import { useUser } from '@/lib/hooks/useUser'
+import { dedupeById } from '@/lib/utils/adInsertion'
 
 const BACKFILL_PAUSE_MS = 13_000
 
 export default function ReelsPage() {
   const { user } = useUser()
-  const queryClient = useQueryClient()
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useReelsPosts(user?.id)
 
   useEffect(() => {
@@ -40,13 +39,8 @@ export default function ReelsPage() {
           pauseTimer = setTimeout(() => { void processNext(result.interactionId) }, 4_000)
           return
         }
-        if (result.processed > 0) {
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ['reels-posts', user.id] }),
-            queryClient.invalidateQueries({ queryKey: ['all-explore-reels', user.id] }),
-            queryClient.invalidateQueries({ queryKey: ['explore-top-reels', user.id] }),
-          ])
-        }
+        // Do not invalidate/refetch visible feeds after background analysis.
+        // Re-ranking during a swipe/scroll changes the active Reel and feels like an unexpected reload.
         if (result.remaining === 0 || result.processed === 0) return
         // Leave enough space between Gemini requests to respect the free-tier quota.
         pauseTimer = setTimeout(() => { void processNext() }, BACKFILL_PAUSE_MS)
@@ -60,9 +54,9 @@ export default function ReelsPage() {
       cancelled = true
       if (pauseTimer) clearTimeout(pauseTimer)
     }
-  }, [user?.id, queryClient])
+  }, [user?.id])
 
-  const reels = data?.pages.flatMap(page => page.posts) ?? []
+  const reels = dedupeById(data?.pages.flatMap(page => page.posts) ?? [])
 
   return (
     <div className="flex justify-center items-center bg-background h-[100dvh] lg:h-[calc(100vh-3.5rem)] overflow-hidden">
