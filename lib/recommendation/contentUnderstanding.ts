@@ -96,7 +96,9 @@ async function loadInlineMedia(post: ContentAnalysisPost): Promise<MediaInput | 
     // Gemini fetches public video directly, avoiding slow Vercel downloads and
     // base64 payloads. This also supports reels larger than the old 12 MB limit.
     if (post.media_type === 'video') {
-      return { type: 'video', uri: mediaUrl.toString(), mime_type: 'video/mp4' }
+      const pathname = mediaUrl.pathname.toLowerCase()
+      const mimeType = pathname.endsWith('.webm') ? 'video/webm' : pathname.endsWith('.mov') || pathname.endsWith('.qt') ? 'video/quicktime' : 'video/mp4'
+      return { type: 'video', uri: mediaUrl.toString(), mime_type: mimeType }
     }
 
     const response = await fetch(mediaUrl, {
@@ -123,7 +125,8 @@ function extractOutputText(payload: any): string {
       if (typeof item?.text === 'string') collected.push(item.text)
     }
   }
-  return collected.join('\n').trim()
+  return collected.join('
+').trim()
 }
 
 function cleanStringArray(value: unknown, limit = 5): string[] {
@@ -310,7 +313,8 @@ export async function analyzeAndStorePostContent(
     (post.content || '').slice(0, 4000) || '(no caption)',
     'Declared media type:',
     post.media_type || 'none',
-  ].join('\n')
+  ].join('
+')
 
   const input: Array<Record<string, unknown>> = [{ type: 'text', text: prompt }]
   if (media?.type === 'image') input.push({ type: 'image', data: media.data, mime_type: media.mime_type })
