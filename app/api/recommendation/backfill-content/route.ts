@@ -70,6 +70,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, processed: 0, failed: 1, remaining: missing.length, reason: 'analysis_failed' }, { status: 502 })
   }
 
+  if (result.pending && result.interactionId) {
+    return NextResponse.json({ ok: true, pending: true, interactionId: result.interactionId, remaining: missing.length }, { status: 202 })
+  }
+
   if (!result.ok) {
     console.error('Recommendation backfill analysis returned failure', post.id, result.reason)
     return NextResponse.json({
