@@ -76,6 +76,17 @@ export async function POST(request: Request) {
 
   if (!result.ok) {
     console.error('Recommendation backfill analysis returned failure', post.id, result.reason)
+    if (result.retryable) {
+      return NextResponse.json({
+        ok: false,
+        retryable: true,
+        retryAfterMs: result.retryAfterMs,
+        processed: 0,
+        failed: 0,
+        remaining: missing.length,
+        reason: result.reason || 'gemini_temporarily_unavailable',
+      }, { status: 503 })
+    }
     return NextResponse.json({
       ok: false,
       processed: 0,
