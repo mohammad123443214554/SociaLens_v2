@@ -363,7 +363,47 @@ export async function analyzeAndStorePostContent(
     return { ok: false, reason: 'gemini_request_failed' }
   }
 
-  const payload = await response.json()
+  const responseText = await response.text()
+  let payload: any
+  try {
+    payload = JSON.parse(responseText)
+  } catch {
+    // Some gateways can append a second JSON fragment or text after the first
+    // object. Read the first complete top-level object rather than failing the job.
+    const start = responseText.indexOf('{')
+    let depth = 0
+    let inString = false
+    let escaped = false
+    let end = -1
+    for (let i = start; start >= 0 && i < responseText.length; i += 1) {
+      const char = responseText[i]
+      if (inString) {
+        if (escaped) escaped = false
+        else if (char.charCodeAt(0) === 92) escaped = true
+        else if (char === '"') inString = false
+        continue
+      }
+      if (char === '"') inString = true
+      else if (char === '{') depth += 1
+      else if (char === '}') {
+        depth -= 1
+        if (depth === 0) {
+          end = i
+          break
+        }
+      }
+    }
+    if (start < 0 || end < start) {
+      console.error('SociaLens Gemini returned a non-JSON response', responseText.slice(0, 500))
+      return { ok: false, reason: 'gemini_invalid_response' }
+    }
+    try {
+      payload = JSON.parse(responseText.slice(start, end + 1))
+    } catch (error) {
+      console.error('SociaLens Gemini returned invalid JSON', error, responseText.slice(0, 500))
+      return { ok: false, reason: 'gemini_invalid_response' }
+    }
+  }
   if (payload?.status === 'failed' || payload?.status === 'cancelled') {
     console.error('SociaLens background content analysis ended unsuccessfully', payload?.status, payload?.error)
     return { ok: false, reason: 'gemini_background_failed' }
