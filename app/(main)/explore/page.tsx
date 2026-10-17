@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import {
   Search, Users, UserPlus, Grid3x3, Hash, X, AlertCircle, Play,
@@ -83,6 +84,13 @@ export default function ExplorePage() {
   const [activeTab, setActiveTab] = useState<Tab>('all')
   const activeSection = 'for-you' as const
   const [selectedHashtag, setSelectedHashtag] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  useEffect(() => {
+    const hashtag = searchParams.get('hashtag')
+    if (hashtag) setSelectedHashtag(hashtag.startsWith('#') ? hashtag : `#${hashtag}`)
+  }, [searchParams])
   const [hiddenReelIds, setHiddenReelIds] = useState<string[]>([])
   const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([])
   const { user } = useUser()
@@ -294,18 +302,28 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
   })
 
   if (selectedHashtag) {
+    const hashtagReels = hashtagPosts.filter(post => post.media_type === 'video' && Boolean(post.media_url))
+    const hashtagPhotoPosts = hashtagPosts.filter(post => post.media_type !== 'video' && Boolean(post.media_url))
     return (
-      <div className="mx-auto w-full max-w-4xl px-3 pb-20 sm:px-5">
-        <div className="sticky top-14 z-10 mb-4 flex items-center gap-3 border-b border-border/70 bg-background/95 px-1 py-4 backdrop-blur">
-          <button onClick={() => setSelectedHashtag(null)} aria-label="Back to Explore" className="flex h-9 w-9 items-center justify-center rounded-full border border-border hover:bg-accent"><X className="h-4 w-4" /></button>
-          <div className="min-w-0 flex-1"><h2 className="truncate text-lg font-bold text-pink-400 sm:text-xl">{selectedHashtag}</h2><p className="text-xs text-muted-foreground">{hashtagPosts.length} posts found</p></div>
-        </div>
-        {hashtagLoading ? Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i} />) :
-          hashtagPosts.length === 0 ? (
-            <div className="rounded-2xl border border-border bg-card px-4 py-16 text-center text-muted-foreground"><Hash className="mx-auto mb-3 h-10 w-10 opacity-40" /><p>No real posts found for {selectedHashtag}</p></div>
-          ) : hashtagPosts.map(post => <PostCard key={post.id} post={post} />)
-        }
-      </div>
+      <main className="mx-auto w-full max-w-6xl px-3 pb-24 pt-4 sm:px-5 sm:pt-7">
+        <Link href="/explore" onClick={() => setSelectedHashtag(null)} className="mb-4 inline-flex items-center gap-2 rounded-full border border-border/80 bg-card/70 px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-pink-500/40 hover:text-pink-400 sm:mb-5 sm:text-sm">
+          <span aria-hidden="true">←</span> Back to Explore
+        </Link>
+        <header className="mb-5 px-1">
+          <h1 className="truncate text-xl font-extrabold text-pink-400 sm:text-2xl">{selectedHashtag}</h1>
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{hashtagPosts.length} posts found</p>
+        </header>
+        {hashtagLoading ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[3/4] animate-pulse rounded-xl bg-muted sm:rounded-2xl" />)}</div>
+        ) : hashtagPosts.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-card px-4 py-16 text-center text-muted-foreground"><Hash className="mx-auto mb-3 h-10 w-10 opacity-40" /><p>No real posts found for {selectedHashtag}</p></div>
+        ) : (
+          <div className="space-y-7">
+            {hashtagReels.length > 0 && <section><h2 className="mb-3 text-sm font-bold sm:text-base">Reels</h2><div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{hashtagReels.map(reel => <article key={reel.id} className="min-w-0 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:rounded-2xl"><ReelViewer post={reel} trigger={<button type="button" aria-label={`Play reel by @${reel.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left"><video src={reel.media_url ?? undefined} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" /></button>} /><div className="p-2 sm:p-3"><Link href={`/profile/${reel.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{reel.profiles?.username ?? 'user'}</Link><PostCaption content={reel.content || ''} expandMode="dialog" titleClassName="text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" /></div></article>)}</div></section>}
+            {hashtagPhotoPosts.length > 0 && <section><h2 className="mb-3 text-sm font-bold sm:text-base">Posts</h2><div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{hashtagPhotoPosts.map(post => <article key={post.id} className="min-w-0 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:rounded-2xl"><ReelViewer post={post} trigger={<button type="button" aria-label={`Open post by @${post.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-muted text-left"><img src={post.media_url!} alt="" loading="lazy" className="h-full w-full object-cover" /></button>} /><div className="p-2 sm:p-3"><Link href={`/profile/${post.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{post.profiles?.username ?? 'user'}</Link>{post.content?.trim() && <PostCaption content={post.content} expandMode="dialog" titleClassName="line-clamp-2 text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}</div></article>)}</div></section>}
+          </div>
+        )}
+      </main>
     )
   }
 
@@ -402,7 +420,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
                 </div>
               ) : (
                 <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {popularHashtags.slice(0, 10).map(({ tag, views }) => <button key={tag.toLocaleLowerCase()} onClick={() => setSelectedHashtag(tag)} className="group w-[108px] shrink-0 rounded-lg border border-border/80 bg-background/60 px-2.5 py-2.5 text-left transition-all hover:border-pink-500/50 hover:bg-pink-500/5 sm:w-[142px] sm:rounded-xl sm:px-3 sm:py-3">
+                  {popularHashtags.slice(0, 10).map(({ tag, views }) => <button key={tag.toLocaleLowerCase()} onClick={() => { setSelectedHashtag(tag); router.replace(`/explore?hashtag=${encodeURIComponent(tag)}`) }} className="group w-[108px] shrink-0 rounded-lg border border-border/80 bg-background/60 px-2.5 py-2.5 text-left transition-all hover:border-pink-500/50 hover:bg-pink-500/5 sm:w-[142px] sm:rounded-xl sm:px-3 sm:py-3">
                     <span className="block truncate text-xs font-bold text-pink-400 group-hover:text-fuchsia-400 sm:text-sm">{tag}</span>
                     <span className="mt-1 block text-[10px] text-muted-foreground sm:text-[11px]">{formatCount(views)} views</span>
                   </button>)}
