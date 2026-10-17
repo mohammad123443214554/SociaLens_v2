@@ -377,7 +377,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
                     </div>
                     {profile.bio && <p className="mt-2 line-clamp-2 w-full text-left text-[11px] leading-relaxed text-muted-foreground sm:text-xs">{profile.bio}</p>}
                     <div className="mt-auto w-full pt-3">
-                      <FollowButton targetUserId={profile.id} targetUsername={profile.username} isPrivate={Boolean(profile.is_private)} currentUserId={user.id} />
+                      <FollowButton targetUserId={profile.id} targetUsername={profile.username} isPrivate={Boolean(profile.is_private)} currentUserId={user.id} className="w-full" />
                     </div>
                   </article>
                 ))}
