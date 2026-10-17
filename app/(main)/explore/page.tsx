@@ -214,14 +214,25 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
   })
 
   const { data: hashtagPosts = [], isLoading: hashtagLoading } = useQuery({
-    queryKey: ['hashtag-posts', selectedHashtag],
+    queryKey: ['hashtag-posts', selectedHashtag, user?.id],
     queryFn: async () => {
       if (!selectedHashtag) return []
       const { data, error } = await supabase.from('posts').select(POST_SELECT).ilike('content', `%${selectedHashtag}%`).order('created_at', { ascending: false }).limit(100)
       if (error) throw error
-      return (data || []) as PostWithProfile[]
+      let candidates = (data || []) as PostWithProfile[]
+      candidates = await attachRecommendationLabels(candidates, user?.id)
+      try {
+        const ctx = await getViewerContext(supabase, user?.id)
+        // Reuse the existing Explore ranker so hashtag results adapt to each
+        // viewer's creator, hashtag and AI-derived content interests.
+        return rankExplorePosts(candidates, ctx, candidates.length)
+      } catch (err) {
+        console.error('Hashtag result ranking failed, showing recent posts', err)
+        return candidates
+      }
     },
     enabled: !!selectedHashtag,
+    staleTime: 30_000,
   })
 
   const { data: popularHashtags = [] } = useQuery({
@@ -301,8 +312,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
   })
 
   if (selectedHashtag) {
-    const hashtagReels = hashtagPosts.filter(post => post.media_type === 'video' && Boolean(post.media_url))
-    const hashtagPhotoPosts = hashtagPosts.filter(post => post.media_type !== 'video' && Boolean(post.media_url))
+    const hashtagMediaPosts = hashtagPosts.filter(post => Boolean(post.media_url))
     const hashtagTextPosts = hashtagPosts.filter(post => !post.media_url)
     return (
       <main className="mx-auto w-full max-w-6xl px-3 pb-24 pt-4 sm:px-5 sm:pt-7">
@@ -318,10 +328,9 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
         ) : hashtagPosts.length === 0 ? (
           <div className="rounded-2xl border border-border bg-card px-4 py-16 text-center text-muted-foreground"><Hash className="mx-auto mb-3 h-10 w-10 opacity-40" /><p>No real posts found for {selectedHashtag}</p></div>
         ) : (
-          <div className="space-y-7">
-            {hashtagReels.length > 0 && <section><h2 className="mb-3 text-sm font-bold sm:text-base">Reels</h2><div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{hashtagReels.map(reel => <article key={reel.id} className="min-w-0 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:rounded-2xl"><ReelViewer post={reel} trigger={<button type="button" aria-label={`Play reel by @${reel.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left"><video src={reel.media_url ?? undefined} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" /></button>} /><div className="p-2 sm:p-3"><Link href={`/profile/${reel.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{reel.profiles?.username ?? 'user'}</Link><PostCaption content={reel.content || ''} expandMode="dialog" titleClassName="text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" /></div></article>)}</div></section>}
-            {hashtagPhotoPosts.length > 0 && <section><h2 className="mb-3 text-sm font-bold sm:text-base">Posts</h2><div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{hashtagPhotoPosts.map(post => <article key={post.id} className="min-w-0 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:rounded-2xl"><ReelViewer post={post} trigger={<button type="button" aria-label={`Open post by @${post.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-muted text-left"><img src={post.media_url!} alt="" loading="lazy" className="h-full w-full object-cover" /></button>} /><div className="p-2 sm:p-3"><Link href={`/profile/${post.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{post.profiles?.username ?? 'user'}</Link>{post.content?.trim() && <PostCaption content={post.content} expandMode="dialog" titleClassName="line-clamp-2 text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}</div></article>)}</div></section>}
-            {hashtagTextPosts.length > 0 && <section className="space-y-4">{hashtagTextPosts.map(post => <PostCard key={post.id} post={post} />)}</section>}
+          <div className="space-y-6">
+            {hashtagMediaPosts.length > 0 && <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{hashtagMediaPosts.map(post => <article key={post.id} className="min-w-0 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:rounded-2xl"><ReelViewer post={post} trigger={<button type="button" aria-label={`Open ${post.media_type === 'video' ? 'reel' : 'post'} by @${post.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-muted text-left">{post.media_type === 'video' ? <video src={post.media_url ?? undefined} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" /> : <img src={post.media_url!} alt="" loading="lazy" className="h-full w-full object-cover" />}</button>} /><div className="p-2 sm:p-3"><Link href={`/profile/${post.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{post.profiles?.username ?? 'user'}</Link>{post.content?.trim() && <PostCaption content={post.content} expandMode="dialog" titleClassName="line-clamp-2 text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}</div></article>)}</div>}
+            {hashtagTextPosts.length > 0 && <div className="space-y-4">{hashtagTextPosts.map(post => <PostCard key={post.id} post={post} />)}</div>}
           </div>
         )}
       </main>
