@@ -312,8 +312,7 @@ export async function analyzeAndStorePostContent(
     (post.content || '').slice(0, 4000) || '(no caption)',
     'Declared media type:',
     post.media_type || 'none',
-  ].join('
-')
+  ].join('\\n')
 
   const input: Array<Record<string, unknown>> = [{ type: 'text', text: prompt }]
   if (media?.type === 'image') input.push({ type: 'image', data: media.data, mime_type: media.mime_type })
