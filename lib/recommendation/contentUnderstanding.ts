@@ -28,7 +28,7 @@ export type ContentAnalysisResult = {
   media_analyzed: boolean
 }
 
-type MediaInput = { type: 'image' | 'video'; data: string; mime_type: string }
+type MediaInput = { type: 'image'; data: string; mime_type: string } | { type: 'video'; uri: string; mime_type: string }
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -85,35 +85,30 @@ async function readBoundedBody(response: Response, maxBytes: number): Promise<Bu
  */
 async function loadInlineMedia(post: ContentAnalysisPost): Promise<MediaInput | null> {
   if (!post.media_url || (post.media_type !== 'image' && post.media_type !== 'video')) return null
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   if (!supabaseUrl) return null
-
   try {
     const mediaUrl = new URL(post.media_url)
     const expectedOrigin = new URL(supabaseUrl).origin
     if (mediaUrl.origin !== expectedOrigin || mediaUrl.protocol !== 'https:') return null
     if (!mediaUrl.pathname.includes('/storage/v1/object/public/')) return null
 
+    // Gemini fetches public video directly, avoiding slow Vercel downloads and
+    // base64 payloads. This also supports reels larger than the old 12 MB limit.
+    if (post.media_type === 'video') {
+      return { type: 'video', uri: mediaUrl.toString(), mime_type: 'video/mp4' }
+    }
+
     const response = await fetch(mediaUrl, {
       redirect: 'error',
       signal: AbortSignal.timeout(10_000),
     })
     if (!response.ok) return null
-
     const mimeType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
-    if (!ALLOWED_MEDIA_TYPES.has(mimeType)) return null
-    if (post.media_type === 'image' && !mimeType.startsWith('image/')) return null
-    if (post.media_type === 'video' && !mimeType.startsWith('video/')) return null
-
+    if (!ALLOWED_MEDIA_TYPES.has(mimeType) || !mimeType.startsWith('image/')) return null
     const bytes = await readBoundedBody(response, MAX_MEDIA_BYTES)
     if (!bytes) return null
-
-    return {
-      type: post.media_type,
-      data: bytes.toString('base64'),
-      mime_type: mimeType,
-    }
+    return { type: 'image', data: bytes.toString('base64'), mime_type: mimeType }
   } catch {
     return null
   }
@@ -281,7 +276,7 @@ async function storeNormalizedLabels(
 
 export async function analyzeAndStorePostContent(
   post: ContentAnalysisPost,
-): Promise<{ ok: boolean; skipped?: boolean; reason?: string; analysis?: ContentAnalysisResult }> {
+): Promise<{ ok: boolean; skipped?: boolean; pending?: boolean; interactionId?: string; reason?: string; analysis?: ContentAnalysisResult }> {
   const apiKey = process.env.SOCIALENS_ALGORITHM_GEMINI_API_KEY
   const model = process.env.SOCIALENS_ALGORITHM_GEMINI_MODEL || DEFAULT_MODEL
   const admin = getAdminClient()
@@ -316,17 +311,19 @@ export async function analyzeAndStorePostContent(
     post.media_type || 'none',
   ].join('\n')
 
-  const input: Array<Record<string, string>> = [{ type: 'text', text: prompt }]
-  if (media) input.push({ type: media.type, data: media.data, mime_type: media.mime_type })
+  const input: Array<Record<string, unknown>> = [{ type: 'text', text: prompt }]
+  if (media?.type === 'image') input.push({ type: 'image', data: media.data, mime_type: media.mime_type })
+  if (media?.type === 'video') input.push({ type: 'video', uri: media.uri, mime_type: media.mime_type })
 
   const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       'x-goog-api-key': apiKey,
+      'Api-Revision': '2026-05-20',
     },
-    body: JSON.stringify({ model, input }),
-    signal: AbortSignal.timeout(45_000),
+    body: JSON.stringify({ model, input, background: true }),
+    signal: AbortSignal.timeout(12_000),
   })
 
   if (!response.ok) {
@@ -336,6 +333,12 @@ export async function analyzeAndStorePostContent(
   }
 
   const payload = await response.json()
+  // Background interactions return quickly. The client polls the interaction
+  // separately so video processing cannot exceed Vercel's function time limit.
+  if (payload?.id && payload?.status !== 'completed') {
+    return { ok: false, pending: true, interactionId: String(payload.id) }
+  }
+
   const rawText = extractOutputText(payload)
   const analysis = parseAnalysis(rawText, Boolean(media))
 
