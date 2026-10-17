@@ -2,6 +2,7 @@ import { PostWithProfile } from '@/lib/types/database.types'
 import { ViewerContext } from './viewerContext'
 import { diversify, pickExplorationSlots } from './scoring'
 import { rankFeedPosts } from './rankFeedPosts'
+import { dedupeById } from '@/lib/utils/adInsertion'
 
 const EXPLORE_DISCOVERY_RATIO = 0.2
 
@@ -15,7 +16,7 @@ export function rankExplorePosts(
   ctx: ViewerContext,
   pageSize: number
 ): PostWithProfile[] {
-  const safe = candidates.filter(post =>
+  const safe = dedupeById(candidates).filter(post =>
     !ctx.blockedUserIds.has(post.user_id) &&
     !ctx.notInterestedPostIds.has(post.id)
   )
