@@ -7,6 +7,7 @@ import { getViewerContext } from '@/lib/recommendation/viewerContext'
 import { rankFeedPosts } from '@/lib/recommendation/rankFeedPosts'
 import { rankExplorePosts } from '@/lib/recommendation/rankExplorePosts'
 import { rankReels } from '@/lib/recommendation/rankReels'
+import { dedupeById } from '@/lib/utils/adInsertion'
 
 const FEED_PAGE_SIZE = 10
 const EXPLORE_PAGE_SIZE = 15
@@ -112,7 +113,7 @@ export function useFeedPosts(userId?: string) {
         }))
       const repostedWithLikes = await fetchPostsWithLikes(repostedPosts, userId)
 
-      let merged = [...ownPosts, ...repostedWithLikes]
+      let merged = dedupeById([...ownPosts, ...repostedWithLikes])
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, FEED_PAGE_SIZE)
 
@@ -177,7 +178,7 @@ export function useExplorePosts(userId?: string) {
         .range(pageParam, pageParam + candidateWindow - 1)
 
       if (error) throw error
-      let candidates = (data ?? []) as PostWithProfile[]
+      let candidates = dedupeById((data ?? []) as PostWithProfile[])
       if (userId) candidates = await fetchPostsWithLikes(candidates, userId)
       candidates = await attachRecommendationLabels(candidates, userId)
 
@@ -224,7 +225,7 @@ export function useReelsPosts(userId?: string) {
       const { data, error } = await query
 
       if (error) throw error
-      let posts = (data ?? []) as PostWithProfile[]
+      let posts = dedupeById((data ?? []) as PostWithProfile[])
       if (userId) posts = await fetchPostsWithLikes(posts, userId)
       posts = await attachRecommendationLabels(posts, userId)
       const nextCursor = posts.length === REELS_CANDIDATE_WINDOW ? (posts[posts.length - 1]?.created_at ?? null) : null
