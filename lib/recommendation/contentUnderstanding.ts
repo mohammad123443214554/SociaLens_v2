@@ -360,7 +360,12 @@ export async function analyzeAndStorePostContent(
   if (!response.ok) {
     const errorText = (await response.text()).slice(0, 500)
     console.error('SociaLens content analysis Gemini request failed', response.status, errorText)
-    return { ok: false, reason: 'gemini_request_failed' }
+    const retryable = response.status === 429 || response.status === 500 || response.status === 502 || response.status === 503 || response.status === 504
+    const retryAfterHeader = Number(response.headers.get('retry-after') || 0)
+    const retryAfterMs = retryable
+      ? Math.max(15_000, Math.min(120_000, retryAfterHeader > 0 ? retryAfterHeader * 1000 : response.status === 429 ? 35_000 : 20_000))
+      : undefined
+    return { ok: false, reason: 'gemini_request_failed', retryable, retryAfterMs }
   }
 
   const responseText = await response.text()
