@@ -138,9 +138,34 @@ function cleanStringArray(value: unknown, limit = 5): string[] {
 }
 
 function parseAnalysis(raw: string, mediaAnalyzed: boolean): ContentAnalysisResult {
+  // Gemini may wrap JSON in prose/code fences or append extra text. Extract the
+  // first complete JSON object while respecting braces inside quoted strings.
   const start = raw.indexOf('{')
-  const end = raw.lastIndexOf('}')
-  if (start < 0 || end <= start) throw new Error('Gemini returned no JSON content')
+  if (start < 0) throw new Error('Gemini returned no JSON content')
+
+  let depth = 0
+  let inString = false
+  let escaped = false
+  let end = -1
+  for (let i = start; i < raw.length; i += 1) {
+    const char = raw[i]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (char === '\\\\') escaped = true
+      else if (char === '"') inString = false
+      continue
+    }
+    if (char === '"') inString = true
+    else if (char === '{') depth += 1
+    else if (char === '}') {
+      depth -= 1
+      if (depth === 0) {
+        end = i
+        break
+      }
+    }
+  }
+  if (end < start) throw new Error('Gemini returned incomplete JSON content')
 
   const value = JSON.parse(raw.slice(start, end + 1))
   const primaryTopic = typeof value.primary_topic === 'string'
