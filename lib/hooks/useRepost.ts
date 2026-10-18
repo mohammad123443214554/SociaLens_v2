@@ -61,8 +61,25 @@ export function useToggleRepost() {
         if (error) throw error
       }
     },
-    onSuccess: (_, { postId, userId }) => {
-      queryClient.invalidateQueries({ queryKey: ['is-reposted', postId, userId] })
+    onMutate: async ({ postId, userId, repost }) => {
+      const key = ['is-reposted', postId, userId] as const
+      await queryClient.cancelQueries({ queryKey: key })
+      const previous = queryClient.getQueryData<boolean>(key)
+
+      // Update the popup's cached status immediately. In the Home Discover
+      // grid, useIsReposted is seeded with a prefetched value and its query is
+      // disabled, so invalidation alone cannot refresh that value.
+      queryClient.setQueryData<boolean>(key, repost)
+      return { key, previous }
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(context.key, context.previous)
+      }
+    },
+    onSuccess: (_, { postId, userId, repost }) => {
+      // Keep the popup's source of truth aligned with the successful write.
+      queryClient.setQueryData(['is-reposted', postId, userId], repost)
       queryClient.invalidateQueries({ queryKey: ['feed-posts'] })
       queryClient.invalidateQueries({ queryKey: ['profile-posts'] })
     },
