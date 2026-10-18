@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { Hash, Search, TrendingUp, X, Loader2 } from 'lucide-react'
@@ -17,6 +17,10 @@ function extractHashtags(content: string): string[] {
 
 export default function ExploreHashtagsPage() {
   const [query, setQuery] = useState('')
+  useEffect(() => {
+    const initialQuery = new URLSearchParams(window.location.search).get('q')
+    if (initialQuery) setQuery(initialQuery)
+  }, [])
   const supabase = createClient()
 
   const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
