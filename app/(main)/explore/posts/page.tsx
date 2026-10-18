@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { ArrowLeft, TrendingUp, Grid3x3, Heart, MessageCircle, Search, X, Loader2 } from 'lucide-react'
@@ -22,6 +22,10 @@ const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
 
 export default function AllExplorePostsPage() {
   const [query, setQuery] = useState('')
+  useEffect(() => {
+    const initialQuery = new URLSearchParams(window.location.search).get('q')
+    if (initialQuery) setQuery(initialQuery)
+  }, [])
   const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([])
   const supabase = createClient()
   const { user } = useUser()
