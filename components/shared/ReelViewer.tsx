@@ -248,13 +248,15 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
                 }} className="flex h-8 w-8 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition-colors hover:text-white/80"><MoreHorizontal className="h-5 w-5" /></button>
               </div>
             </div>
-            <div className={`flex w-full items-center justify-center ${post.media_type === 'video' ? 'bg-black' : 'bg-background'}`}>
-              {post.media_type === 'video' ? (
-                <video ref={videoRef} src={post.media_url ?? undefined} controls playsInline autoPlay preload="auto" onTimeUpdate={trackVideoProgress} onPause={flushVideoWatchTime} onEnded={handleVideoEnded} className="max-h-[58dvh] w-full object-contain sm:max-h-[62vh]" aria-label={`Video post by @${post.profiles?.username ?? 'user'}`} />
-              ) : (
-                <img src={post.media_url ?? undefined} alt={`Post by @${post.profiles?.username ?? 'user'}`} className="max-h-[58dvh] w-full object-contain sm:max-h-[62vh]" />
-              )}
-            </div>
+            {post.media_type === 'video' && post.media_url ? (
+              <div className="flex w-full items-center justify-center bg-black">
+                <video ref={videoRef} src={post.media_url} controls playsInline autoPlay preload="auto" onTimeUpdate={trackVideoProgress} onPause={flushVideoWatchTime} onEnded={handleVideoEnded} className="max-h-[58dvh] w-full object-contain sm:max-h-[62vh]" aria-label={`Video post by @${post.profiles?.username ?? 'user'}`} />
+              </div>
+            ) : post.media_type === 'image' && post.media_url ? (
+              <div className="flex w-full items-center justify-center bg-background">
+                <img src={post.media_url} alt={`Post by @${post.profiles?.username ?? 'user'}`} className="max-h-[58dvh] w-full object-contain sm:max-h-[62vh]" />
+              </div>
+            ) : null}
             {post.content?.trim() && <div className="border-b border-border/60 px-4 py-3">
               <PostCaption content={post.content} expandMode="inline" titleClassName="text-sm leading-relaxed font-semibold" captionClassName="mt-1 text-sm leading-6 text-muted-foreground" buttonClassName="mt-1 text-xs font-semibold text-pink-400 hover:underline" />
             </div>}
