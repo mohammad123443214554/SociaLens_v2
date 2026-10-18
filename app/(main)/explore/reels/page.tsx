@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { ArrowLeft, Heart, MessageCircle, Play, Search, X, Loader2, TrendingUp } from 'lucide-react'
+import { ArrowLeft, Heart, MessageCircle, Play, Search, X, Loader2, TrendingUp, Mic } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
 import { PostWithProfile } from '@/lib/types/database.types'
@@ -50,14 +50,46 @@ async function attachRecommendationLabels(posts: PostWithProfile[], supabase: Re
 
 export default function AllReelsPage() {
   const [query, setQuery] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
+  const [isListening, setIsListening] = useState(false)
+  const recognitionRef = useState<{ current: any }>({ current: null })[0]
   useEffect(() => {
     const initialQuery = new URLSearchParams(window.location.search).get('q')
-    if (initialQuery) setQuery(initialQuery)
+    if (initialQuery) {
+      setQuery(initialQuery)
+      setSubmittedQuery(initialQuery)
+    }
   }, [])
+  const toggleVoiceSearch = () => {
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+    if (typeof window === 'undefined') return
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      window.alert('Voice search is not supported in this browser. Please try Chrome or Edge.')
+      return
+    }
+    const recognition = new SpeechRecognition()
+    recognition.lang = navigator.language || 'en-IN'
+    recognition.interimResults = true
+    recognition.continuous = false
+    recognitionRef.current = recognition
+    recognition.onstart = () => setIsListening(true)
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results as ArrayLike<any>).map((result: any) => result[0]?.transcript || '').join(' ')
+      setQuery(transcript)
+    }
+    recognition.onerror = () => setIsListening(false)
+    recognition.onend = () => setIsListening(false)
+    recognition.start()
+  }
   const [hiddenReelIds, setHiddenReelIds] = useState<string[]>([])
   const supabase = createClient()
   const { user } = useUser()
-  const searchTerm = query.trim()
+  const searchTerm = submittedQuery.trim()
 
   const {
     data,
@@ -118,9 +150,10 @@ export default function AllReelsPage() {
           </div>
         </div>
         <div className="relative mt-3 sm:mt-6">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground sm:left-3.5" />
-          <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search reels..." aria-label="Search reels" className="h-10 rounded-xl border-border/80 bg-background/80 pl-9 pr-9 text-sm focus-visible:ring-pink-500/50 sm:h-12 sm:rounded-2xl sm:pl-10 sm:pr-10" />
-          {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear reel search" className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" /></button>}
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground sm:left-3.5 sm:h-4 sm:w-4" />
+          <Input value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); setSubmittedQuery(query.trim()) } }} placeholder={isListening ? 'Listening… speak to search' : 'Search SociaLens'} aria-label="Search SociaLens" className="h-10 rounded-xl border-border/80 bg-card/80 pl-9 pr-20 text-sm shadow-sm focus-visible:ring-pink-500/50 sm:h-12 sm:rounded-2xl sm:pl-10 sm:pr-20" />
+          {query && <button type="button" onClick={() => { setQuery(''); setSubmittedQuery('') }} aria-label="Clear search" className="absolute right-10 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" /></button>}
+          <button type="button" onClick={toggleVoiceSearch} aria-label={isListening ? 'Stop voice search' : 'Start voice search'} title={isListening ? 'Stop voice search' : 'Voice search'} className={`absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 transition-colors hover:bg-accent ${isListening ? 'text-pink-400' : 'text-muted-foreground hover:text-pink-400'}`}><Mic className="h-4 w-4" /></button>
         </div>
       </header>
 
