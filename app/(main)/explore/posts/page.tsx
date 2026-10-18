@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { ArrowLeft, TrendingUp, Grid3x3, Heart, MessageCircle, Search, X, Loader2 } from 'lucide-react'
+import { ArrowLeft, TrendingUp, Grid3x3, Heart, MessageCircle, Search, X, Loader2, Mic } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
 import { PostWithProfile } from '@/lib/types/database.types'
@@ -22,14 +22,46 @@ const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
 
 export default function AllExplorePostsPage() {
   const [query, setQuery] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
+  const [isListening, setIsListening] = useState(false)
+  const recognitionRef = useState<{ current: any }>({ current: null })[0]
   useEffect(() => {
     const initialQuery = new URLSearchParams(window.location.search).get('q')
-    if (initialQuery) setQuery(initialQuery)
+    if (initialQuery) {
+      setQuery(initialQuery)
+      setSubmittedQuery(initialQuery)
+    }
   }, [])
+  const toggleVoiceSearch = () => {
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+    if (typeof window === 'undefined') return
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      window.alert('Voice search is not supported in this browser. Please try Chrome or Edge.')
+      return
+    }
+    const recognition = new SpeechRecognition()
+    recognition.lang = navigator.language || 'en-IN'
+    recognition.interimResults = true
+    recognition.continuous = false
+    recognitionRef.current = recognition
+    recognition.onstart = () => setIsListening(true)
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results as ArrayLike<any>).map((result: any) => result[0]?.transcript || '').join(' ')
+      setQuery(transcript)
+    }
+    recognition.onerror = () => setIsListening(false)
+    recognition.onend = () => setIsListening(false)
+    recognition.start()
+  }
   const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([])
   const supabase = createClient()
   const { user } = useUser()
-  const searchTerm = query.trim()
+  const searchTerm = submittedQuery.trim()
 
   const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ['all-explore-photo-posts', user?.id, searchTerm.toLocaleLowerCase()],
