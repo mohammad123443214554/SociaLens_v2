@@ -192,7 +192,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
   const { data: searchPosts = [] } = useQuery({
     queryKey: ['search-posts', query],
     queryFn: async () => {
-      if (!query.trim()) return []
+      if (!query.trim() || query.trim().startsWith('#')) return []
       const { data, error } = await supabase.from('posts').select(POST_SELECT)
         .neq('media_type', 'video').not('media_url', 'is', null)
         .ilike('content', `%${query}%`).order('created_at', { ascending: false }).limit(100)
@@ -213,7 +213,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
   const { data: searchReels = [] } = useQuery({
     queryKey: ['search-reels', query, user?.id],
     queryFn: async () => {
-      if (!query.trim()) return []
+      if (!query.trim() || query.trim().startsWith('#')) return []
       let request = supabase.from('posts').select(POST_SELECT)
         .eq('media_type', 'video').not('media_url', 'is', null)
         .ilike('content', `%${query}%`).order('created_at', { ascending: false })
