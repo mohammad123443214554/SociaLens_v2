@@ -193,9 +193,46 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
     queryKey: ['search-posts', query],
     queryFn: async () => {
       if (!query.trim()) return []
-      const { data, error } = await supabase.from('posts').select(POST_SELECT).ilike('content', `%${query}%`).order('created_at', { ascending: false }).limit(20)
+      const { data, error } = await supabase.from('posts').select(POST_SELECT)
+        .neq('media_type', 'video').not('media_url', 'is', null)
+        .ilike('content', `%${query}%`).order('created_at', { ascending: false }).limit(100)
       if (error) throw error
-      return (data || []) as PostWithProfile[]
+      let candidates = (data || []) as PostWithProfile[]
+      candidates = await attachRecommendationLabels(candidates, user?.id)
+      try {
+        const ctx = await getViewerContext(supabase, user?.id)
+        return rankExplorePosts(candidates, ctx, 20)
+      } catch (err) {
+        console.error('Explore search post ranking failed', err)
+        return candidates.slice(0, 20)
+      }
+    },
+    enabled: isSearching,
+  })
+
+  const { data: searchReels = [] } = useQuery({
+    queryKey: ['search-reels', query, user?.id],
+    queryFn: async () => {
+      if (!query.trim()) return []
+      let request = supabase.from('posts').select(POST_SELECT)
+        .eq('media_type', 'video').not('media_url', 'is', null)
+        .ilike('content', `%${query}%`).order('created_at', { ascending: false })
+      if (user) {
+        const { data: hiddenRows, error: hiddenError } = await supabase.from('post_not_interested').select('post_id').eq('user_id', user.id)
+        if (hiddenError) throw hiddenError
+        const hiddenIds = (hiddenRows || []).map(row => row.post_id)
+        if (hiddenIds.length) request = request.not('id', 'in', `(${hiddenIds.join(',')})`)
+      }
+      const { data, error } = await request.limit(100)
+      if (error) throw error
+      let candidates = await attachRecommendationLabels((data || []) as PostWithProfile[], user?.id)
+      try {
+        const ctx = await getViewerContext(supabase, user?.id)
+        return rankReels(candidates, ctx, 20)
+      } catch (err) {
+        console.error('Explore search reel ranking failed', err)
+        return candidates.slice(0, 20)
+      }
     },
     enabled: isSearching,
   })
@@ -350,41 +387,61 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
 
         {isSearching && (
           <div className="mt-3 flex gap-1 overflow-x-auto rounded-xl border border-border/70 bg-card/60 p-1">
-            {[{ id: 'all', label: 'All' }, { id: 'profiles', label: `People (${searchProfiles.length})` }, { id: 'posts', label: `Posts (${searchPosts.length})` }, { id: 'hashtags', label: `Hashtags (${searchHashtags.length})` }].map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id as Tab)} className={cn('flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition-all sm:text-sm', activeTab === tab.id ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-muted-foreground hover:bg-accent')}>{tab.label}</button>)}
+            {[{ id: 'all', label: 'All' }, { id: 'profiles', label: `People (${searchProfiles.length})` }, { id: 'reels', label: `Reels (${searchReels.length})` }, { id: 'posts', label: `Posts (${searchPosts.length})` }, { id: 'hashtags', label: `Hashtags (${searchHashtags.length})` }].map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id as Tab)} className={cn('flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition-all sm:text-sm', activeTab === tab.id ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-muted-foreground hover:bg-accent')}>{tab.label}</button>)}
           </div>
         )}
       </header>
 
       {isSearching ? (
-        <div className="space-y-5">
+        <div className="space-y-4 sm:space-y-6">
           {(activeTab === 'all' || activeTab === 'profiles') && searchProfiles.length > 0 && (
-            <section className="rounded-2xl border border-border/70 bg-card/40 p-3 sm:p-4">
-              <SectionHeading icon={<Users className="h-4 w-4" />} title="People" subtitle="Profiles matching your search" />
-              <div className="grid gap-1 sm:grid-cols-2">
-                {searchProfiles.map(profile => <Link key={profile.id} href={`/profile/${profile.username}`} className="flex min-w-0 items-center gap-3 rounded-xl p-3 transition-colors hover:bg-accent/70">
-                  <Avatar className="h-11 w-11 shrink-0 ring-1 ring-border"><AvatarImage src={getAvatarUrl(profile.avatar_url)} /><AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-500 font-bold text-white">{profile.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
-                  <div className="min-w-0 flex-1"><p className="flex items-center gap-1 truncate text-sm font-semibold">{profile.username}{profile.is_verified && <VerifiedBadge type={profile.verification_type} className="text-xs" />}</p>{profile.full_name && <p className="truncate text-xs text-muted-foreground">{profile.full_name}</p>}</div>
-                  <p className="shrink-0 text-xs text-muted-foreground">{formatCount(profile.followers_count)} followers</p>
+            <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
+              <SectionHeading icon={<Users className="h-4 w-4" />} title="People" action={<span className="text-xs text-muted-foreground">{searchProfiles.length} found</span>} />
+              <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {searchProfiles.map(profile => <Link key={profile.id} href={`/profile/${profile.username}`} className="flex w-[172px] shrink-0 flex-col items-center rounded-xl border border-border/70 bg-background/60 p-3 text-center transition-colors hover:border-pink-500/40 sm:w-[200px] sm:p-4">
+                  <Avatar className="mb-2 h-12 w-12 ring-1 ring-border sm:h-14 sm:w-14"><AvatarImage src={getAvatarUrl(profile.avatar_url)} /><AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-500 font-bold text-white">{profile.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar>
+                  <p className="flex max-w-full items-center gap-1 truncate text-xs font-semibold sm:text-sm">{profile.username}{profile.is_verified && <VerifiedBadge type={profile.verification_type} className="text-xs" />}</p>
+                  {profile.full_name && <p className="mt-0.5 max-w-full truncate text-[10px] text-muted-foreground sm:text-xs">{profile.full_name}</p>}
+                  <p className="mt-2 text-[10px] text-muted-foreground sm:text-xs">{formatCount(profile.followers_count)} followers</p>
                 </Link>)}
               </div>
             </section>
           )}
           {(activeTab === 'all' || activeTab === 'hashtags') && searchHashtags.length > 0 && (
-            <section className="rounded-2xl border border-border/70 bg-card/40 p-3 sm:p-4">
-              <SectionHeading icon={<Hash className="h-4 w-4" />} title="Hashtags" subtitle="Capitalization variants are merged" />
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {searchHashtags.map(({ tag, count }) => <button key={tag.toLocaleLowerCase()} onClick={() => setSelectedHashtag(tag)} className="flex min-w-0 items-center gap-3 rounded-xl border border-border/70 bg-background/50 p-3 text-left transition-colors hover:border-pink-500/40 hover:bg-pink-500/5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400"><Hash className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{tag}</span><span className="text-xs text-muted-foreground">{formatCount(count)} posts</span></span><ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </button>)}
+            <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
+              <SectionHeading icon={<Hash className="h-4 w-4" />} title="Hashtags" action={<Link href={`/explore/hashtags?q=${encodeURIComponent(query.trim())}`} className="shrink-0 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">See All <ArrowUpRight className="ml-1 inline h-3.5 w-3.5" /></Link>} />
+              <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {searchHashtags.map(({ tag, count }) => <Link key={tag.toLocaleLowerCase()} href={`/explore?hashtag=${encodeURIComponent(tag)}`} className="group w-[118px] shrink-0 rounded-lg border border-border/80 bg-background/60 px-2.5 py-2.5 transition-all hover:border-pink-500/50 hover:bg-pink-500/5 sm:w-[160px] sm:rounded-xl sm:px-3 sm:py-3">
+                  <span className="block truncate text-xs font-bold text-pink-400 sm:text-sm">{tag}</span><span className="mt-1 block text-[10px] text-muted-foreground sm:text-[11px]">{formatCount(count)} posts</span>
+                </Link>)}
+              </div>
+            </section>
+          )}
+          {(activeTab === 'all' || activeTab === 'reels') && searchReels.length > 0 && (
+            <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
+              <SectionHeading icon={<ReelsMark className="h-5 w-5" />} title="Reels" action={<Link href={`/explore/reels?q=${encodeURIComponent(query.trim())}`} className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">See All <ArrowUpRight className="h-3.5 w-3.5" /></Link>} />
+              <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {searchReels.map(reel => <article key={reel.id} className="w-[118px] shrink-0 overflow-hidden rounded-xl border border-border/80 bg-card sm:w-[160px] sm:rounded-2xl">
+                  <ReelViewer post={reel} trigger={<button type="button" aria-label={`Play reel by @${reel.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden text-left"><video src={reel.media_url ?? undefined} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" /></button>} />
+                  <div className="p-2 sm:p-2.5"><Link href={`/profile/${reel.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{reel.profiles?.username ?? 'user'}</Link>{reel.content?.trim() && <PostCaption content={reel.content} expandMode="dialog" titleClassName="line-clamp-2 text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}</div>
+                </article>)}
               </div>
             </section>
           )}
           {(activeTab === 'all' || activeTab === 'posts') && searchPosts.length > 0 && (
-            <section><SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title="Posts" subtitle="Real posts matching your search" /><div className="grid gap-4 xl:grid-cols-2">{interleaveAds(dedupeById(searchPosts), 3, 8).map((item, i) => item === 'ad' ? <AdPostSlot key={`ad-${i}`} /> : <PostCard key={item.id} post={item} />)}</div></section>
+            <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
+              <SectionHeading icon={<Grid3x3 className="h-4 w-4" />} title="Posts" action={<Link href={`/explore/posts?q=${encodeURIComponent(query.trim())}`} className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">See All <ArrowUpRight className="h-3.5 w-3.5" /></Link>} />
+              <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {searchPosts.map(post => <article key={post.id} className="w-[118px] shrink-0 overflow-hidden rounded-xl border border-border/80 bg-card sm:w-[160px] sm:rounded-2xl">
+                  <ReelViewer post={post} trigger={<button type="button" aria-label={`Open post by @${post.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden text-left"><img src={post.media_url!} alt="" loading="lazy" className="h-full w-full object-cover" /></button>} />
+                  <div className="p-2 sm:p-2.5"><Link href={`/profile/${post.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{post.profiles?.username ?? 'user'}</Link>{post.content?.trim() && <PostCaption content={post.content} expandMode="dialog" titleClassName="line-clamp-2 text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}</div>
+                </article>)}
+              </div>
+            </section>
           )}
-          {!searchProfiles.length && !searchPosts.length && !searchHashtags.length && <div className="rounded-2xl border border-border/70 bg-card/40 px-4 py-16 text-center text-muted-foreground"><Search className="mx-auto mb-3 h-10 w-10 opacity-40" /><p className="font-semibold">No results for “{query}”</p><p className="mt-1 text-sm">Try a different name, keyword or hashtag.</p></div>}
+          {!(searchProfiles.length || searchPosts.length || searchReels.length || searchHashtags.length) && <div className="rounded-xl border border-border/70 bg-card/30 px-4 py-16 text-center text-muted-foreground"><Search className="mx-auto mb-3 h-10 w-10 opacity-40" /><p className="font-semibold">No results for “{query}”</p><p className="mt-1 text-sm">Try a different name or keyword.</p></div>}
         </div>
-      ) : (
+
         <div className="space-y-4 sm:space-y-6">
           {user && suggestedPeople.length > 0 && (
             <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
