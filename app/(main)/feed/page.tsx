@@ -5,6 +5,7 @@ import { PostCard } from '@/components/feed/PostCard'
 import { PostSkeleton } from '@/components/feed/PostSkeleton'
 import { AdPostSlot } from '@/components/ads/AdPostSlot'
 import { StoriesBar } from '@/components/stories/StoriesBar'
+import { HomeGreetingBanner } from '@/components/feed/HomeGreetingBanner'
 import { useFeedPosts } from '@/lib/hooks/usePosts'
 import { useUser } from '@/lib/hooks/useUser'
 import { createClient } from '@/lib/supabase/client'
@@ -45,6 +46,9 @@ export default function FeedPage() {
 
   return (
     <div className="max-w-xl mx-auto">
+      {/* Time-based greeting banner, placed above Stories */}
+      <HomeGreetingBanner />
+
       {/* Stories */}
       <StoriesBar />
 
