@@ -46,24 +46,24 @@ export function HomeGreetingBanner() {
   return (
     <section
       aria-label={`${greetingCopy[period]}, ${fullName}`}
-      className="relative isolate mx-4 mb-4 overflow-hidden rounded-2xl border border-white/10 bg-card shadow-sm"
+      className="relative isolate mx-3 mb-4 overflow-hidden rounded-2xl border border-white/10 bg-card shadow-sm sm:mx-4"
     >
-      {/* Render the artwork as a real image so it keeps its proportions and isn't blurred or dimmed as a CSS background. */}
-      <div className="relative flex min-h-[132px] items-center sm:min-h-[176px] lg:min-h-[200px]">
+      {/* Fill the card with the original image asset; cover avoids empty black bars on every screen size. */}
+      <div className="relative aspect-[2.1/1] w-full sm:aspect-[3.5/1] lg:aspect-[4/1]">
         <img
           key={period}
           src={imagePaths[period]}
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-contain object-center"
+          className="absolute inset-0 h-full w-full object-cover object-center"
           fetchPriority="high"
         />
         <div
           aria-hidden="true"
           className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/30 to-transparent"
         />
-        <div className="relative z-10 max-w-[88%] px-4 py-5 sm:px-7 sm:py-7">
-          <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/85 sm:text-xs sm:tracking-[0.28em]">
+        <div className="absolute inset-y-0 left-0 z-10 flex max-w-[88%] flex-col justify-center px-4 py-3 sm:max-w-[72%] sm:px-7 sm:py-6">
+          <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-white/90 sm:text-xs sm:tracking-[0.28em]">
             SociaLens · Your space, your moment
           </p>
           <h1 className="font-serif text-xl font-semibold leading-tight tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)] sm:text-4xl">
