@@ -39,7 +39,6 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
   const trackedOpenRef = useRef(false)
   const lastVideoTimeRef = useRef<number | null>(null)
   const watchedSecondsRef = useRef(0)
-  const dialogScrollRef = useRef<HTMLDivElement>(null)
   const { user, profile } = useUser()
   const supabase = createClient()
   const queryClient = useQueryClient()
@@ -95,15 +94,6 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
       if (onCanPlay) video.removeEventListener('canplay', onCanPlay)
     }
   }, [open, post.media_url])
-
-  useEffect(() => {
-    if (!showComments || !open) return
-    const frame = window.requestAnimationFrame(() => {
-      const container = dialogScrollRef.current
-      if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
-    })
-    return () => window.cancelAnimationFrame(frame)
-  }, [showComments, open])
 
   useEffect(() => {
     if (!open) {
@@ -233,7 +223,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
       <Dialog modal={false} open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>{trigger}</DialogTrigger>
         <DialogContent onInteractOutside={(event) => event.preventDefault()} onEscapeKeyDown={(event) => event.preventDefault()} className="flex max-h-[94dvh] w-[calc(100%-1rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl border-border/80 bg-background p-0 shadow-2xl sm:max-h-[92vh] sm:w-[calc(100%-2rem)] sm:rounded-2xl">
-          <div ref={dialogScrollRef} className="flex min-h-0 flex-col overflow-y-auto">
+          <div className="flex min-h-0 flex-col overflow-hidden">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
               <Link href={`/profile/${post.profiles?.username ?? ''}`} onClick={() => setOpen(false)} className="min-w-0 truncate text-sm font-semibold hover:text-pink-400">@{post.profiles?.username ?? 'user'}</Link>
               <div className="mr-8 shrink-0">
@@ -260,7 +250,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
             {post.content?.trim() && <div className="border-b border-border/60 px-4 py-3">
               <PostCaption content={post.content} expandMode="inline" titleClassName="text-sm leading-relaxed font-semibold" captionClassName="mt-1 text-sm leading-6 text-muted-foreground" buttonClassName="mt-1 text-xs font-semibold text-pink-400 hover:underline" />
             </div>}
-            {showComments && <div className="min-h-[180px] max-h-[42dvh] shrink-0 overflow-y-auto border-b border-border/70 px-4 py-3 sm:min-h-[220px]"><p className="mb-3 text-xs font-semibold text-muted-foreground">Comments</p><CommentThread target="post" targetId={post.id} currentUserId={user?.id} ownerId={post.user_id} commentRestrictedUntil={profile?.restrict_comment_until} variant="compact" listClassName="max-h-[36dvh] min-h-[130px] mb-2" /></div>}
+            {showComments && <div className="shrink-0 overflow-hidden border-b border-border/70 px-4 py-3"><p className="mb-3 text-xs font-semibold text-muted-foreground">Comments</p><CommentThread target="post" targetId={post.id} currentUserId={user?.id} ownerId={post.user_id} commentRestrictedUntil={profile?.restrict_comment_until} variant="compact" listClassName="max-h-[32dvh] overflow-y-auto mb-2" /></div>}
             <div className="shrink-0 px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <div className="flex min-w-0 flex-1 items-center justify-start gap-3 sm:gap-4">
