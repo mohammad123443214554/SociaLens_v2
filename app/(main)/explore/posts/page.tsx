@@ -76,7 +76,7 @@ export default function AllExplorePostsPage() {
           <div className="min-w-0 flex-1">
             <p className="mb-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-pink-400 sm:text-xs"><TrendingUp className="h-3.5 w-3.5" /> Explore</p>
             <h1 className="text-lg font-extrabold leading-tight tracking-tight sm:text-3xl">Posts</h1>
-            <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">Photos shared by the SociaLens community</p>
+            
           </div>
         </div>
         <div className="relative mt-3 sm:mt-6">
