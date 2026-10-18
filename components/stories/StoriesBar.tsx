@@ -71,8 +71,8 @@ export function StoriesBar() {
   if (!profile) return null
 
   return (
-    <div className="mx-4 mt-4 mb-2">
-      <div className="flex gap-4 overflow-x-auto pb-1 scrollbar-hide">
+    <div className="mx-0 mt-4 mb-3 min-w-0 rounded-2xl border border-border/70 bg-card p-3 shadow-sm sm:p-4">
+      <div className="flex min-w-0 gap-4 overflow-x-auto pb-1 scrollbar-hide">
         {/* Your Story bubble */}
         <button
           onClick={() => {
@@ -83,21 +83,21 @@ export function StoriesBar() {
               setShowCreate(true)
             }
           }}
-          className="flex flex-col items-center gap-1 shrink-0 w-16"
+          className="flex w-16 shrink-0 flex-col items-center gap-1"
         >
-          <div className={`relative h-16 w-16 rounded-full flex items-center justify-center ${myGroup ? 'bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 p-[2px]' : ''}`}>
+          <div className={`relative flex h-16 w-16 items-center justify-center rounded-full ${myGroup ? 'bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 p-[2px]' : ''}`}>
             <Avatar className="h-full w-full border-2 border-background">
               <AvatarImage src={getAvatarUrl(profile.avatar_url)} />
               <AvatarFallback>{profile.username?.[0]?.toUpperCase()}</AvatarFallback>
             </Avatar>
             <button
               onClick={(e) => { e.stopPropagation(); setShowCreate(true) }}
-              className="absolute -bottom-0.5 -right-0.5 h-5 w-5 rounded-full bg-pink-500 border-2 border-background flex items-center justify-center"
+              className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-background bg-pink-500"
             >
               <Plus className="h-3 w-3 text-white" />
             </button>
           </div>
-          <span className="text-[11px] text-muted-foreground truncate w-full text-center">Your Story</span>
+          <span className="w-full truncate text-center text-[11px] text-muted-foreground">Your Story</span>
         </button>
 
         {/* Friends' stories, with sponsored rings mixed in at random gaps */}
@@ -112,7 +112,7 @@ export function StoriesBar() {
                 setViewerStoryIndex(0)
                 setViewerIndex(groups.indexOf(item))
               }}
-              className="flex flex-col items-center gap-1 shrink-0 w-16"
+              className="flex w-16 shrink-0 flex-col items-center gap-1"
             >
               <div className="h-16 w-16 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 p-[2px]">
                 <Avatar className="h-full w-full border-2 border-background">
@@ -120,7 +120,7 @@ export function StoriesBar() {
                   <AvatarFallback>{item.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
                 </Avatar>
               </div>
-              <span className="text-[11px] text-muted-foreground truncate w-full text-center">{item.profile?.username}</span>
+              <span className="w-full truncate text-center text-[11px] text-muted-foreground">{item.profile?.username}</span>
             </button>
           )
         })}
