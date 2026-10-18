@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Hash, Search, TrendingUp, X, Loader2 } from 'lucide-react'
+import { Hash, Search, TrendingUp, X, Loader2, Mic } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
 import { formatCount } from '@/lib/utils/helpers'
@@ -17,10 +17,42 @@ function extractHashtags(content: string): string[] {
 
 export default function ExploreHashtagsPage() {
   const [query, setQuery] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
+  const [isListening, setIsListening] = useState(false)
+  const recognitionRef = useState<{ current: any }>({ current: null })[0]
   useEffect(() => {
     const initialQuery = new URLSearchParams(window.location.search).get('q')
-    if (initialQuery) setQuery(initialQuery)
+    if (initialQuery) {
+      setQuery(initialQuery)
+      setSubmittedQuery(initialQuery)
+    }
   }, [])
+  const toggleVoiceSearch = () => {
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+    if (typeof window === 'undefined') return
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      window.alert('Voice search is not supported in this browser. Please try Chrome or Edge.')
+      return
+    }
+    const recognition = new SpeechRecognition()
+    recognition.lang = navigator.language || 'en-IN'
+    recognition.interimResults = true
+    recognition.continuous = false
+    recognitionRef.current = recognition
+    recognition.onstart = () => setIsListening(true)
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results as ArrayLike<any>).map((result: any) => result[0]?.transcript || '').join(' ')
+      setQuery(transcript)
+    }
+    recognition.onerror = () => setIsListening(false)
+    recognition.onend = () => setIsListening(false)
+    recognition.start()
+  }
   const supabase = createClient()
 
   const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
@@ -62,10 +94,10 @@ export default function ExploreHashtagsPage() {
   }, [data])
 
   const filteredHashtags = useMemo(() => {
-    const needle = query.trim().replace(/^#/, '').toLocaleLowerCase()
+    const needle = submittedQuery.trim().replace(/^#/, '').toLocaleLowerCase()
     if (!needle) return hashtags
     return hashtags.filter(item => item.tag.replace(/^#/, '').toLocaleLowerCase().includes(needle))
-  }, [hashtags, query])
+  }, [hashtags, submittedQuery])
 
   return (
     <main className="mx-auto w-full max-w-4xl px-3 pb-24 pt-4 sm:px-5 sm:pt-7">
@@ -82,9 +114,10 @@ export default function ExploreHashtagsPage() {
           </div>
         </div>
         <div className="relative mt-3 sm:mt-6">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground sm:left-3.5" />
-          <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search hashtags..." aria-label="Search hashtags" className="h-10 rounded-xl border-border/80 bg-background/80 pl-9 pr-9 text-sm focus-visible:ring-pink-500/50 sm:h-12 sm:rounded-2xl sm:pl-10 sm:pr-10" />
-          {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear hashtag search" className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" /></button>}
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground sm:left-3.5 sm:h-4 sm:w-4" />
+          <Input value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); setSubmittedQuery(query.trim()) } }} placeholder={isListening ? 'Listening… speak to search' : 'Search SociaLens'} aria-label="Search SociaLens" className="h-10 rounded-xl border-border/80 bg-card/80 pl-9 pr-20 text-sm shadow-sm focus-visible:ring-pink-500/50 sm:h-12 sm:rounded-2xl sm:pl-10 sm:pr-20" />
+          {query && <button type="button" onClick={() => { setQuery(''); setSubmittedQuery('') }} aria-label="Clear search" className="absolute right-10 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" /></button>}
+          <button type="button" onClick={toggleVoiceSearch} aria-label={isListening ? 'Stop voice search' : 'Start voice search'} title={isListening ? 'Stop voice search' : 'Voice search'} className={`absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 transition-colors hover:bg-accent ${isListening ? 'text-pink-400' : 'text-muted-foreground hover:text-pink-400'}`}><Mic className="h-4 w-4" /></button>
         </div>
       </header>
 
@@ -102,7 +135,7 @@ export default function ExploreHashtagsPage() {
             </div>)}
           </div>
         ) : (
-          <div className="px-5 py-14 text-center"><Hash className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" /><p className="text-sm font-semibold">{query ? 'No matching hashtags' : 'No hashtags found yet'}</p><p className="mt-1 text-xs text-muted-foreground">{query ? 'Try another hashtag name.' : 'Hashtags from real posts will appear here.'}</p></div>
+          <div className="px-5 py-14 text-center"><Hash className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" /><p className="text-sm font-semibold">{submittedQuery ? 'No matching hashtags' : 'No hashtags found yet'}</p><p className="mt-1 text-xs text-muted-foreground">{submittedQuery ? 'Try another hashtag name.' : 'Hashtags from real posts will appear here.'}</p></div>
         )}
         <InfiniteScrollSentinel onIntersect={fetchNextPage} hasMore={!!hasNextPage} isLoading={isFetchingNextPage} />
         {isFetchingNextPage && <div className="flex justify-center pb-3"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>}
