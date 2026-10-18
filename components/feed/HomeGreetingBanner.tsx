@@ -46,18 +46,22 @@ export function HomeGreetingBanner() {
   return (
     <section
       aria-label={`${greetingCopy[period]}, ${fullName}`}
-      className="relative isolate mx-3 mb-4 overflow-hidden rounded-2xl border border-white/10 bg-card shadow-sm sm:mx-4"
+      className="relative isolate mb-4 w-full overflow-hidden rounded-2xl border border-white/10 bg-card shadow-sm"
     >
       {/* Fill the card with the original image asset; cover avoids empty black bars on every screen size. */}
       <div className="relative aspect-[2.1/1] w-full sm:aspect-[3.5/1] lg:aspect-[4/1]">
-        <img
-          key={period}
-          src={imagePaths[period]}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-cover object-center"
-          fetchPriority="high"
-        />
+        {(Object.keys(imagePaths) as GreetingPeriod[]).map((imagePeriod) => (
+          <img
+            key={imagePeriod}
+            src={imagePaths[imagePeriod]}
+            alt=""
+            aria-hidden="true"
+            loading="eager"
+            decoding="async"
+            className={"absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-700 ease-in-out " + (period === imagePeriod ? "opacity-100" : "opacity-0")}
+            fetchPriority={period === imagePeriod ? "high" : "auto"}
+          />
+        ))}
         <div
           aria-hidden="true"
           className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/30 to-transparent"
