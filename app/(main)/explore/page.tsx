@@ -28,7 +28,7 @@ import { getViewerContext } from '@/lib/recommendation/viewerContext'
 import { rankExplorePosts } from '@/lib/recommendation/rankExplorePosts'
 import { rankReels } from '@/lib/recommendation/rankReels'
 
-type Tab = 'all' | 'profiles' | 'posts' | 'hashtags'
+type Tab = 'all' | 'profiles' | 'reels' | 'posts' | 'hashtags'
 const POST_SELECT = '*, profiles!posts_user_id_fkey(*)'
 
 function extractHashtags(content: string): string[] {
@@ -441,7 +441,7 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
           )}
           {!(searchProfiles.length || searchPosts.length || searchReels.length || searchHashtags.length) && <div className="rounded-xl border border-border/70 bg-card/30 px-4 py-16 text-center text-muted-foreground"><Search className="mx-auto mb-3 h-10 w-10 opacity-40" /><p className="font-semibold">No results for “{query}”</p><p className="mt-1 text-sm">Try a different name or keyword.</p></div>}
         </div>
-
+      ) : (
         <div className="space-y-4 sm:space-y-6">
           {user && suggestedPeople.length > 0 && (
             <section className="rounded-xl border border-border/70 bg-card/30 p-2.5 sm:rounded-2xl sm:p-4">
