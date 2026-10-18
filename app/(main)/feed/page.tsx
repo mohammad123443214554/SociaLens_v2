@@ -6,6 +6,7 @@ import { PostSkeleton } from '@/components/feed/PostSkeleton'
 import { AdPostSlot } from '@/components/ads/AdPostSlot'
 import { StoriesBar } from '@/components/stories/StoriesBar'
 import { HomeGreetingBanner } from '@/components/feed/HomeGreetingBanner'
+import { ReelViewer } from '@/components/shared/ReelViewer'
 import { useFeedPosts } from '@/lib/hooks/usePosts'
 import { useUser } from '@/lib/hooks/useUser'
 import { createClient } from '@/lib/supabase/client'
@@ -51,6 +52,40 @@ export default function FeedPage() {
 
       {/* Stories */}
       <StoriesBar />
+
+      {/* One vertically-scrolling, algorithm-ranked section for reels, photo posts and text posts */}
+      <section className="my-4 overflow-hidden rounded-xl border border-border/70 bg-card/30 sm:rounded-2xl">
+        <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-3 sm:px-4">
+          <h2 className="text-sm font-bold sm:text-base">Recommended for you</h2>
+          <span className="text-[11px] text-muted-foreground sm:text-xs">Reels · Posts · Text Posts</span>
+        </div>
+        {isLoading ? (
+          <div className="space-y-3 p-3 sm:p-4">
+            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />)}
+          </div>
+        ) : posts.filter(post => post.content?.trim()).length ? (
+          <div className="divide-y divide-border/60">
+            {posts.filter(post => post.content?.trim()).slice(0, 8).map(post => {
+              const content = post.content?.trim() ?? ''
+              const title = content.split(/\r?\n/).map(line => line.trim()).find(Boolean) ?? ''
+              return (
+                <ReelViewer
+                  key={post.id}
+                  post={post}
+                  trigger={
+                    <button type="button" className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/40 sm:px-4">
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</span>
+                      <span className="shrink-0 text-xs font-semibold text-pink-400 hover:text-fuchsia-400">See more</span>
+                    </button>
+                  }
+                />
+              )
+            })}
+          </div>
+        ) : (
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">No recommended posts available yet.</p>
+        )}
+      </section>
 
       {/* feed */}
       <div>
