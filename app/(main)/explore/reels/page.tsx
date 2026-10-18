@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { ArrowLeft, Heart, MessageCircle, Play, Search, X, Loader2, TrendingUp, Mic } from 'lucide-react'
@@ -52,7 +52,7 @@ export default function AllReelsPage() {
   const [query, setQuery] = useState('')
   const [submittedQuery, setSubmittedQuery] = useState('')
   const [isListening, setIsListening] = useState(false)
-  const recognitionRef = useState<{ current: any }>({ current: null })[0]
+  const recognitionRef = useRef<any>(null)
   useEffect(() => {
     const initialQuery = new URLSearchParams(window.location.search).get('q')
     if (initialQuery) {
