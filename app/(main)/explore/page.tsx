@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import {
   Search, Users, UserPlus, Grid3x3, Hash, X, AlertCircle, Play,
-  Image as ImageIcon, ArrowUpRight, Heart, MessageCircle,
+  Image as ImageIcon, ArrowUpRight, Heart, MessageCircle, Mic,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { PostCard } from '@/components/feed/PostCard'
@@ -80,6 +80,9 @@ function SectionHeading({ icon, title, subtitle, action }: {
 
 export default function ExplorePage() {
   const [query, setQuery] = useState('')
+  const [searchSubmitted, setSearchSubmitted] = useState(false)
+  const [isListening, setIsListening] = useState(false)
+  const recognitionRef = useRef<any>(null)
   const activeSection = 'for-you' as const
   const [selectedHashtag, setSelectedHashtag] = useState<string | null>(null)
   const router = useRouter()
@@ -101,7 +104,36 @@ export default function ExplorePage() {
   // Keep using the existing personalized reels pipeline; no ranking code is changed here.
   const posts = explorePages?.pages.flatMap(page => page.posts) ?? []
 const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [posts])
-  const isSearching = query.trim().length > 1
+  const isSearching = searchSubmitted && query.trim().length > 1
+
+  const submitSearch = () => setSearchSubmitted(query.trim().length > 0)
+  const toggleVoiceSearch = () => {
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+    if (typeof window === 'undefined') return
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      window.alert('Voice search is not supported in this browser. Please try Chrome or Edge.')
+      return
+    }
+    const recognition = new SpeechRecognition()
+    recognition.lang = navigator.language || 'en-IN'
+    recognition.interimResults = true
+    recognition.continuous = false
+    recognitionRef.current = recognition
+    recognition.onstart = () => setIsListening(true)
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results as ArrayLike<any>).map((result: any) => result[0]?.transcript || '').join(' ')
+      setQuery(transcript)
+      setSearchSubmitted(false)
+    }
+    recognition.onerror = () => setIsListening(false)
+    recognition.onend = () => setIsListening(false)
+    recognition.start()
+  }
 
   const { data: searchProfiles = [] } = useQuery({
     queryKey: ['search-profiles', query, user?.id],
@@ -379,8 +411,9 @@ const exploreItems = useMemo(() => interleaveAds(dedupeById(posts), 3, 8), [post
         </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground sm:left-3.5 sm:h-4 sm:w-4" />
-          <Input placeholder="Search people, posts, #hashtags..." value={query} onChange={e => setQuery(e.target.value)} className="h-10 rounded-xl border-border/80 bg-card/80 pl-9 pr-9 text-sm shadow-sm focus-visible:ring-pink-500/50 sm:h-12 sm:rounded-2xl sm:pl-10 sm:pr-10" />
-          {query && <button onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" /></button>}
+          <Input placeholder={isListening ? 'Listening… speak to search' : 'Search people, posts, #hashtags...'} value={query} onChange={e => { setQuery(e.target.value); setSearchSubmitted(false) }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitSearch() } }} className="h-10 rounded-xl border-border/80 bg-card/80 pl-9 pr-20 text-sm shadow-sm focus-visible:ring-pink-500/50 sm:h-12 sm:rounded-2xl sm:pl-10 sm:pr-24" />
+          <button type="button" onClick={toggleVoiceSearch} aria-label={isListening ? 'Stop voice search' : 'Start voice search'} title={isListening ? 'Stop voice search' : 'Voice search'} className={cn('absolute right-10 top-1/2 -translate-y-1/2 rounded-full p-1.5 transition-colors hover:bg-accent sm:right-12', isListening ? 'text-pink-400' : 'text-muted-foreground hover:text-pink-400')}><Mic className="h-4 w-4" /></button>
+          {query && <button onClick={() => { setQuery(''); setSearchSubmitted(false) }} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" /></button>}
         </div>
 
 
