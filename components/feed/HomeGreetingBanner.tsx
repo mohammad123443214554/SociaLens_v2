@@ -48,8 +48,7 @@ export function HomeGreetingBanner() {
       aria-label={`${greetingCopy[period]}, ${fullName}`}
       className="relative isolate mb-4 w-full overflow-hidden rounded-2xl border border-white/10 bg-card shadow-sm"
     >
-      {/* Keep the original image quality while making the banner shorter on mobile and desktop. */}
-      <div className="relative aspect-[2.8/1] w-full sm:aspect-[4.5/1] lg:aspect-[5/1]">
+      <div className="relative h-[96px] w-full sm:h-[201px]">
         {(Object.keys(imagePaths) as GreetingPeriod[]).map((imagePeriod) => (
           <img
             key={imagePeriod}
@@ -66,14 +65,14 @@ export function HomeGreetingBanner() {
           aria-hidden="true"
           className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/30 to-transparent"
         />
-        <div className="absolute inset-y-0 left-0 z-10 flex max-w-[88%] flex-col justify-center px-3 py-1.5 sm:max-w-[72%] sm:px-6 sm:py-3">
-          <p className="mb-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-white/90 sm:mb-1 sm:text-xs sm:tracking-[0.24em]">
+        <div className="absolute inset-y-0 left-0 z-10 flex max-w-[88%] flex-col justify-center px-3 sm:max-w-[72%] sm:px-6">
+          <p className="mb-0.5 text-[7px] font-semibold uppercase tracking-[0.1em] text-white/90 sm:mb-1 sm:text-xs sm:tracking-[0.24em]">
             SociaLens · Your space, your moment
           </p>
-          <h1 className="font-serif text-lg font-semibold leading-tight tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)] sm:text-3xl lg:text-4xl">
+          <h1 className="font-serif text-base font-semibold leading-tight tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)] sm:text-3xl lg:text-4xl">
             {greetingCopy[period]},
           </h1>
-          <p className="mt-0.5 break-words font-serif text-base font-medium tracking-wide text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)] sm:mt-1 sm:text-2xl lg:text-3xl">
+          <p className="mt-0.5 break-words font-serif text-sm font-medium tracking-wide text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)] sm:mt-1 sm:text-2xl lg:text-3xl">
             {fullName}
           </p>
         </div>
