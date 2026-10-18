@@ -45,7 +45,7 @@ export default function FeedPage() {
   let lastRealPost: typeof posts[number] | null = null
 
   return (
-    <div className="max-w-xl mx-auto">
+    <div className="w-full min-w-0 px-3 sm:px-4 xl:px-6">
       {/* Time-based greeting banner, placed above Stories */}
       <HomeGreetingBanner />
 
