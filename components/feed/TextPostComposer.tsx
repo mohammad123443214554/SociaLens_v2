@@ -97,35 +97,26 @@ export function TextPostComposer() {
             <AvatarImage src={getAvatarUrl(profile?.avatar_url)} />
             <AvatarFallback>{profile?.username?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
           </Avatar>
+          <textarea
+            aria-label="What's on your mind?"
+            value={content}
+            onChange={event => { setContent(event.target.value.slice(0, MAX_TEXT_POST_LENGTH)); setError('') }}
+            placeholder="What's on your mind?"
+            rows={1}
+            maxLength={MAX_TEXT_POST_LENGTH}
+            className="min-h-10 min-w-0 flex-1 resize-none rounded-full border border-border/80 bg-muted/35 px-4 py-2.5 text-sm leading-5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/10 sm:min-h-11 sm:py-3"
+          />
           <button
             type="button"
             onClick={() => { setStep('expiration'); setError('') }}
-            className="flex h-10 min-w-0 flex-1 items-center rounded-full border border-border/80 bg-muted/35 px-4 text-left text-sm text-muted-foreground transition-colors hover:border-pink-500/40 hover:bg-muted/60 sm:h-11"
-          >
-            What's on your mind?
-          </button>
-          <button
-            type="button"
-            onClick={() => { setStep('expiration'); setError('') }}
-            disabled={!user}
+            disabled={!user || !content.trim()}
             className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-pink-500 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:px-5"
           >
             <Send className="h-4 w-4" />
             <span>Send</span>
           </button>
         </div>
-        {step === null && (
-          <textarea
-            aria-label="What's on your mind?"
-            value={content}
-            onChange={event => setContent(event.target.value.slice(0, MAX_TEXT_POST_LENGTH))}
-            onFocus={() => { /* keep the inline composer compact; the full editor opens from Send */ }}
-            placeholder="What's on your mind?"
-            rows={0}
-            className="sr-only"
-            tabIndex={-1}
-          />
-        )}
+        <div className="mt-1 flex justify-end px-1 text-[10px] text-muted-foreground">{content.length.toLocaleString()} / {MAX_TEXT_POST_LENGTH.toLocaleString()}</div>
       </section>
 
       {step && (
@@ -156,20 +147,10 @@ export function TextPostComposer() {
                     This text post is temporary. When its timer ends, it will be permanently deleted from SociaLens and Supabase.
                   </div>
 
-                  <label htmlFor="text-post-content" className="block text-xs font-semibold text-foreground">Your text</label>
-                  <textarea
-                    id="text-post-content"
-                    autoFocus
-                    value={content}
-                    onChange={event => { setContent(event.target.value.slice(0, MAX_TEXT_POST_LENGTH)); setError('') }}
-                    placeholder="What's on your mind?"
-                    maxLength={MAX_TEXT_POST_LENGTH}
-                    rows={6}
-                    className="w-full resize-y rounded-xl border border-border bg-background px-3.5 py-3 text-sm leading-6 text-foreground outline-none transition focus:border-pink-500/60 focus:ring-2 focus:ring-pink-500/15"
-                  />
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] text-muted-foreground">Maximum {MAX_TEXT_POST_LENGTH.toLocaleString()} characters</span>
-                    <span className={`text-[11px] tabular-nums ${content.length >= MAX_TEXT_POST_LENGTH ? 'font-semibold text-pink-400' : 'text-muted-foreground'}`}>{content.length.toLocaleString()} / {MAX_TEXT_POST_LENGTH.toLocaleString()}</span>
+                  <div className="rounded-xl border border-border bg-background px-3.5 py-3">
+                    <p className="mb-2 text-[11px] font-semibold text-muted-foreground">Post content</p>
+                    <p className="max-h-36 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{content.trim()}</p>
+                    <p className="mt-2 text-right text-[10px] text-muted-foreground">{content.length.toLocaleString()} / {MAX_TEXT_POST_LENGTH.toLocaleString()} characters</p>
                   </div>
 
                   <div>
