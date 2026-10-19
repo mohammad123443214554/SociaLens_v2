@@ -474,15 +474,26 @@ export default function AperonixPage() {
             await addReferenceImage(await referenceResponse.blob())
           }
         }
+        const asksForSociaLensLogo = /socialens/i.test(text) && /logo|brand|branding/i.test(text)
+        if (asksForSociaLensLogo && referenceImages.length < 4) {
+          try {
+            const logoResponse = await fetch('/images/socialens-logo.png', { cache: 'force-cache' })
+            if (logoResponse.ok) await addReferenceImage(await logoResponse.blob())
+          } catch (error) {
+            console.error('Could not load official SociaLens logo reference', error)
+          }
+        }
         const imageResponse = await fetch('/api/aperonix/image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt: previousGeneratedImage && previousImageRequest && imageRefinement
-              ? `Refine the provided reference image. Keep the same subject and composition unless the user asks to change them. Earlier request: ${previousImageRequest.content}. Requested change: ${text}`
-              : previousImageIntent && previousImageRequest
-                ? `Create an image based on this earlier request: ${previousImageRequest.content}. The user is confirming that they want the image generated now. Follow-up: ${text}`
-                : text,
+            prompt: asksForSociaLensLogo
+              ? `Use the official SociaLens logo supplied as a reference image. Preserve the logo's recognizable mark, proportions, and colors. ${hasCurrentImage ? 'Apply this exact logo to the user-provided target image as requested.' : 'Create a polished visual featuring the real SociaLens brand logo, not an invented substitute.'} User request: ${text}`
+              : previousGeneratedImage && previousImageRequest && imageRefinement
+                ? `Refine the provided reference image. Keep the same subject and composition unless the user asks to change them. Earlier request: ${previousImageRequest.content}. Requested change: ${text}`
+                : previousImageIntent && previousImageRequest
+                  ? `Create an image based on this earlier request: ${previousImageRequest.content}. The user is confirming that they want the image generated now. Follow-up: ${text}`
+                  : text,
             referenceImages,
           }),
         })
