@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, Check, Clock3, Send, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowLeft, ArrowRight, Check, Clock3, FileText, Send, X } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useUser } from '@/lib/hooks/useUser'
 import { createClient } from '@/lib/supabase/client'
@@ -25,12 +25,64 @@ export function TextPostComposer() {
   const supabase = createClient()
   const queryClient = useQueryClient()
   const [content, setContent] = useState('')
+  const [draftSaved, setDraftSaved] = useState(false)
+  const [draftLoaded, setDraftLoaded] = useState(false)
   const composerInputRef = useRef<HTMLTextAreaElement>(null)
   const [step, setStep] = useState<ComposerStep | null>(null)
   const [expirationMs, setExpirationMs] = useState<number>(EXPIRATION_OPTIONS[1].value)
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState('')
   const [showRestrictionPopup, setShowRestrictionPopup] = useState(false)
+  const draftStorageKey = user ? `socialens:text-post-draft:${user.id}` : null
+
+  useEffect(() => {
+    if (!draftStorageKey || draftLoaded) return
+    setDraftLoaded(true)
+    try {
+      const rawDraft = window.localStorage.getItem(draftStorageKey)
+      if (!rawDraft) return
+      const draft = JSON.parse(rawDraft) as { content?: string; expirationMs?: number }
+      if (typeof draft.content === 'string') setContent(draft.content.slice(0, MAX_TEXT_POST_LENGTH))
+      if (typeof draft.expirationMs === 'number' && EXPIRATION_OPTIONS.some(option => option.value === draft.expirationMs)) {
+        setExpirationMs(draft.expirationMs)
+      }
+      setDraftSaved(true)
+    } catch (draftError) {
+      console.error('Could not restore text post draft', draftError)
+    }
+  }, [draftStorageKey, draftLoaded])
+
+  const saveDraft = () => {
+    if (!draftStorageKey || !content.trim()) {
+      setError('Write something before saving this draft.')
+      return
+    }
+    try {
+      window.localStorage.setItem(draftStorageKey, JSON.stringify({ content, expirationMs, updatedAt: new Date().toISOString() }))
+      setDraftSaved(true)
+      setStep(null)
+      setError('')
+    } catch (draftError) {
+      console.error('Could not save text post draft', draftError)
+      setError('Draft could not be saved. Please try again.')
+    }
+  }
+
+  const openDraft = () => {
+    if (!draftStorageKey) return
+    try {
+      const rawDraft = window.localStorage.getItem(draftStorageKey)
+      if (!rawDraft) return
+      const draft = JSON.parse(rawDraft) as { content?: string; expirationMs?: number }
+      setContent(typeof draft.content === 'string' ? draft.content.slice(0, MAX_TEXT_POST_LENGTH) : '')
+      if (typeof draft.expirationMs === 'number' && EXPIRATION_OPTIONS.some(option => option.value === draft.expirationMs)) setExpirationMs(draft.expirationMs)
+      if (composerInputRef.current) composerInputRef.current.style.height = 'auto'
+      setStep(null)
+      setError('')
+    } catch (draftError) {
+      console.error('Could not open text post draft', draftError)
+    }
+  }
 
   const closeFlow = () => {
     if (posting) return
@@ -78,6 +130,8 @@ export function TextPostComposer() {
       ])
       setContent('')
       if (composerInputRef.current) composerInputRef.current.style.height = 'auto'
+      if (draftStorageKey) window.localStorage.removeItem(draftStorageKey)
+      setDraftSaved(false)
       setStep(null)
     } catch (err) {
       console.error('Text post could not be shared', err)
@@ -122,10 +176,13 @@ export function TextPostComposer() {
             className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-pink-500 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:px-5"
           >
             <Send className="h-4 w-4" />
-            <span>Send</span>
+            <span>Share</span>
           </button>
         </div>
-        {content.length > 0 && <div className="mt-1 flex justify-end px-1 text-[10px] text-muted-foreground">{content.length.toLocaleString()} / {MAX_TEXT_POST_LENGTH.toLocaleString()}</div>}
+        <div className="mt-1 flex items-center justify-end gap-2 px-1">
+          {draftSaved && <button type="button" onClick={openDraft} className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-semibold text-pink-400 hover:bg-pink-500/10"><FileText className="h-3 w-3" /> Draft</button>}
+          {content.length > 0 && <span className="text-[10px] text-muted-foreground">{content.length.toLocaleString()} / {MAX_TEXT_POST_LENGTH.toLocaleString()}</span>}
+        </div>
       </section>
 
       {step && (
@@ -151,11 +208,6 @@ export function TextPostComposer() {
             <div className="space-y-4 p-4 sm:p-5">
               {step === 'expiration' ? (
                 <>
-                  <div className="flex items-center gap-2 rounded-xl border border-pink-500/20 bg-pink-500/5 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
-                    <Clock3 className="h-4 w-4 shrink-0 text-pink-400" />
-                    This text post is temporary. When its timer ends, it will be permanently deleted from SociaLens and Supabase.
-                  </div>
-
                   <div className="rounded-xl border border-border bg-background px-3.5 py-3">
                     <p className="mb-2 text-[11px] font-semibold text-muted-foreground">Post content</p>
                     <p className="max-h-36 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{content.trim()}</p>
@@ -204,9 +256,14 @@ export function TextPostComposer() {
               <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
                 <button type="button" onClick={closeFlow} disabled={posting} className="rounded-full px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50">Cancel</button>
                 {step === 'expiration' ? (
-                  <button type="button" onClick={continueToPreview} className="inline-flex items-center gap-2 rounded-full bg-pink-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pink-600">
-                    Next <ArrowRight className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={saveDraft} disabled={posting} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-50">
+                      <FileText className="h-4 w-4" /> Save as draft
+                    </button>
+                    <button type="button" onClick={continueToPreview} className="inline-flex items-center gap-2 rounded-full bg-pink-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pink-600">
+                      Next <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 ) : (
                   <button type="button" onClick={sharePost} disabled={posting} className="inline-flex items-center gap-2 rounded-full bg-pink-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pink-600 disabled:cursor-wait disabled:opacity-60">
                     {posting ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <Send className="h-4 w-4" />}
