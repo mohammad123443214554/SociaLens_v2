@@ -77,6 +77,7 @@ export function TextPostComposer() {
         queryClient.invalidateQueries({ queryKey: ['profile-posts'] }),
       ])
       setContent('')
+      if (composerInputRef.current) composerInputRef.current.style.height = 'auto'
       setStep(null)
     } catch (err) {
       console.error('Text post could not be shared', err)
