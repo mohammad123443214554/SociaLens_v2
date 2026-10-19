@@ -159,8 +159,8 @@ export function TextPostComposer() {
         <RestrictionPopup feature="posting" until={profile?.restrict_post_until} onClose={() => setShowRestrictionPopup(false)} />
       )}
 
-      <section aria-label="Create a text post" className="mb-4 rounded-xl border border-border/70 bg-card px-3 py-3 shadow-sm sm:rounded-2xl sm:px-4 sm:py-3.5">
-        <div className="flex items-center gap-2.5 sm:gap-3">
+      {!(step && editingDraft) && <section aria-label="Create a text post" className="mb-4 rounded-xl border border-border/70 bg-card px-3 py-3 shadow-sm sm:rounded-2xl sm:px-4 sm:py-3.5">
+        <div className="grid grid-cols-[36px_minmax(0,1fr)_auto] items-start gap-x-2.5 sm:grid-cols-[40px_minmax(0,1fr)_auto] sm:gap-x-3">
           <Avatar className="h-9 w-9 shrink-0 border border-border sm:h-10 sm:w-10">
             <AvatarImage src={getAvatarUrl(profile?.avatar_url)} />
             <AvatarFallback>{profile?.username?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
@@ -191,13 +191,15 @@ export function TextPostComposer() {
             <span>Share</span>
           </button>
         </div>
-        <div className="mt-1 flex min-h-7 items-center justify-between gap-2 px-1">
-          <div className="min-w-0">
-            {draftSaved && <button type="button" onClick={openDraft} className="inline-flex items-center gap-1.5 rounded-full border border-pink-500/25 bg-pink-500/10 px-2.5 py-1 text-[11px] font-semibold text-pink-400 transition-colors hover:bg-pink-500/15"><FileText className="h-3.5 w-3.5" /> Open draft</button>}
-          </div>
-          {content.length > 0 && <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{content.length.toLocaleString()} / {MAX_TEXT_POST_LENGTH.toLocaleString()}</span>}
+        <div className="mt-1.5 grid grid-cols-[36px_minmax(0,1fr)_auto] items-start gap-x-2.5 sm:grid-cols-[40px_minmax(0,1fr)_auto] sm:gap-x-3">
+          {draftSaved && (
+            <button type="button" onClick={openDraft} className="col-start-2 inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg border border-pink-500/25 bg-pink-500/10 px-2 text-[11px] font-semibold text-pink-400 transition-colors hover:bg-pink-500/15">
+              <FileText className="h-3.5 w-3.5 shrink-0" /> Open draft
+            </button>
+          )}
+          {content.length > 0 && <span className="col-start-2 mt-1 text-right text-[10px] tabular-nums text-muted-foreground">{content.length.toLocaleString()} / {MAX_TEXT_POST_LENGTH.toLocaleString()}</span>}
         </div>
-      </section>
+      </section>}
 
       {step && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-3 backdrop-blur-[2px] sm:p-5" onClick={closeFlow}>
