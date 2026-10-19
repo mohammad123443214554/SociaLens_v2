@@ -82,7 +82,7 @@ export default function FeedPage() {
                 <article key={post.id} className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm transition-colors hover:border-pink-400/50 sm:rounded-2xl">
                   <ReelViewer post={post} trigger={trigger} />
                   <div className="flex min-h-[76px] min-w-0 flex-1 flex-col p-2 sm:min-h-[88px] sm:p-3">
-                    <p className="line-clamp-2 break-words text-[11px] font-semibold leading-snug text-foreground sm:text-xs">{title || 'Text post'}</p>
+                    {title && <p className="line-clamp-2 break-words text-[11px] font-semibold leading-snug text-foreground sm:text-xs">{title}</p>}
                     {content && <PostCaption content={content} expandMode="dialog" titleClassName="hidden" captionClassName="hidden" buttonClassName="mt-auto pt-2 text-[10px] font-semibold text-pink-400 hover:text-fuchsia-400 sm:text-xs" />}
                   </div>
                 </article>
