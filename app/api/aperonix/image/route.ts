@@ -20,8 +20,14 @@ export async function POST(request: NextRequest) {
       }, { status: 503 })
     }
 
-    const body = await request.json() as { prompt?: unknown }
+    const body = await request.json() as { prompt?: unknown; referenceImages?: unknown }
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
+    const referenceImages = Array.isArray(body.referenceImages)
+      ? body.referenceImages.filter((image): image is string => typeof image === 'string').slice(0, 4)
+      : []
+    if (referenceImages.some(image => image.length > 2_000_000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(image))) {
+      return NextResponse.json({ error: 'The reference image could not be prepared. Please try a smaller image.' }, { status: 413 })
+    }
     if (!prompt) return NextResponse.json({ error: 'Describe the image you want Aperonix to create.' }, { status: 400 })
     if (prompt.length > MAX_PROMPT_LENGTH) {
       return NextResponse.json({ error: 'Please keep the image prompt under 2,000 characters.' }, { status: 413 })
@@ -33,6 +39,11 @@ export async function POST(request: NextRequest) {
     form.set('prompt', prompt)
     form.set('width', '1024')
     form.set('height', '1024')
+    referenceImages.forEach((image, index) => {
+      const bytes = Buffer.from(image, 'base64')
+      if (!bytes.length || bytes.length > 750_000) throw new Error('Reference image is too large.')
+      form.set(`input_image_${index}`, new Blob([bytes], { type: 'image/jpeg' }), `reference-${index}.jpg`)
+    })
     const response = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${MODEL}`,
       {
