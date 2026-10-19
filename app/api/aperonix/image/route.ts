@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 export const maxDuration = 60
 
 const MAX_PROMPT_LENGTH = 2000
-const MODEL = '@cf/black-forest-labs/flux-1-schnell'
+const MODEL = '@cf/black-forest-labs/flux-2-klein-9b'
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,12 +27,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please keep the image prompt under 2,000 characters.' }, { status: 413 })
     }
 
+    // FLUX.2 Klein 9B produces noticeably richer detail than FLUX.1 Schnell.
+    // Its REST endpoint expects multipart form data and uses a fixed 4-step process.
+    const form = new FormData()
+    form.set('prompt', prompt)
+    form.set('width', '1024')
+    form.set('height', '1024')
     const response = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${MODEL}`,
       {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, steps: 4 }),
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
         signal: AbortSignal.timeout(55000),
         cache: 'no-store',
       },
@@ -57,7 +63,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'The image service returned no image. Please try again.' }, { status: 502 })
     }
 
-    return NextResponse.json({ image, mimeType: 'image/png' }, { headers: { 'Cache-Control': 'no-store' } })
+    // Decode on the server and stream binary PNG to the browser; never send a
+    // large base64 image inside JSON, which can cause memory spikes and tab hangs.
+    const imageBytes = Buffer.from(image, 'base64')
+    if (imageBytes.length < 1000) {
+      return NextResponse.json({ error: 'The image service returned an incomplete image. Please try again.' }, { status: 502 })
+    }
+    return new NextResponse(imageBytes, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Content-Length': String(imageBytes.length),
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    })
   } catch (error) {
     console.error('Aperonix image generation error:', error)
     const timedOut = error instanceof Error && error.name === 'TimeoutError'
