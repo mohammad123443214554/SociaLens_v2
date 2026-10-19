@@ -334,8 +334,8 @@ export default function AperonixPage() {
     const isFirstMessage = !(conversations.find(conversation => conversation.id === conversationId)?.messages.length)
     const messageId = crypto.randomUUID()
     setInput('')
-    const wantsImage = /\\b(generate|create|make|draw|design|render|image|picture|photo|illustration|wallpaper|logo)\\b|image bana|tasveer bana|photo bana|picture bana/i.test(text)
-    setActivityLabel(wantsImage ? 'Generating' : (/\\b(search|research|look up|find online|internet|latest|news|sources|youtube|video|horror|drama|movie|film|series|episode|watch|recommend|recommendation|review|price|buy|weather|today|website|site|official link|trailer|song|music|download)\\b|search karo|research karo|internet par|dhoondh|dhundh/i.test(text) ? 'Researching' : 'Thinking'))
+    const wantsImage = /\b(generate|create|make|draw|design|render|image|picture|photo|illustration|wallpaper|logo)\b|image bana|tasveer bana|photo bana|picture bana/i.test(text)
+    setActivityLabel(wantsImage ? 'Generating' : (/\b(search|research|look up|find online|internet|latest|news|sources|youtube|video|horror|drama|movie|film|series|episode|watch|recommend|recommendation|review|price|buy|weather|today|website|site|official link|trailer|song|music|download)\b|search karo|research karo|internet par|dhoondh|dhundh/i.test(text) ? 'Researching' : 'Thinking'))
     setSending(true)
 
     try {
