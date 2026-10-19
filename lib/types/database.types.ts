@@ -128,6 +128,7 @@ export type Post = {
   last_engaged_at?: string | null
   created_at: string
   updated_at: string
+  expires_at: string | null
 }
 
 export type Like = {
@@ -433,7 +434,7 @@ export type Database = {
   public: {
     Tables: {
       profiles: { Row: Profile; Insert: Partial<Profile> & { id: string; username: string }; Update: Partial<Profile> }
-      posts: { Row: Post; Insert: Omit<Post, 'id' | 'created_at' | 'updated_at' | 'likes_count' | 'comments_count' | 'shares_count'> & { id?: string }; Update: Partial<Post> }
+      posts: { Row: Post; Insert: Omit<Post, 'id' | 'created_at' | 'updated_at' | 'likes_count' | 'comments_count' | 'shares_count' | 'expires_at'> & { id?: string; expires_at?: string | null }; Update: Partial<Post> }
       likes: { Row: Like; Insert: Omit<Like, 'id' | 'created_at'>; Update: Partial<Like> }
       comments: { Row: Comment; Insert: Omit<Comment, 'id' | 'created_at' | 'updated_at'>; Update: Partial<Comment> }
       follows: { Row: Follow; Insert: Omit<Follow, 'id' | 'created_at'>; Update: Partial<Follow> }
