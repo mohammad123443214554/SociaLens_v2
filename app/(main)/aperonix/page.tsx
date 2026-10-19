@@ -201,7 +201,8 @@ export default function AperonixPage() {
 
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [activityLabel, setActivityLabel] = useState<'Thinking' | 'Researching'>('Thinking')
+  const [activityLabel, setActivityLabel] = useState<'Thinking' | 'Researching' | 'Generating'>('Thinking')
+  const [generatedImageUrls, setGeneratedImageUrls] = useState<Record<string, string>>({})
   const [titleGeneratingId, setTitleGeneratingId] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
@@ -297,6 +298,29 @@ export default function AperonixPage() {
   }, [requestedConversationExists, requestedChatId, activeId, setActiveId])
 
   useEffect(() => {
+    let cancelled = false
+    const imageAttachments = (activeConversation?.messages ?? [])
+      .flatMap(message => message.attachments ?? [])
+      .filter(attachment => attachment.kind === 'image' && attachment.name.startsWith('Aperonix generated image'))
+    if (!imageAttachments.length) return () => { cancelled = true }
+    const supabase = createClient()
+    void Promise.all(imageAttachments.map(async attachment => {
+      if (generatedImageUrls[attachment.path]) return [attachment.path, generatedImageUrls[attachment.path]] as const
+      const { data, error } = await supabase.storage.from('aperonix-files').createSignedUrl(attachment.path, 60 * 60)
+      if (error || !data?.signedUrl) return null
+      return [attachment.path, data.signedUrl] as const
+    })).then(results => {
+      if (cancelled) return
+      setGeneratedImageUrls(previous => {
+        const next = { ...previous }
+        for (const result of results) if (result) next[result[0]] = result[1]
+        return next
+      })
+    }).catch(error => console.error('Could not load generated Aperonix image', error))
+    return () => { cancelled = true }
+  }, [activeConversation?.messages, generatedImageUrls])
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [activeConversation?.messages.length, sending])
 
@@ -310,7 +334,8 @@ export default function AperonixPage() {
     const isFirstMessage = !(conversations.find(conversation => conversation.id === conversationId)?.messages.length)
     const messageId = crypto.randomUUID()
     setInput('')
-    setActivityLabel(/\b(search|research|look up|find online|internet|latest|news|sources|youtube|video|horror|drama|movie|film|series|episode|watch|recommend|recommendation|review|price|buy|weather|today|website|site|official link|trailer|song|music|download)\b|search karo|research karo|internet par|dhoondh|dhundh/i.test(text) ? 'Researching' : 'Thinking')
+    const wantsImage = /\\b(generate|create|make|draw|design|render|image|picture|photo|illustration|wallpaper|logo)\\b|image bana|tasveer bana|photo bana|picture bana/i.test(text)
+    setActivityLabel(wantsImage ? 'Generating' : (/\\b(search|research|look up|find online|internet|latest|news|sources|youtube|video|horror|drama|movie|film|series|episode|watch|recommend|recommendation|review|price|buy|weather|today|website|site|official link|trailer|song|music|download)\\b|search karo|research karo|internet par|dhoondh|dhundh/i.test(text) ? 'Researching' : 'Thinking'))
     setSending(true)
 
     try {
@@ -382,6 +407,35 @@ export default function AperonixPage() {
 
       const history = [...(activeConversation?.contextMessages ?? []), ...(activeConversation?.messages ?? [])]
         .map(m => ({ role: m.role, content: m.content, files: m.attachments ?? [] }))
+      if (wantsImage && uploaded.length === 0) {
+        const imageResponse = await fetch('/api/aperonix/image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: text }),
+        })
+        const imageData = await imageResponse.json()
+        if (!imageResponse.ok) throw new Error(imageData.error || 'Aperonix could not generate this image.')
+        const binary = atob(imageData.image)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        const imageBlob = new Blob([bytes], { type: imageData.mimeType || 'image/jpeg' })
+        const imagePath = `${user.id}/${conversationId}/${messageId}/aperonix-generated-${crypto.randomUUID()}.jpg`
+        const { error: uploadError } = await supabase.storage.from('aperonix-files').upload(imagePath, imageBlob, {
+          contentType: imageData.mimeType || 'image/jpeg', upsert: false, cacheControl: '3600',
+        })
+        if (uploadError) throw new Error('The image was generated, but could not be saved to your chat. Please try again.')
+        await addMessage(conversationId, {
+          role: 'model',
+          content: 'Here is the image I generated for you.',
+          timestamp: Date.now(),
+          attachments: [{
+            name: 'Aperonix generated image.jpg', path: imagePath,
+            mimeType: imageData.mimeType || 'image/jpeg', size: imageBlob.size, kind: 'image',
+          }],
+        })
+        return
+      }
+
       const res = await fetch('/api/aperonix/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -898,22 +952,29 @@ export default function AperonixPage() {
                       <div className={`w-[min(284px,100%)] max-w-full shrink-0 rounded-2xl p-3 ${msg.role === 'user' ? 'mr-10 bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
                         <div className="flex flex-col items-start gap-3">
                           {msg.attachments.map((a, i) => (
-                            <button
-                              key={a.path || i}
-                              type="button"
-                              onClick={() => void openStoredAttachment(a)}
-                              title={`Open ${a.name}`}
-                              className={`group flex w-full items-center gap-2.5 min-w-0 rounded-xl border px-3 py-2.5 text-left transition-colors ${msg.role === 'user' ? 'border-white/20 bg-black/10 hover:bg-black/20' : 'border-border bg-background hover:bg-accent'}`}
-                            >
-                              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${msg.role === 'user' ? 'bg-white/15' : 'bg-muted'}`}>
-                                <FileText className="h-4 w-4" />
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-xs font-medium">{a.name}</span>
-                                <span className="block text-[10px] opacity-70">{a.mimeType || 'File'} · Click to open</span>
-                              </span>
-                              <span className="text-[10px] opacity-70 group-hover:opacity-100">Open</span>
-                            </button>
+                            a.name.startsWith('Aperonix generated image') && generatedImageUrls[a.path] ? (
+                              <div key={a.path || i} className="w-full overflow-hidden rounded-xl">
+                                <img src={generatedImageUrls[a.path]} alt="Image generated by Aperonix" className="block h-auto max-h-[70vh] w-full rounded-xl object-contain" />
+                                <a href={generatedImageUrls[a.path]} download={a.name} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent">Download image</a>
+                              </div>
+                            ) : (
+                              <button
+                                key={a.path || i}
+                                type="button"
+                                onClick={() => void openStoredAttachment(a)}
+                                title={`Open ${a.name}`}
+                                className={`group flex w-full items-center gap-2.5 min-w-0 rounded-xl border px-3 py-2.5 text-left transition-colors ${msg.role === 'user' ? 'border-white/20 bg-black/10 hover:bg-black/20' : 'border-border bg-background hover:bg-accent'}`}
+                              >
+                                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${msg.role === 'user' ? 'bg-white/15' : 'bg-muted'}`}>
+                                  <FileText className="h-4 w-4" />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-xs font-medium">{a.name}</span>
+                                  <span className="block text-[10px] opacity-70">{a.mimeType || 'File'} · Click to open</span>
+                                </span>
+                                <span className="text-[10px] opacity-70 group-hover:opacity-100">Open</span>
+                              </button>
+                            )
                           ))}
                         </div>
                       </div>
