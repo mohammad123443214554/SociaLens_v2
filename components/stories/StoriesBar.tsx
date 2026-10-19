@@ -73,32 +73,37 @@ export function StoriesBar() {
   return (
     <div className="mx-0 mt-4 mb-3 min-w-0 rounded-2xl border border-border/70 bg-card p-3 shadow-sm sm:p-4">
       <div className="flex min-w-0 gap-4 overflow-x-auto pb-1 scrollbar-hide">
-        {/* Your Story bubble */}
+        {/* Separate Add Story bubble */}
         <button
-          onClick={() => {
-            if (myGroup) {
+          onClick={() => setShowCreate(true)}
+          className="flex w-16 shrink-0 flex-col items-center gap-1"
+          aria-label="Add a story"
+        >
+          <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-border bg-muted/40">
+            <Plus className="h-6 w-6 text-pink-500" />
+          </div>
+          <span className="w-full truncate text-center text-[11px] text-muted-foreground">Add Story</span>
+        </button>
+
+        {/* Your existing story appears in its own circle beside Add Story */}
+        {myGroup && (
+          <button
+            key={myGroup.userId}
+            onClick={() => {
               setViewerStoryIndex(0)
               setViewerIndex(groups.indexOf(myGroup))
-            } else {
-              setShowCreate(true)
-            }
-          }}
-          className="flex w-16 shrink-0 flex-col items-center gap-1"
-        >
-          <div className={`relative flex h-16 w-16 items-center justify-center rounded-full ${myGroup ? 'bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 p-[2px]' : ''}`}>
-            <Avatar className="h-full w-full border-2 border-background">
-              <AvatarImage src={getAvatarUrl(profile.avatar_url)} />
-              <AvatarFallback>{profile.username?.[0]?.toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowCreate(true) }}
-              className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-background bg-pink-500"
-            >
-              <Plus className="h-3 w-3 text-white" />
-            </button>
-          </div>
-          <span className="w-full truncate text-center text-[11px] text-muted-foreground">Your Story</span>
-        </button>
+            }}
+            className="flex w-16 shrink-0 flex-col items-center gap-1"
+          >
+            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 p-[2px]">
+              <Avatar className="h-full w-full border-2 border-background">
+                <AvatarImage src={getAvatarUrl(myGroup.profile?.avatar_url)} />
+                <AvatarFallback>{myGroup.profile?.username?.[0]?.toUpperCase()}</AvatarFallback>
+              </Avatar>
+            </div>
+            <span className="w-full truncate text-center text-[11px] text-muted-foreground">Your Story</span>
+          </button>
+        )}
 
         {/* Friends' stories, with sponsored rings mixed in at random gaps */}
         {otherItems.map((item, index) => {
