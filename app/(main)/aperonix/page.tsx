@@ -418,10 +418,10 @@ export default function AperonixPage() {
         const binary = atob(imageData.image)
         const bytes = new Uint8Array(binary.length)
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-        const imageBlob = new Blob([bytes], { type: imageData.mimeType || 'image/jpeg' })
-        const imagePath = `${user.id}/${conversationId}/${messageId}/aperonix-generated-${crypto.randomUUID()}.jpg`
+        const imageBlob = new Blob([bytes], { type: imageData.mimeType || 'image/png' })
+        const imagePath = `${user.id}/${conversationId}/${messageId}/aperonix-generated-${crypto.randomUUID()}.png`
         const { error: uploadError } = await supabase.storage.from('aperonix-files').upload(imagePath, imageBlob, {
-          contentType: imageData.mimeType || 'image/jpeg', upsert: false, cacheControl: '3600',
+          contentType: imageData.mimeType || 'image/png', upsert: false, cacheControl: '3600',
         })
         if (uploadError) throw new Error('The image was generated, but could not be saved to your chat. Please try again.')
         await addMessage(conversationId, {
@@ -429,8 +429,8 @@ export default function AperonixPage() {
           content: 'Here is the image I generated for you.',
           timestamp: Date.now(),
           attachments: [{
-            name: 'Aperonix generated image.jpg', path: imagePath,
-            mimeType: imageData.mimeType || 'image/jpeg', size: imageBlob.size, kind: 'image',
+            name: 'Aperonix generated image.png', path: imagePath,
+            mimeType: imageData.mimeType || 'image/png', size: imageBlob.size, kind: 'image',
           }],
         })
         return
