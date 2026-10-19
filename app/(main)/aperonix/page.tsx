@@ -343,12 +343,18 @@ export default function AperonixPage() {
     const isFirstMessage = !(conversations.find(conversation => conversation.id === conversationId)?.messages.length)
     const messageId = crypto.randomUUID()
     setInput('')
-    const explicitImageRequest = /\b(generate|create|make|draw|design|render|image|picture|photo|illustration|wallpaper|logo|artwork|portrait|concept art)\b|image bana|tasveer bana|photo bana|picture bana|image banao|tasveer banao/i.test(text)
-    // Users often paste a complete image prompt without adding "generate this".
-    // Detect clearly visual, prompt-style descriptions while avoiding ordinary chat.
+    const explicitImageRequest = /\b(generate|create|make|draw|design|render|image|picture|photo|illustration|wallpaper|logo|artwork|portrait|concept art)\b|image bana|tasveer bana|photo bana|picture bana|image banao|tasveer banao|bana kar do/i.test(text)
+    const previousGeneratedImage = (activeConversation?.messages ?? []).some(message =>
+      (message.attachments ?? []).some(attachment =>
+        attachment.kind === 'image' && attachment.name.startsWith('Aperonix generated image')
+      )
+    )
+    const imageRefinement = /\b(age|aged|years old|older|younger|indian|realistic|more|change|edit|replace|remove|add|put|place|logo|candle|colour|color|background|same|instead|make her|make it|this image|that image|is image|iss image|umar|laga do|jod do|hata do|badal do|kar do|aisi|wahi|usme|isme)\b/i.test(text)
+    const hasCurrentImage = items.some(item => item.type === 'image')
+    const imageEditRequest = hasCurrentImage && /\b(add|put|place|apply|logo|edit|change|remove|replace|candle|background|text|brand|laga|jod|hata|badal|kar do)\b/i.test(text)
     const visualPromptTerms = text.match(/\b(futuristic|cyberpunk|photorealistic|cinematic|neon-lit|highly detailed|8k|4k|wallpaper|portrait|landscape|illustration|concept art|glowing|lighting|color palette|ultra realistic|digital art|anime style|3d render|glassmorphism|background|close-up|wide shot|soft lighting|dramatic lighting|purple accents|cyan accents)\b/gi) ?? []
     const looksLikeImagePrompt = text.length >= 45 && visualPromptTerms.length >= 3
-    const wantsImage = explicitImageRequest || looksLikeImagePrompt
+    const wantsImage = explicitImageRequest || looksLikeImagePrompt || (previousGeneratedImage && imageRefinement) || imageEditRequest
     setActivityLabel(wantsImage ? 'Generating' : (/\b(search|research|look up|find online|internet|latest|news|sources|youtube|video|horror|drama|movie|film|series|episode|watch|recommend|recommendation|review|price|buy|weather|today|website|site|official link|trailer|song|music|download)\b|search karo|research karo|internet par|dhoondh|dhundh/i.test(text) ? 'Researching' : 'Thinking'))
     setSending(true)
 
@@ -422,10 +428,52 @@ export default function AperonixPage() {
       const history = [...(activeConversation?.contextMessages ?? []), ...(activeConversation?.messages ?? [])]
         .map(m => ({ role: m.role, content: m.content, files: m.attachments ?? [] }))
       if (wantsImage && uploaded.length === 0) {
+        const referenceImages: string[] = []
+        const addReferenceImage = async (blob: Blob) => {
+          const resized = await new Promise<Blob>((resolve, reject) => {
+            const url = URL.createObjectURL(blob)
+            const image = document.createElement('img')
+            image.onload = () => {
+              const scale = Math.min(1, 511 / Math.max(image.naturalWidth, image.naturalHeight))
+              const canvas = document.createElement('canvas')
+              canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+              canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+              const context = canvas.getContext('2d')
+              if (!context) { URL.revokeObjectURL(url); reject(new Error('Could not prepare the reference image.')); return }
+              context.drawImage(image, 0, 0, canvas.width, canvas.height)
+              URL.revokeObjectURL(url)
+              canvas.toBlob(result => result ? resolve(result) : reject(new Error('Could not prepare the reference image.')), 'image/jpeg', 0.82)
+            }
+            image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read the reference image.')) }
+            image.src = url
+          })
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not encode the reference image.'))
+            reader.onerror = () => reject(new Error('Could not encode the reference image.'))
+            reader.readAsDataURL(resized)
+          })
+          referenceImages.push(dataUrl.slice(dataUrl.indexOf(',') + 1))
+        }
+        for (const item of items.filter(item => item.type === 'image').slice(0, 4)) {
+          await addReferenceImage(item.file)
+        }
+        if (referenceImages.length === 0 && previousGeneratedImage && imageRefinement) {
+          const previousImage = [...(activeConversation?.messages ?? [])].reverse()
+            .flatMap(message => message.attachments ?? [])
+            .find(attachment => attachment.kind === 'image' && attachment.name.startsWith('Aperonix generated image'))
+          if (previousImage) {
+            const { data: signed, error: signedError } = await supabase.storage.from('aperonix-files').createSignedUrl(previousImage.path, 5 * 60)
+            if (signedError || !signed?.signedUrl) throw new Error('I could not load the previous image to edit it. Please try again.')
+            const referenceResponse = await fetch(signed.signedUrl)
+            if (!referenceResponse.ok) throw new Error('I could not load the previous image to edit it. Please try again.')
+            await addReferenceImage(await referenceResponse.blob())
+          }
+        }
         const imageResponse = await fetch('/api/aperonix/image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: text }),
+          body: JSON.stringify({ prompt: text, referenceImages }),
         })
         if (!imageResponse.ok) {
           const errorData = await imageResponse.json().catch(() => ({}))
