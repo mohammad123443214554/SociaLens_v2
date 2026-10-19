@@ -139,8 +139,10 @@ export function TextPostComposer() {
       ])
       setContent('')
       if (composerInputRef.current) composerInputRef.current.style.height = 'auto'
-      if (draftStorageKey) window.localStorage.removeItem(draftStorageKey)
-      setDraftSaved(false)
+      if (editingDraft) {
+        if (draftStorageKey) window.localStorage.removeItem(draftStorageKey)
+        setDraftSaved(false)
+      }
       setEditingDraft(false)
       setStep(null)
     } catch (err) {
