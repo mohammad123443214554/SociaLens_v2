@@ -22,9 +22,10 @@ interface ReelViewerProps {
   post: PostWithProfile
   trigger: ReactNode
   onNotInterested?: (postId: string) => void
+  initialShowComments?: boolean
 }
 
-export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) {
+export function ReelViewer({ post, trigger, onNotInterested, initialShowComments = false }: ReelViewerProps) {
   const [open, setOpen] = useState(false)
   const [liked, setLiked] = useState(false)
   const [likesCount, setLikesCount] = useState(Number(post.likes_count) || 0)
@@ -48,6 +49,10 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
   const mediaLabel = post.media_type === 'video' ? 'reel' : 'post'
 
   useEffect(() => setPortalReady(true), [])
+
+  useEffect(() => {
+    if (open && initialShowComments) setShowComments(true)
+  }, [open, initialShowComments])
 
   useEffect(() => {
     if (!showOptions) return
