@@ -349,12 +349,17 @@ export default function AperonixPage() {
         attachment.kind === 'image' && attachment.name.startsWith('Aperonix generated image')
       )
     )
+    const previousImageRequest = [...(activeConversation?.messages ?? [])].reverse().find(message =>
+      message.role === 'user' && /\\b(image|picture|photo|girl|woman|portrait|candle|logo|tasveer|bana|generate|create|draw|design)\\b/i.test(message.content)
+    )
+    const previousImageIntent = Boolean(previousImageRequest) &&
+      /\\b(haan|han|yes|yeah|okay|ok|go ahead|do it|banao|bana do|bana na|kar do|create it|generate it|make it)\\b/i.test(text)
     const imageRefinement = /\b(age|aged|years old|older|younger|indian|realistic|more|change|edit|replace|remove|add|put|place|logo|candle|colour|color|background|same|instead|make her|make it|this image|that image|is image|iss image|umar|laga do|jod do|hata do|badal do|kar do|aisi|wahi|usme|isme)\b/i.test(text)
     const hasCurrentImage = items.some(item => item.type === 'image')
     const imageEditRequest = hasCurrentImage && /\b(add|put|place|apply|logo|edit|change|remove|replace|candle|background|text|brand|laga|jod|hata|badal|kar do)\b/i.test(text)
     const visualPromptTerms = text.match(/\b(futuristic|cyberpunk|photorealistic|cinematic|neon-lit|highly detailed|8k|4k|wallpaper|portrait|landscape|illustration|concept art|glowing|lighting|color palette|ultra realistic|digital art|anime style|3d render|glassmorphism|background|close-up|wide shot|soft lighting|dramatic lighting|purple accents|cyan accents)\b/gi) ?? []
     const looksLikeImagePrompt = text.length >= 45 && visualPromptTerms.length >= 3
-    const wantsImage = explicitImageRequest || looksLikeImagePrompt || (previousGeneratedImage && imageRefinement) || imageEditRequest
+    const wantsImage = explicitImageRequest || looksLikeImagePrompt || (previousGeneratedImage && imageRefinement) || imageEditRequest || previousImageIntent
     setActivityLabel(wantsImage ? 'Generating' : (/\b(search|research|look up|find online|internet|latest|news|sources|youtube|video|horror|drama|movie|film|series|episode|watch|recommend|recommendation|review|price|buy|weather|today|website|site|official link|trailer|song|music|download)\b|search karo|research karo|internet par|dhoondh|dhundh/i.test(text) ? 'Researching' : 'Thinking'))
     setSending(true)
 
@@ -473,7 +478,14 @@ export default function AperonixPage() {
         const imageResponse = await fetch('/api/aperonix/image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: text, referenceImages }),
+          body: JSON.stringify({
+            prompt: previousGeneratedImage && previousImageRequest && imageRefinement
+              ? `Refine the provided reference image. Keep the same subject and composition unless the user asks to change them. Earlier request: ${previousImageRequest.content}. Requested change: ${text}`
+              : previousImageIntent && previousImageRequest
+                ? `Create an image based on this earlier request: ${previousImageRequest.content}. The user is confirming that they want the image generated now. Follow-up: ${text}`
+                : text,
+            referenceImages,
+          }),
         })
         if (!imageResponse.ok) {
           const errorData = await imageResponse.json().catch(() => ({}))
