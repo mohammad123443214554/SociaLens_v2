@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { StoriesBar } from '@/components/stories/StoriesBar'
 import { HomeGreetingBanner } from '@/components/feed/HomeGreetingBanner'
 import { TextPostComposer } from '@/components/feed/TextPostComposer'
+import { HomePostEngagement } from '@/components/feed/HomePostEngagement'
 import { ReelViewer } from '@/components/shared/ReelViewer'
 import { PostCaption } from '@/components/shared/PostCaption'
 import { useFeedPosts, useReelsPosts } from '@/lib/hooks/usePosts'
@@ -103,6 +104,7 @@ export default function FeedPage() {
                     {title && post.media_url && <p className="line-clamp-2 break-words text-[11px] font-semibold leading-snug text-foreground sm:text-xs">{title}</p>}
                     {content && !!post.media_url && <PostCaption content={content} expandMode="dialog" titleClassName="hidden" captionClassName="hidden" buttonClassName="mt-auto pt-2 text-[10px] font-semibold text-pink-400 hover:text-fuchsia-400 sm:text-xs" />}
                   </div>
+                  <HomePostEngagement post={post} />
                 </article>
               )
             })}
