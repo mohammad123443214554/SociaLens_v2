@@ -39,7 +39,9 @@ export function PostCaption({
   const expanded = forceExpanded || expandedState
   if (!content?.trim()) return null
 
-  const { title, rest } = parseCaption(content)
+  const parsedCaption = parseCaption(content)
+  const title = plainTextMode ? null : parsedCaption.title
+  const rest = plainTextMode ? content.trim() : parsedCaption.rest
   const hashtagMatches = rest.match(/#[\w\u0600-\u06FF]+/g) || []
   const bio = rest.replace(/#[\w\u0600-\u06FF]+/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
   const truncatedRest = rest.length > 60 ? rest.slice(0, 60).trimEnd() + '…' : rest
