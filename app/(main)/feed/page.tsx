@@ -80,7 +80,7 @@ export default function FeedPage() {
         {isLoading || reelsLoading ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[3/4] animate-pulse rounded-xl bg-muted sm:rounded-2xl" />)}</div>
         ) : posts.length ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             {posts.map(post => {
               const content = post.content?.trim() ?? ''
               const firstLine = content.split(/\r?\n/).map(line => line.trim()).find(Boolean) ?? ''
