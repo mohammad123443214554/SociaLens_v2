@@ -116,7 +116,7 @@ export function TextPostComposer() {
             <span>Send</span>
           </button>
         </div>
-        <div className="mt-1 flex justify-end px-1 text-[10px] text-muted-foreground">{content.length.toLocaleString()} / {MAX_TEXT_POST_LENGTH.toLocaleString()}</div>
+        {content.length > 0 && <div className="mt-1 flex justify-end px-1 text-[10px] text-muted-foreground">{content.length.toLocaleString()} / {MAX_TEXT_POST_LENGTH.toLocaleString()}</div>}
       </section>
 
       {step && (
