@@ -20,6 +20,7 @@ interface PostCaptionProps {
   captionClassName?: string
   buttonClassName?: string
   prefix?: ReactNode
+  plainTextMode?: boolean
 }
 
 export function PostCaption({
@@ -32,6 +33,7 @@ export function PostCaption({
   captionClassName = 'text-sm text-muted-foreground leading-relaxed',
   buttonClassName = 'text-xs text-muted-foreground/70 hover:underline font-medium',
   prefix,
+  plainTextMode = false,
 }: PostCaptionProps) {
   const [expandedState, setExpanded] = useState(false)
   const expanded = forceExpanded || expandedState
@@ -68,11 +70,17 @@ export function PostCaption({
                 {title && <h2 className="text-lg font-bold leading-snug tracking-tight text-foreground sm:text-xl">{title}</h2>}
               </div>
               <div className="space-y-4 px-5 py-5 sm:px-6">
-                {bio && <p className="whitespace-pre-wrap break-words text-sm leading-7 text-muted-foreground">{bio}</p>}
-                {hashtagMatches.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {hashtagMatches.map((tag, index) => <span key={tag + index} className="rounded-full border border-pink-500/20 bg-pink-500/10 px-3 py-1.5 text-xs font-medium text-pink-400">{tag}</span>)}
-                  </div>
+                {plainTextMode ? (
+                  <p className="whitespace-pre-wrap break-words text-sm leading-7 text-muted-foreground">{content.trim()}</p>
+                ) : (
+                  <>
+                    {bio && <p className="whitespace-pre-wrap break-words text-sm leading-7 text-muted-foreground">{bio}</p>}
+                    {hashtagMatches.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {hashtagMatches.map((tag, index) => <span key={tag + index} className="rounded-full border border-pink-500/20 bg-pink-500/10 px-3 py-1.5 text-xs font-medium text-pink-400">{tag}</span>)}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </DialogContent>
