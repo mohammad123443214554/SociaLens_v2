@@ -334,7 +334,12 @@ export default function AperonixPage() {
     const isFirstMessage = !(conversations.find(conversation => conversation.id === conversationId)?.messages.length)
     const messageId = crypto.randomUUID()
     setInput('')
-    const wantsImage = /\b(generate|create|make|draw|design|render|image|picture|photo|illustration|wallpaper|logo)\b|image bana|tasveer bana|photo bana|picture bana/i.test(text)
+    const explicitImageRequest = /\b(generate|create|make|draw|design|render|image|picture|photo|illustration|wallpaper|logo|artwork|portrait|concept art)\b|image bana|tasveer bana|photo bana|picture bana|image banao|tasveer banao/i.test(text)
+    // Users often paste a complete image prompt without adding "generate this".
+    // Detect clearly visual, prompt-style descriptions while avoiding ordinary chat.
+    const visualPromptTerms = text.match(/\b(futuristic|cyberpunk|photorealistic|cinematic|neon-lit|highly detailed|8k|4k|wallpaper|portrait|landscape|illustration|concept art|glowing|lighting|color palette|ultra realistic|digital art|anime style|3d render|glassmorphism|background|close-up|wide shot|soft lighting|dramatic lighting|purple accents|cyan accents)\b/gi) ?? []
+    const looksLikeImagePrompt = text.length >= 45 && visualPromptTerms.length >= 3
+    const wantsImage = explicitImageRequest || looksLikeImagePrompt
     setActivityLabel(wantsImage ? 'Generating' : (/\b(search|research|look up|find online|internet|latest|news|sources|youtube|video|horror|drama|movie|film|series|episode|watch|recommend|recommendation|review|price|buy|weather|today|website|site|official link|trailer|song|music|download)\b|search karo|research karo|internet par|dhoondh|dhundh/i.test(text) ? 'Researching' : 'Thinking'))
     setSending(true)
 
