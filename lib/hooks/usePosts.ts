@@ -178,6 +178,7 @@ export function useExplorePosts(userId?: string) {
       const { data, error } = await supabase
         .from('posts')
         .select(POST_SELECT)
+        .in('media_type', ['image', 'video'])
         .order('created_at', { ascending: false })
         .range(pageParam, pageParam + candidateWindow - 1)
 
