@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { X, ImageIcon, Film, ArrowLeft, Hash, FileText, Sparkles, Loader2 } from 'lucide-react'
+import { X, ImageIcon, Film, ArrowLeft, Hash, Sparkles, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -182,13 +182,6 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
     setMediaFile(file)
     setMediaType(file.type.startsWith('video') ? 'video' : 'image')
     setMediaPreview(URL.createObjectURL(file))
-    setStep('details')
-  }
-
-  const handleTextOnly = () => {
-    setMediaType('none')
-    setMediaPreview(null)
-    setMediaFile(null)
     setStep('details')
   }
 
@@ -450,16 +443,7 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
                 </div>
               </button>
 
-              <button onClick={handleTextOnly}
-                className="flex items-center gap-4 p-4 rounded-xl border border-dashed border-cyan-500/40 hover:border-cyan-500 hover:bg-cyan-500/5 transition-all group">
-                <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
-                  <FileText className="h-6 w-6 text-cyan-500" />
-                </div>
-                <div className="text-left">
-                  <p className="font-semibold text-sm">Text Post</p>
-                  <p className="text-xs text-muted-foreground">Share thoughts, quotes or updates</p>
-                </div>
-              </button>
+
             </div>
             {checkingVideo && (
               <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
