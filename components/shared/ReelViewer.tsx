@@ -249,7 +249,7 @@ export function ReelViewer({ post, trigger, onNotInterested }: ReelViewerProps) 
                 </div>
               ) : null}
               {post.content?.trim() && <div className="border-b border-border/60 px-4 py-3">
-                <PostCaption content={post.content} expandMode={post.media_type === 'none' ? 'dialog' : 'inline'} titleClassName="text-sm leading-relaxed font-semibold" captionClassName="mt-1 text-sm leading-6 text-muted-foreground" buttonClassName="mt-1 text-xs font-semibold text-pink-400 hover:underline" />
+                <PostCaption content={post.content} expandMode={post.media_type === 'none' ? 'dialog' : 'inline'} plainTextMode={post.media_type === 'none'} titleClassName="text-sm leading-relaxed font-semibold" captionClassName="mt-1 text-sm leading-6 text-muted-foreground" buttonClassName="mt-1 text-xs font-semibold text-pink-400 hover:underline" />
               </div>}
             </div>
             {showComments && <div className="shrink-0 overflow-hidden border-b border-border/70 px-4 py-3"><p className="mb-3 text-xs font-semibold text-muted-foreground">Comments</p><CommentThread target="post" targetId={post.id} currentUserId={user?.id} ownerId={post.user_id} commentRestrictedUntil={profile?.restrict_comment_until} variant="compact" listClassName="max-h-[32dvh] overflow-y-auto mb-2" /></div>}
