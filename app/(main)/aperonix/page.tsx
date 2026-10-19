@@ -474,6 +474,12 @@ export default function AperonixPage() {
             await addReferenceImage(await referenceResponse.blob())
           }
         }
+        const recentConversationContext = history
+          .filter(message => message.content.trim())
+          .slice(-6)
+          .map(message => `${message.role === 'user' ? 'User' : 'Aperonix'}: ${message.content.trim()}`)
+          .join('\n')
+          .slice(-600)
         const asksForSociaLensLogo = /socialens/i.test(text) && /logo|brand|branding/i.test(text)
         if (asksForSociaLensLogo && referenceImages.length < 4) {
           try {
@@ -487,13 +493,13 @@ export default function AperonixPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt: asksForSociaLensLogo
+            prompt: `Recent conversation context (use only what helps with this image): ${recentConversationContext}\n${asksForSociaLensLogo
               ? `Use the official SociaLens logo supplied as a reference image. Preserve the logo's recognizable mark, proportions, and colors. ${hasCurrentImage ? 'Apply this exact logo to the user-provided target image as requested.' : 'Create a polished visual featuring the real SociaLens brand logo, not an invented substitute.'} User request: ${text}`
               : previousGeneratedImage && previousImageRequest && imageRefinement
                 ? `Refine the provided reference image. Keep the same subject and composition unless the user asks to change them. Earlier request: ${previousImageRequest.content}. Requested change: ${text}`
                 : previousImageIntent && previousImageRequest
                   ? `Create an image based on this earlier request: ${previousImageRequest.content}. The user is confirming that they want the image generated now. Follow-up: ${text}`
-                  : text,
+                  : text}`.slice(0, 1900),
             referenceImages,
           }),
         })
