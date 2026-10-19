@@ -93,7 +93,7 @@ export default function FeedPage() {
               const isImage = post.media_type === 'image' && !!post.media_url
               const trigger = (
                 <button type="button" aria-label={(isVideo ? 'Play reel: ' : 'Open post: ') + (title || (isVideo ? 'Reel' : 'Post'))} className="relative block aspect-[3/4] w-full overflow-hidden bg-muted text-left">
-                  {isVideo ? <video src={post.media_url!} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" /> : isImage ? <img src={post.media_url!} alt="" loading="lazy" className="pointer-events-none h-full w-full object-cover" /> : <div className="h-full w-full bg-muted/50 p-3 sm:p-4"><p className="line-clamp-7 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground sm:text-sm">{title || content}</p></div>}
+                  {isVideo ? <video src={post.media_url!} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" /> : isImage ? <img src={post.media_url!} alt="" loading="lazy" className="pointer-events-none h-full w-full object-cover" /> : <div className="h-full w-full bg-muted/50 p-3 sm:p-4"><p className="line-clamp-7 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground sm:text-sm">{content}</p></div>}
                 </button>
               )
               return (
@@ -102,7 +102,7 @@ export default function FeedPage() {
                   <div className="flex min-h-[76px] min-w-0 flex-1 flex-col p-2 sm:min-h-[88px] sm:p-3">
                     {title && post.media_url && <p className="line-clamp-2 break-words text-[11px] font-semibold leading-snug text-foreground sm:text-xs">{title}</p>}
                     {content && !post.media_url && content.length <= 280 && <p className="line-clamp-3 whitespace-pre-wrap break-words text-[10px] leading-relaxed text-muted-foreground sm:text-xs">{content}</p>}
-                    {content && ((!post.media_url && content.length > 280) || !!post.media_url) && <PostCaption content={content} expandMode="dialog" titleClassName="hidden" captionClassName="hidden" buttonClassName="mt-auto pt-2 text-[10px] font-semibold text-pink-400 hover:text-fuchsia-400 sm:text-xs" />}
+                    {content && ((!post.media_url && content.length > 280) || !!post.media_url) && <PostCaption content={content} expandMode="dialog" plainTextMode={!post.media_url} titleClassName="hidden" captionClassName="hidden" buttonClassName="mt-auto pt-2 text-[10px] font-semibold text-pink-400 hover:text-fuchsia-400 sm:text-xs" />}
                   </div>
                 </article>
               )
