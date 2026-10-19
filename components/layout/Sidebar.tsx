@@ -48,7 +48,7 @@ export function Sidebar() {
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-accent text-left w-full"
         >
           <PlusSquare className="h-5 w-5" />
-          Create Post
+          Create
         </button>
 
         <div className="mt-auto pt-4 border-t space-y-1">
