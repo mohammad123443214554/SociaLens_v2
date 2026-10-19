@@ -287,14 +287,14 @@ export function TextPostComposer() {
 
               <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
                 {step === 'expiration' && editingDraft ? (
-                  <button type="button" onClick={deleteDraft} disabled={posting} className="rounded-full px-4 py-2.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50">Delete draft</button>
+                  <button type="button" onClick={deleteDraft} disabled={posting} className="rounded-full px-3 py-2.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50 sm:px-4"><span className="sm:hidden">Delete</span><span className="hidden sm:inline">Delete draft</span></button>
                 ) : (
                   <button type="button" onClick={closeFlow} disabled={posting} className="rounded-full px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50">Cancel</button>
                 )}
                 {step === 'expiration' ? (
                   <div className="flex items-center gap-2">
                     {(!draftSaved || editingDraft) && <button type="button" onClick={saveDraft} disabled={posting} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-50">
-                      <FileText className="h-4 w-4" /> Save as draft
+                      <FileText className="h-4 w-4" /><span className="sm:hidden">Draft</span><span className="hidden sm:inline">Save as draft</span>
                     </button>}
                     <button type="button" onClick={continueToPreview} className="inline-flex items-center gap-2 rounded-full bg-pink-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pink-600">
                       Next <ArrowRight className="h-4 w-4" />
