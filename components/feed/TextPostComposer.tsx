@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, Clock3, Send, X } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useUser } from '@/lib/hooks/useUser'
@@ -25,6 +25,7 @@ export function TextPostComposer() {
   const supabase = createClient()
   const queryClient = useQueryClient()
   const [content, setContent] = useState('')
+  const composerInputRef = useRef<HTMLTextAreaElement>(null)
   const [step, setStep] = useState<ComposerStep | null>(null)
   const [expirationMs, setExpirationMs] = useState<number>(EXPIRATION_OPTIONS[1].value)
   const [posting, setPosting] = useState(false)
@@ -99,12 +100,19 @@ export function TextPostComposer() {
           </Avatar>
           <textarea
             aria-label="What's on your mind?"
+            ref={composerInputRef}
             value={content}
-            onChange={event => { setContent(event.target.value.slice(0, MAX_TEXT_POST_LENGTH)); setError('') }}
+            onChange={event => {
+              const nextValue = event.target.value.slice(0, MAX_TEXT_POST_LENGTH)
+              setContent(nextValue)
+              setError('')
+              event.currentTarget.style.height = 'auto'
+              event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 160)}px`
+            }}
             placeholder="What's on your mind?"
             rows={1}
             maxLength={MAX_TEXT_POST_LENGTH}
-            className="min-h-10 min-w-0 flex-1 resize-none rounded-full border border-border/80 bg-muted/35 px-4 py-2.5 text-sm leading-5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/10 sm:min-h-11 sm:py-3"
+            className="min-h-10 max-h-40 min-w-0 flex-1 resize-none overflow-y-auto rounded-2xl border border-border/80 bg-muted/35 px-4 py-2.5 text-sm leading-5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/10 sm:min-h-11 sm:py-3"
           />
           <button
             type="button"
