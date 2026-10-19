@@ -75,7 +75,6 @@ export async function POST(request: NextRequest) {
 
         lastDetails = await response.text().catch(() => '')
         let errorCode = ''
-        let errorMessage = ''
         try {
           const errorBody = JSON.parse(lastDetails) as {
             errors?: { code?: string | number; message?: string }[]
@@ -83,9 +82,7 @@ export async function POST(request: NextRequest) {
           }
           const firstError = errorBody.errors?.[0] ?? errorBody.messages?.[0]
           errorCode = String(firstError?.code ?? '')
-          errorMessage = firstError?.message ?? ''
         } catch {
-          errorMessage = lastDetails
         }
         console.error('Cloudflare image model failed:', model, response.status, errorCode, lastDetails.slice(0, 300))
 
