@@ -353,7 +353,6 @@ export default function AperonixPage() {
       message.role === 'user' && /\b(image|picture|photo|girl|woman|portrait|candle|logo|tasveer|bana|generate|create|draw|design)\b/i.test(message.content)
     )
     const previousImageIntent = Boolean(previousImageRequest) && /\b(haan|han|yes|yeah|okay|ok|go ahead|do it|banao|bana do|bana na|kar do|create it|generate it|make it)\b/i.test(text)
-      /\\b(haan|han|yes|yeah|okay|ok|go ahead|do it|banao|bana do|bana na|kar do|create it|generate it|make it)\\b/i.test(text)
     const imageRefinement = /\b(age|aged|years old|older|younger|indian|realistic|more|change|edit|replace|remove|add|put|place|logo|candle|colour|color|background|same|instead|make her|make it|this image|that image|is image|iss image|umar|laga do|jod do|hata do|badal do|kar do|aisi|wahi|usme|isme)\b/i.test(text)
     const hasCurrentImage = items.some(item => item.type === 'image')
     const imageEditRequest = hasCurrentImage && /\b(add|put|place|apply|logo|edit|change|remove|replace|candle|background|text|brand|laga|jod|hata|badal|kar do)\b/i.test(text)
