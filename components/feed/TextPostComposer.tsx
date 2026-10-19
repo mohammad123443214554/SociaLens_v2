@@ -27,6 +27,7 @@ export function TextPostComposer() {
   const [content, setContent] = useState('')
   const [draftSaved, setDraftSaved] = useState(false)
   const [draftLoaded, setDraftLoaded] = useState(false)
+  const [editingDraft, setEditingDraft] = useState(false)
   const composerInputRef = useRef<HTMLTextAreaElement>(null)
   const [step, setStep] = useState<ComposerStep | null>(null)
   const [expirationMs, setExpirationMs] = useState<number>(EXPIRATION_OPTIONS[1].value)
@@ -42,7 +43,6 @@ export function TextPostComposer() {
       const rawDraft = window.localStorage.getItem(draftStorageKey)
       if (!rawDraft) return
       const draft = JSON.parse(rawDraft) as { content?: string; expirationMs?: number }
-      if (typeof draft.content === 'string') setContent(draft.content.slice(0, MAX_TEXT_POST_LENGTH))
       if (typeof draft.expirationMs === 'number' && EXPIRATION_OPTIONS.some(option => option.value === draft.expirationMs)) {
         setExpirationMs(draft.expirationMs)
       }
@@ -60,6 +60,9 @@ export function TextPostComposer() {
     try {
       window.localStorage.setItem(draftStorageKey, JSON.stringify({ content, expirationMs, updatedAt: new Date().toISOString() }))
       setDraftSaved(true)
+      setContent('')
+      if (composerInputRef.current) composerInputRef.current.style.height = 'auto'
+      setEditingDraft(false)
       setStep(null)
       setError('')
     } catch (draftError) {
@@ -77,7 +80,8 @@ export function TextPostComposer() {
       setContent(typeof draft.content === 'string' ? draft.content.slice(0, MAX_TEXT_POST_LENGTH) : '')
       if (typeof draft.expirationMs === 'number' && EXPIRATION_OPTIONS.some(option => option.value === draft.expirationMs)) setExpirationMs(draft.expirationMs)
       if (composerInputRef.current) composerInputRef.current.style.height = 'auto'
-      setStep(null)
+      setEditingDraft(true)
+      setStep('expiration')
       setError('')
     } catch (draftError) {
       console.error('Could not open text post draft', draftError)
@@ -87,6 +91,11 @@ export function TextPostComposer() {
   const closeFlow = () => {
     if (posting) return
     setStep(null)
+    if (draftSaved && editingDraft) {
+      setContent('')
+      if (composerInputRef.current) composerInputRef.current.style.height = 'auto'
+      setEditingDraft(false)
+    }
     setError('')
   }
 
@@ -132,6 +141,7 @@ export function TextPostComposer() {
       if (composerInputRef.current) composerInputRef.current.style.height = 'auto'
       if (draftStorageKey) window.localStorage.removeItem(draftStorageKey)
       setDraftSaved(false)
+      setEditingDraft(false)
       setStep(null)
     } catch (err) {
       console.error('Text post could not be shared', err)
@@ -179,9 +189,11 @@ export function TextPostComposer() {
             <span>Share</span>
           </button>
         </div>
-        <div className="mt-1 flex items-center justify-end gap-2 px-1">
-          {draftSaved && <button type="button" onClick={openDraft} className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-semibold text-pink-400 hover:bg-pink-500/10"><FileText className="h-3 w-3" /> Draft</button>}
-          {content.length > 0 && <span className="text-[10px] text-muted-foreground">{content.length.toLocaleString()} / {MAX_TEXT_POST_LENGTH.toLocaleString()}</span>}
+        <div className="mt-1 flex min-h-7 items-center justify-between gap-2 px-1">
+          <div className="min-w-0">
+            {draftSaved && <button type="button" onClick={openDraft} className="inline-flex items-center gap-1.5 rounded-full border border-pink-500/25 bg-pink-500/10 px-2.5 py-1 text-[11px] font-semibold text-pink-400 transition-colors hover:bg-pink-500/15"><FileText className="h-3.5 w-3.5" /> Open draft</button>}
+          </div>
+          {content.length > 0 && <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{content.length.toLocaleString()} / {MAX_TEXT_POST_LENGTH.toLocaleString()}</span>}
         </div>
       </section>
 
@@ -257,9 +269,9 @@ export function TextPostComposer() {
                 <button type="button" onClick={closeFlow} disabled={posting} className="rounded-full px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50">Cancel</button>
                 {step === 'expiration' ? (
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={saveDraft} disabled={posting} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-50">
+                    {(!draftSaved || editingDraft) && <button type="button" onClick={saveDraft} disabled={posting} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-50">
                       <FileText className="h-4 w-4" /> Save as draft
-                    </button>
+                    </button>}
                     <button type="button" onClick={continueToPreview} className="inline-flex items-center gap-2 rounded-full bg-pink-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pink-600">
                       Next <ArrowRight className="h-4 w-4" />
                     </button>
