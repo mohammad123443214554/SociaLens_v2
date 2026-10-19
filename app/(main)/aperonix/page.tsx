@@ -312,9 +312,18 @@ export default function AperonixPage() {
     })).then(results => {
       if (cancelled) return
       setGeneratedImageUrls(previous => {
+        let changed = false
         const next = { ...previous }
-        for (const result of results) if (result) next[result[0]] = result[1]
-        return next
+        for (const result of results) {
+          if (result && next[result[0]] !== result[1]) {
+            next[result[0]] = result[1]
+            changed = true
+          }
+        }
+        // This effect depends on generatedImageUrls. Return the same object when
+        // every signed URL is already cached, otherwise it would cause an
+        // endless effect -> state update -> render loop and freeze the chat.
+        return changed ? next : previous
       })
     }).catch(error => console.error('Could not load generated Aperonix image', error))
     return () => { cancelled = true }
@@ -430,7 +439,7 @@ export default function AperonixPage() {
         }
         const imagePath = `${user.id}/${conversationId}/${messageId}/aperonix-generated-${crypto.randomUUID()}.png`
         const { error: uploadError } = await supabase.storage.from('aperonix-files').upload(imagePath, imageBlob, {
-          contentType: imageData.mimeType || 'image/png', upsert: false, cacheControl: '3600',
+          contentType: imageBlob.type || 'image/png', upsert: false, cacheControl: '3600',
         })
         if (uploadError) throw new Error('The image was generated, but could not be saved to your chat. Please try again.')
         await addMessage(conversationId, {
@@ -439,7 +448,7 @@ export default function AperonixPage() {
           timestamp: Date.now(),
           attachments: [{
             name: 'Aperonix generated image.png', path: imagePath,
-            mimeType: imageData.mimeType || 'image/png', size: imageBlob.size, kind: 'image',
+            mimeType: imageBlob.type || 'image/png', size: imageBlob.size, kind: 'image',
           }],
         })
         return
