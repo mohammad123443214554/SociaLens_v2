@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, num_steps: 4 }),
+        body: JSON.stringify({ prompt, steps: 4 }),
         signal: AbortSignal.timeout(55000),
         cache: 'no-store',
       },
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'The image service returned no image. Please try again.' }, { status: 502 })
     }
 
-    return NextResponse.json({ image, mimeType: 'image/jpeg' }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json({ image, mimeType: 'image/png' }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     console.error('Aperonix image generation error:', error)
     const timedOut = error instanceof Error && error.name === 'TimeoutError'
