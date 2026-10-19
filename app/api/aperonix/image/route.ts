@@ -54,32 +54,78 @@ export async function POST(request: NextRequest) {
 
     let response: Response | null = null
     let lastDetails = ''
-    for (const model of MODELS) {
-      response = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: makeForm(),
-          signal: AbortSignal.timeout(55000),
-          cache: 'no-store',
-        },
-      )
-      if (response.ok) break
-      lastDetails = await response.text().catch(() => '')
-      console.error('Cloudflare image model failed:', model, response.status, lastDetails.slice(0, 300))
-      if (response.status === 401 || response.status === 403) {
-        return NextResponse.json({ error: 'Cloudflare rejected the API token. Check the token permissions in Vercel Environment Variables.' }, { status: 502 })
-      }
-      // A model-specific rate limit should not prevent trying the compatible 4B model.
-      if (response.status !== 429 && response.status < 500) {
+    let dailyQuotaExceeded = false
+
+    // Keep the higher-quality 9B model first. Retry it once only when Cloudflare
+    // reports temporary capacity pressure, then fall back to 4B if needed.
+    for (const [modelIndex, model] of MODELS.entries()) {
+      const attempts = modelIndex === 0 ? 2 : 1
+      for (let attempt = 0; attempt < attempts; attempt++) {
+        response = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: makeForm(),
+            signal: AbortSignal.timeout(55000),
+            cache: 'no-store',
+          },
+        )
+        if (response.ok) break
+
+        lastDetails = await response.text().catch(() => '')
+        let errorCode = ''
+        let errorMessage = ''
+        try {
+          const errorBody = JSON.parse(lastDetails) as {
+            errors?: { code?: string | number; message?: string }[]
+            messages?: { code?: string | number; message?: string }[]
+          }
+          const firstError = errorBody.errors?.[0] ?? errorBody.messages?.[0]
+          errorCode = String(firstError?.code ?? '')
+          errorMessage = firstError?.message ?? ''
+        } catch {
+          errorMessage = lastDetails
+        }
+        console.error('Cloudflare image model failed:', model, response.status, errorCode, lastDetails.slice(0, 300))
+
+        if (response.status === 401 || response.status === 403) {
+          return NextResponse.json({ error: 'Cloudflare rejected the API token or model access. Check CLOUDFLARE_AI_API_TOKEN permissions and Workers AI access in Cloudflare.' }, { status: 502 })
+        }
+
+        // Cloudflare code 3036 means the daily free Neurons allocation is exhausted.
+        // Trying another model cannot fix an account-wide quota limit.
+        if (response.status === 429 && errorCode === '3036') {
+          dailyQuotaExceeded = true
+          break
+        }
+
+        if (response.status === 429 && errorCode === '3040' && attempt === 0 && modelIndex === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1200))
+          continue
+        }
+
+        // Capacity/rate limits and transient provider failures can be model-specific.
+        if (response.status === 429 || response.status >= 500) break
+
         return NextResponse.json({ error: 'The image request could not be processed. Please try changing the prompt or image.' }, { status: 502 })
       }
+      if (response?.ok || dailyQuotaExceeded) break
+    }
+
+    if (dailyQuotaExceeded) {
+      return NextResponse.json({
+        error: 'Cloudflare has used up this account’s daily free AI allocation, so image generation is paused for now. It resets at 00:00 UTC; to keep generating today, enable Workers Paid billing in Cloudflare. Your prompt has not been lost.',
+        code: 'DAILY_AI_QUOTA_EXCEEDED',
+      }, { status: 429 })
     }
 
     if (!response?.ok) {
+      const providerSaysBusy = /capacity temporarily exceeded|temporarily busy|overloaded/i.test(lastDetails)
       return NextResponse.json({
-        error: 'Both image-generation models are temporarily busy or rate-limited. Please wait a little and try again; your prompt has not been lost.',
+        error: providerSaysBusy
+          ? 'Cloudflare image servers are temporarily at capacity. Aperonix tried the high-quality model and its fallback; please retry in a minute. Your prompt has not been lost.'
+          : 'Cloudflare temporarily rate-limited image generation. If this keeps happening, check Workers AI usage and billing in your Cloudflare dashboard. Your prompt has not been lost.',
       }, { status: 429 })
     }
 
