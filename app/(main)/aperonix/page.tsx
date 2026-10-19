@@ -427,7 +427,7 @@ export default function AperonixPage() {
 
       const history = [...(activeConversation?.contextMessages ?? []), ...(activeConversation?.messages ?? [])]
         .map(m => ({ role: m.role, content: m.content, files: m.attachments ?? [] }))
-      if (wantsImage && uploaded.length === 0) {
+      if (wantsImage) {
         const referenceImages: string[] = []
         const addReferenceImage = async (blob: Blob) => {
           const resized = await new Promise<Blob>((resolve, reject) => {
