@@ -61,7 +61,8 @@ export default function ExploreHashtagsPage() {
     queryFn: async ({ pageParam }) => {
       const { data: posts, error } = await supabase
         .from('posts')
-        .select('content, views_count, id')
+        .select('content, views_count, id, media_type')
+        .in('media_type', ['image', 'video'])
         .order('created_at', { ascending: false })
         .range(pageParam, pageParam + PAGE_SIZE - 1)
       if (error) throw error
