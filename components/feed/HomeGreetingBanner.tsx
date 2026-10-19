@@ -46,7 +46,7 @@ export function HomeGreetingBanner() {
   return (
     <section
       aria-label={`${greetingCopy[period]}, ${fullName}`}
-      className="relative isolate mb-4 w-full overflow-hidden rounded-2xl border border-white/10 bg-card shadow-sm"
+      className="relative isolate mt-[7px] mb-4 w-full overflow-hidden rounded-2xl border border-white/10 bg-card shadow-sm"
     >
       <div className="relative h-[96px] w-full sm:h-[201px]">
         {(Object.keys(imagePaths) as GreetingPeriod[]).map((imagePeriod) => (
