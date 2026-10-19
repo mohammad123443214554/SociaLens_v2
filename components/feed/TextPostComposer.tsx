@@ -91,12 +91,28 @@ export function TextPostComposer() {
   const closeFlow = () => {
     if (posting) return
     setStep(null)
-    if (draftSaved && editingDraft) {
+    if (editingDraft) {
       setContent('')
       if (composerInputRef.current) composerInputRef.current.style.height = 'auto'
       setEditingDraft(false)
     }
     setError('')
+  }
+
+  const deleteDraft = () => {
+    if (!draftStorageKey || posting) return
+    try {
+      window.localStorage.removeItem(draftStorageKey)
+      setDraftSaved(false)
+      setContent('')
+      if (composerInputRef.current) composerInputRef.current.style.height = 'auto'
+      setEditingDraft(false)
+      setStep(null)
+      setError('')
+    } catch (draftError) {
+      console.error('Could not delete text post draft', draftError)
+      setError('Draft could not be deleted. Please try again.')
+    }
   }
 
   const continueToPreview = () => {
@@ -193,7 +209,7 @@ export function TextPostComposer() {
         </div>
         <div className="mt-1.5 grid grid-cols-[36px_minmax(0,1fr)_auto] items-start gap-x-2.5 sm:grid-cols-[40px_minmax(0,1fr)_auto] sm:gap-x-3">
           {draftSaved && (
-            <button type="button" onClick={openDraft} className="col-start-2 inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg border border-pink-500/25 bg-pink-500/10 px-2 text-[11px] font-semibold text-pink-400 transition-colors hover:bg-pink-500/15">
+            <button type="button" onClick={openDraft} className="col-span-3 inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg border border-pink-500/25 bg-pink-500/10 px-2 text-[11px] font-semibold text-pink-400 transition-colors hover:bg-pink-500/15">
               <FileText className="h-3.5 w-3.5 shrink-0" /> Open draft
             </button>
           )}
@@ -270,7 +286,11 @@ export function TextPostComposer() {
               {error && <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">{error}</p>}
 
               <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-                <button type="button" onClick={closeFlow} disabled={posting} className="rounded-full px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50">Cancel</button>
+                {step === 'expiration' && editingDraft ? (
+                  <button type="button" onClick={deleteDraft} disabled={posting} className="rounded-full px-4 py-2.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50">Delete draft</button>
+                ) : (
+                  <button type="button" onClick={closeFlow} disabled={posting} className="rounded-full px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50">Cancel</button>
+                )}
                 {step === 'expiration' ? (
                   <div className="flex items-center gap-2">
                     {(!draftSaved || editingDraft) && <button type="button" onClick={saveDraft} disabled={posting} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-50">
