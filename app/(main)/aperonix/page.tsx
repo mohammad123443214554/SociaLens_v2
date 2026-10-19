@@ -418,12 +418,16 @@ export default function AperonixPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: text }),
         })
-        const imageData = await imageResponse.json()
-        if (!imageResponse.ok) throw new Error(imageData.error || 'Aperonix could not generate this image.')
-        const binary = atob(imageData.image)
-        const bytes = new Uint8Array(binary.length)
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-        const imageBlob = new Blob([bytes], { type: imageData.mimeType || 'image/png' })
+        if (!imageResponse.ok) {
+          const errorData = await imageResponse.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Aperonix could not generate this image.')
+        }
+        // Receive the image as binary instead of a giant base64 JSON string.
+        // This avoids duplicating the full image in memory and freezing the chat tab.
+        const imageBlob = await imageResponse.blob()
+        if (!imageBlob.size || !imageBlob.type.startsWith('image/')) {
+          throw new Error('The image service returned an invalid image. Please try again.')
+        }
         const imagePath = `${user.id}/${conversationId}/${messageId}/aperonix-generated-${crypto.randomUUID()}.png`
         const { error: uploadError } = await supabase.storage.from('aperonix-files').upload(imagePath, imageBlob, {
           contentType: imageData.mimeType || 'image/png', upsert: false, cacheControl: '3600',
@@ -456,7 +460,8 @@ export default function AperonixPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Please try again later.'
       if (text) setInput(text)
-      setAttachError(message)
+      // Request failures must not set attachError: that state disables the composer
+      // until an attachment is cleared, which can leave the whole chat stuck.
       try { await addMessage(conversationId, { role: 'model', content: message, timestamp: Date.now() }) } catch (saveError) { console.error('Could not save Aperonix error message', saveError) }
     } finally {
       setSending(false)
