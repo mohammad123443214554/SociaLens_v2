@@ -201,10 +201,10 @@ export function TextPostComposer() {
             type="button"
             onClick={() => { setStep('expiration'); setError('') }}
             disabled={!user || !content.trim()}
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-pink-500 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:px-5"
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-0 rounded-full bg-pink-500 px-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:gap-1.5 sm:px-5"
           >
             <Send className="h-4 w-4" />
-            <span>Share</span>
+            <span className="hidden sm:inline">Share</span>
           </button>
         </div>
         <div className="mt-1.5 grid grid-cols-[36px_minmax(0,1fr)_auto] items-start gap-x-2.5 sm:grid-cols-[40px_minmax(0,1fr)_auto] sm:gap-x-3">
