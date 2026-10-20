@@ -1,8 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Type, ImageIcon, Video } from 'lucide-react'
-import { TextStoryModal } from './TextStoryModal'
+import { useRef, useState } from 'react'
+import { X, ImagePlus, Video, Upload, Clock, ShieldCheck } from 'lucide-react'
 import { PhotoStoryModal } from './PhotoStoryModal'
 import { VideoStoryModal } from './VideoStoryModal'
 import { useUser } from '@/lib/hooks/useUser'
@@ -14,86 +13,66 @@ interface CreateStoryModalProps {
   onClose: () => void
 }
 
-type Step = 'select' | 'text' | 'photo' | 'video'
+type Step = 'select' | 'photo' | 'video'
 
 export function CreateStoryModal({ userId, onClose }: CreateStoryModalProps) {
   const [step, setStep] = useState<Step>('select')
+  const [initialFile, setInitialFile] = useState<File | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
   const { profile } = useUser()
   const restricted = isRestricted(profile?.restrict_story_until)
 
-  if (step === 'text' && !restricted) {
-    return <TextStoryModal userId={userId} onClose={onClose} onBack={() => setStep('select')} />
+  if (step === 'photo' && initialFile && !restricted) {
+    return <PhotoStoryModal key={initialFile.name + initialFile.lastModified} userId={userId} initialFile={initialFile} onClose={onClose} onBack={() => { setInitialFile(null); setStep('select') }} />
   }
-  if (step === 'photo' && !restricted) {
-    return <PhotoStoryModal userId={userId} onClose={onClose} onBack={() => setStep('select')} />
-  }
-  if (step === 'video' && !restricted) {
-    return <VideoStoryModal userId={userId} onClose={onClose} onBack={() => setStep('select')} />
+  if (step === 'video' && initialFile && !restricted) {
+    return <VideoStoryModal key={initialFile.name + initialFile.lastModified} userId={userId} initialFile={initialFile} onClose={onClose} onBack={() => { setInitialFile(null); setStep('select') }} />
   }
 
   if (restricted) {
     return <RestrictionPopup feature="posting stories" until={profile?.restrict_story_until} onClose={onClose} />
   }
 
+  const chooseFile = (kind: 'photo' | 'video', file?: File) => {
+    if (!file) return
+    const isPhoto = kind === 'photo' && file.type.startsWith('image/')
+    const isVideo = kind === 'video' && file.type.startsWith('video/')
+    if (!isPhoto && !isVideo) return
+    setInitialFile(file)
+    setStep(kind)
+  }
+
   return (
-    <div
-      className="fixed inset-0 bg-black/60 z-[100] flex items-end sm:items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-card rounded-2xl w-full max-w-sm p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-lg">Create Story</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X className="h-5 w-5" />
-          </button>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between border-b border-border px-5 py-5 sm:px-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-pink-500">SociaLens Stories</p>
+            <h2 className="mt-1 text-xl font-bold tracking-tight">Create a story</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Choose a photo or video from your device.</p>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"><X className="h-5 w-5" /></button>
         </div>
 
-        <div className="space-y-2">
-          <button
-            onClick={() => setStep('text')}
-            className="w-full flex items-center gap-3 p-3 rounded-xl border hover:border-pink-500/40 hover:bg-pink-500/5 transition-colors"
-          >
-            <div className="h-11 w-11 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center shrink-0">
-              <Type className="h-5 w-5 text-white" />
-            </div>
-            <div className="text-left">
-              <p className="font-medium text-sm">Create a text story</p>
-              <p className="text-xs text-muted-foreground">Share your thoughts with a colorful background</p>
-            </div>
+        <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6">
+          <button onClick={() => photoInputRef.current?.click()} className="group rounded-2xl border border-border bg-background p-4 text-left transition hover:border-pink-500/60 hover:bg-pink-500/[0.04] focus:outline-none focus:ring-2 focus:ring-pink-500/40">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 text-white shadow-sm"><ImagePlus className="h-6 w-6" /></div>
+            <p className="font-semibold">Upload photo</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Add a song, text and your favourite font.</p>
+            <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-pink-500">Choose photo <Upload className="h-3.5 w-3.5" /></span>
           </button>
-
-          <button
-            onClick={() => setStep('photo')}
-            className="w-full flex items-center gap-3 p-3 rounded-xl border hover:border-pink-500/40 hover:bg-pink-500/5 transition-colors"
-          >
-            <div className="h-11 w-11 rounded-full bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center shrink-0">
-              <ImageIcon className="h-5 w-5 text-white" />
-            </div>
-            <div className="text-left">
-              <p className="font-medium text-sm">Create a photo story</p>
-              <p className="text-xs text-muted-foreground">Upload a photo and add text on top</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setStep('video')}
-            className="w-full flex items-center gap-3 p-3 rounded-xl border hover:border-pink-500/40 hover:bg-pink-500/5 transition-colors"
-          >
-            <div className="h-11 w-11 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shrink-0">
-              <Video className="h-5 w-5 text-white" />
-            </div>
-            <div className="text-left">
-              <p className="font-medium text-sm">Create a video story</p>
-              <p className="text-xs text-muted-foreground">Upload a video and add text on top</p>
-            </div>
+          <button onClick={() => videoInputRef.current?.click()} className="group rounded-2xl border border-border bg-background p-4 text-left transition hover:border-blue-500/60 hover:bg-blue-500/[0.04] focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-700 text-white shadow-sm"><Video className="h-6 w-6" /></div>
+            <p className="font-semibold">Upload video</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Preview your clip, then share it to your story.</p>
+            <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-500">Choose video <Upload className="h-3.5 w-3.5" /></span>
           </button>
         </div>
-
-        <p className="text-[11px] text-muted-foreground text-center mt-4">Your story disappears after 24 hours</p>
+        <div className="flex items-center justify-center gap-2 border-t border-border bg-muted/30 px-5 py-3 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5" /> Stories disappear after 24 hours <span className="mx-1 text-border">•</span><ShieldCheck className="h-3.5 w-3.5" /> Choose your audience before sharing</div>
+        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { chooseFile('photo', e.target.files?.[0]); e.currentTarget.value = '' }} />
+        <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={(e) => { chooseFile('video', e.target.files?.[0]); e.currentTarget.value = '' }} />
       </div>
     </div>
   )
-} 
+}
