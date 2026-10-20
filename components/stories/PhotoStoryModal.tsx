@@ -366,10 +366,28 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
         <div className="flex items-center gap-2"><span className="hidden text-xs text-white/45 sm:inline">Unsaved draft</span><button onClick={requestClose} className="flex h-9 w-9 items-center justify-center rounded-lg text-white/65 transition-colors hover:bg-white/10 hover:text-white" aria-label="Close editor"><X className="h-5 w-5" /></button></div>
       </header>
 
+      <div className="flex flex-1 min-h-0 flex-col sm:flex-row">
+        <aside aria-label="Story editing tools" className="order-2 sm:order-1 shrink-0 flex sm:w-[76px] sm:flex-col items-center justify-around sm:justify-start sm:gap-2 border-t sm:border-t-0 sm:border-r border-white/10 bg-[#202023] px-2 py-2 sm:py-4">
+          <button onClick={() => initialFileRef.current?.click()} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Add photo">
+            <Upload className="h-5 w-5" /><span className="text-[10px]">Media</span>
+          </button>
+          <button onClick={() => activeScene && setEditingCaption(true)} disabled={!activeScene} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors" title="Add or edit text">
+            <Type className="h-5 w-5" /><span className="text-[10px]">Text</span>
+          </button>
+          <button onClick={openGlobalFont} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Choose story font">
+            <span className="text-lg font-serif leading-5">Aa</span><span className="text-[10px]">Font</span>
+          </button>
+          <button onClick={openGlobalMusic} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Add background music">
+            <Music className="h-5 w-5" /><span className="text-[10px]">Music</span>
+          </button>
+          <button onClick={() => addSceneFileRef.current?.click()} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Add another scene">
+            <ImagePlus className="h-5 w-5" /><span className="text-[10px]">Add scene</span>
+          </button>
+        </aside>
       {/* Canvas */}
       <div
         ref={canvasRef}
-        className="relative flex-1 min-h-0 overflow-hidden touch-none flex items-center justify-center bg-[#242427] px-3 py-4 sm:px-6"
+        className="order-1 sm:order-2 relative flex-1 min-w-0 min-h-0 overflow-hidden touch-none flex items-center justify-center bg-[#242427] px-3 py-4 sm:px-6"
         onPointerMove={handleDragMove}
         onPointerUp={handleDragEnd}
       >
@@ -401,6 +419,7 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
             )}
           </>
         )}
+      </div>
       </div>
 
       {/* Caption editor (opened via 3-dot "Add/Edit Text" - color/font live in the 3-dot menu only) */}
