@@ -313,6 +313,76 @@ export default function AperonixPage() {
     setActivityLabel(/\b(search|research|look up|find online|internet|latest|news|sources|youtube|video|horror|drama|movie|film|series|episode|watch|recommend|recommendation|review|price|buy|weather|today|website|site|official link|trailer|song|music|download)\b|search karo|research karo|internet par|dhoondh|dhundh/i.test(text) ? 'Researching' : 'Thinking')
     setSending(true)
 
+
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Please sign in to upload files and save your chat.')
+
+      // Compress image files before storage; all other file bytes go directly
+      // from the browser to private Supabase Storage, never through Vercel.
+      const uploaded = await Promise.all(items.map(async item => {
+        let uploadBlob: Blob = item.file
+        let uploadName = item.file.name
+        let mimeType = item.file.type || 'application/octet-stream'
+        if (item.type === 'image') {
+          try {
+            uploadBlob = await compressImageBlob(item.file)
+            uploadName = item.file.name.replace(/\.[^.]+$/, '') + '.jpg'
+            mimeType = 'image/jpeg'
+          } catch {
+            // Preserve the original if this browser cannot decode/compress it.
+          }
+        }
+        if (uploadBlob.size > MAX_FILE_BYTES) {
+          throw new Error(`“${item.file.name}” is larger than the 20 MB limit after compression.`)
+        }
+        const safeName = uploadName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120) || 'upload.bin'
+        const path = `${user.id}/${conversationId}/${messageId}/${crypto.randomUUID()}-${safeName}`
+        const { error } = await supabase.storage.from('aperonix-files').upload(path, uploadBlob, {
+          contentType: mimeType, upsert: false, cacheControl: '3600',
+        })
+        if (error) throw new Error(`Could not upload “${item.file.name}”. Please try again.`)
+        const kind = mimeType.startsWith('image/') ? 'image'
+          : mimeType.startsWith('video/') ? 'video'
+          : mimeType.startsWith('audio/') ? 'audio'
+          : ['application/pdf','text/plain','text/csv','application/json'].includes(mimeType) ? 'document' : 'file'
+        return { name: item.file.name, path, mimeType, size: uploadBlob.size, kind: kind as 'image'|'video'|'audio'|'document'|'file' }
+      }))
+
+      const userMessage: Omit<AperonixMessage, 'id'> & { id: string } = {
+        id: messageId, role: 'user', content: text, timestamp: Date.now(),
+        attachments: uploaded.length > 0 ? uploaded : null,
+      }
+      await addMessage(conversationId, userMessage)
+      clearAttachment()
+
+      // Start naming as soon as the first message is submitted. Keep "New chat"
+      // visible with Aperonix's spinner until the AI-generated title is ready.
+      if (isFirstMessage) {
+        setTitleGeneratingId(conversationId)
+        void fetch('/api/aperonix/title', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            attachmentNames: uploaded.map(file => file.name),
+          }),
+        }).then(async titleResponse => {
+          if (!titleResponse.ok) throw new Error('Title generation failed')
+          const titleData = await titleResponse.json()
+          if (typeof titleData.title === 'string' && titleData.title.trim()) {
+            updateConversationTitle(conversationId, titleData.title)
+          }
+        }).catch(error => {
+          console.error('Could not generate Aperonix chat title', error)
+        }).finally(() => {
+          setTitleGeneratingId(current => current === conversationId ? null : current)
+        })
+      }
+
+      const history = [...(activeConversation?.contextMessages ?? []), ...(activeConversation?.messages ?? [])]
+        .map(m => ({ role: m.role, content: m.content, files: m.attachments ?? [] }))
       const res = await fetch('/api/aperonix/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
