@@ -19,6 +19,7 @@ interface PhotoStoryModalProps {
   userId: string
   onClose: () => void
   onBack: () => void
+  initialFile?: File
 }
 
 interface EditingScene extends Omit<DraftPhotoScene, 'overlayText' | 'overlayTextColor'> {
@@ -55,7 +56,7 @@ function effectiveMusicFor(scene: EditingScene, globalMusic: GlobalMusic | null)
   return null
 }
 
-export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProps) {
+export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoStoryModalProps) {
   const [scenes, setScenes] = useState<EditingScene[]>([])
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null)
   const [globalMusic, setGlobalMusic] = useState<GlobalMusic | null>(null)
@@ -90,6 +91,16 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
   const stageRef = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
   const { createPhotoStory } = useCreateStory()
+
+  useEffect(() => {
+    if (!initialFile || scenes.length > 0) return
+    const scene = sceneFromFile(initialFile)
+    setScenes([scene])
+    setActiveSceneId(scene.id)
+    // The uploaded File is supplied once by the chooser; the local preview URL
+    // is released when the editor unmounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile])
 
   const activeScene = scenes.find((s) => s.id === activeSceneId) || null
   const totalDuration = scenes.reduce((sum, s) => sum + s.duration, 0) || 5
@@ -368,8 +379,8 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
       </header>
 
       <div className="flex flex-1 min-h-0 flex-col sm:flex-row">
-        <aside aria-label="Story editing tools" className="order-2 sm:order-1 shrink-0 flex sm:w-[76px] sm:flex-col items-center justify-around sm:justify-start sm:gap-2 border-t sm:border-t-0 sm:border-r border-white/10 bg-[#202023] px-2 py-2 sm:py-4">
-          <button onClick={() => (scenes.length ? addSceneFileRef.current : initialFileRef.current)?.click()} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Add photo">
+        <aside aria-label="Photo story tools" className="order-2 sm:order-1 shrink-0 flex sm:w-[76px] sm:flex-col items-center justify-around sm:justify-start sm:gap-2 border-t sm:border-t-0 sm:border-r border-white/10 bg-[#202023] px-2 py-2 sm:py-4">
+          <button onClick={() => (scenes.length ? addSceneFileRef.current : initialFileRef.current)?.click()} className="hidden" title="Add photo">
             <Upload className="h-5 w-5" /><span className="text-[10px]">Media</span>
           </button>
           <button onClick={() => activeScene && setEditingCaption(true)} disabled={!activeScene} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors" title="Add or edit text">
@@ -381,7 +392,7 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
           <button onClick={openGlobalMusic} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Add background music">
             <Music className="h-5 w-5" /><span className="text-[10px]">Music</span>
           </button>
-          <button onClick={() => addSceneFileRef.current?.click()} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Add another scene">
+          <button onClick={() => addSceneFileRef.current?.click()} className="hidden" title="Add another scene">
             <ImagePlus className="h-5 w-5" /><span className="text-[10px]">Add scene</span>
           </button>
         </aside>
@@ -455,7 +466,7 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
 
       {/* Timeline */}
       {!editingCaption && (
-        <section aria-label="Story timeline" className="z-10 w-full shrink-0 border-y border-white/10 bg-[#1c1c1f] shadow-[0_-8px_24px_rgba(0,0,0,0.18)]">
+        <section aria-label="Story timeline" className="hidden">
           <div className="flex h-7 items-center justify-between border-b border-white/[0.06] px-4 sm:px-5">
             <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/55">Timeline</span>
             <span className="text-[10px] text-white/35">Drag clips to reorder · Scroll to explore</span>
@@ -489,9 +500,6 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
         <div className="relative flex shrink-0 items-center gap-2 border-t border-white/10 bg-[#202023] px-3 py-3 sm:px-5">
           <button onClick={openGlobalFont} className="h-11 w-11 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors" title="Font for the whole story">
             <Type className="h-5 w-5" />
-          </button>
-          <button onClick={startPreview} className="h-11 w-11 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors" title="Preview story">
-            <Play className="h-5 w-5" />
           </button>
           <Button variant="gradient" className="flex-1" disabled={createPhotoStory.isPending} onClick={handleShare}>
             {createPhotoStory.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Share to Story'}
