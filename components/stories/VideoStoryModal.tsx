@@ -18,6 +18,7 @@ interface VideoStoryModalProps {
   userId: string
   onClose: () => void
   onBack: () => void
+  initialFile?: File
 }
 
 interface EditingScene extends Omit<DraftVideoScene, 'overlayText'> {
@@ -70,7 +71,7 @@ function effectiveMusicFor(scene: EditingScene, globalMusic: GlobalMusic | null)
   return null
 }
 
-export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProps) {
+export function VideoStoryModal({ userId, onClose, onBack, initialFile }: VideoStoryModalProps) {
   const [scenes, setScenes] = useState<EditingScene[]>([])
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null)
   const [globalMusic, setGlobalMusic] = useState<GlobalMusic | null>(null)
@@ -102,6 +103,25 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
   const stageRef = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
   const { createVideoStory } = useCreateStory()
+
+  useEffect(() => {
+    if (!initialFile || scenes.length > 0) return
+    let cancelled = false
+    sceneFromFile(initialFile).then((scene) => {
+      if (cancelled) {
+        if (scene) URL.revokeObjectURL(scene.previewUrl)
+        return
+      }
+      if (scene) {
+        setScenes([scene])
+        setActiveSceneId(scene.id)
+      } else {
+        setShowVideoLimitPopup(true)
+      }
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile])
 
   const activeScene = scenes.find((s) => s.id === activeSceneId) || null
   const totalDuration = scenes.reduce((sum, s) => sum + s.duration, 0) || 5
@@ -365,7 +385,7 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
       </header>
 
       <div className="flex flex-1 min-h-0 flex-col sm:flex-row">
-        <aside aria-label="Story editing tools" className="order-2 sm:order-1 shrink-0 flex sm:w-[76px] sm:flex-col items-center justify-around sm:justify-start sm:gap-2 border-t sm:border-t-0 sm:border-r border-white/10 bg-[#202023] px-2 py-2 sm:py-4">
+        <aside aria-label="Story editing tools" className="hidden">
           <button onClick={() => (scenes.length ? addSceneFileRef.current : initialFileRef.current)?.click()} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Add video">
             <Upload className="h-5 w-5" /><span className="text-[10px]">Video</span>
           </button>
@@ -419,7 +439,7 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
       </div>
       </div>
 
-      {editingCaption && activeScene && (
+      {false && editingCaption && activeScene && (
         <div className="p-4 border-t border-white/10">
           <input
             autoFocus
@@ -437,7 +457,7 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
       )}
 
       {!editingCaption && (
-        <section aria-label="Story timeline" className="z-10 w-full shrink-0 border-y border-white/10 bg-[#1c1c1f] shadow-[0_-8px_24px_rgba(0,0,0,0.18)]">
+        <section aria-label="Story timeline" className="hidden">
           <div className="flex h-7 items-center justify-between border-b border-white/[0.06] px-4 sm:px-5">
             <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/55">Timeline</span>
             <span className="text-[10px] text-white/35">Drag clips to reorder · Scroll to explore</span>
@@ -468,12 +488,6 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
 
       {!editingCaption && (
         <div className="relative flex shrink-0 items-center gap-2 border-t border-white/10 bg-[#202023] px-3 py-3 sm:px-5">
-          <button onClick={openGlobalFont} className="h-11 w-11 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors" title="Font for the whole story">
-            <Type className="h-5 w-5" />
-          </button>
-          <button onClick={startPreview} className="h-11 w-11 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors" title="Preview story">
-            <Play className="h-5 w-5" />
-          </button>
           <Button variant="gradient" className="flex-1" disabled={createVideoStory.isPending} onClick={handleShare}>
             {createVideoStory.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Share to Story'}
           </Button>
