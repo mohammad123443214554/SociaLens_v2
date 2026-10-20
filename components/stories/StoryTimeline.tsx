@@ -22,8 +22,8 @@ interface StoryTimelineProps<T extends BaseScene> {
   onOpenGlobalMusic: () => void
   trackIcon: React.ReactNode
   resizable?: boolean
-  canvasZoom: number
-  onCanvasZoomChange: (zoom: number) => void
+  canvasZoom?: number
+  onCanvasZoomChange?: (zoom: number) => void
 }
 
 const BASE_PX_PER_SECOND = 20
@@ -37,7 +37,7 @@ const TOUCH_SENSITIVITY = 4
 
 export function StoryTimeline<T extends BaseScene>({
   scenes, activeSceneId, onSelectScene, onAddScene, onResizeScene, renderBlock, getMenuItems,
-  globalMusic, onOpenGlobalMusic, trackIcon, resizable = true, canvasZoom, onCanvasZoomChange,
+  globalMusic, onOpenGlobalMusic, trackIcon, resizable = true, canvasZoom = 80, onCanvasZoomChange,
 }: StoryTimelineProps<T>) {
   const [menuFor, setMenuFor] = useState<{ id: string; x: number; y: number } | null>(null)
   const PX_PER_SECOND = BASE_PX_PER_SECOND
@@ -156,9 +156,9 @@ export function StoryTimeline<T extends BaseScene>({
 
       <div className="flex items-center justify-end gap-3 pt-2 border-t border-neutral-200 dark:border-white/10">
         <span className="text-[11px] text-neutral-500 dark:text-white/45">Page zoom</span>
-        <button type="button" onClick={() => onCanvasZoomChange(Math.max(60, canvasZoom - 5))} disabled={canvasZoom <= 60} className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-600 dark:text-white/70 hover:bg-neutral-200 dark:hover:bg-white/10 disabled:opacity-30" aria-label="Zoom out"><Minus className="h-4 w-4" /></button>
-        <input aria-label="Timeline zoom" type="range" min="60" max="100" step="5" value={canvasZoom} onChange={(e) => onCanvasZoomChange(Number(e.target.value))} className="w-28 accent-pink-500 cursor-pointer" />
-        <button type="button" onClick={() => onCanvasZoomChange(Math.min(100, canvasZoom + 5))} disabled={canvasZoom >= 100} className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-600 dark:text-white/70 hover:bg-neutral-200 dark:hover:bg-white/10 disabled:opacity-30" aria-label="Zoom in"><ZoomIn className="h-4 w-4" /></button>
+        <button type="button" onClick={() => onCanvasZoomChange?.(Math.max(60, canvasZoom - 5))} disabled={canvasZoom <= 60} className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-600 dark:text-white/70 hover:bg-neutral-200 dark:hover:bg-white/10 disabled:opacity-30" aria-label="Zoom out"><Minus className="h-4 w-4" /></button>
+        <input aria-label="Timeline zoom" type="range" min="60" max="100" step="5" value={canvasZoom} onChange={(e) => onCanvasZoomChange?.(Number(e.target.value))} className="w-28 accent-pink-500 cursor-pointer" />
+        <button type="button" onClick={() => onCanvasZoomChange?.(Math.min(100, canvasZoom + 5))} disabled={canvasZoom >= 100} className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-600 dark:text-white/70 hover:bg-neutral-200 dark:hover:bg-white/10 disabled:opacity-30" aria-label="Zoom in"><ZoomIn className="h-4 w-4" /></button>
         <span className="w-8 text-right text-[11px] tabular-nums text-neutral-500 dark:text-white/45">{canvasZoom}%</span>
       </div>
 
