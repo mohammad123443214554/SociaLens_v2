@@ -14,12 +14,13 @@ export interface StoryDraftRecord {
     overlayX: number
     overlayY: number
     font: string | null
-    song: { title: string; artist: string; artworkUrl: string; previewUrl: string } | null
+    song: { title: string; artist: string; artworkUrl: string; previewUrl: string; duration?: number; licenseUrl?: string; source?: string } | null
     storyDuration: number
     textStart: number
     textDuration: number
     songStart: number
     songDuration: number
+    songOffset?: number
   }
   video?: { duration: number }
   updatedAt: number
