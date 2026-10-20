@@ -421,14 +421,14 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
               </div>
             </div>
           </div>
-          <div className="relative z-10 -mt-2 flex items-center justify-center gap-3 text-white/80" aria-label="Canvas zoom controls">
-            <span className="text-xs text-white/60">Zoom</span>
-            <button type="button" onClick={() => setCanvasZoom((zoom) => Math.max(60, zoom - 5))} disabled={canvasZoom <= 60} className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-white/10 disabled:opacity-30" aria-label="Zoom out"><Minus className="h-4 w-4" /></button>
-            <input aria-label="Canvas zoom" type="range" min="60" max="100" step="5" value={canvasZoom} onChange={(e) => setCanvasZoom(Number(e.target.value))} className="w-28 accent-pink-500 cursor-pointer" />
-            <button type="button" onClick={() => setCanvasZoom((zoom) => Math.min(100, zoom + 5))} disabled={canvasZoom >= 100} className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-white/10 disabled:opacity-30" aria-label="Zoom in"><ZoomIn className="h-4 w-4" /></button>
-            <span className="w-9 text-right text-xs tabular-nums text-white/60">{canvasZoom}%</span>
-          </div>
         </section>
+      </div>
+      <div className="shrink-0 flex items-center justify-center gap-3 px-3 py-2 text-white/80 border-t border-white/10" aria-label="Canvas zoom controls">
+        <span className="text-xs text-white/60">Zoom</span>
+        <button type="button" onClick={() => setCanvasZoom((zoom) => Math.max(60, zoom - 5))} disabled={canvasZoom <= 60} className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-white/10 disabled:opacity-30" aria-label="Zoom out"><Minus className="h-4 w-4" /></button>
+        <input aria-label="Canvas zoom" type="range" min="60" max="100" step="5" value={canvasZoom} onChange={(e) => setCanvasZoom(Number(e.target.value))} className="w-28 accent-pink-500 cursor-pointer" />
+        <button type="button" onClick={() => setCanvasZoom((zoom) => Math.min(100, zoom + 5))} disabled={canvasZoom >= 100} className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-white/10 disabled:opacity-30" aria-label="Zoom in"><ZoomIn className="h-4 w-4" /></button>
+        <span className="w-9 text-right text-xs tabular-nums text-white/60">{canvasZoom}%</span>
       </div>
 
       {colorPanel === 'bg' && (
