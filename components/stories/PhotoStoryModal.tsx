@@ -101,6 +101,25 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
     }, 100)
     return () => window.clearInterval(timer)
   }, [showPreview, storyDuration])
+  useEffect(() => {
+    const audio = previewAudioRef.current
+    if (!audio || !song || !showPreview) {
+      audio?.pause()
+      return
+    }
+
+    const clipLength = Math.min(songDuration, storyDuration - songStart)
+    const clipEnd = songStart + clipLength
+    if (previewElapsed < songStart || previewElapsed >= clipEnd) {
+      audio.pause()
+      return
+    }
+
+    const targetTime = songOffset + (previewElapsed - songStart)
+    if (Math.abs(audio.currentTime - targetTime) > 1.25) audio.currentTime = targetTime
+    if (audio.paused) void audio.play().catch(() => {})
+  }, [song, showPreview, previewElapsed, songOffset, songStart, songDuration, storyDuration])
+
   const [showAudience, setShowAudience] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const replaceInput = useRef<HTMLInputElement>(null)
