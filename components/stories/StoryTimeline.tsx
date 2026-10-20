@@ -146,12 +146,7 @@ export function StoryTimeline<T extends BaseScene>({
             <span className="text-[10px] text-white/50 shrink-0">Trim</span>
           </button>
         ) : (
-          <button
-            onClick={onOpenGlobalMusic}
-            className="flex-1 h-9 rounded-md bg-white/5 border border-dashed border-white/20 flex items-center justify-center gap-1.5 text-white/60 text-[11px] hover:bg-white/10 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add music for your story
-          </button>
+          <div className="flex-1 h-2" aria-hidden="true" />
         )}
       </div>
 
