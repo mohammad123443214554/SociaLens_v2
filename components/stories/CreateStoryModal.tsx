@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { X, ImagePlus, Video, Upload, Clock, ShieldCheck } from 'lucide-react'
+import { X, ImagePlus, Video, Upload } from 'lucide-react'
 import { PhotoStoryModal } from './PhotoStoryModal'
 import { VideoStoryModal } from './VideoStoryModal'
 import { useUser } from '@/lib/hooks/useUser'
@@ -75,7 +75,6 @@ export function CreateStoryModal({ userId, onClose }: CreateStoryModalProps) {
           </button>
         </div>
         {fileError && <p role="alert" className="px-5 pb-3 text-sm text-red-500 sm:px-6">{fileError}</p>}
-        <div className="flex items-center justify-center gap-2 border-t border-border bg-muted/30 px-5 py-3 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5" /> Stories disappear after 24 hours <span className="mx-1 text-border">•</span><ShieldCheck className="h-3.5 w-3.5" /> Choose your audience before sharing</div>
         <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" className="hidden" onChange={(e) => { chooseFile('photo', e.target.files?.[0]); e.currentTarget.value = '' }} />
         <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime,video/ogg,video/x-m4v" className="hidden" onChange={(e) => { chooseFile('video', e.target.files?.[0]); e.currentTarget.value = '' }} />
       </div>
