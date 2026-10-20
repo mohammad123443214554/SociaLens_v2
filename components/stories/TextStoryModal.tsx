@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { X, ArrowLeft, Smile, Loader2, Type, Play, Minus, Plus, Move, Trash2, Copy, Palette, PaintBucket, Music } from 'lucide-react'
+import { X, ArrowLeft, Smile, Loader2, Type, Play, Minus, Plus, ZoomIn, Move, Trash2, Copy, Palette, PaintBucket, Music } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EmojiPicker } from './EmojiPicker'
 import { MusicPicker, SelectedSong } from './MusicPicker'
@@ -391,10 +391,10 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
           </button>
           
         </aside>
-        <section className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-2 md:p-3 overflow-hidden">
+        <section className="flex-1 min-w-0 min-h-0 flex flex-col items-center justify-center gap-2 p-2 md:p-3 overflow-hidden">
           <div className="h-full max-h-full aspect-[9/16] max-w-full relative overflow-hidden rounded-md shadow-2xl ring-1 ring-white/10 touch-none"
             ref={canvasRef}
-            style={{ background: resolveBackgroundCss(activeScene.backgroundColor), height: `min(${canvasZoom}%, 500px)`, transform: `translateY(-8px) scale(${canvasZoom / 100})`, transformOrigin: 'center center' }}
+            style={{ background: resolveBackgroundCss(activeScene.backgroundColor), height: `min(${canvasZoom}%, 500px)`, transform: `translateY(-16px) scale(${canvasZoom / 100})`, transformOrigin: 'center center' }}
             onPointerMove={handleDragMove}
             onPointerUp={handleDragEnd}
           >
@@ -420,6 +420,13 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
                 <button onClick={() => adjustTextSize(4)} className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center"><Plus className="h-3.5 w-3.5 text-white" /></button>
               </div>
             </div>
+          </div>
+          <div className="relative z-10 -mt-2 flex items-center justify-center gap-3 text-white/80" aria-label="Canvas zoom controls">
+            <span className="text-xs text-white/60">Zoom</span>
+            <button type="button" onClick={() => setCanvasZoom((zoom) => Math.max(60, zoom - 5))} disabled={canvasZoom <= 60} className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-white/10 disabled:opacity-30" aria-label="Zoom out"><Minus className="h-4 w-4" /></button>
+            <input aria-label="Canvas zoom" type="range" min="60" max="100" step="5" value={canvasZoom} onChange={(e) => setCanvasZoom(Number(e.target.value))} className="w-28 accent-pink-500 cursor-pointer" />
+            <button type="button" onClick={() => setCanvasZoom((zoom) => Math.min(100, zoom + 5))} disabled={canvasZoom >= 100} className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-white/10 disabled:opacity-30" aria-label="Zoom in"><ZoomIn className="h-4 w-4" /></button>
+            <span className="w-9 text-right text-xs tabular-nums text-white/60">{canvasZoom}%</span>
           </div>
         </section>
       </div>
