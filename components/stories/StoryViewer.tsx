@@ -70,7 +70,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const [storyIndex, setStoryIndex] = useState(startStoryIndex)
   const [progress, setProgress] = useState(0)
   const progressRef = useRef(0)
-  progressRef.current = progress
+  useEffect(() => { progressRef.current = progress }, [progress])
   const [videoSceneIndex, setVideoSceneIndex] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
