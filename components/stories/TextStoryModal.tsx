@@ -346,7 +346,7 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
         <button onClick={requestBack} className="text-white p-1">
           <ArrowLeft className="h-6 w-6" />
         </button>
-        <p className="text-white font-semibold">Text Story</p>
+        <span aria-hidden="true" />
         <button onClick={requestClose} className="text-white p-1">
           <X className="h-6 w-6" />
         </button>
@@ -371,7 +371,7 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
           <button onClick={openGlobalMusic} className="min-w-[100px] md:min-w-0 flex md:flex-col items-center md:items-start gap-2 rounded-xl px-3 py-2.5 text-white/85 hover:bg-white/10 text-sm">
             <Music className="h-5 w-5 shrink-0" /><span>Audio</span>
           </button>
-          <div className="hidden md:block mt-auto rounded-xl bg-white/5 p-3 text-xs text-white/50 leading-relaxed">Select a scene below, then edit its text, style, timing and audio.</div>
+          
         </aside>
         <section className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-3 md:p-6 overflow-hidden">
           <div className="h-full max-h-full aspect-[9/16] max-w-full relative overflow-hidden rounded-md shadow-2xl ring-1 ring-white/10 touch-none"
