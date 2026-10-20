@@ -60,6 +60,7 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null)
   const [globalMusic, setGlobalMusic] = useState<GlobalMusic | null>(null)
   const [globalFont, setGlobalFont] = useState<string | null>(null)
+  const [timelineZoom, setTimelineZoom] = useState(80)
 
   const [editingCaption, setEditingCaption] = useState(false)
   const [colorTarget, setColorTarget] = useState<string | null>(null)
@@ -437,6 +438,8 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
           activeSceneId={activeSceneId || scenes[0].id}
           onSelectScene={setActiveSceneId}
           onReorderScenes={handleReorderScenes}
+          canvasZoom={timelineZoom}
+          onCanvasZoomChange={setTimelineZoom}
           onAddScene={handleAddScene}
           onResizeScene={(id, duration) => updateScene(id, { duration })}
           trackIcon={<ImagePlus className="h-3.5 w-3.5 text-white/40" />}
