@@ -33,6 +33,8 @@ export function MusicAdjustModal({
   const [playing, setPlaying] = useState(false)
   const [playhead, setPlayhead] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const timelineRef = useRef<HTMLDivElement | null>(null)
+  const dragRef = useRef<{ edge: 'move' | 'start' | 'end'; pointerX: number; start: number; duration: number } | null>(null)
 
   const maxStart = useMemo(() => Math.max(0, trackDuration - clipDuration), [trackDuration, clipDuration])
 
@@ -80,19 +82,38 @@ export function MusicAdjustModal({
     }
   }
 
-  const changeDuration = (value: number) => {
-    const nextDuration = Math.max(1, Math.min(clipLimit, value))
-    setClipDuration(nextDuration)
-    setSourceStart((current) => Math.min(current, Math.max(0, trackDuration - nextDuration)))
-    setPlayhead(0)
+  const beginTimelineAdjust = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement
+    if (!target.closest('[data-song-segment]')) return
+    const edge = (target.closest('[data-edge]')?.getAttribute('data-edge') as 'start' | 'end' | null) || 'move'
+    dragRef.current = { edge, pointerX: event.clientX, start: sourceStart, duration: clipDuration }
+    event.currentTarget.setPointerCapture(event.pointerId)
     stopPreview()
+    event.preventDefault()
   }
 
-  const changeStart = (value: number) => {
-    setSourceStart(Math.max(0, Math.min(maxStart, value)))
+  const moveTimelineAdjust = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current
+    const timeline = timelineRef.current
+    if (!drag || !timeline) return
+    const delta = ((event.clientX - drag.pointerX) / Math.max(1, timeline.getBoundingClientRect().width)) * trackDuration
+    if (drag.edge === 'move') {
+      const nextStart = Math.max(0, Math.min(trackDuration - drag.duration, Math.round(drag.start + delta)))
+      setSourceStart(nextStart)
+    } else if (drag.edge === 'start') {
+      const end = drag.start + drag.duration
+      const nextStart = Math.max(Math.max(0, end - clipLimit), Math.min(end - 1, Math.round(drag.start + delta)))
+      setSourceStart(nextStart)
+      setClipDuration(end - nextStart)
+    } else {
+      const nextDuration = Math.max(1, Math.min(clipLimit, Math.round(drag.duration + delta)))
+      setClipDuration(nextDuration)
+      setSourceStart(Math.min(drag.start, Math.max(0, trackDuration - nextDuration)))
+    }
     setPlayhead(0)
-    stopPreview()
   }
+
+  const endTimelineAdjust = () => { dragRef.current = null }
 
   const reset = () => {
     stopPreview()
@@ -133,34 +154,33 @@ export function MusicAdjustModal({
           </button>
         </div>
 
-        <div className="mt-5 space-y-5">
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <label htmlFor="song-source-start" className="text-sm font-medium">Start song at</label>
-              <span className="text-sm tabular-nums text-muted-foreground">{formatTime(sourceStart)}</span>
-            </div>
-            <input id="song-source-start" type="range" min={0} max={Math.floor(maxStart)} step={1} value={Math.min(sourceStart, Math.floor(maxStart))} onChange={(event) => changeStart(Number(event.target.value))} className="w-full accent-pink-500" />
-            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground"><span>0:00</span><span>{formatTime(maxStart)}</span></div>
-          </div>
-
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <label htmlFor="song-clip-length" className="text-sm font-medium">Song length in Story</label>
-              <span className="text-sm font-semibold tabular-nums">{formatTime(clipDuration)}</span>
-            </div>
-            <input id="song-clip-length" type="range" min={1} max={Math.floor(clipLimit)} step={1} value={Math.min(clipDuration, Math.floor(clipLimit))} onChange={(event) => changeDuration(Number(event.target.value))} className="w-full accent-pink-500" />
-            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground"><span>1 sec</span><span>Up to {formatTime(clipLimit)}</span></div>
-          </div>
-
+        <div className="mt-5">
+          <p className="mb-2 text-sm font-medium">Drag the strip to choose the song part</p>
           <div className="overflow-hidden rounded-lg border border-border bg-muted p-2">
-            <div className="relative h-8 rounded-md bg-muted-foreground/10">
-              <div className="absolute inset-y-0 rounded-md border border-pink-500 bg-pink-500/25" style={{ left: `${(sourceStart / trackDuration) * 100}%`, width: `${(clipDuration / trackDuration) * 100}%` }}>
-                <div className="absolute inset-y-0 left-0 w-1 rounded-l bg-pink-500" />
-                <div className="absolute inset-y-0 right-0 w-1 rounded-r bg-pink-500" />
-                {playing && <div className="absolute inset-y-0 w-0.5 bg-foreground" style={{ left: `${Math.min(100, (playhead / clipDuration) * 100)}%` }} />}
+            <div
+              ref={timelineRef}
+              onPointerDown={beginTimelineAdjust}
+              onPointerMove={moveTimelineAdjust}
+              onPointerUp={endTimelineAdjust}
+              onPointerCancel={endTimelineAdjust}
+              className="relative h-12 touch-none rounded-md bg-muted-foreground/10"
+              aria-label="Adjust song segment: drag the strip to move it and drag either edge to resize"
+            >
+              <div
+                data-song-segment
+                className="absolute inset-y-0 cursor-grab rounded-md border border-pink-500 bg-pink-500/25 active:cursor-grabbing"
+                style={{ left: `${(sourceStart / trackDuration) * 100}%`, width: `${(clipDuration / trackDuration) * 100}%`, minWidth: '8px' }}
+              >
+                <div data-edge="start" className="absolute inset-y-0 left-0 z-10 w-3 cursor-ew-resize rounded-l bg-pink-500" />
+                <div data-edge="end" className="absolute inset-y-0 right-0 z-10 w-3 cursor-ew-resize rounded-r bg-pink-500" />
+                {playing && <div className="pointer-events-none absolute inset-y-0 w-0.5 bg-foreground" style={{ left: `${Math.min(100, (playhead / clipDuration) * 100)}%` }} />}
               </div>
             </div>
-            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground"><span>{formatTime(sourceStart)}</span><span>{formatTime(sourceStart + clipDuration)}</span></div>
+            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <span>{formatTime(sourceStart)}</span>
+              <span className="font-medium text-foreground">{formatTime(clipDuration)} selected</span>
+              <span>{formatTime(sourceStart + clipDuration)}</span>
+            </div>
           </div>
         </div>
 
