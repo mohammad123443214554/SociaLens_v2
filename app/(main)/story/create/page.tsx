@@ -7,9 +7,9 @@ import { Loader2 } from 'lucide-react'
 
 export default function CreateStoryPage() {
   const router = useRouter()
-  const { user, isLoading } = useUser()
+  const { user, loading } = useUser()
 
-  if (isLoading) {
+  if (loading) {
     return (
       <main className="min-h-[70vh] flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-pink-500" />
