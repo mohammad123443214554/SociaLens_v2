@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, Music2, Pause, Play, RotateCcw, X } from 'lucide-react'
 import type { SelectedSong } from './MusicPicker'
 
@@ -36,7 +36,6 @@ export function MusicAdjustModal({
   const timelineRef = useRef<HTMLDivElement | null>(null)
   const dragRef = useRef<{ edge: 'move' | 'start' | 'end'; pointerX: number; start: number; duration: number } | null>(null)
 
-  const maxStart = useMemo(() => Math.max(0, trackDuration - clipDuration), [trackDuration, clipDuration])
 
   const stopPreview = () => {
     audioRef.current?.pause()
