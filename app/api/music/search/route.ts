@@ -62,7 +62,13 @@ export async function GET(request: NextRequest) {
     }
 
     const results = (data.results || [])
-      .filter((track) => Boolean(track.id && track.name && track.audio))
+      .filter((track) => {
+        const license = (track.license_ccurl || '').toLowerCase()
+        // Only offer tracks with a visible Creative Commons licence, and
+        // independently enforce the no-NC/no-ND constraints client-side too.
+        return Boolean(track.id && track.name && track.audio && license)
+          && !/by-nc|\\/nc(?:-|\\/)|by-nd|\\/nd(?:-|\\/)/.test(license)
+      })
       .map((track) => ({
         id: String(track.id),
         title: track.name || 'Unknown track',
