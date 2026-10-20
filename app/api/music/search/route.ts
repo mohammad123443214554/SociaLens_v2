@@ -48,7 +48,7 @@ async function searchApple(query: string): Promise<StoryTrack[]> {
       artist: track.artistName || 'Unknown artist',
       artworkUrl: track.artworkUrl100?.replace(/\d+x\d+bb\.(jpg|png)$/i, '400x400bb.$1') || track.artworkUrl100 || '',
       previewUrl: track.previewUrl || '',
-      duration: Math.max(0, Math.round((Number(track.trackTimeMillis) || 30000) / 1000)),
+      duration: Math.min(30, Math.max(0, Math.round((Number(track.trackTimeMillis) || 30000) / 1000))),
       source: 'apple',
     }))
 }
@@ -116,13 +116,21 @@ export async function GET(request: NextRequest) {
 
   // Put familiar catalogue matches first, then append independent full-length tracks.
   // Deduplicate by title + artist so the combined list feels like one search.
-  const seen = new Set<string>()
-  const results = [...appleTracks, ...independentTracks].filter((track) => {
+  const results: StoryTrack[] = [...appleTracks]
+  const indexByKey = new Map<string, number>()
+  results.forEach((track, index) => indexByKey.set(trackKey(track), index))
+  for (const track of independentTracks) {
     const key = trackKey(track)
-    if (!key || seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+    if (!key) continue
+    const existingIndex = indexByKey.get(key)
+    if (existingIndex === undefined) {
+      indexByKey.set(key, results.length)
+      results.push(track)
+    } else if (track.duration > results[existingIndex].duration) {
+      // Prefer the full-length version when the same track exists in both catalogs.
+      results[existingIndex] = track
+    }
+  }
 
   if (results.length === 0 && appleResult.status === 'rejected' && independentResult.status === 'rejected') {
     return NextResponse.json({ error: 'Music search is temporarily unavailable. Please try again.' }, { status: 502 })
