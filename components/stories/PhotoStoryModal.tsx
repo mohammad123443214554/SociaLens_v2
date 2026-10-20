@@ -8,32 +8,34 @@ import { FontPicker } from './FontPicker'
 import { useCreateStory, DraftPhotoScene } from '@/lib/hooks/useStories'
 import { StoryAudienceModal } from './StoryAudienceModal'
 import type { GlobalMusic, StoryVisibility } from '@/lib/types/database.types'
+import { clearStoryDraft, saveStoryDraft, type StoryDraftRecord } from '@/lib/utils/storyDraft'
 
 interface PhotoStoryModalProps {
   userId: string
   onClose: () => void
   onBack: () => void
   initialFile?: File
+  initialDraft?: StoryDraftRecord | null
 }
 
 const makeId = () => Math.random().toString(36).slice(2, 10)
 
-export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoStoryModalProps) {
+export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialDraft }: PhotoStoryModalProps) {
   const [file, setFile] = useState<File | null>(initialFile || null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [overlayText, setOverlayText] = useState('')
-  const [overlayX, setOverlayX] = useState(50)
-  const [overlayY, setOverlayY] = useState(50)
-  const [font, setFont] = useState<string | null>(null)
+  const [overlayText, setOverlayText] = useState(initialDraft?.photo?.overlayText || '')
+  const [overlayX, setOverlayX] = useState(initialDraft?.photo?.overlayX ?? 50)
+  const [overlayY, setOverlayY] = useState(initialDraft?.photo?.overlayY ?? 50)
+  const [font, setFont] = useState<string | null>(initialDraft?.photo?.font ?? null)
   const [showFontPicker, setShowFontPicker] = useState(false)
   const [showTextInput, setShowTextInput] = useState(false)
   const [showMusicPicker, setShowMusicPicker] = useState(false)
-  const [song, setSong] = useState<SelectedSong | null>(null)
-  const [storyDuration, setStoryDuration] = useState(5)
-  const [textStart, setTextStart] = useState(0)
-  const [textDuration, setTextDuration] = useState(5)
-  const [songStart, setSongStart] = useState(0)
-  const [songDuration, setSongDuration] = useState(5)
+  const [song, setSong] = useState<SelectedSong | null>(initialDraft?.photo?.song ?? null)
+  const [storyDuration, setStoryDuration] = useState(initialDraft?.photo?.storyDuration ?? 5)
+  const [textStart, setTextStart] = useState(initialDraft?.photo?.textStart ?? 0)
+  const [textDuration, setTextDuration] = useState(initialDraft?.photo?.textDuration ?? 5)
+  const [songStart, setSongStart] = useState(initialDraft?.photo?.songStart ?? 0)
+  const [songDuration, setSongDuration] = useState(initialDraft?.photo?.songDuration ?? 5)
   const [showPreview, setShowPreview] = useState(false)
   const [previewElapsed, setPreviewElapsed] = useState(0)
   const previewAudioRef = useRef<HTMLAudioElement>(null)
@@ -113,6 +115,16 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
     return () => URL.revokeObjectURL(url)
   }, [file])
 
+  useEffect(() => {
+    if (!file) return
+    const draft: StoryDraftRecord = {
+      userId, kind: 'photo', file, fileName: file.name, fileType: file.type, lastModified: file.lastModified,
+      photo: { overlayText, overlayX, overlayY, font, song, storyDuration, textStart, textDuration, songStart, songDuration },
+      updatedAt: Date.now(),
+    }
+    void saveStoryDraft(draft).catch(() => {})
+  }, [userId, file, overlayText, overlayX, overlayY, font, song, storyDuration, textStart, textDuration, songStart, songDuration])
+
   const onTextPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     dragging.current = true
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -158,6 +170,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
         visibilitySelectedIds: selectedIds,
       })
       setShowAudience(false)
+      await clearStoryDraft(userId).catch(() => {})
       onClose()
     } catch (cause) {
       setError(cause instanceof Error ? 'Could not publish your story: ' + cause.message : 'Could not publish your story. Please try again.')
