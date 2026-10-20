@@ -93,6 +93,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
       if (elapsed >= storyDuration) {
         setPreviewElapsed(storyDuration)
         setShowPreview(false)
+        previewAudioRef.current?.pause()
         window.clearInterval(timer)
       } else setPreviewElapsed(elapsed)
     }, 100)
@@ -295,6 +296,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
         </div>
       </main>
 
+      {song && <audio ref={previewAudioRef} src={song.previewUrl} className="hidden" />}
       {showPreview && previewUrl && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Story preview">
           <button onClick={() => { setShowPreview(false); previewAudioRef.current?.pause() }} aria-label="Close story preview" className="absolute right-4 top-4 z-10 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"><X className="h-5 w-5" /></button>
@@ -307,7 +309,6 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
             <div className="absolute inset-x-0 top-0 h-1 bg-white/30"><div className="h-full bg-white" style={{ width: (Math.min(100, (previewElapsed / storyDuration) * 100)) + '%' }} /></div>
             {song && previewElapsed >= songStart && previewElapsed < songStart + Math.min(songDuration, storyDuration - songStart) && <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 rounded-xl bg-black/60 p-2 text-white"><Music2 className="h-4 w-4 shrink-0" /><div className="min-w-0"><p className="truncate text-xs font-semibold">{song.title}</p><p className="truncate text-[10px] opacity-80">{song.artist}</p></div></div>}
           </div>
-          {song && <audio ref={previewAudioRef} src={song.previewUrl} className="hidden" />}
         </div>
       )}
       {showMusicPicker && <MusicPicker onSelect={(selected) => { setSong(selected); setSongStart(0); setSongDuration(Math.min(5, storyDuration)); setShowMusicPicker(false) }} onClose={() => setShowMusicPicker(false)} />}
