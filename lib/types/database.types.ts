@@ -276,6 +276,8 @@ export type GlobalMusic = {
   start: number
   duration: number
   timelineStart?: number
+  source?: string
+  licenseUrl?: string
 }
 
 export type PhotoScene = {
