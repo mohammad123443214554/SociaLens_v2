@@ -352,22 +352,58 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
         </button>
       </div>
 
-      {/* Top: 2 simple options, apply to the currently selected scene */}
-      <div className="flex items-center gap-2 px-4 pb-3 relative z-10">
-        <button
-          onClick={() => { colorBeforePicker.current = activeScene.backgroundColor; setColorPanel('bg') }}
-          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-full bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors"
-        >
-          <span className="h-4 w-4 rounded-full" style={{ background: resolveBackgroundCss(activeScene.backgroundColor) }} />
-          Background Color
-        </button>
-        <button
-          onClick={() => { colorBeforePicker.current = activeScene.textColor; setColorPanel('text') }}
-          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-full bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors"
-        >
-          <span className="h-4 w-4 rounded-full border border-white/40" style={{ background: activeScene.textColor.startsWith('gradient:') ? resolveBackgroundCss(activeScene.textColor) : activeScene.textColor }} />
-          Text Color
-        </button>
+      {/* Canva-style workspace: editing tools at left, story canvas in the center */}
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-[#111216] overflow-hidden">
+        <aside className="shrink-0 md:w-[188px] border-b md:border-b-0 md:border-r border-white/10 bg-[#17181d] p-2 md:p-3 flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto">
+          <p className="hidden md:block text-[11px] uppercase tracking-wider text-white/45 px-2 py-1">Design</p>
+          <button onClick={() => { colorBeforePicker.current = activeScene.backgroundColor; setColorPanel('bg') }} className="min-w-[100px] md:min-w-0 flex md:flex-col items-center md:items-start gap-2 rounded-xl px-3 py-2.5 text-white/85 hover:bg-white/10 text-sm">
+            <PaintBucket className="h-5 w-5 shrink-0" /><span>Background</span>
+          </button>
+          <button onClick={() => { colorBeforePicker.current = activeScene.textColor; setColorPanel('text') }} className="min-w-[100px] md:min-w-0 flex md:flex-col items-center md:items-start gap-2 rounded-xl px-3 py-2.5 text-white/85 hover:bg-white/10 text-sm">
+            <Palette className="h-5 w-5 shrink-0" /><span>Text color</span>
+          </button>
+          <button onClick={() => { setShowEmoji((s) => !s) }} className="min-w-[100px] md:min-w-0 flex md:flex-col items-center md:items-start gap-2 rounded-xl px-3 py-2.5 text-white/85 hover:bg-white/10 text-sm">
+            <Smile className="h-5 w-5 shrink-0" /><span>Elements / Emoji</span>
+          </button>
+          <button onClick={openGlobalFont} className="min-w-[100px] md:min-w-0 flex md:flex-col items-center md:items-start gap-2 rounded-xl px-3 py-2.5 text-white/85 hover:bg-white/10 text-sm">
+            <Type className="h-5 w-5 shrink-0" /><span>Font</span>
+          </button>
+          <button onClick={openGlobalMusic} className="min-w-[100px] md:min-w-0 flex md:flex-col items-center md:items-start gap-2 rounded-xl px-3 py-2.5 text-white/85 hover:bg-white/10 text-sm">
+            <Music className="h-5 w-5 shrink-0" /><span>Audio</span>
+          </button>
+          <div className="hidden md:block mt-auto rounded-xl bg-white/5 p-3 text-xs text-white/50 leading-relaxed">Select a scene below, then edit its text, style, timing and audio.</div>
+        </aside>
+        <section className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-3 md:p-6 overflow-hidden">
+          <div className="h-full max-h-full aspect-[9/16] max-w-full relative overflow-hidden rounded-md shadow-2xl ring-1 ring-white/10 touch-none"
+            ref={canvasRef}
+            style={{ background: resolveBackgroundCss(activeScene.backgroundColor), height: 'min(100%, 560px)' }}
+            onPointerMove={handleDragMove}
+            onPointerUp={handleDragEnd}
+          >
+            <div style={{ left: `${activeScene.textX}%`, top: `${activeScene.textY}%`, transform: 'translate(-50%, -50%)' }} className="absolute max-w-[85%] select-none w-[85%]">
+              <textarea
+                ref={textareaRef}
+                value={activeScene.text}
+                onChange={(e) => updateScene(activeSceneId, { text: e.target.value })}
+                placeholder="Start typing..."
+                autoFocus
+                maxLength={280}
+                rows={3}
+                style={{
+                  ...getTextFillStyle(activeScene.textColor),
+                  fontFamily: (activeScene.fontFamily || globalFont) ? `'${activeScene.fontFamily || globalFont}', sans-serif` : undefined,
+                  fontSize: `${activeScene.textSize}px`,
+                }}
+                className="bg-transparent text-center font-semibold outline-none resize-none w-full"
+              />
+              <div className="flex items-center justify-center gap-2 mt-1">
+                <button onPointerDown={handleDragStart} className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center cursor-grab active:cursor-grabbing"><Move className="h-3.5 w-3.5 text-white" /></button>
+                <button onClick={() => adjustTextSize(-4)} className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center"><Minus className="h-3.5 w-3.5 text-white" /></button>
+                <button onClick={() => adjustTextSize(4)} className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center"><Plus className="h-3.5 w-3.5 text-white" /></button>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
       {colorPanel === 'bg' && (
@@ -389,46 +425,7 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
         />
       )}
 
-      {/* Canvas */}
-      <div
-        ref={canvasRef}
-        className="flex-1 relative overflow-hidden touch-none"
-        style={{ background: resolveBackgroundCss(activeScene.backgroundColor) }}
-        onPointerMove={handleDragMove}
-        onPointerUp={handleDragEnd}
-      >
-        <div
-          style={{ left: `${activeScene.textX}%`, top: `${activeScene.textY}%`, transform: 'translate(-50%, -50%)' }}
-          className="absolute max-w-[85%] select-none"
-        >
-          <textarea
-            ref={textareaRef}
-            value={activeScene.text}
-            onChange={(e) => updateScene(activeSceneId, { text: e.target.value })}
-            placeholder="Start typing..."
-            autoFocus
-            maxLength={280}
-            rows={3}
-            style={{
-              ...getTextFillStyle(activeScene.textColor),
-              fontFamily: (activeScene.fontFamily || globalFont) ? `'${activeScene.fontFamily || globalFont}', sans-serif` : undefined,
-              fontSize: `${activeScene.textSize}px`,
-            }}
-            className="bg-transparent text-center font-semibold outline-none resize-none w-full"
-          />
-          <div className="flex items-center justify-center gap-2 mt-1">
-            <button onPointerDown={handleDragStart} className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center cursor-grab active:cursor-grabbing">
-              <Move className="h-3.5 w-3.5 text-white" />
-            </button>
-            <button onClick={() => adjustTextSize(-4)} className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center">
-              <Minus className="h-3.5 w-3.5 text-white" />
-            </button>
-            <button onClick={() => adjustTextSize(4)} className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center">
-              <Plus className="h-3.5 w-3.5 text-white" />
-            </button>
-          </div>
-        </div>
-      </div>
+
 
       {/* Timeline strip */}
       <StoryTimeline
