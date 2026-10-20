@@ -54,6 +54,7 @@ function effectiveMusicFor(scene: TextScene, globalMusic: GlobalMusic | null) {
 }
 
 export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps) {
+  const [canvasZoom, setCanvasZoom] = useState(80)
   const [scenes, setScenes] = useState<TextScene[]>([newScene()])
   const [activeSceneId, setActiveSceneId] = useState(scenes[0].id)
   const [globalMusic, setGlobalMusic] = useState<GlobalMusic | null>(null)
@@ -390,10 +391,10 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
           </button>
           
         </aside>
-        <section className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-3 md:p-6 overflow-hidden">
+        <section className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-2 md:p-3 overflow-hidden">
           <div className="h-full max-h-full aspect-[9/16] max-w-full relative overflow-hidden rounded-md shadow-2xl ring-1 ring-white/10 touch-none"
             ref={canvasRef}
-            style={{ background: resolveBackgroundCss(activeScene.backgroundColor), height: 'min(100%, 560px)' }}
+            style={{ background: resolveBackgroundCss(activeScene.backgroundColor), height: `min(${canvasZoom}%, 500px)`, transform: `translateY(-8px) scale(${canvasZoom / 100})`, transformOrigin: 'center center' }}
             onPointerMove={handleDragMove}
             onPointerUp={handleDragEnd}
           >
@@ -458,6 +459,8 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
         getMenuItems={getMenuItems}
         globalMusic={globalMusic}
         onOpenGlobalMusic={openGlobalMusic}
+        canvasZoom={canvasZoom}
+        onCanvasZoomChange={setCanvasZoom}
       />
 
       {showEmoji && <EmojiPicker onSelect={insertEmoji} onClose={() => setShowEmoji(false)} />}
