@@ -1,12 +1,13 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { X, ImagePlus, Video, Upload } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { X, ImagePlus, Video, Upload, Loader2 } from 'lucide-react'
 import { PhotoStoryModal } from './PhotoStoryModal'
 import { VideoStoryModal } from './VideoStoryModal'
 import { useUser } from '@/lib/hooks/useUser'
 import { isRestricted } from '@/lib/utils/restrictionCheck'
 import { RestrictionPopup } from '@/components/shared/RestrictionPopup'
+import { loadStoryDraft, saveStoryDraft, type StoryDraftRecord } from '@/lib/utils/storyDraft'
 
 interface CreateStoryModalProps {
   userId: string
@@ -19,17 +20,34 @@ export function CreateStoryModal({ userId, onClose }: CreateStoryModalProps) {
   const [step, setStep] = useState<Step>('select')
   const [initialFile, setInitialFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
+  const [draftRecord, setDraftRecord] = useState<StoryDraftRecord | null>(null)
+  const [draftReady, setDraftReady] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
   const { profile } = useUser()
   const restricted = isRestricted(profile?.restrict_story_until)
 
+  useEffect(() => {
+    let active = true
+    void loadStoryDraft(userId).then((draft) => {
+      if (!active) return
+      if (draft?.file && (draft.kind === 'photo' || draft.kind === 'video')) {
+        setDraftRecord(draft)
+        setInitialFile(draft.file)
+        setStep(draft.kind)
+      }
+    }).catch(() => {}).finally(() => { if (active) setDraftReady(true) })
+    return () => { active = false }
+  }, [userId])
+
   if (step === 'photo' && initialFile && !restricted) {
-    return <PhotoStoryModal key={initialFile.name + initialFile.lastModified} userId={userId} initialFile={initialFile} onClose={onClose} onBack={() => { setInitialFile(null); setStep('select') }} />
+    return <PhotoStoryModal key={initialFile.name + initialFile.lastModified} userId={userId} initialFile={initialFile} initialDraft={draftRecord} onClose={onClose} onBack={() => { setInitialFile(null); setDraftRecord(null); setStep('select') }} />
   }
   if (step === 'video' && initialFile && !restricted) {
-    return <VideoStoryModal key={initialFile.name + initialFile.lastModified} userId={userId} initialFile={initialFile} onClose={onClose} onBack={() => { setInitialFile(null); setStep('select') }} />
+    return <VideoStoryModal key={initialFile.name + initialFile.lastModified} userId={userId} initialFile={initialFile} initialDraft={draftRecord} onClose={onClose} onBack={() => { setInitialFile(null); setDraftRecord(null); setStep('select') }} />
   }
+
+  if (!draftReady) return <div className="fixed inset-0 z-[120] flex items-center justify-center bg-background text-foreground"><Loader2 className="h-8 w-8 animate-spin text-pink-500" aria-label="Restoring story draft" /></div>
 
   if (restricted) {
     return <RestrictionPopup feature="posting stories" until={profile?.restrict_story_until} onClose={onClose} />
@@ -46,6 +64,9 @@ export function CreateStoryModal({ userId, onClose }: CreateStoryModalProps) {
     }
     setInitialFile(file)
     setStep(kind)
+    const draft: StoryDraftRecord = { userId, kind, file, fileName: file.name, fileType: file.type, lastModified: file.lastModified, ...(kind === 'photo' ? { photo: { overlayText: '', overlayX: 50, overlayY: 50, font: null, song: null, storyDuration: 5, textStart: 0, textDuration: 5, songStart: 0, songDuration: 5 } } : { video: { duration: 0 } }), updatedAt: Date.now() }
+    setDraftRecord(draft)
+    void saveStoryDraft(draft).catch(() => {})
   }
 
   return (
