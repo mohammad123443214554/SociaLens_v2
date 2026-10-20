@@ -341,12 +341,16 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-[100] flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 relative z-10 border-b border-white/10">
-        <button onClick={requestBack} className="text-white p-1" aria-label="Back">
-          <ArrowLeft className="h-6 w-6" />
-        </button>
+    <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden bg-[#171719] text-white">
+      {/* Studio header */}
+      <header className="relative z-20 flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[#202023] px-3 sm:px-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <button onClick={requestBack} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/75 transition-colors hover:bg-white/10 hover:text-white" aria-label="Back">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <span className="h-6 w-px bg-white/10" />
+          <div className="min-w-0"><p className="text-sm font-semibold tracking-wide">Text Story</p><p className="hidden text-[11px] text-white/45 sm:block">SociaLens Studio</p></div>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={startPreview}
@@ -368,11 +372,11 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
             <X className="h-6 w-6" />
           </button>
         </div>
-      </div>
+      </header>
 
       {/* Canva-style workspace: editing tools at left, story canvas in the center */}
-      <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-transparent overflow-hidden">
-        <aside className="shrink-0 md:w-[188px] border-b md:border-b-0 md:border-r border-transparent bg-transparent p-2 md:p-3 flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto">
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-[#242427] overflow-hidden">
+        <aside className="shrink-0 md:w-[208px] border-b md:border-b-0 md:border-r border-white/10 bg-[#202023] p-2 md:p-4 flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto">
           <p className="hidden md:block text-[11px] uppercase tracking-wider text-white/45 px-2 py-1">Design</p>
           <button onClick={() => { colorBeforePicker.current = activeScene.backgroundColor; setColorPanel('bg') }} className="min-w-[100px] md:min-w-0 flex md:flex-col items-center md:items-start gap-2 rounded-xl px-3 py-2.5 text-white/85 hover:bg-white/10 text-sm">
             <PaintBucket className="h-5 w-5 shrink-0" /><span>Background</span>
@@ -423,7 +427,7 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
           </div>
         </section>
       </div>
-      <div className="shrink-0 flex items-center justify-center gap-3 px-3 py-2 text-white/80 border-t border-white/10" aria-label="Canvas zoom controls">
+      <div className="shrink-0 flex items-center justify-center gap-3 px-3 py-2 text-white/80 border-t border-white/10 bg-[#202023]" aria-label="Canvas zoom controls">
         <span className="text-xs text-white/60">Zoom</span>
         <button type="button" onClick={() => setCanvasZoom((zoom) => Math.max(60, zoom - 5))} disabled={canvasZoom <= 60} className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-white/10 disabled:opacity-30" aria-label="Zoom out"><Minus className="h-4 w-4" /></button>
         <input aria-label="Canvas zoom" type="range" min="60" max="100" step="5" value={canvasZoom} onChange={(e) => setCanvasZoom(Number(e.target.value))} className="w-28 accent-pink-500 cursor-pointer" />
