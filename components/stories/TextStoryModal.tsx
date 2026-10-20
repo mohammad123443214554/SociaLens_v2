@@ -342,14 +342,31 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
   return (
     <div className="fixed inset-0 bg-black z-[100] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 relative z-10">
-        <button onClick={requestBack} className="text-white p-1">
+      <div className="flex items-center justify-between p-3 relative z-10 border-b border-white/10">
+        <button onClick={requestBack} className="text-white p-1" aria-label="Back">
           <ArrowLeft className="h-6 w-6" />
         </button>
-        <span aria-hidden="true" />
-        <button onClick={requestClose} className="text-white p-1">
-          <X className="h-6 w-6" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={startPreview}
+            disabled={!scenes.some((s) => s.text.trim())}
+            className="h-10 w-10 rounded-full bg-white text-black dark:bg-black dark:text-white border border-black/10 dark:border-white/20 flex items-center justify-center hover:opacity-85 transition-opacity disabled:opacity-40"
+            title="Preview story"
+            aria-label="Preview story"
+          >
+            <Play className="h-5 w-5" />
+          </button>
+          <button
+            onClick={handleShare}
+            disabled={!scenes.some((s) => s.text.trim()) || createTextStory.isPending}
+            className="h-10 px-5 rounded-full bg-pink-500 text-white font-semibold text-sm flex items-center justify-center gap-2 hover:bg-pink-600 transition-colors disabled:opacity-40"
+          >
+            {createTextStory.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Share'}
+          </button>
+          <button onClick={requestClose} className="text-white p-1 ml-1" aria-label="Close">
+            <X className="h-6 w-6" />
+          </button>
+        </div>
       </div>
 
       {/* Canva-style workspace: editing tools at left, story canvas in the center */}
@@ -443,36 +460,7 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
         onOpenGlobalMusic={openGlobalMusic}
       />
 
-      {/* Footer: emoji + global font + preview + share */}
-      <div className="relative p-4 flex items-center gap-2 border-t border-white/10">
-        {showEmoji && <EmojiPicker onSelect={insertEmoji} onClose={() => setShowEmoji(false)} />}
-        <button onClick={() => setShowEmoji((s) => !s)} className="h-11 w-11 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
-          <Smile className="h-5 w-5" />
-        </button>
-        <button
-          onClick={openGlobalFont}
-          className="h-11 w-11 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-          title="Font for the whole story"
-        >
-          <Type className="h-5 w-5" />
-        </button>
-        <button
-          onClick={startPreview}
-          disabled={!scenes.some((s) => s.text.trim())}
-          className="h-11 w-11 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors disabled:opacity-40"
-          title="Preview story"
-        >
-          <Play className="h-5 w-5" />
-        </button>
-        <Button
-          variant="gradient"
-          className="flex-1"
-          disabled={!scenes.some((s) => s.text.trim()) || createTextStory.isPending}
-          onClick={handleShare}
-        >
-          {createTextStory.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Share to Story'}
-        </Button>
-      </div>
+      {showEmoji && <EmojiPicker onSelect={insertEmoji} onClose={() => setShowEmoji(false)} />}
       {createTextStory.isError && (
         <p className="text-xs text-red-400 text-center pb-3">Couldn't post your story. Try again.</p>
       )}
