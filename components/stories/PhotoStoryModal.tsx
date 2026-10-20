@@ -29,6 +29,11 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
   const [showTextInput, setShowTextInput] = useState(false)
   const [showMusicPicker, setShowMusicPicker] = useState(false)
   const [song, setSong] = useState<SelectedSong | null>(null)
+  const [storyDuration, setStoryDuration] = useState(5)
+  const [textStart, setTextStart] = useState(0)
+  const [textDuration, setTextDuration] = useState(5)
+  const [songStart, setSongStart] = useState(0)
+  const [songDuration, setSongDuration] = useState(5)
   const [showAudience, setShowAudience] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const replaceInput = useRef<HTMLInputElement>(null)
@@ -64,10 +69,10 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
     const scene: DraftPhotoScene = {
       id: makeId(),
       file,
-      duration: 5,
+      duration: storyDuration,
       overlayX,
       overlayY,
-      ...(overlayText.trim() ? { overlayText: overlayText.trim(), overlayTextColor: '#ffffff', overlayFontFamily: font || undefined } : {}),
+      ...(overlayText.trim() ? { overlayText: overlayText.trim(), overlayTextColor: '#ffffff', overlayFontFamily: font || undefined, overlayStart: textStart, overlayDuration: Math.min(textDuration, storyDuration - textStart) } : {}),
     }
     const globalMusic: GlobalMusic | null = song ? {
       url: song.previewUrl,
@@ -75,7 +80,8 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
       artist: song.artist,
       artworkUrl: song.artworkUrl,
       start: 0,
-      duration: 5,
+      duration: Math.min(songDuration, storyDuration - songStart),
+      timelineStart: songStart,
     } : null
     try {
       await createPhotoStory.mutateAsync({
@@ -138,6 +144,36 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
         </div>
 
         <div className="w-full max-w-lg space-y-3">
+          <section aria-label="Story timeline" className="rounded-xl border border-border bg-card p-3 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div><p className="text-sm font-semibold">Timeline</p><p className="text-xs text-muted-foreground">Adjust each strip to set when it appears</p></div>
+              <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold tabular-nums">{storyDuration >= 60 ? `${Math.floor(storyDuration / 60)}m ${storyDuration % 60}s` : `${storyDuration}s`}</span>
+            </div>
+            <div className="space-y-2.5">
+              <div>
+                <div className="mb-1.5 flex items-center justify-between text-xs"><span className="font-medium">Text</span><span className="text-muted-foreground tabular-nums">{overlayText.trim() ? `${textStart}s – ${Math.min(storyDuration, textStart + textDuration)}s` : 'Add text to enable'}</span></div>
+                <div className="relative h-3 overflow-hidden rounded-full bg-muted"><div className="absolute top-0 h-full rounded-full bg-violet-500 transition-all" style={{ left: `${(textStart / storyDuration) * 100}%`, width: `${(Math.min(textDuration, storyDuration - textStart) / storyDuration) * 100}%` }} /></div>
+                <div className="mt-1 grid grid-cols-2 gap-3">
+                  <label className="text-[11px] text-muted-foreground">Start <input aria-label="Text start time" type="range" min={0} max={Math.max(0, storyDuration - 1)} step={1} value={Math.min(textStart, storyDuration - 1)} disabled={!overlayText.trim()} onChange={(e) => { const next = Number(e.target.value); setTextStart(next); setTextDuration((v) => Math.min(v, storyDuration - next)) }} className="block w-full accent-violet-500" /></label>
+                  <label className="text-[11px] text-muted-foreground">Length <input aria-label="Text duration" type="range" min={1} max={Math.max(1, storyDuration - textStart)} step={1} value={Math.max(1, Math.min(textDuration, storyDuration - textStart))} disabled={!overlayText.trim()} onChange={(e) => setTextDuration(Number(e.target.value))} className="block w-full accent-violet-500" /></label>
+                </div>
+              </div>
+              <div>
+                <div className="mb-1.5 flex items-center justify-between text-xs"><span className="font-medium">Photo · Main duration</span><span className="text-muted-foreground tabular-nums">{storyDuration}s</span></div>
+                <div className="h-4 overflow-hidden rounded-full bg-muted"><div className="h-full w-full rounded-full bg-pink-500" /></div>
+                <input aria-label="Photo story duration" type="range" min={5} max={180} step={1} value={storyDuration} onChange={(e) => { const next = Number(e.target.value); setStoryDuration(next); setTextStart((v) => Math.min(v, next - 1)); setTextDuration((v) => Math.min(v, next)); setSongStart((v) => Math.min(v, next - 1)); setSongDuration((v) => Math.min(v, next)) }} className="mt-1.5 block w-full accent-pink-500" />
+                <div className="flex justify-between text-[10px] text-muted-foreground"><span>5 sec</span><span>3 min max</span></div>
+              </div>
+              <div>
+                <div className="mb-1.5 flex items-center justify-between text-xs"><span className="font-medium">Song</span><span className="text-muted-foreground tabular-nums">{song ? `${songStart}s – ${Math.min(storyDuration, songStart + songDuration)}s` : 'Add song to enable'}</span></div>
+                <div className="relative h-3 overflow-hidden rounded-full bg-muted"><div className="absolute top-0 h-full rounded-full bg-emerald-500 transition-all" style={{ left: `${(songStart / storyDuration) * 100}%`, width: `${(Math.min(songDuration, storyDuration - songStart) / storyDuration) * 100}%` }} /></div>
+                <div className="mt-1 grid grid-cols-2 gap-3">
+                  <label className="text-[11px] text-muted-foreground">Start <input aria-label="Song start time" type="range" min={0} max={Math.max(0, storyDuration - 1)} step={1} value={Math.min(songStart, storyDuration - 1)} disabled={!song} onChange={(e) => { const next = Number(e.target.value); setSongStart(next); setSongDuration((v) => Math.min(v, storyDuration - next)) }} className="block w-full accent-emerald-500" /></label>
+                  <label className="text-[11px] text-muted-foreground">Length <input aria-label="Song duration" type="range" min={1} max={Math.max(1, storyDuration - songStart)} step={1} value={Math.max(1, Math.min(songDuration, storyDuration - songStart))} disabled={!song} onChange={(e) => setSongDuration(Number(e.target.value))} className="block w-full accent-emerald-500" /></label>
+                </div>
+              </div>
+            </div>
+          </section>
           {song && (
             <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -173,7 +209,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
         </div>
       </main>
 
-      {showMusicPicker && <MusicPicker onSelect={(selected) => { setSong(selected); setShowMusicPicker(false) }} onClose={() => setShowMusicPicker(false)} />}
+      {showMusicPicker && <MusicPicker onSelect={(selected) => { setSong(selected); setSongStart(0); setSongDuration(Math.min(5, storyDuration)); setShowMusicPicker(false) }} onClose={() => setShowMusicPicker(false)} />}
       {showFontPicker && <FontPicker currentFont={font || ''} onSelect={(value) => setFont(value || null)} onCancel={() => setShowFontPicker(false)} onDone={() => setShowFontPicker(false)} />}
       {showAudience && <StoryAudienceModal userId={userId} isPending={createPhotoStory.isPending} confirmLabel="Confirm Share" onClose={() => setShowAudience(false)} onConfirm={confirmShare} />}
     </div>
