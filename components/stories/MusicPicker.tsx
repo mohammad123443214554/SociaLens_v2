@@ -8,7 +8,7 @@ export interface SelectedSong {
   artist: string
   artworkUrl: string
   previewUrl: string
-  duration: number
+  duration?: number
   licenseUrl?: string
   source?: string
 }
@@ -167,7 +167,7 @@ export function MusicPicker({ onSelect, onClose }: MusicPickerProps) {
                 <p className="truncate text-sm font-medium">{track.title}</p>
                 <p className="truncate text-xs text-muted-foreground">{track.artist}</p>
                 <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                  <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {formatTime(track.duration)}</span>
+                  <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {formatTime(track.duration || 0)}</span>
                   {track.licenseUrl && <a href={track.licenseUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="inline-flex items-center gap-1 underline underline-offset-2">Licence <ExternalLink className="h-3 w-3" /></a>}
                 </div>
               </div>
