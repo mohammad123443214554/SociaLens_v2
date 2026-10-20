@@ -22,6 +22,8 @@ interface StoryTimelineProps<T extends BaseScene> {
   onOpenGlobalMusic: () => void
   trackIcon: React.ReactNode
   resizable?: boolean
+  canvasZoom: number
+  onCanvasZoomChange: (zoom: number) => void
 }
 
 const BASE_PX_PER_SECOND = 20
@@ -35,16 +37,15 @@ const TOUCH_SENSITIVITY = 4
 
 export function StoryTimeline<T extends BaseScene>({
   scenes, activeSceneId, onSelectScene, onAddScene, onResizeScene, renderBlock, getMenuItems,
-  globalMusic, onOpenGlobalMusic, trackIcon, resizable = true,
+  globalMusic, onOpenGlobalMusic, trackIcon, resizable = true, canvasZoom, onCanvasZoomChange,
 }: StoryTimelineProps<T>) {
   const [menuFor, setMenuFor] = useState<{ id: string; x: number; y: number } | null>(null)
-  const [zoom, setZoom] = useState(20)
-  const PX_PER_SECOND = zoom
+  const PX_PER_SECOND = BASE_PX_PER_SECOND
   const resizing = useRef<{ id: string; startX: number; startDuration: number; isTouch: boolean } | null>(null)
 
   const totalSeconds = scenes.reduce((sum, s) => sum + s.duration, 0)
   const rulerSeconds = Math.max(30, Math.ceil(totalSeconds / 10) * 10 + 10)
-  const rulerStep = zoom < 14 ? 10 : 5
+  const rulerStep = 5
 
   const handleResizeStart = (e: React.PointerEvent, scene: T) => {
     e.stopPropagation()
@@ -63,7 +64,7 @@ export function StoryTimeline<T extends BaseScene>({
   const menuScene = menuFor ? scenes.find((s) => s.id === menuFor.id) : null
 
   return (
-    <div className="w-full min-w-0 bg-transparent px-3 pt-2 pb-2 space-y-1.5 text-neutral-900 dark:text-white">
+    <div className="w-full min-w-0 max-w-full overflow-hidden bg-transparent px-3 pt-2 pb-2 space-y-1.5 text-neutral-900 dark:text-white md:ml-[188px] md:w-[calc(100%-188px)]">
       {/* Ruler */}
       <div className="relative h-4 overflow-x-auto scrollbar-hide">
         <div className="relative h-full" style={{ width: `${rulerSeconds * PX_PER_SECOND}px` }}>
@@ -154,11 +155,11 @@ export function StoryTimeline<T extends BaseScene>({
       </div>
 
       <div className="flex items-center justify-end gap-3 pt-2 border-t border-neutral-200 dark:border-white/10">
-        <span className="text-[11px] text-neutral-500 dark:text-white/45">Zoom</span>
-        <button type="button" onClick={() => setZoom((z) => Math.max(8, z - 2))} disabled={zoom <= 8} className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-600 dark:text-white/70 hover:bg-neutral-200 dark:hover:bg-white/10 disabled:opacity-30" aria-label="Zoom out"><Minus className="h-4 w-4" /></button>
-        <input aria-label="Timeline zoom" type="range" min="8" max="60" step="2" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-28 accent-pink-500 cursor-pointer" />
-        <button type="button" onClick={() => setZoom((z) => Math.min(60, z + 2))} disabled={zoom >= 60} className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-600 dark:text-white/70 hover:bg-neutral-200 dark:hover:bg-white/10 disabled:opacity-30" aria-label="Zoom in"><ZoomIn className="h-4 w-4" /></button>
-        <span className="w-8 text-right text-[11px] tabular-nums text-neutral-500 dark:text-white/45">{Math.round((zoom / BASE_PX_PER_SECOND) * 100)}%</span>
+        <span className="text-[11px] text-neutral-500 dark:text-white/45">Page zoom</span>
+        <button type="button" onClick={() => onCanvasZoomChange(Math.max(60, canvasZoom - 5))} disabled={canvasZoom <= 60} className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-600 dark:text-white/70 hover:bg-neutral-200 dark:hover:bg-white/10 disabled:opacity-30" aria-label="Zoom out"><Minus className="h-4 w-4" /></button>
+        <input aria-label="Timeline zoom" type="range" min="60" max="100" step="5" value={canvasZoom} onChange={(e) => onCanvasZoomChange(Number(e.target.value))} className="w-28 accent-pink-500 cursor-pointer" />
+        <button type="button" onClick={() => onCanvasZoomChange(Math.min(100, canvasZoom + 5))} disabled={canvasZoom >= 100} className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-600 dark:text-white/70 hover:bg-neutral-200 dark:hover:bg-white/10 disabled:opacity-30" aria-label="Zoom in"><ZoomIn className="h-4 w-4" /></button>
+        <span className="w-8 text-right text-[11px] tabular-nums text-neutral-500 dark:text-white/45">{canvasZoom}%</span>
       </div>
 
       {/* Rendered fixed to the viewport (not inside the horizontally-
