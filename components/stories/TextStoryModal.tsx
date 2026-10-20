@@ -371,8 +371,8 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
       </div>
 
       {/* Canva-style workspace: editing tools at left, story canvas in the center */}
-      <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-[#111216] overflow-hidden">
-        <aside className="shrink-0 md:w-[188px] border-b md:border-b-0 md:border-r border-white/10 bg-[#17181d] p-2 md:p-3 flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto">
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-transparent overflow-hidden">
+        <aside className="shrink-0 md:w-[188px] border-b md:border-b-0 md:border-r border-transparent bg-transparent p-2 md:p-3 flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto">
           <p className="hidden md:block text-[11px] uppercase tracking-wider text-white/45 px-2 py-1">Design</p>
           <button onClick={() => { colorBeforePicker.current = activeScene.backgroundColor; setColorPanel('bg') }} className="min-w-[100px] md:min-w-0 flex md:flex-col items-center md:items-start gap-2 rounded-xl px-3 py-2.5 text-white/85 hover:bg-white/10 text-sm">
             <PaintBucket className="h-5 w-5 shrink-0" /><span>Background</span>
