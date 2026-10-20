@@ -343,24 +343,27 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-[100] flex flex-col">
-      <div className="flex items-center justify-between p-4 relative z-10">
-        <button onClick={requestBack} className="text-white p-1"><ArrowLeft className="h-6 w-6" /></button>
-        <p className="text-white font-semibold">Photo Story</p>
-        <button onClick={requestClose} className="text-white p-1"><X className="h-6 w-6" /></button>
-      </div>
+    <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden bg-[#171719] text-white">
+      <header className="relative z-20 flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[#202023] px-3 sm:px-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <button onClick={requestBack} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/75 transition-colors hover:bg-white/10 hover:text-white" aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>
+          <span className="h-6 w-px bg-white/10" />
+          <div className="min-w-0"><p className="text-sm font-semibold tracking-wide">Photo Story</p><p className="hidden text-[11px] text-white/45 sm:block">SociaLens Studio</p></div>
+        </div>
+        <div className="flex items-center gap-2"><span className="hidden text-xs text-white/45 sm:inline">Unsaved draft</span><button onClick={requestClose} className="flex h-9 w-9 items-center justify-center rounded-lg text-white/65 transition-colors hover:bg-white/10 hover:text-white" aria-label="Close editor"><X className="h-5 w-5" /></button></div>
+      </header>
 
       {/* Canvas */}
       <div
         ref={canvasRef}
-        className="flex-1 min-h-0 relative overflow-hidden touch-none flex items-center justify-center bg-black"
+        className="relative flex-1 min-h-0 overflow-hidden touch-none flex items-center justify-center bg-[#242427] px-3 py-4 sm:px-6"
         onPointerMove={handleDragMove}
         onPointerUp={handleDragEnd}
       >
         {activeScene && (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={activeScene.previewUrl} alt="Story" className="max-w-full max-h-full object-contain" />
+            <div className="relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-sm bg-black shadow-[0_18px_70px_rgba(0,0,0,0.45)] ring-1 ring-white/10"><img src={activeScene.previewUrl} alt="Story" className="max-h-full max-w-full object-contain" /></div>
             {activeScene.overlayText && (
               <div
                 style={{ left: `${activeScene.overlayX}%`, top: `${activeScene.overlayY}%`, transform: 'translate(-50%, -50%)' }}
@@ -439,7 +442,7 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
 
       {/* Footer */}
       {!editingCaption && (
-        <div className="relative p-4 flex items-center gap-2 border-t border-white/10">
+        <div className="relative flex shrink-0 items-center gap-2 border-t border-white/10 bg-[#202023] px-3 py-3 sm:px-5">
           <button onClick={openGlobalFont} className="h-11 w-11 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors" title="Font for the whole story">
             <Type className="h-5 w-5" />
           </button>
