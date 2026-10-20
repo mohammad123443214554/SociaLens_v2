@@ -291,6 +291,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const activeMusicTitle = musicSource.title
   const activeMusicArtist = musicSource.artist
   const activeMusicArtwork = musicSource.artwork
+  const activeMusicLicenseUrl = story.global_music?.licenseUrl || null
   const musicStart = musicSource.start
   const musicClipDuration = musicSource.clipDuration
   const musicTimelineStart = story.story_type === 'photo' && !sceneMusicUrl ? (story.global_music?.timelineStart ?? 0) : 0
@@ -565,6 +566,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
               <span className="text-white text-xs font-medium truncate">
                 {activeMusicTitle}{activeMusicArtist ? ` \u00b7 ${activeMusicArtist}` : ''}
               </span>
+              {activeMusicLicenseUrl && <a href={activeMusicLicenseUrl} target="_blank" rel="noreferrer" aria-label="View music licence" title="View music licence" className="shrink-0 text-[10px] text-white/80 underline underline-offset-2">Licence</a>}
             </div>
           )}
 
