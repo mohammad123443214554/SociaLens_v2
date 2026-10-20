@@ -6,6 +6,7 @@ import type { User } from '@supabase/supabase-js'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal'
+import { clearStoryDraft } from '@/lib/utils/storyDraft'
 
 export default function CreateStoryPage() {
   const router = useRouter()
@@ -71,9 +72,14 @@ export default function CreateStoryPage() {
     )
   }
 
+  const handleClose = async () => {
+    await clearStoryDraft(user.id).catch(() => {})
+    router.push('/feed')
+  }
+
   return (
     <main className={`fixed inset-0 z-[9999] min-h-dvh overflow-hidden ${lightTheme ? 'bg-white' : 'bg-black'}`}>
-      <CreateStoryModal userId={user.id} onClose={() => router.push('/feed')} />
+      <CreateStoryModal userId={user.id} onClose={() => { void handleClose() }} />
     </main>
   )
 }
