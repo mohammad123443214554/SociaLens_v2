@@ -67,7 +67,10 @@ export async function GET(request: NextRequest) {
         // Only offer tracks with a visible Creative Commons licence, and
         // independently enforce the no-NC/no-ND constraints client-side too.
         return Boolean(track.id && track.name && track.audio && license)
-          && !/by-nc|\\/nc(?:-|\\/)|by-nd|\\/nd(?:-|\\/)/.test(license)
+          && !license.includes('by-nc')
+          && !license.includes('by-nd')
+          && !license.includes('/nc-')
+          && !license.includes('/nd-')
       })
       .map((track) => ({
         id: String(track.id),
