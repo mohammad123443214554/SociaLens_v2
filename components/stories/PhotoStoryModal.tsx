@@ -55,9 +55,9 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
     const drag = timelineDrag.current
     const row = timelineRowRefs.current[kind]
     if (!drag || drag.kind !== kind || !row) return
-    const delta = ((event.clientX - drag.x) / row.getBoundingClientRect().width) * 180
+    const delta = ((event.clientX - drag.x) / row.getBoundingClientRect().width) * 60
     if (kind === 'photo') {
-      const next = Math.max(5, Math.min(180, Math.round(drag.duration + delta)))
+      const next = Math.max(5, Math.min(60, Math.round(drag.duration + delta)))
       setStoryDuration(next)
       setTextStart((value) => Math.min(value, next - 1))
       setTextDuration((value) => Math.min(value, next - Math.min(textStart, next - 1)))
@@ -201,7 +201,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
                 className={`relative h-[27px] w-full shrink-0 touch-none overflow-hidden rounded-sm bg-muted ${overlayText.trim() ? 'cursor-grab' : 'cursor-default opacity-60'}`}
                 aria-label="Text timeline strip"
               >
-                <div className="absolute inset-y-0 rounded-sm bg-violet-500/90" style={{ left: `${(textStart / 180) * 100}%`, width: `${Math.max(overlayText.trim() ? 1.5 : 0, (Math.min(textDuration, storyDuration - textStart) / 180) * 100)}%` }}>
+                <div className="absolute inset-y-0 rounded-sm bg-violet-500/90" style={{ left: `${(textStart / 60) * 100}%`, width: `${Math.max(overlayText.trim() ? 1.5 : 0, (Math.min(textDuration, storyDuration - textStart) / 60) * 100)}%` }}>
                   {overlayText.trim() && <><span data-edge="start" className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-sm bg-violet-200/90" /><span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-sm bg-violet-200/90" /></>}
                 </div>
                 <span className="pointer-events-none absolute inset-y-0 left-2 z-20 flex items-center text-[11px] font-semibold text-foreground drop-shadow-sm">Text</span>
@@ -215,7 +215,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
                 className="relative h-[52px] w-full shrink-0 touch-none cursor-ew-resize overflow-hidden rounded-sm bg-muted"
                 aria-label="Photo duration timeline strip"
               >
-                <div className="absolute inset-y-0 left-0 rounded-sm bg-pink-500/90" style={{ width: `${(storyDuration / 180) * 100}%`, minWidth: '18px' }}>
+                <div className="absolute inset-y-0 left-0 rounded-sm bg-pink-500/90" style={{ width: `${(storyDuration / 60) * 100}%`, minWidth: '18px' }}>
                   <span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-3 cursor-ew-resize rounded-r-sm border-l-2 border-white/80 bg-pink-200/90" />
                 </div>
                 <span className="pointer-events-none absolute inset-y-0 left-2 z-20 flex items-center text-xs font-semibold text-foreground drop-shadow-sm">Photo</span>
@@ -230,7 +230,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
                 className={`relative h-[27px] w-full shrink-0 touch-none overflow-hidden rounded-sm bg-muted ${song ? 'cursor-grab' : 'cursor-default opacity-60'}`}
                 aria-label="Music timeline strip"
               >
-                <div className="absolute inset-y-0 rounded-sm bg-emerald-500/90" style={{ left: `${(songStart / 180) * 100}%`, width: `${Math.max(song ? 1.5 : 0, (Math.min(songDuration, storyDuration - songStart) / 180) * 100)}%` }}>
+                <div className="absolute inset-y-0 rounded-sm bg-emerald-500/90" style={{ left: `${(songStart / 60) * 100}%`, width: `${Math.max(song ? 1.5 : 0, (Math.min(songDuration, storyDuration - songStart) / 60) * 100)}%` }}>
                   {song && <><span data-edge="start" className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-sm bg-emerald-200/90" /><span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-sm bg-emerald-200/90" /></>}
                 </div>
                 <span className="pointer-events-none absolute inset-y-0 left-2 z-20 flex items-center text-[11px] font-semibold text-foreground drop-shadow-sm">Music</span>
