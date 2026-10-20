@@ -455,7 +455,12 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
 
       {/* Timeline */}
       {!editingCaption && (
-        <StoryTimeline
+        <section aria-label="Story timeline" className="z-10 w-full shrink-0 border-y border-white/10 bg-[#1c1c1f] shadow-[0_-8px_24px_rgba(0,0,0,0.18)]">
+          <div className="flex h-7 items-center justify-between border-b border-white/[0.06] px-4 sm:px-5">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/55">Timeline</span>
+            <span className="text-[10px] text-white/35">Drag clips to reorder · Scroll to explore</span>
+          </div>
+          <StoryTimeline
           scenes={scenes}
           activeSceneId={activeSceneId || scenes[0].id}
           onSelectScene={setActiveSceneId}
@@ -475,7 +480,8 @@ export function PhotoStoryModal({ userId, onClose, onBack }: PhotoStoryModalProp
           getMenuItems={getMenuItems}
           globalMusic={globalMusic}
           onOpenGlobalMusic={openGlobalMusic}
-        />
+          />
+        </section>
       )}
 
       {/* Footer */}
