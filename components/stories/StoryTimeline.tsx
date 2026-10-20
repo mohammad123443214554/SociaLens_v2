@@ -97,9 +97,7 @@ export function StoryTimeline<T extends BaseScene>({
               onDrop={(e) => { if (!onReorderScenes) return; e.preventDefault(); const fromId = e.dataTransfer.getData('text/plain') || draggingSceneId; if (fromId && fromId !== scene.id) onReorderScenes(fromId, scene.id); setDraggingSceneId(null) }}
               onDragEnd={() => setDraggingSceneId(null)}
               style={{ width: `${Math.max(scene.duration * PX_PER_SECOND, 50)}px` }}
-              className={`relative h-10 shrink-0 rounded-md flex items-center px-2 cursor-pointer transition-colors overflow-hidden ${
-                scene.id === activeSceneId ? 'ring-2 ring-white bg-pink-500' : 'bg-white/15 hover:bg-white/25'} ${draggingSceneId === scene.id ? 'opacity-40' : ''}
-              }`}
+              className={`relative h-10 shrink-0 rounded-md flex items-center px-2 cursor-pointer transition-colors overflow-hidden ${scene.id === activeSceneId ? 'ring-2 ring-white bg-pink-500' : 'bg-white/15 hover:bg-white/25'} ${draggingSceneId === scene.id ? 'opacity-40' : ''}`}
             >
               {renderBlock(scene, i)}
 
