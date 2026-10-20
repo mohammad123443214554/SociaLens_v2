@@ -26,8 +26,10 @@ export async function GET(request: NextRequest) {
       format: 'json',
       limit: '25',
       search: query,
+      type: 'single albumtrack',
       include: 'licenses',
       ccnc: 'false',
+      ccnd: 'false',
       audioformat: 'mp32',
     })
     const response = await fetch(`https://api.jamendo.com/v3.0/tracks/?${params.toString()}`, {
