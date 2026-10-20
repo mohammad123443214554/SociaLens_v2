@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Plus, Music as MusicIcon, MoreVertical } from 'lucide-react'
+import { Plus, Music as MusicIcon, MoreVertical, Minus, ZoomIn } from 'lucide-react'
 import type { GlobalMusic } from '@/lib/types/database.types'
 import { SceneMenu, SceneMenuItem } from './SceneMenu'
 
@@ -24,7 +24,7 @@ interface StoryTimelineProps<T extends BaseScene> {
   resizable?: boolean
 }
 
-const PX_PER_SECOND = 20
+const BASE_PX_PER_SECOND = 20
 const MIN_SCENE_DURATION = 1
 const MAX_SCENE_DURATION = 60
 // Touch drags report much smaller pixel deltas than mouse drags for the
@@ -38,10 +38,13 @@ export function StoryTimeline<T extends BaseScene>({
   globalMusic, onOpenGlobalMusic, trackIcon, resizable = true,
 }: StoryTimelineProps<T>) {
   const [menuFor, setMenuFor] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [zoom, setZoom] = useState(20)
+  const PX_PER_SECOND = zoom
   const resizing = useRef<{ id: string; startX: number; startDuration: number; isTouch: boolean } | null>(null)
 
   const totalSeconds = scenes.reduce((sum, s) => sum + s.duration, 0)
-  const rulerSeconds = Math.max(15, Math.ceil(totalSeconds / 5) * 5 + 5)
+  const rulerSeconds = Math.max(30, Math.ceil(totalSeconds / 10) * 10 + 10)
+  const rulerStep = zoom < 14 ? 10 : 5
 
   const handleResizeStart = (e: React.PointerEvent, scene: T) => {
     e.stopPropagation()
@@ -60,13 +63,13 @@ export function StoryTimeline<T extends BaseScene>({
   const menuScene = menuFor ? scenes.find((s) => s.id === menuFor.id) : null
 
   return (
-    <div className="bg-[#111214] border-t border-white/10 px-3 pt-2 pb-3 space-y-1.5">
+    <div className="w-full min-w-0 bg-transparent px-3 pt-2 pb-2 space-y-1.5 text-neutral-900 dark:text-white">
       {/* Ruler */}
       <div className="relative h-4 overflow-x-auto scrollbar-hide">
         <div className="relative h-full" style={{ width: `${rulerSeconds * PX_PER_SECOND}px` }}>
-          {Array.from({ length: Math.floor(rulerSeconds / 5) + 1 }).map((_, i) => (
-            <span key={i} className="absolute top-0 text-[9px] text-white/40" style={{ left: `${i * 5 * PX_PER_SECOND}px` }}>
-              {i * 5}s
+          {Array.from({ length: Math.floor(rulerSeconds / rulerStep) + 1 }).map((_, i) => (
+            <span key={i} className="absolute top-0 text-[10px] text-neutral-500 dark:text-white/45" style={{ left: `${i * rulerStep * PX_PER_SECOND}px` }}>
+              {i * rulerStep}s
             </span>
           ))}
         </div>
@@ -132,7 +135,7 @@ export function StoryTimeline<T extends BaseScene>({
       {/* Music track - one song shared across the whole story. Scenes with
           their own separate song override this for just their own duration. */}
       <div className="flex items-center gap-2">
-        <MusicIcon className="h-3.5 w-3.5 text-white/40 shrink-0" />
+        <span className="w-3.5 shrink-0" aria-hidden="true" />
         {globalMusic ? (
           <button
             onClick={onOpenGlobalMusic}
@@ -148,6 +151,14 @@ export function StoryTimeline<T extends BaseScene>({
         ) : (
           <div className="flex-1 h-2" aria-hidden="true" />
         )}
+      </div>
+
+      <div className="flex items-center justify-end gap-3 pt-2 border-t border-neutral-200 dark:border-white/10">
+        <span className="text-[11px] text-neutral-500 dark:text-white/45">Zoom</span>
+        <button type="button" onClick={() => setZoom((z) => Math.max(8, z - 2))} disabled={zoom <= 8} className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-600 dark:text-white/70 hover:bg-neutral-200 dark:hover:bg-white/10 disabled:opacity-30" aria-label="Zoom out"><Minus className="h-4 w-4" /></button>
+        <input aria-label="Timeline zoom" type="range" min="8" max="60" step="2" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-28 accent-pink-500 cursor-pointer" />
+        <button type="button" onClick={() => setZoom((z) => Math.min(60, z + 2))} disabled={zoom >= 60} className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-600 dark:text-white/70 hover:bg-neutral-200 dark:hover:bg-white/10 disabled:opacity-30" aria-label="Zoom in"><ZoomIn className="h-4 w-4" /></button>
+        <span className="w-8 text-right text-[11px] tabular-nums text-neutral-500 dark:text-white/45">{Math.round((zoom / BASE_PX_PER_SECOND) * 100)}%</span>
       </div>
 
       {/* Rendered fixed to the viewport (not inside the horizontally-
