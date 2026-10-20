@@ -108,7 +108,7 @@ export function MusicPicker({ onSelect, onClose }: MusicPickerProps) {
       previewUrl: track.previewUrl,
       duration: track.duration,
       licenseUrl: track.licenseUrl,
-      source: track.source || 'Jamendo',
+      source: track.source || 'music catalog',
     })
   }
 
@@ -124,7 +124,7 @@ export function MusicPicker({ onSelect, onClose }: MusicPickerProps) {
         <header className="flex shrink-0 items-center justify-between border-b border-border p-4">
           <div>
             <h2 className="text-lg font-semibold">Add music</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">Full-length independent tracks from Jamendo</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Find music for your story</p>
           </div>
           <button onClick={onClose} aria-label="Close music picker" className="rounded-full p-2 hover:bg-muted"><X className="h-5 w-5" /></button>
         </header>
@@ -143,13 +143,25 @@ export function MusicPicker({ onSelect, onClose }: MusicPickerProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 pb-4">
-          {loading && <p className="py-8 text-center text-sm text-muted-foreground">Searching Jamendo…</p>}
+          {loading && <p className="py-8 text-center text-sm text-muted-foreground">Searching songs…</p>}
           {!loading && error && <p role="alert" className="mx-3 my-4 rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
           {!loading && !error && query.trim() && results.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No playable tracks found. Try another search.</p>}
           {!query.trim() && (
-            <div className="px-6 py-12 text-center text-sm text-muted-foreground">
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">
               <Music className="mx-auto mb-3 h-10 w-10 opacity-40" />
-              Search Jamendo’s independent music catalog. Track availability and usage terms can vary.
+              <p>Search songs, artists, or explore Indian music.</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {['Hindi songs', 'Bollywood', 'Punjabi', 'Tamil', 'Telugu', 'Bengali', 'Marathi', 'Gujarati', 'Malayalam', 'Kannada', 'Indian classical', 'Indian instrumental'].map((term) => (
+                  <button
+                    key={term}
+                    type="button"
+                    onClick={() => setQuery(term)}
+                    className="rounded-full border border-border px-3 py-1.5 text-xs text-foreground transition-colors hover:border-pink-500/50 hover:bg-pink-500/5"
+                  >
+                    {term}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           {results.map((track) => (
@@ -176,7 +188,7 @@ export function MusicPicker({ onSelect, onClose }: MusicPickerProps) {
           ))}
         </div>
         <footer className="shrink-0 border-t border-border px-4 py-2 text-center text-[10px] text-muted-foreground">
-          Music provided by Jamendo. Check each track’s licence before publishing.
+          Track availability and usage rights may vary.
         </footer>
       </div>
     </div>
