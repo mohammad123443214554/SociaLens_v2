@@ -1,18 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { X, ArrowLeft, Upload, Type, Loader2, Play, Move, Trash2, Copy, Music, Clapperboard } from 'lucide-react'
+import { ArrowLeft, Loader2, Video, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { MusicPicker, SelectedSong } from './MusicPicker'
-import { MusicTrimPanel } from './MusicTrimPanel'
-import { DiscardConfirmDialog } from './DiscardConfirmDialog'
-import { FontPicker } from './FontPicker'
-import { StoryTimeline } from './StoryTimeline'
-import { SceneMenuItem } from './SceneMenu'
 import { useCreateStory, DraftVideoScene } from '@/lib/hooks/useStories'
 import { StoryAudienceModal } from './StoryAudienceModal'
 import { LimitAlertDialog } from '@/components/shared/LimitAlertDialog'
-import type { GlobalMusic, StoryVisibility } from '@/lib/types/database.types'
+import type { StoryVisibility } from '@/lib/types/database.types'
 
 interface VideoStoryModalProps {
   userId: string
@@ -21,565 +15,97 @@ interface VideoStoryModalProps {
   initialFile?: File
 }
 
-interface EditingScene extends Omit<DraftVideoScene, 'overlayText'> {
-  overlayText: string
-  previewUrl: string
-}
-
-function makeSceneId() {
-  return Math.random().toString(36).slice(2, 9)
-}
-
-const MAX_STORY_VIDEO_SECONDS = 5 * 60 // 5 minutes
-
-// Video scenes get their duration from the clip itself, not a manual slider.
-// Returns null (instead of a scene) if the clip is longer than SociaLens
-// allows for a single story video, so the caller can show a limit popup.
-function sceneFromFile(file: File): Promise<EditingScene | null> {
-  return new Promise((resolve) => {
-    const previewUrl = URL.createObjectURL(file)
-    const probe = document.createElement('video')
-    probe.preload = 'metadata'
-    probe.src = previewUrl
-    probe.onloadedmetadata = () => {
-      if (probe.duration > MAX_STORY_VIDEO_SECONDS) {
-        URL.revokeObjectURL(previewUrl)
-        resolve(null)
-        return
-      }
-      resolve({
-        id: makeSceneId(),
-        file,
-        previewUrl,
-        duration: Math.max(1, Math.round(probe.duration) || 5),
-        overlayText: '',
-        overlayFontFamily: undefined,
-        overlayX: 50,
-        overlayY: 50,
-      })
-    }
-  })
-}
-
-function effectiveMusicFor(scene: EditingScene, globalMusic: GlobalMusic | null) {
-  if (scene.musicUrl) {
-    return { url: scene.musicUrl, title: scene.musicTitle, artist: scene.musicArtist, artworkUrl: scene.musicArtworkUrl, start: scene.musicStart ?? 0 }
-  }
-  if (globalMusic) {
-    return { url: globalMusic.url, title: globalMusic.title, artist: globalMusic.artist, artworkUrl: globalMusic.artworkUrl, start: globalMusic.start }
-  }
-  return null
-}
+const MAX_STORY_VIDEO_SECONDS = 5 * 60
 
 export function VideoStoryModal({ userId, onClose, onBack, initialFile }: VideoStoryModalProps) {
-  const [scenes, setScenes] = useState<EditingScene[]>([])
-  const [activeSceneId, setActiveSceneId] = useState<string | null>(null)
-  const [globalMusic, setGlobalMusic] = useState<GlobalMusic | null>(null)
-  const [globalFont, setGlobalFont] = useState<string | null>(null)
-  const [timelineZoom, setTimelineZoom] = useState(80)
-
-  const [editingCaption, setEditingCaption] = useState(false)
-
-  const [fontTarget, setFontTarget] = useState<'global' | string | null>(null)
-  const fontBeforePicker = useRef<string | null | undefined>(null)
-
-  const [musicTarget, setMusicTarget] = useState<'global' | string | null>(null)
-  const [showMusicPicker, setShowMusicPicker] = useState(false)
-  const [trimSong, setTrimSong] = useState<SelectedSong | null>(null)
-
-  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
-  const [discardAction, setDiscardAction] = useState<'close' | 'back' | null>(null)
-  const [showVideoLimitPopup, setShowVideoLimitPopup] = useState(false)
-
-  const [previewing, setPreviewing] = useState(false)
-  const [previewIndex, setPreviewIndex] = useState(0)
-  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
-  const previewAudioUrlRef = useRef<string | null>(null)
-  const previewVideoRef = useRef<HTMLVideoElement>(null)
-
-  const initialFileRef = useRef<HTMLInputElement>(null)
-  const addSceneFileRef = useRef<HTMLInputElement>(null)
-  const canvasRef = useRef<HTMLDivElement>(null)
-  const stageRef = useRef<HTMLDivElement>(null)
-  const dragging = useRef(false)
+  const [file, setFile] = useState<File | null>(initialFile || null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [duration, setDuration] = useState(0)
+  const [showAudience, setShowAudience] = useState(false)
+  const [showLimit, setShowLimit] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const replaceInput = useRef<HTMLInputElement>(null)
   const { createVideoStory } = useCreateStory()
 
   useEffect(() => {
-    if (!initialFile || scenes.length > 0) return
-    let cancelled = false
-    sceneFromFile(initialFile).then((scene) => {
-      if (cancelled) {
-        if (scene) URL.revokeObjectURL(scene.previewUrl)
-        return
-      }
-      if (scene) {
-        setScenes([scene])
-        setActiveSceneId(scene.id)
-      } else {
-        setShowVideoLimitPopup(true)
-      }
-    })
-    return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialFile])
+    if (!file) { setPreviewUrl(null); setDuration(0); return }
+    const url = URL.createObjectURL(file)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
 
-  const activeScene = scenes.find((s) => s.id === activeSceneId) || null
-  const totalDuration = scenes.reduce((sum, s) => sum + s.duration, 0) || 5
-
-  const updateScene = (id: string, patch: Partial<EditingScene>) => {
-    setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)))
-  }
-
-  const handleInitialUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    e.target.value = ''
-    if (!f) return
-    const s = await sceneFromFile(f)
-    if (!s) {
-      setShowVideoLimitPopup(true)
+  const onVideoMetadata = (event: React.SyntheticEvent<HTMLVideoElement>) => {
+    const seconds = event.currentTarget.duration
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      setError('This video could not be read. Please choose another video.')
       return
     }
-    setScenes([s])
-    setActiveSceneId(s.id)
-  }
-
-  const handleAddScene = () => addSceneFileRef.current?.click()
-  const handleAddSceneFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    e.target.value = ''
-    if (!f) return
-    const s = await sceneFromFile(f)
-    if (!s) {
-      setShowVideoLimitPopup(true)
+    if (seconds > MAX_STORY_VIDEO_SECONDS) {
+      setDuration(seconds)
+      setShowLimit(true)
+      setError('Videos must be 5 minutes or shorter.')
       return
     }
-    setScenes((prev) => [...prev, s])
-    setActiveSceneId(s.id)
+    setDuration(seconds)
+    setError(null)
   }
 
-  const handleDuplicateScene = (id: string) => {
-    const source = scenes.find((s) => s.id === id)
-    if (!source) return
-    const copy = { ...source, id: makeSceneId() }
-    setScenes((prev) => {
-      const idx = prev.findIndex((s) => s.id === id)
-      const next = [...prev]
-      next.splice(idx + 1, 0, copy)
-      return next
-    })
-    setActiveSceneId(copy.id)
+  const onShare = () => {
+    if (!file || !previewUrl) { setError('Choose a video before sharing your story.'); return }
+    if (!duration || duration > MAX_STORY_VIDEO_SECONDS) { setError('Please choose a valid video that is 5 minutes or shorter.'); return }
+    setError(null)
+    setShowAudience(true)
   }
 
-  const handleDeleteScene = (id: string) => {
-    setScenes((prev) => {
-      const next = prev.filter((s) => s.id !== id)
-      if (id === activeSceneId) setActiveSceneId(next[0]?.id ?? null)
-      return next
-    })
-  }
-
-  const handleReorderScenes = (fromId: string, toId: string) => {
-    setScenes((prev) => {
-      const fromIndex = prev.findIndex((scene) => scene.id === fromId)
-      const toIndex = prev.findIndex((scene) => scene.id === toId)
-      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return prev
-      const next = [...prev]
-      const [moved] = next.splice(fromIndex, 1)
-      next.splice(toIndex, 0, moved)
-      return next
-    })
-  }
-
-  const updatePosFromClientPoint = (clientX: number, clientY: number) => {
-    if (!activeSceneId) return
-    const canvas = stageRef.current
-    if (!canvas) return
-    const rect = canvas.getBoundingClientRect()
-    const x = Math.min(95, Math.max(5, ((clientX - rect.left) / rect.width) * 100))
-    const y = Math.min(95, Math.max(5, ((clientY - rect.top) / rect.height) * 100))
-    updateScene(activeSceneId, { overlayX: x, overlayY: y })
-  }
-  const handleDragStart = (e: React.PointerEvent) => { dragging.current = true; (e.target as HTMLElement).setPointerCapture(e.pointerId) }
-  const handleDragMove = (e: React.PointerEvent) => { if (dragging.current) updatePosFromClientPoint(e.clientX, e.clientY) }
-  const handleDragEnd = () => { dragging.current = false }
-
-  const hasUnsavedWork = scenes.length > 0
-  const requestClose = () => { if (hasUnsavedWork) { setDiscardAction('close'); setShowDiscardConfirm(true) } else onClose() }
-  const requestBack = () => { if (hasUnsavedWork) { setDiscardAction('back'); setShowDiscardConfirm(true) } else onBack() }
-  const confirmDiscard = () => {
-    setShowDiscardConfirm(false)
-    scenes.forEach((s) => URL.revokeObjectURL(s.previewUrl))
-    if (discardAction === 'back') onBack(); else onClose()
-  }
-
-  const [showAudiencePicker, setShowAudiencePicker] = useState(false)
-
-  const handleShare = () => {
-    if (scenes.length === 0) return
-    setShowAudiencePicker(true)
-  }
-
-  const doShare = async (visibility: StoryVisibility, selectedIds: string[]) => {
+  const confirmShare = async (visibility: StoryVisibility, selectedIds: string[]) => {
+    if (!file || !duration || duration > MAX_STORY_VIDEO_SECONDS || createVideoStory.isPending) return
+    const scene: DraftVideoScene = {
+      id: Math.random().toString(36).slice(2, 10),
+      file,
+      duration: Math.max(1, Math.round(duration)),
+      overlayX: 50,
+      overlayY: 50,
+    }
     try {
-      const payload: DraftVideoScene[] = scenes.map(({ previewUrl, overlayText, ...rest }) => ({
-        ...rest,
-        overlayText: overlayText || undefined,
-      }))
-      await createVideoStory.mutateAsync({ userId, scenes: payload, globalMusic, globalFont, visibility, visibilitySelectedIds: selectedIds })
-      setShowAudiencePicker(false)
+      await createVideoStory.mutateAsync({ userId, scenes: [scene], visibility, visibilitySelectedIds: selectedIds })
+      setShowAudience(false)
       onClose()
-    } catch {
-      // surfaced via createVideoStory.isError below
+    } catch (cause) {
+      setError(cause instanceof Error ? 'Could not publish your video story: ' + cause.message : 'Could not publish your video story. Please try again.')
     }
-  }
-
-  const openGlobalMusic = () => {
-    setMusicTarget('global')
-    if (globalMusic) setTrimSong({ title: globalMusic.title, artist: globalMusic.artist, artworkUrl: globalMusic.artworkUrl, previewUrl: globalMusic.url })
-    else setShowMusicPicker(true)
-  }
-  const openSeparateSong = (sceneId: string) => {
-    setMusicTarget(sceneId)
-    const scene = scenes.find((s) => s.id === sceneId)
-    if (scene?.musicUrl) setTrimSong({ title: scene.musicTitle || '', artist: scene.musicArtist || '', artworkUrl: scene.musicArtworkUrl || '', previewUrl: scene.musicUrl })
-    else setShowMusicPicker(true)
-  }
-
-  const openGlobalFont = () => { fontBeforePicker.current = globalFont; setFontTarget('global') }
-  const openSeparateFont = (sceneId: string) => {
-    fontBeforePicker.current = scenes.find((s) => s.id === sceneId)?.overlayFontFamily
-    setFontTarget(sceneId)
-  }
-
-  const stopPreview = () => {
-    previewAudioRef.current?.pause()
-    previewAudioRef.current = null
-    previewAudioUrlRef.current = null
-    setPreviewing(false)
-  }
-  const startPreview = () => {
-    if (scenes.length === 0) return
-    setPreviewIndex(0)
-    setPreviewing(true)
-  }
-
-  useEffect(() => {
-    if (!previewing) return
-    const scene = scenes[previewIndex]
-    if (!scene) { stopPreview(); return }
-
-    const music = effectiveMusicFor(scene, globalMusic)
-    if (music?.url !== previewAudioUrlRef.current) {
-      previewAudioRef.current?.pause()
-      previewAudioUrlRef.current = music?.url ?? null
-      if (music?.url) {
-        const audio = new Audio(music.url)
-        audio.currentTime = music.start
-        audio.play().catch(() => {})
-        previewAudioRef.current = audio
-      } else {
-        previewAudioRef.current = null
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewing, previewIndex])
-
-  useEffect(() => () => { previewAudioRef.current?.pause() }, [])
-
-  const handlePreviewVideoEnded = () => {
-    if (previewIndex < scenes.length - 1) setPreviewIndex((i) => i + 1)
-    else stopPreview()
-  }
-
-  const getMenuItems = (scene: EditingScene): SceneMenuItem[] => [
-    { icon: <Type className="h-4 w-4" />, label: scene.overlayText ? 'Edit Text' : 'Add Text', onClick: () => { setActiveSceneId(scene.id); setEditingCaption(true) } },
-    { icon: <Type className="h-4 w-4" />, label: scene.overlayFontFamily ? 'Edit Font' : 'Add Font', onClick: () => openSeparateFont(scene.id) },
-    { icon: <Copy className="h-4 w-4" />, label: 'Duplicate Scene', onClick: () => handleDuplicateScene(scene.id) },
-    ...(scenes.length > 1 ? [{ icon: <Trash2 className="h-4 w-4" />, label: 'Delete Scene', onClick: () => handleDeleteScene(scene.id), danger: true }] : []),
-    { icon: <Music className="h-4 w-4" />, label: scene.musicUrl ? 'Edit Song' : 'Add Song', onClick: () => openSeparateSong(scene.id) },
-  ]
-
-  // --- No video uploaded yet ------------------------------------------
-  if (scenes.length === 0) {
-    return (
-      <div className="fixed inset-0 bg-black z-[100] flex flex-col">
-        <div className="flex items-center justify-between p-4">
-          <button onClick={onBack} className="text-white p-1"><ArrowLeft className="h-6 w-6" /></button>
-          <p className="text-white font-semibold">Video Story</p>
-          <button onClick={onClose} className="text-white p-1"><X className="h-6 w-6" /></button>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <button onClick={() => initialFileRef.current?.click()} className="flex flex-col items-center gap-3 text-white/80 hover:text-white transition-colors">
-            <div className="h-16 w-16 rounded-full bg-white/10 flex items-center justify-center">
-              <Upload className="h-7 w-7" />
-            </div>
-            <span className="font-medium">Upload from device</span>
-            <span className="text-xs text-white/50">Videos only</span>
-          </button>
-        </div>
-        <input ref={initialFileRef} type="file" accept="video/*" onChange={handleInitialUpload} className="hidden" />
-      </div>
-    )
-  }
-
-  if (previewing) {
-    const scene = scenes[previewIndex]
-    const music = effectiveMusicFor(scene, globalMusic)
-    const font = scene.overlayFontFamily || globalFont
-    return (
-      <div className="fixed inset-0 bg-black z-[100] flex flex-col">
-        <div className="flex gap-1 p-3 pt-4">
-          {scenes.map((_, i) => (
-            <div key={i} className="flex-1 h-1 bg-white/25 rounded-full overflow-hidden">
-              <div className={`h-full bg-white rounded-full ${i === previewIndex ? '' : ''}`} style={{ width: i < previewIndex ? '100%' : i === previewIndex ? '50%' : '0%' }} />
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center justify-between px-4 pb-2">
-          <span className="text-white/60 text-xs font-medium">Previewing draft - not posted yet</span>
-          <button onClick={stopPreview} className="text-white p-1"><X className="h-6 w-6" /></button>
-        </div>
-        <div className="flex-1 min-h-0 relative flex items-center justify-center bg-black">
-          <video
-            ref={previewVideoRef}
-            src={scene.previewUrl}
-            className="max-w-full max-h-full object-contain"
-            autoPlay
-            playsInline
-            muted={!!music}
-            onEnded={handlePreviewVideoEnded}
-          />
-          {scene.overlayText && (
-            <p
-              style={{
-                position: 'absolute', left: `${scene.overlayX}%`, top: `${scene.overlayY}%`, transform: 'translate(-50%, -50%)',
-                color: '#ffffff', textShadow: '0 1px 6px rgba(0,0,0,0.6)',
-                fontFamily: font ? `'${font}', sans-serif` : undefined,
-              }}
-              className="text-xl font-bold break-words max-w-[85%] text-center"
-            >
-              {scene.overlayText}
-            </p>
-          )}
-          {music?.title && (
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full pl-1.5 pr-4 py-1.5 max-w-[85%]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={music.artworkUrl} alt={music.title} className="h-7 w-7 rounded-full object-cover shrink-0" />
-              <span className="text-white text-xs font-medium truncate">{music.title} &middot; {music.artist}</span>
-            </div>
-          )}
-        </div>
-      </div>
-    )
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden bg-[#171719] text-white">
-      <header className="relative z-20 flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[#202023] px-3 sm:px-5">
-        <div className="flex min-w-0 items-center gap-3">
-          <button onClick={requestBack} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/75 transition-colors hover:bg-white/10 hover:text-white" aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>
-          <span className="h-6 w-px bg-white/10" />
-          <div className="min-w-0"><p className="text-sm font-semibold tracking-wide">Video Story</p><p className="hidden text-[11px] text-white/45 sm:block">SociaLens Studio</p></div>
-        </div>
-        <div className="flex items-center gap-2"><span className="hidden text-xs text-white/45 sm:inline">Unsaved draft</span><button onClick={requestClose} className="flex h-9 w-9 items-center justify-center rounded-lg text-white/65 transition-colors hover:bg-white/10 hover:text-white" aria-label="Close editor"><X className="h-5 w-5" /></button></div>
+    <div className="fixed inset-0 z-[120] flex min-h-dvh flex-col bg-background text-foreground">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3 sm:px-5">
+        <button onClick={onBack} aria-label="Back to story upload choices" className="rounded-full p-2 hover:bg-muted"><ArrowLeft className="h-5 w-5" /></button>
+        <h1 className="text-sm font-semibold sm:text-base">Video story</h1>
+        <button onClick={onClose} aria-label="Close story creator" className="rounded-full p-2 hover:bg-muted"><X className="h-5 w-5" /></button>
       </header>
 
-      <div className="flex flex-1 min-h-0 flex-col sm:flex-row">
-        <aside aria-label="Story editing tools" className="hidden">
-          <button onClick={() => (scenes.length ? addSceneFileRef.current : initialFileRef.current)?.click()} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Add video">
-            <Upload className="h-5 w-5" /><span className="text-[10px]">Video</span>
-          </button>
-          <button onClick={() => activeScene && setEditingCaption(true)} disabled={!activeScene} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors" title="Add or edit text">
-            <Type className="h-5 w-5" /><span className="text-[10px]">Text</span>
-          </button>
-          <button onClick={openGlobalFont} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Choose story font">
-            <span className="text-lg font-serif leading-5">Aa</span><span className="text-[10px]">Font</span>
-          </button>
-          <button onClick={openGlobalMusic} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Add background music">
-            <Music className="h-5 w-5" /><span className="text-[10px]">Music</span>
-          </button>
-          <button onClick={() => addSceneFileRef.current?.click()} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Add another scene">
-            <Clapperboard className="h-5 w-5" /><span className="text-[10px]">Add scene</span>
-          </button>
-        </aside>
-      <div
-        ref={canvasRef}
-        className="order-1 sm:order-2 relative flex-1 min-w-0 min-h-0 overflow-hidden touch-none flex items-center justify-center bg-[#242427] px-3 py-4 sm:px-6"
-        onPointerMove={handleDragMove}
-        onPointerUp={handleDragEnd}
-      >
-        {activeScene && (
-          <>
-            <div ref={stageRef} className="relative aspect-[9/16] h-full max-h-full w-auto max-w-full overflow-hidden rounded-sm bg-black shadow-[0_18px_70px_rgba(0,0,0,0.45)] ring-1 ring-white/10">
-              <video src={activeScene.previewUrl} className="absolute inset-0 h-full w-full object-contain" autoPlay loop muted playsInline />
-            {activeScene.overlayText && (
-              <div
-                style={{ position: 'absolute', left: `${activeScene.overlayX}%`, top: `${activeScene.overlayY}%`, transform: 'translate(-50%, -50%)' }}
-                className="max-w-[85%] select-none"
-              >
-                <p
-                  style={{
-                    color: '#ffffff', textShadow: '0 1px 6px rgba(0,0,0,0.6)',
-                    fontFamily: (activeScene.overlayFontFamily || globalFont) ? `'${activeScene.overlayFontFamily || globalFont}', sans-serif` : undefined,
-                  }}
-                  className="text-xl font-bold break-words text-center"
-                >
-                  {activeScene.overlayText}
-                </p>
-                <div className="flex items-center justify-center mt-1">
-                  <button onPointerDown={handleDragStart} className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center cursor-grab active:cursor-grabbing">
-                    <Move className="h-3.5 w-3.5 text-white" />
-                  </button>
-                </div>
-              </div>
-            )}
-            </div>
-          </>
-        )}
-      </div>
-      </div>
-
-      {false && editingCaption && activeScene && (
-        <div className="p-4 border-t border-white/10">
-          <input
-            autoFocus
-            value={activeScene.overlayText}
-            onChange={(e) => updateScene(activeScene.id, { overlayText: e.target.value })}
-            onKeyDown={(e) => { if (e.key === 'Enter') setEditingCaption(false) }}
-            placeholder="Type your caption..."
-            maxLength={100}
-            className="w-full bg-white/10 text-white placeholder:text-white/50 rounded-xl px-4 py-2.5 outline-none"
-          />
-          <button onClick={() => setEditingCaption(false)} className="text-white/70 text-sm mt-2">
-            Done - drag the text on your video to reposition it
-          </button>
-        </div>
-      )}
-
-      {!editingCaption && (
-        <section aria-label="Story timeline" className="hidden">
-          <div className="flex h-7 items-center justify-between border-b border-white/[0.06] px-4 sm:px-5">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/55">Timeline</span>
-            <span className="text-[10px] text-white/35">Drag clips to reorder · Scroll to explore</span>
-          </div>
-          <StoryTimeline
-          scenes={scenes}
-          activeSceneId={activeSceneId || scenes[0].id}
-          onSelectScene={setActiveSceneId}
-          onReorderScenes={handleReorderScenes}
-          canvasZoom={timelineZoom}
-          onCanvasZoomChange={setTimelineZoom}
-          onAddScene={handleAddScene}
-          onResizeScene={() => {}}
-          resizable={false}
-          trackIcon={<Clapperboard className="h-3.5 w-3.5 text-white/40" />}
-          renderBlock={(scene, i) => (
-            <>
-              <video src={scene.previewUrl} className="absolute inset-0 w-full h-full object-cover opacity-60" muted />
-              <span className="relative text-[10px] font-medium text-white truncate flex-1 z-[1]">{i + 1}</span>
-            </>
+      <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-auto p-3 sm:p-6">
+        <div className="flex min-h-[220px] w-full max-w-sm items-center justify-center overflow-hidden rounded-2xl bg-black sm:max-h-[calc(100dvh-180px)]">
+          {previewUrl ? (
+            <video key={previewUrl} src={previewUrl} controls playsInline preload="metadata" onLoadedMetadata={onVideoMetadata} onError={() => setError('This video could not be played. Please choose another supported video file.')} className="max-h-[calc(100dvh-210px)] w-full object-contain" />
+          ) : (
+            <div className="p-8 text-center text-white/70"><Video className="mx-auto mb-2 h-10 w-10" /><p>No video selected</p></div>
           )}
-          getMenuItems={getMenuItems}
-          globalMusic={globalMusic}
-          onOpenGlobalMusic={openGlobalMusic}
-          />
-        </section>
-      )}
-
-      {!editingCaption && (
-        <div className="relative flex shrink-0 items-center gap-2 border-t border-white/10 bg-[#202023] px-3 py-3 sm:px-5">
-          <Button variant="gradient" className="flex-1" disabled={createVideoStory.isPending} onClick={handleShare}>
-            {createVideoStory.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Share to Story'}
-          </Button>
         </div>
-      )}
-      {createVideoStory.isError && (
-        <p className="text-xs text-red-400 text-center pb-3">Couldn't post your story. Try again.</p>
-      )}
+        <div className="w-full max-w-sm space-y-3">
+          {file && <p className="truncate text-center text-sm text-muted-foreground">{file.name}{duration > 0 && duration <= MAX_STORY_VIDEO_SECONDS ? ' · ' + Math.round(duration) + ' sec' : ''}</p>}
+          <div className="flex gap-2">
+            <Button variant="outline" className="shrink-0" onClick={() => replaceInput.current?.click()}>Replace video</Button>
+            <Button className="flex-1" onClick={onShare} disabled={!file || !duration || duration > MAX_STORY_VIDEO_SECONDS || createVideoStory.isPending}>
+              {createVideoStory.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing…</> : 'Share'}
+            </Button>
+          </div>
+          <input ref={replaceInput} type="file" accept="video/*" className="hidden" onChange={(e) => { const next = e.target.files?.[0]; e.currentTarget.value = ''; if (next && next.type.startsWith('video/')) { setFile(next); setDuration(0); setError(null) } else if (next) setError('Please choose a supported video file.') }} />
+          {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
+        </div>
+      </main>
 
-      <input ref={addSceneFileRef} type="file" accept="video/*" onChange={handleAddSceneFile} className="hidden" />
-
-      {showMusicPicker && (
-        <MusicPicker
-          onSelect={(s) => {
-            if (musicTarget === 'global') {
-              setGlobalMusic({ url: s.previewUrl, title: s.title, artist: s.artist, artworkUrl: s.artworkUrl, start: 0, duration: Math.min(totalDuration, 30) })
-            } else if (musicTarget) {
-              updateScene(musicTarget, {
-                musicUrl: s.previewUrl, musicTitle: s.title, musicArtist: s.artist, musicArtworkUrl: s.artworkUrl,
-                musicStart: 0, musicDuration: Math.min(scenes.find((sc) => sc.id === musicTarget)?.duration ?? 5, 30),
-              })
-            }
-            setShowMusicPicker(false)
-            setTrimSong(s)
-          }}
-          onClose={() => setShowMusicPicker(false)}
-        />
-      )}
-
-      {trimSong && musicTarget === 'global' && (
-        <MusicTrimPanel
-          song={trimSong}
-          initialStart={globalMusic?.start ?? 0}
-          initialDuration={globalMusic?.duration ?? Math.min(totalDuration, 30)}
-          sceneDuration={totalDuration}
-          isGlobal
-          onCancel={() => setTrimSong(null)}
-          onDone={(start, duration) => { setGlobalMusic({ url: trimSong.previewUrl, title: trimSong.title, artist: trimSong.artist, artworkUrl: trimSong.artworkUrl, start, duration }); setTrimSong(null) }}
-          onRemove={() => { setGlobalMusic(null); setTrimSong(null) }}
-          onChangeSong={() => { setTrimSong(null); setShowMusicPicker(true) }}
-        />
-      )}
-      {trimSong && musicTarget && musicTarget !== 'global' && (
-        <MusicTrimPanel
-          song={trimSong}
-          initialStart={scenes.find((s) => s.id === musicTarget)?.musicStart ?? 0}
-          initialDuration={scenes.find((s) => s.id === musicTarget)?.musicDuration ?? Math.min(scenes.find((s) => s.id === musicTarget)?.duration ?? 5, 30)}
-          sceneDuration={scenes.find((s) => s.id === musicTarget)?.duration ?? 5}
-          onCancel={() => setTrimSong(null)}
-          onDone={(start, duration) => { updateScene(musicTarget, { musicStart: start, musicDuration: duration }); setTrimSong(null) }}
-          onRemove={() => { updateScene(musicTarget, { musicUrl: undefined, musicTitle: undefined, musicArtist: undefined, musicArtworkUrl: undefined, musicStart: undefined, musicDuration: undefined }); setTrimSong(null) }}
-          onChangeSong={() => { setTrimSong(null); setShowMusicPicker(true) }}
-        />
-      )}
-
-      {fontTarget === 'global' && (
-        <FontPicker
-          currentFont={globalFont || ''}
-          onSelect={(f) => setGlobalFont(f || null)}
-          onCancel={() => { setGlobalFont(fontBeforePicker.current ?? null); setFontTarget(null) }}
-          onDone={() => setFontTarget(null)}
-        />
-      )}
-      {fontTarget && fontTarget !== 'global' && (
-        <FontPicker
-          currentFont={scenes.find((s) => s.id === fontTarget)?.overlayFontFamily || ''}
-          onSelect={(f) => updateScene(fontTarget, { overlayFontFamily: f || undefined })}
-          onCancel={() => { updateScene(fontTarget, { overlayFontFamily: fontBeforePicker.current || undefined }); setFontTarget(null) }}
-          onDone={() => setFontTarget(null)}
-        />
-      )}
-
-      {showDiscardConfirm && (
-        <DiscardConfirmDialog onContinueEditing={() => setShowDiscardConfirm(false)} onDiscard={confirmDiscard} />
-      )}
-
-      {showVideoLimitPopup && (
-        <LimitAlertDialog
-          title="Video is too long"
-          description="You can only upload a video up to 5 minutes long for a story. Please trim it or pick a shorter one."
-          onClose={() => setShowVideoLimitPopup(false)}
-        />
-      )}
-
-      {showAudiencePicker && (
-        <StoryAudienceModal
-          userId={userId}
-          isPending={createVideoStory.isPending}
-          onClose={() => setShowAudiencePicker(false)}
-          onConfirm={doShare}
-        />
-      )}
+      {showAudience && <StoryAudienceModal userId={userId} isPending={createVideoStory.isPending} confirmLabel="Confirm Share" onClose={() => setShowAudience(false)} onConfirm={confirmShare} />}
+      {showLimit && <LimitAlertDialog title="Video is too long" description="Story videos must be 5 minutes or shorter. Please choose a shorter clip." onClose={() => setShowLimit(false)} />}
     </div>
   )
 }
