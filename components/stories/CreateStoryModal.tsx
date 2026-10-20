@@ -18,6 +18,7 @@ type Step = 'select' | 'photo' | 'video'
 export function CreateStoryModal({ userId, onClose }: CreateStoryModalProps) {
   const [step, setStep] = useState<Step>('select')
   const [initialFile, setInitialFile] = useState<File | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
   const { profile } = useUser()
@@ -36,9 +37,13 @@ export function CreateStoryModal({ userId, onClose }: CreateStoryModalProps) {
 
   const chooseFile = (kind: 'photo' | 'video', file?: File) => {
     if (!file) return
+    setFileError(null)
     const isPhoto = kind === 'photo' && file.type.startsWith('image/')
     const isVideo = kind === 'video' && file.type.startsWith('video/')
-    if (!isPhoto && !isVideo) return
+    if (!isPhoto && !isVideo) {
+      setFileError(kind === 'photo' ? 'Please choose a supported image file.' : 'Please choose a supported video file.')
+      return
+    }
     setInitialFile(file)
     setStep(kind)
   }
@@ -69,9 +74,10 @@ export function CreateStoryModal({ userId, onClose }: CreateStoryModalProps) {
             <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-500">Choose video <Upload className="h-3.5 w-3.5" /></span>
           </button>
         </div>
+        {fileError && <p role="alert" className="px-5 pb-3 text-sm text-red-500 sm:px-6">{fileError}</p>}
         <div className="flex items-center justify-center gap-2 border-t border-border bg-muted/30 px-5 py-3 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5" /> Stories disappear after 24 hours <span className="mx-1 text-border">•</span><ShieldCheck className="h-3.5 w-3.5" /> Choose your audience before sharing</div>
-        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { chooseFile('photo', e.target.files?.[0]); e.currentTarget.value = '' }} />
-        <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={(e) => { chooseFile('video', e.target.files?.[0]); e.currentTarget.value = '' }} />
+        <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" className="hidden" onChange={(e) => { chooseFile('photo', e.target.files?.[0]); e.currentTarget.value = '' }} />
+        <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime,video/ogg,video/x-m4v" className="hidden" onChange={(e) => { chooseFile('video', e.target.files?.[0]); e.currentTarget.value = '' }} />
       </div>
     </div>
   )
