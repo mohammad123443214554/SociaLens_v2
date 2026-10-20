@@ -424,6 +424,24 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
         </section>
       </div>
 
+      {/* Timeline strip */}
+      <StoryTimeline
+        scenes={scenes}
+        activeSceneId={activeSceneId}
+        onSelectScene={setActiveSceneId}
+        onAddScene={handleAddScene}
+        onResizeScene={(id, duration) => updateScene(id, { duration })}
+        trackIcon={<Type className="h-3.5 w-3.5 text-white/40" />}
+        renderBlock={(scene, i) => (
+          <span className="text-[11px] font-medium text-white truncate flex-1">{scene.text || `Scene ${i + 1}`}</span>
+        )}
+        getMenuItems={getMenuItems}
+        globalMusic={globalMusic}
+        onOpenGlobalMusic={openGlobalMusic}
+        canvasZoom={canvasZoom}
+        onCanvasZoomChange={setCanvasZoom}
+      />
+
       {colorPanel === 'bg' && (
         <ColorPickerPanel
           label="Background Color"
@@ -444,24 +462,6 @@ export function TextStoryModal({ userId, onClose, onBack }: TextStoryModalProps)
       )}
 
 
-
-      {/* Timeline strip */}
-      <StoryTimeline
-        scenes={scenes}
-        activeSceneId={activeSceneId}
-        onSelectScene={setActiveSceneId}
-        onAddScene={handleAddScene}
-        onResizeScene={(id, duration) => updateScene(id, { duration })}
-        trackIcon={<Type className="h-3.5 w-3.5 text-white/40" />}
-        renderBlock={(scene, i) => (
-          <span className="text-[11px] font-medium text-white truncate flex-1">{scene.text || `Scene ${i + 1}`}</span>
-        )}
-        getMenuItems={getMenuItems}
-        globalMusic={globalMusic}
-        onOpenGlobalMusic={openGlobalMusic}
-        canvasZoom={canvasZoom}
-        onCanvasZoomChange={setCanvasZoom}
-      />
 
       {showEmoji && <EmojiPicker onSelect={insertEmoji} onClose={() => setShowEmoji(false)} />}
       {createTextStory.isError && (
