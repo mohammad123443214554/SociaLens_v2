@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Check, ImagePlus, Loader2, Music2, Type, X } from 'lucide-react'
+import { ArrowLeft, Check, ImagePlus, Loader2, Music2, Play, Type, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MusicPicker, SelectedSong } from './MusicPicker'
 import { FontPicker } from './FontPicker'
@@ -34,6 +34,9 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
   const [textDuration, setTextDuration] = useState(5)
   const [songStart, setSongStart] = useState(0)
   const [songDuration, setSongDuration] = useState(5)
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewElapsed, setPreviewElapsed] = useState(0)
+  const previewAudioRef = useRef<HTMLAudioElement>(null)
   const timelineDrag = useRef<{ kind: 'photo' | 'text' | 'song'; edge: 'start' | 'end' | 'move'; x: number; start: number; duration: number } | null>(null)
   const timelineRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
@@ -80,6 +83,21 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
   }
 
   const endTimelineDrag = () => { timelineDrag.current = null }
+
+  useEffect(() => {
+    if (!showPreview) return
+    setPreviewElapsed(0)
+    const startedAt = Date.now()
+    const timer = window.setInterval(() => {
+      const elapsed = (Date.now() - startedAt) / 1000
+      if (elapsed >= storyDuration) {
+        setPreviewElapsed(storyDuration)
+        setShowPreview(false)
+        window.clearInterval(timer)
+      } else setPreviewElapsed(elapsed)
+    }, 100)
+    return () => window.clearInterval(timer)
+  }, [showPreview, storyDuration])
   const [showAudience, setShowAudience] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const replaceInput = useRef<HTMLInputElement>(null)
@@ -201,9 +219,9 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
                 className={`relative h-[27px] w-full shrink-0 touch-none overflow-hidden rounded-sm bg-muted ${overlayText.trim() ? 'cursor-grab' : 'cursor-default opacity-60'}`}
                 aria-label="Text timeline strip"
               >
-                <div className="absolute inset-y-0 rounded-sm bg-violet-500/90" style={{ left: `${(textStart / 60) * 100}%`, width: `${Math.max(overlayText.trim() ? 1.5 : 0, (Math.min(textDuration, storyDuration - textStart) / 60) * 100)}%` }}>
+                {overlayText.trim() && <div className="absolute inset-y-0 rounded-sm bg-violet-500/90" style={{ left: `${(textStart / 60) * 100}%`, width: `${Math.max(1.5, (Math.min(textDuration, storyDuration - textStart) / 60) * 100)}%` }}>
                   {overlayText.trim() && <><span data-edge="start" className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-sm bg-violet-200/90" /><span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-sm bg-violet-200/90" /></>}
-                </div>
+                </div>}
                 <span className="pointer-events-none absolute inset-y-0 left-2 z-20 flex items-center text-[11px] font-semibold text-foreground drop-shadow-sm">Text</span>
               </div>
               <div
@@ -230,9 +248,9 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
                 className={`relative h-[27px] w-full shrink-0 touch-none overflow-hidden rounded-sm bg-muted ${song ? 'cursor-grab' : 'cursor-default opacity-60'}`}
                 aria-label="Music timeline strip"
               >
-                <div className="absolute inset-y-0 rounded-sm bg-emerald-500/90" style={{ left: `${(songStart / 60) * 100}%`, width: `${Math.max(song ? 1.5 : 0, (Math.min(songDuration, storyDuration - songStart) / 60) * 100)}%` }}>
+                {song && <div className="absolute inset-y-0 rounded-sm bg-emerald-500/90" style={{ left: `${(songStart / 60) * 100}%`, width: `${Math.max(1.5, (Math.min(songDuration, storyDuration - songStart) / 60) * 100)}%` }}>
                   {song && <><span data-edge="start" className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-sm bg-emerald-200/90" /><span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-sm bg-emerald-200/90" /></>}
-                </div>
+                </div>}
                 <span className="pointer-events-none absolute inset-y-0 left-2 z-20 flex items-center text-[11px] font-semibold text-foreground drop-shadow-sm">Music</span>
               </div>
             </div>
@@ -263,8 +281,13 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
           </div>
           <div className="flex gap-2">
             <Button variant="outline" className="shrink-0" onClick={() => replaceInput.current?.click()}><ImagePlus className="mr-2 h-4 w-4" /> Replace</Button>
-            <Button className="flex-1" disabled={createPhotoStory.isPending} onClick={onShare}>
-              {createPhotoStory.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing…</> : 'Share'}
+            <Button type="button" variant="outline" className="shrink-0" onClick={() => {
+              setPreviewElapsed(0)
+              setShowPreview(true)
+              if (song && previewAudioRef.current) { previewAudioRef.current.currentTime = 0; void previewAudioRef.current.play().catch(() => {}) }
+            }}><Play className="mr-1.5 h-4 w-4" /> Preview</Button>
+            <Button className="min-w-0 flex-1 px-3" disabled={createPhotoStory.isPending} onClick={onShare}>
+              {createPhotoStory.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Publishing…</> : 'Share'}
             </Button>
           </div>
           <input ref={replaceInput} type="file" accept="image/*" className="hidden" onChange={(e) => { const next = e.target.files?.[0]; e.currentTarget.value = ''; if (next && next.type.startsWith('image/')) { setFile(next); setError(null) } else if (next) setError('Please choose a supported image file.') }} />
@@ -272,6 +295,21 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
         </div>
       </main>
 
+      {showPreview && previewUrl && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Story preview">
+          <button onClick={() => { setShowPreview(false); previewAudioRef.current?.pause() }} aria-label="Close story preview" className="absolute right-4 top-4 z-10 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"><X className="h-5 w-5" /></button>
+          <div className="relative flex h-[min(82dvh,760px)] aspect-[9/16] max-w-full items-center justify-center overflow-hidden rounded-2xl bg-black">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={previewUrl} alt="Story preview" className="h-full w-full object-contain" />
+            {overlayText.trim() && previewElapsed >= textStart && previewElapsed < textStart + Math.min(textDuration, storyDuration - textStart) && (
+              <div className="absolute max-w-[86%] rounded-lg px-2 py-1 text-center text-xl font-bold text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.9)]" style={{ left: overlayX + '%', top: overlayY + '%', transform: 'translate(-50%, -50%)', fontFamily: font ? "'" + font + "', sans-serif" : undefined }}>{overlayText}</div>
+            )}
+            <div className="absolute inset-x-0 top-0 h-1 bg-white/30"><div className="h-full bg-white" style={{ width: (Math.min(100, (previewElapsed / storyDuration) * 100)) + '%' }} /></div>
+            {song && previewElapsed >= songStart && previewElapsed < songStart + Math.min(songDuration, storyDuration - songStart) && <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 rounded-xl bg-black/60 p-2 text-white"><Music2 className="h-4 w-4 shrink-0" /><div className="min-w-0"><p className="truncate text-xs font-semibold">{song.title}</p><p className="truncate text-[10px] opacity-80">{song.artist}</p></div></div>}
+          </div>
+          {song && <audio ref={previewAudioRef} src={song.previewUrl} className="hidden" />}
+        </div>
+      )}
       {showMusicPicker && <MusicPicker onSelect={(selected) => { setSong(selected); setSongStart(0); setSongDuration(Math.min(5, storyDuration)); setShowMusicPicker(false) }} onClose={() => setShowMusicPicker(false)} />}
       {showFontPicker && <FontPicker currentFont={font || ''} onSelect={(value) => setFont(value || null)} onCancel={() => setShowFontPicker(false)} onDone={() => setShowFontPicker(false)} />}
       {showAudience && <StoryAudienceModal userId={userId} isPending={createPhotoStory.isPending} confirmLabel="Confirm Share" onClose={() => setShowAudience(false)} onConfirm={confirmShare} />}
