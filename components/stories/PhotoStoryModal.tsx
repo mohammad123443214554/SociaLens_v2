@@ -34,6 +34,52 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
   const [textDuration, setTextDuration] = useState(5)
   const [songStart, setSongStart] = useState(0)
   const [songDuration, setSongDuration] = useState(5)
+  const timelineDrag = useRef<{ kind: 'photo' | 'text' | 'song'; edge: 'start' | 'end' | 'move'; x: number; start: number; duration: number } | null>(null)
+  const timelineRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  const beginTimelineDrag = (kind: 'photo' | 'text' | 'song', event: React.PointerEvent<HTMLDivElement>) => {
+    if (kind === 'text' && !overlayText.trim()) return
+    if (kind === 'song' && !song) return
+    const row = event.currentTarget
+    const edge = kind === 'photo' ? 'end' : ((event.target as HTMLElement).closest('[data-edge]')?.getAttribute('data-edge') as 'start' | 'end' | null) || 'move'
+    timelineDrag.current = {
+      kind, edge, x: event.clientX,
+      start: kind === 'text' ? textStart : kind === 'song' ? songStart : 0,
+      duration: kind === 'text' ? textDuration : kind === 'song' ? songDuration : storyDuration,
+    }
+    row.setPointerCapture(event.pointerId)
+    event.preventDefault()
+  }
+
+  const moveTimelineDrag = (kind: 'photo' | 'text' | 'song', event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = timelineDrag.current
+    const row = timelineRowRefs.current[kind]
+    if (!drag || drag.kind !== kind || !row) return
+    const delta = ((event.clientX - drag.x) / row.getBoundingClientRect().width) * 180
+    if (kind === 'photo') {
+      const next = Math.max(5, Math.min(180, Math.round(drag.duration + delta)))
+      setStoryDuration(next)
+      setTextStart((value) => Math.min(value, next - 1))
+      setTextDuration((value) => Math.min(value, next - Math.min(textStart, next - 1)))
+      setSongStart((value) => Math.min(value, next - 1))
+      setSongDuration((value) => Math.min(value, next - Math.min(songStart, next - 1)))
+      return
+    }
+    const startSetter = kind === 'text' ? setTextStart : setSongStart
+    const durationSetter = kind === 'text' ? setTextDuration : setSongDuration
+    if (drag.edge === 'move') {
+      startSetter(Math.max(0, Math.min(storyDuration - drag.duration, Math.round(drag.start + delta))))
+    } else if (drag.edge === 'start') {
+      const end = drag.start + drag.duration
+      const nextStart = Math.max(0, Math.min(end - 1, Math.round(drag.start + delta)))
+      startSetter(nextStart)
+      durationSetter(end - nextStart)
+    } else {
+      durationSetter(Math.max(1, Math.min(storyDuration - drag.start, Math.round(drag.duration + delta))))
+    }
+  }
+
+  const endTimelineDrag = () => { timelineDrag.current = null }
   const [showAudience, setShowAudience] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const replaceInput = useRef<HTMLInputElement>(null)
@@ -144,33 +190,50 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
         </div>
 
         <div className="w-full max-w-lg space-y-3">
-          <section aria-label="Story timeline" className="rounded-xl border border-border bg-card p-3 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div><p className="text-sm font-semibold">Timeline</p><p className="text-xs text-muted-foreground">Adjust each strip to set when it appears</p></div>
-              <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold tabular-nums">{storyDuration >= 60 ? `${Math.floor(storyDuration / 60)}m ${storyDuration % 60}s` : `${storyDuration}s`}</span>
-            </div>
-            <div className="space-y-2.5">
-              <div>
-                <div className="mb-1.5 flex items-center justify-between text-xs"><span className="font-medium">Text</span><span className="text-muted-foreground tabular-nums">{overlayText.trim() ? `${textStart}s – ${Math.min(storyDuration, textStart + textDuration)}s` : 'Add text to enable'}</span></div>
-                <div className="relative h-3 overflow-hidden rounded-full bg-muted"><div className="absolute top-0 h-full rounded-full bg-violet-500 transition-all" style={{ left: `${(textStart / storyDuration) * 100}%`, width: overlayText.trim() ? `${(Math.min(textDuration, storyDuration - textStart) / storyDuration) * 100}%` : '0%' }} /></div>
-                <div className="mt-1 grid grid-cols-2 gap-3">
-                  <label className="text-[11px] text-muted-foreground">Start <input aria-label="Text start time" type="range" min={0} max={Math.max(0, storyDuration - 1)} step={1} value={Math.min(textStart, storyDuration - 1)} disabled={!overlayText.trim()} onChange={(e) => { const next = Number(e.target.value); setTextStart(next); setTextDuration((v) => Math.min(v, storyDuration - next)) }} className="block w-full accent-violet-500" /></label>
-                  <label className="text-[11px] text-muted-foreground">Length <input aria-label="Text duration" type="range" min={1} max={Math.max(1, storyDuration - textStart)} step={1} value={Math.max(1, Math.min(textDuration, storyDuration - textStart))} disabled={!overlayText.trim()} onChange={(e) => setTextDuration(Number(e.target.value))} className="block w-full accent-violet-500" /></label>
+          <section aria-label="Story timeline" className="mx-auto box-border h-[121px] w-[min(652px,calc(100vw-24px))] shrink-0 overflow-hidden rounded-md border border-border bg-card px-[9px] py-[4px]">
+            <div className="flex h-full w-full flex-col gap-[2px]">
+              <div
+                ref={(node) => { timelineRowRefs.current.text = node }}
+                onPointerDown={(event) => beginTimelineDrag('text', event)}
+                onPointerMove={(event) => moveTimelineDrag('text', event)}
+                onPointerUp={endTimelineDrag}
+                onPointerCancel={endTimelineDrag}
+                className={`relative h-[27px] w-full shrink-0 touch-none overflow-hidden rounded-sm bg-muted ${overlayText.trim() ? 'cursor-grab' : 'cursor-default opacity-60'}`}
+                aria-label="Text timeline strip"
+              >
+                <div className="absolute inset-y-0 rounded-sm bg-violet-500/90" style={{ left: `${(textStart / 180) * 100}%`, width: `${Math.max(overlayText.trim() ? 1.5 : 0, (Math.min(textDuration, storyDuration - textStart) / 180) * 100)}%` }}>
+                  {overlayText.trim() && <><span data-edge="start" className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-sm bg-violet-200/90" /><span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-sm bg-violet-200/90" /></>}
                 </div>
+                <span className="pointer-events-none absolute inset-y-0 left-2 z-20 flex items-center text-[11px] font-semibold text-foreground drop-shadow-sm">Text</span>
               </div>
-              <div>
-                <div className="mb-1.5 flex items-center justify-between text-xs"><span className="font-medium">Photo · Main duration</span><span className="text-muted-foreground tabular-nums">{storyDuration}s</span></div>
-                <div className="h-4 overflow-hidden rounded-full bg-muted"><div className="h-full w-full rounded-full bg-pink-500" /></div>
-                <input aria-label="Photo story duration" type="range" min={5} max={180} step={1} value={storyDuration} onChange={(e) => { const next = Number(e.target.value); setStoryDuration(next); setTextStart((v) => Math.min(v, next - 1)); setTextDuration((v) => Math.min(v, next)); setSongStart((v) => Math.min(v, next - 1)); setSongDuration((v) => Math.min(v, next)) }} className="mt-1.5 block w-full accent-pink-500" />
-                <div className="flex justify-between text-[10px] text-muted-foreground"><span>5 sec</span><span>3 min max</span></div>
-              </div>
-              <div>
-                <div className="mb-1.5 flex items-center justify-between text-xs"><span className="font-medium">Song</span><span className="text-muted-foreground tabular-nums">{song ? `${songStart}s – ${Math.min(storyDuration, songStart + songDuration)}s` : 'Add song to enable'}</span></div>
-                <div className="relative h-3 overflow-hidden rounded-full bg-muted"><div className="absolute top-0 h-full rounded-full bg-emerald-500 transition-all" style={{ left: `${(songStart / storyDuration) * 100}%`, width: song ? `${(Math.min(songDuration, storyDuration - songStart) / storyDuration) * 100}%` : '0%' }} /></div>
-                <div className="mt-1 grid grid-cols-2 gap-3">
-                  <label className="text-[11px] text-muted-foreground">Start <input aria-label="Song start time" type="range" min={0} max={Math.max(0, storyDuration - 1)} step={1} value={Math.min(songStart, storyDuration - 1)} disabled={!song} onChange={(e) => { const next = Number(e.target.value); setSongStart(next); setSongDuration((v) => Math.min(v, storyDuration - next)) }} className="block w-full accent-emerald-500" /></label>
-                  <label className="text-[11px] text-muted-foreground">Length <input aria-label="Song duration" type="range" min={1} max={Math.max(1, storyDuration - songStart)} step={1} value={Math.max(1, Math.min(songDuration, storyDuration - songStart))} disabled={!song} onChange={(e) => setSongDuration(Number(e.target.value))} className="block w-full accent-emerald-500" /></label>
+              <div
+                ref={(node) => { timelineRowRefs.current.photo = node }}
+                onPointerDown={(event) => beginTimelineDrag('photo', event)}
+                onPointerMove={(event) => moveTimelineDrag('photo', event)}
+                onPointerUp={endTimelineDrag}
+                onPointerCancel={endTimelineDrag}
+                className="relative h-[52px] w-full shrink-0 touch-none cursor-ew-resize overflow-hidden rounded-sm bg-muted"
+                aria-label="Photo duration timeline strip"
+              >
+                <div className="absolute inset-y-0 left-0 rounded-sm bg-pink-500/90" style={{ width: `${(storyDuration / 180) * 100}%`, minWidth: '18px' }}>
+                  <span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-3 cursor-ew-resize rounded-r-sm border-l-2 border-white/80 bg-pink-200/90" />
                 </div>
+                <span className="pointer-events-none absolute inset-y-0 left-2 z-20 flex items-center text-xs font-semibold text-foreground drop-shadow-sm">Photo</span>
+                <span className="pointer-events-none absolute inset-y-0 right-2 z-20 flex items-center rounded bg-black/65 px-1.5 text-[10px] font-medium text-white tabular-nums">{storyDuration >= 60 ? `${Math.floor(storyDuration / 60)}m ${storyDuration % 60}s` : `${storyDuration}s`}</span>
+              </div>
+              <div
+                ref={(node) => { timelineRowRefs.current.song = node }}
+                onPointerDown={(event) => beginTimelineDrag('song', event)}
+                onPointerMove={(event) => moveTimelineDrag('song', event)}
+                onPointerUp={endTimelineDrag}
+                onPointerCancel={endTimelineDrag}
+                className={`relative h-[27px] w-full shrink-0 touch-none overflow-hidden rounded-sm bg-muted ${song ? 'cursor-grab' : 'cursor-default opacity-60'}`}
+                aria-label="Music timeline strip"
+              >
+                <div className="absolute inset-y-0 rounded-sm bg-emerald-500/90" style={{ left: `${(songStart / 180) * 100}%`, width: `${Math.max(song ? 1.5 : 0, (Math.min(songDuration, storyDuration - songStart) / 180) * 100)}%` }}>
+                  {song && <><span data-edge="start" className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-sm bg-emerald-200/90" /><span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-sm bg-emerald-200/90" /></>}
+                </div>
+                <span className="pointer-events-none absolute inset-y-0 left-2 z-20 flex items-center text-[11px] font-semibold text-foreground drop-shadow-sm">Music</span>
               </div>
             </div>
           </section>
