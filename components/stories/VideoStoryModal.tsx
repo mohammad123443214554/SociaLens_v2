@@ -156,6 +156,18 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
     })
   }
 
+  const handleReorderScenes = (fromId: string, toId: string) => {
+    setScenes((prev) => {
+      const fromIndex = prev.findIndex((scene) => scene.id === fromId)
+      const toIndex = prev.findIndex((scene) => scene.id === toId)
+      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return prev
+      const next = [...prev]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+  }
+
   const updatePosFromClientPoint = (clientX: number, clientY: number) => {
     if (!activeSceneId) return
     const canvas = canvasRef.current
@@ -406,6 +418,7 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
           scenes={scenes}
           activeSceneId={activeSceneId || scenes[0].id}
           onSelectScene={setActiveSceneId}
+          onReorderScenes={handleReorderScenes}
           onAddScene={handleAddScene}
           onResizeScene={() => {}}
           resizable={false}
