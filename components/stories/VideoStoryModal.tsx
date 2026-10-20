@@ -99,6 +99,7 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
   const initialFileRef = useRef<HTMLInputElement>(null)
   const addSceneFileRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
   const { createVideoStory } = useCreateStory()
 
@@ -171,7 +172,7 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
 
   const updatePosFromClientPoint = (clientX: number, clientY: number) => {
     if (!activeSceneId) return
-    const canvas = canvasRef.current
+    const canvas = stageRef.current
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
     const x = Math.min(95, Math.max(5, ((clientX - rect.left) / rect.width) * 100))
@@ -365,7 +366,7 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
 
       <div className="flex flex-1 min-h-0 flex-col sm:flex-row">
         <aside aria-label="Story editing tools" className="order-2 sm:order-1 shrink-0 flex sm:w-[76px] sm:flex-col items-center justify-around sm:justify-start sm:gap-2 border-t sm:border-t-0 sm:border-r border-white/10 bg-[#202023] px-2 py-2 sm:py-4">
-          <button onClick={() => initialFileRef.current?.click()} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Add video">
+          <button onClick={() => (scenes.length ? addSceneFileRef.current : initialFileRef.current)?.click()} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white transition-colors" title="Add video">
             <Upload className="h-5 w-5" /><span className="text-[10px]">Video</span>
           </button>
           <button onClick={() => activeScene && setEditingCaption(true)} disabled={!activeScene} className="flex w-[58px] flex-col items-center gap-1 rounded-xl px-1 py-2 text-white/75 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors" title="Add or edit text">
@@ -389,11 +390,12 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
       >
         {activeScene && (
           <>
-            <div className="relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-sm bg-black shadow-[0_18px_70px_rgba(0,0,0,0.45)] ring-1 ring-white/10"><video src={activeScene.previewUrl} className="max-h-full max-w-full object-contain" autoPlay loop muted playsInline /></div>
+            <div ref={stageRef} className="relative aspect-[9/16] h-full max-h-full w-auto max-w-full overflow-hidden rounded-sm bg-black shadow-[0_18px_70px_rgba(0,0,0,0.45)] ring-1 ring-white/10">
+              <video src={activeScene.previewUrl} className="absolute inset-0 h-full w-full object-contain" autoPlay loop muted playsInline />
             {activeScene.overlayText && (
               <div
-                style={{ left: `${activeScene.overlayX}%`, top: `${activeScene.overlayY}%`, transform: 'translate(-50%, -50%)' }}
-                className="absolute max-w-[85%] select-none"
+                style={{ position: 'absolute', left: `${activeScene.overlayX}%`, top: `${activeScene.overlayY}%`, transform: 'translate(-50%, -50%)' }}
+                className="max-w-[85%] select-none"
               >
                 <p
                   style={{
@@ -411,6 +413,7 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
                 </div>
               </div>
             )}
+            </div>
           </>
         )}
       </div>
