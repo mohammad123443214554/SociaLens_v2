@@ -179,6 +179,8 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       start: 0,
       duration: Math.min(songDuration, storyDuration - songStart),
       timelineStart: songStart,
+      source: song.source || 'Jamendo',
+      licenseUrl: song.licenseUrl || undefined,
     } : null
     try {
       await createPhotoStory.mutateAsync({
