@@ -16,6 +16,7 @@ interface StoryTimelineProps<T extends BaseScene> {
   onSelectScene: (id: string) => void
   onAddScene: () => void
   onResizeScene: (id: string, duration: number) => void
+  onReorderScenes?: (fromId: string, toId: string) => void
   renderBlock: (scene: T, index: number) => React.ReactNode
   getMenuItems: (scene: T) => SceneMenuItem[]
   globalMusic: GlobalMusic | null
@@ -36,10 +37,11 @@ const MAX_SCENE_DURATION = 60
 const TOUCH_SENSITIVITY = 4
 
 export function StoryTimeline<T extends BaseScene>({
-  scenes, activeSceneId, onSelectScene, onAddScene, onResizeScene, renderBlock, getMenuItems,
+  scenes, activeSceneId, onSelectScene, onAddScene, onResizeScene, onReorderScenes, renderBlock, getMenuItems,
   globalMusic, onOpenGlobalMusic, trackIcon, resizable = true, canvasZoom = 80, onCanvasZoomChange,
 }: StoryTimelineProps<T>) {
   const [menuFor, setMenuFor] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [draggingSceneId, setDraggingSceneId] = useState<string | null>(null)
   // Timeline zoom changes the actual time scale (ruler and clip widths), not just the displayed percentage.
   const PX_PER_SECOND = BASE_PX_PER_SECOND * (canvasZoom / 80)
   const resizing = useRef<{ id: string; startX: number; startDuration: number; isTouch: boolean } | null>(null)
@@ -89,9 +91,14 @@ export function StoryTimeline<T extends BaseScene>({
             <div
               key={scene.id}
               onClick={() => onSelectScene(scene.id)}
+              draggable={!!onReorderScenes}
+              onDragStart={(e) => { if (!onReorderScenes) return; setDraggingSceneId(scene.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', scene.id) }}
+              onDragOver={(e) => { if (onReorderScenes && draggingSceneId && draggingSceneId !== scene.id) { e.preventDefault(); e.dataTransfer.dropEffect = 'move' } }}
+              onDrop={(e) => { if (!onReorderScenes) return; e.preventDefault(); const fromId = e.dataTransfer.getData('text/plain') || draggingSceneId; if (fromId && fromId !== scene.id) onReorderScenes(fromId, scene.id); setDraggingSceneId(null) }}
+              onDragEnd={() => setDraggingSceneId(null)}
               style={{ width: `${Math.max(scene.duration * PX_PER_SECOND, 50)}px` }}
               className={`relative h-10 shrink-0 rounded-md flex items-center px-2 cursor-pointer transition-colors overflow-hidden ${
-                scene.id === activeSceneId ? 'ring-2 ring-white bg-pink-500' : 'bg-white/15 hover:bg-white/25'
+                scene.id === activeSceneId ? 'ring-2 ring-white bg-pink-500' : 'bg-white/15 hover:bg-white/25'} ${draggingSceneId === scene.id ? 'opacity-40' : ''}
               }`}
             >
               {renderBlock(scene, i)}
