@@ -7,20 +7,22 @@ import { useCreateStory, DraftVideoScene } from '@/lib/hooks/useStories'
 import { StoryAudienceModal } from './StoryAudienceModal'
 import { LimitAlertDialog } from '@/components/shared/LimitAlertDialog'
 import type { StoryVisibility } from '@/lib/types/database.types'
+import { clearStoryDraft, saveStoryDraft, type StoryDraftRecord } from '@/lib/utils/storyDraft'
 
 interface VideoStoryModalProps {
   userId: string
   onClose: () => void
   onBack: () => void
   initialFile?: File
+  initialDraft?: StoryDraftRecord | null
 }
 
 const MAX_STORY_VIDEO_SECONDS = 5 * 60
 
-export function VideoStoryModal({ userId, onClose, onBack, initialFile }: VideoStoryModalProps) {
+export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialDraft }: VideoStoryModalProps) {
   const [file, setFile] = useState<File | null>(initialFile || null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [duration, setDuration] = useState(0)
+  const [duration, setDuration] = useState(initialDraft?.video?.duration ?? 0)
   const [showAudience, setShowAudience] = useState(false)
   const [showLimit, setShowLimit] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,6 +35,16 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile }: VideoS
     setPreviewUrl(url)
     return () => URL.revokeObjectURL(url)
   }, [file])
+
+  useEffect(() => {
+    if (!file) return
+    const draft: StoryDraftRecord = {
+      userId, kind: 'video', file, fileName: file.name, fileType: file.type, lastModified: file.lastModified,
+      video: { duration },
+      updatedAt: Date.now(),
+    }
+    void saveStoryDraft(draft).catch(() => {})
+  }, [userId, file, duration])
 
   const onVideoMetadata = (event: React.SyntheticEvent<HTMLVideoElement>) => {
     const seconds = event.currentTarget.duration
@@ -69,6 +81,7 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile }: VideoS
     try {
       await createVideoStory.mutateAsync({ userId, scenes: [scene], visibility, visibilitySelectedIds: selectedIds })
       setShowAudience(false)
+      await clearStoryDraft(userId).catch(() => {})
       onClose()
     } catch (cause) {
       setError(cause instanceof Error ? 'Could not publish your video story: ' + cause.message : 'Could not publish your video story. Please try again.')
