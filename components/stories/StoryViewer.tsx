@@ -69,6 +69,8 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const [groupIndex, setGroupIndex] = useState(startGroupIndex)
   const [storyIndex, setStoryIndex] = useState(startStoryIndex)
   const [progress, setProgress] = useState(0)
+  const progressRef = useRef(0)
+  progressRef.current = progress
   const [videoSceneIndex, setVideoSceneIndex] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -262,7 +264,8 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
   const displayImageUrl = activePhotoScene ? activePhotoScene.imageUrl : story.media_url
   const displayVideoUrl = activeVideoScene ? activeVideoScene.videoUrl : story.media_url
-  const displayOverlayText = activePhotoScene ? activePhotoScene.overlayText : (activeVideoScene ? activeVideoScene.overlayText : story.overlay_text)
+  const photoTextInWindow = !!activePhotoScene?.overlayText && elapsedSeconds >= (activePhotoScene.overlayStart ?? 0) && elapsedSeconds < (activePhotoScene.overlayStart ?? 0) + (activePhotoScene.overlayDuration ?? totalDuration)
+  const displayOverlayText = activePhotoScene ? (photoTextInWindow ? activePhotoScene.overlayText : null) : (activeVideoScene ? activeVideoScene.overlayText : story.overlay_text)
   const displayOverlayColor = activePhotoScene ? activePhotoScene.overlayTextColor : story.overlay_text_color
   const displayOverlayFont = activePhotoScene
     ? (activePhotoScene.overlayFontFamily || story.global_font_family)
@@ -290,6 +293,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const activeMusicArtwork = musicSource.artwork
   const musicStart = musicSource.start
   const musicClipDuration = musicSource.clipDuration
+  const musicTimelineStart = story.story_type === 'photo' && !sceneMusicUrl ? (story.global_music?.timelineStart ?? 0) : 0
 
   // Load whichever font this particular scene/story needs (only fetched
   // once per font, cached after that - see loadGoogleFont).
@@ -311,22 +315,37 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
     const audio = new Audio(activeMusicUrl)
     audio.currentTime = musicStart
-    audio.play().catch(() => {
-      // Autoplay can be blocked in some browsers - not critical, the story
-      // still plays fine without sound in that edge case.
-    })
     audioRef.current = audio
+    let hasStarted = false
 
-    // If a trimmed clip is shorter than however long this scene/story stays
-    // on screen, loop just that trimmed window instead of the whole preview.
-    if (musicClipDuration) {
-      loopCheckRef.current = setInterval(() => {
-        if (audio.currentTime >= musicStart + musicClipDuration) {
-          audio.currentTime = musicStart
-        }
-      }, 200)
-    } else if (story.story_type !== 'video') {
-      audio.loop = true
+    // Photo-story music can be positioned on the timeline. Start it only
+    // inside its selected window and stop it when that window ends.
+    loopCheckRef.current = setInterval(() => {
+      const elapsed = (progressRef.current / 100) * (story.duration_seconds || 5)
+      const trackStart = musicTimelineStart
+      const trackEnd = trackStart + (musicClipDuration || (story.duration_seconds || 5))
+      if (elapsed < trackStart || elapsed >= trackEnd) {
+        audio.pause()
+        if (elapsed >= trackEnd) hasStarted = false
+        return
+      }
+      if (!hasStarted) {
+        audio.currentTime = musicStart
+        hasStarted = true
+      }
+      if (audio.paused) audio.play().catch(() => {})
+      if (musicClipDuration && audio.currentTime >= musicStart + musicClipDuration) {
+        audio.currentTime = musicStart
+      }
+    }, 100)
+
+    if (story.story_type !== 'photo' || musicTimelineStart === 0) {
+      audio.play().catch(() => {
+        // Autoplay can be blocked in some browsers - not critical, the story
+        // still plays fine without sound in that edge case.
+      })
+    } else {
+      audio.pause()
     }
 
     return () => {
