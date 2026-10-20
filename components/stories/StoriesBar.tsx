@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Plus } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -20,14 +19,15 @@ import { interleaveAds } from '@/lib/utils/adInsertion'
 // never open either of them. Loaded on demand instead, the moment
 // someone actually taps "Your Story" or a story ring.
 const StoryViewer = dynamic(() => import('./StoryViewer').then(m => m.StoryViewer), { ssr: false })
+const CreateStoryModal = dynamic(() => import('./CreateStoryModal').then(m => m.CreateStoryModal), { ssr: false })
 
 export function StoriesBar() {
-  const router = useRouter()
   const { user, profile } = useUser()
   const { data: groups = [] } = useActiveStories(user?.id)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [viewerStoryIndex, setViewerStoryIndex] = useState(0)
   const [showAdStory, setShowAdStory] = useState(false)
+  const [showCreateStory, setShowCreateStory] = useState(false)
 
   // Whether the ad story we're showing was reached by finishing (or
   // tapping past) the very last real story, rather than by tapping the
@@ -75,7 +75,7 @@ export function StoriesBar() {
       <div className="flex min-w-0 gap-4 overflow-x-auto pb-1 scrollbar-hide">
         {/* Separate Add Story bubble */}
         <button
-          onClick={() => router.push('/story/create')}
+          onClick={() => setShowCreateStory(true)}
           className="flex w-16 shrink-0 flex-col items-center gap-1"
           aria-label="Add a story"
         >
@@ -148,6 +148,10 @@ export function StoriesBar() {
           onClose={() => { setShowAdStory(false); setAdFromChain(false) }}
           onGoBack={adFromChain ? handleAdGoBack : undefined}
         />
+      )}
+
+      {showCreateStory && user && (
+        <CreateStoryModal userId={user.id} onClose={() => setShowCreateStory(false)} />
       )}
     </div>
   )
