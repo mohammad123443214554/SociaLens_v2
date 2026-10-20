@@ -7,7 +7,7 @@ import { VideoStoryModal } from './VideoStoryModal'
 import { useUser } from '@/lib/hooks/useUser'
 import { isRestricted } from '@/lib/utils/restrictionCheck'
 import { RestrictionPopup } from '@/components/shared/RestrictionPopup'
-import { loadStoryDraft, saveStoryDraft, type StoryDraftRecord } from '@/lib/utils/storyDraft'
+import { clearStoryDraft, loadStoryDraft, saveStoryDraft, type StoryDraftRecord } from '@/lib/utils/storyDraft'
 
 interface CreateStoryModalProps {
   userId: string
@@ -41,7 +41,7 @@ export function CreateStoryModal({ userId, onClose }: CreateStoryModalProps) {
   }, [userId])
 
   if (step === 'photo' && initialFile && !restricted) {
-    return <PhotoStoryModal key={initialFile.name + initialFile.lastModified} userId={userId} initialFile={initialFile} initialDraft={draftRecord} onClose={onClose} onBack={() => { setInitialFile(null); setDraftRecord(null); setStep('select') }} />
+    return <PhotoStoryModal key={initialFile.name + initialFile.lastModified} userId={userId} initialFile={initialFile} initialDraft={draftRecord} onClose={onClose} onBack={() => { void clearStoryDraft(userId).catch(() => {}); setInitialFile(null); setDraftRecord(null); setStep('select') }} />
   }
   if (step === 'video' && initialFile && !restricted) {
     return <VideoStoryModal key={initialFile.name + initialFile.lastModified} userId={userId} initialFile={initialFile} initialDraft={draftRecord} onClose={onClose} onBack={() => { setInitialFile(null); setDraftRecord(null); setStep('select') }} />
