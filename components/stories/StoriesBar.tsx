@@ -19,14 +19,12 @@ import { interleaveAds } from '@/lib/utils/adInsertion'
 // none of that should be part of Feed's initial bundle when most visits
 // never open either of them. Loaded on demand instead, the moment
 // someone actually taps "Your Story" or a story ring.
-const CreateStoryModal = dynamic(() => import('./CreateStoryModal').then(m => m.CreateStoryModal), { ssr: false })
 const StoryViewer = dynamic(() => import('./StoryViewer').then(m => m.StoryViewer), { ssr: false })
 
 export function StoriesBar() {
   const router = useRouter()
   const { user, profile } = useUser()
   const { data: groups = [] } = useActiveStories(user?.id)
-  const [showCreate, setShowCreate] = useState(false)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [viewerStoryIndex, setViewerStoryIndex] = useState(0)
   const [showAdStory, setShowAdStory] = useState(false)
@@ -133,7 +131,6 @@ export function StoriesBar() {
         })}
       </div>
 
-      {showCreate && user && <CreateStoryModal userId={user.id} onClose={() => setShowCreate(false)} />}
 
       {viewerIndex !== null && (
         <StoryViewer
