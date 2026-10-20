@@ -119,7 +119,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile }: PhotoS
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-auto px-3 py-4 sm:px-6">
-        <div className="relative flex min-h-0 max-h-[calc(100dvh-190px)] aspect-[9/16] w-auto max-w-full items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl" ref={stageRef}>
+        <div className="relative flex h-[min(62dvh,680px)] min-h-0 aspect-[9/16] w-auto max-w-full items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl" ref={stageRef}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={previewUrl} alt="Photo story preview" className="block h-full w-full object-contain" />
           {overlayText.trim() && (
