@@ -916,7 +916,6 @@ export default function AperonixPage() {
                                 </span>
                                 <span className="text-[10px] opacity-70 group-hover:opacity-100">Open</span>
                               </button>
-                            )
                           ))}
                         </div>
                       </div>
