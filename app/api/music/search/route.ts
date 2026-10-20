@@ -4,9 +4,9 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
- * Search Jamendo's independent music catalog.
- * Keep the client ID server-side and avoid returning tracks explicitly
- * marked as non-commercial. Individual track licences still apply.
+ * Search the full music catalog available through the provider.
+ * Keep the provider client ID server-side. Licence metadata is returned
+ * when available, but is not used to exclude search results.
  */
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get('q')?.trim()
@@ -24,12 +24,10 @@ export async function GET(request: NextRequest) {
     const params = new URLSearchParams({
       client_id: clientId,
       format: 'json',
-      limit: '25',
+      limit: '100',
       search: query,
       type: 'single albumtrack',
       include: 'licenses',
-      ccnc: 'false',
-      ccnd: 'false',
       audioformat: 'mp32',
     })
     const response = await fetch(`https://api.jamendo.com/v3.0/tracks/?${params.toString()}`, {
@@ -38,8 +36,8 @@ export async function GET(request: NextRequest) {
     })
 
     if (!response.ok) {
-      console.error('Jamendo search returned status:', response.status)
-      return NextResponse.json({ error: 'Jamendo music search is temporarily unavailable.' }, { status: 502 })
+      console.error('Music provider search returned status:', response.status)
+      return NextResponse.json({ error: 'Music search is temporarily unavailable.' }, { status: 502 })
     }
 
     const data = await response.json() as {
@@ -57,21 +55,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (data.headers?.status === 'failed') {
-      console.error('Jamendo API error:', data.headers.error_message)
-      return NextResponse.json({ error: 'Jamendo could not complete this search.' }, { status: 502 })
+      console.error('Music provider API error:', data.headers.error_message)
+      return NextResponse.json({ error: 'Music search could not be completed.' }, { status: 502 })
     }
 
     const results = (data.results || [])
-      .filter((track) => {
-        const license = (track.license_ccurl || '').toLowerCase()
-        // Only offer tracks with a visible Creative Commons licence, and
-        // independently enforce the no-NC/no-ND constraints client-side too.
-        return Boolean(track.id && track.name && track.audio && license)
-          && !license.includes('by-nc')
-          && !license.includes('by-nd')
-          && !license.includes('/nc-')
-          && !license.includes('/nd-')
-      })
+      .filter((track) => Boolean(track.id && track.name && track.audio))
       .map((track) => ({
         id: String(track.id),
         title: track.name || 'Unknown track',
@@ -85,7 +74,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ results })
   } catch (error) {
-    console.error('Jamendo music search error:', error)
+    console.error('Music search error:', error)
     return NextResponse.json({ error: 'Could not search Jamendo music right now.' }, { status: 500 })
   }
 }
