@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { TextStoryModal } from '@/components/stories/TextStoryModal'
+import { CreateStoryModal } from '@/components/stories/CreateStoryModal'
 
 export default function CreateStoryPage() {
   const router = useRouter()
@@ -66,14 +66,14 @@ export default function CreateStoryPage() {
   if (!authReady || !user) {
     return (
       <main className={`fixed inset-0 z-[9999] flex min-h-dvh items-center justify-center ${lightTheme ? 'bg-white text-black' : 'bg-black text-white'}`}>
-        <Loader2 className="h-8 w-8 animate-spin text-pink-500" aria-label="Loading story editor" />
+        <Loader2 className="h-8 w-8 animate-spin text-pink-500" aria-label="Loading story creator" />
       </main>
     )
   }
 
   return (
     <main className={`fixed inset-0 z-[9999] min-h-dvh overflow-hidden ${lightTheme ? 'bg-white' : 'bg-black'}`}>
-      <TextStoryModal userId={user.id} onClose={() => router.push('/feed')} onBack={() => router.push('/feed')} />
+      <CreateStoryModal userId={user.id} onClose={() => router.push('/feed')} />
     </main>
   )
 }
