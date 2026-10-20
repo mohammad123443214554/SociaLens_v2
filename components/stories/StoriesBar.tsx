@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Plus } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -22,6 +23,7 @@ const CreateStoryModal = dynamic(() => import('./CreateStoryModal').then(m => m.
 const StoryViewer = dynamic(() => import('./StoryViewer').then(m => m.StoryViewer), { ssr: false })
 
 export function StoriesBar() {
+  const router = useRouter()
   const { user, profile } = useUser()
   const { data: groups = [] } = useActiveStories(user?.id)
   const [showCreate, setShowCreate] = useState(false)
@@ -75,7 +77,7 @@ export function StoriesBar() {
       <div className="flex min-w-0 gap-4 overflow-x-auto pb-1 scrollbar-hide">
         {/* Separate Add Story bubble */}
         <button
-          onClick={() => setShowCreate(true)}
+          onClick={() => router.push('/story/create')}
           className="flex w-16 shrink-0 flex-col items-center gap-1"
           aria-label="Add a story"
         >
