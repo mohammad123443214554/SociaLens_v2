@@ -64,7 +64,7 @@ export function StoryTimeline<T extends BaseScene>({
   const menuScene = menuFor ? scenes.find((s) => s.id === menuFor.id) : null
 
   return (
-    <div className="w-full min-w-0 max-w-full overflow-hidden bg-transparent px-3 pt-2 pb-2 space-y-1.5 text-neutral-900 dark:text-white md:ml-[188px] md:w-[calc(100%-188px)]">
+    <div className="w-full min-w-0 max-w-full overflow-hidden bg-transparent px-3 pt-2 pb-3 space-y-1.5 text-white">
       {/* Ruler */}
       <div className="relative h-4 overflow-x-auto scrollbar-hide">
         <div className="relative h-full" style={{ width: `${rulerSeconds * PX_PER_SECOND}px` }}>
