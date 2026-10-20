@@ -122,7 +122,8 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       photo: { overlayText, overlayX, overlayY, font, song, storyDuration, textStart, textDuration, songStart, songDuration },
       updatedAt: Date.now(),
     }
-    void saveStoryDraft(draft).catch(() => {})
+    const timer = window.setTimeout(() => { void saveStoryDraft(draft).catch(() => {}) }, 120)
+    return () => window.clearTimeout(timer)
   }, [userId, file, overlayText, overlayX, overlayY, font, song, storyDuration, textStart, textDuration, songStart, songDuration])
 
   const onTextPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
