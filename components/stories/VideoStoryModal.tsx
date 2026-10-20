@@ -43,7 +43,8 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
       video: { duration },
       updatedAt: Date.now(),
     }
-    void saveStoryDraft(draft).catch(() => {})
+    const timer = window.setTimeout(() => { void saveStoryDraft(draft).catch(() => {}) }, 120)
+    return () => window.clearTimeout(timer)
   }, [userId, file, duration])
 
   const onVideoMetadata = (event: React.SyntheticEvent<HTMLVideoElement>) => {
