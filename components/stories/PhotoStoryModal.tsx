@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Check, ImagePlus, Loader2, Music2, Play, Type, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MusicPicker, SelectedSong } from './MusicPicker'
+import { MusicAdjustModal } from './MusicAdjustModal'
 import { FontPicker } from './FontPicker'
 import { useCreateStory, DraftPhotoScene } from '@/lib/hooks/useStories'
 import { StoryAudienceModal } from './StoryAudienceModal'
@@ -31,6 +32,8 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const [showTextInput, setShowTextInput] = useState(false)
   const [showMusicPicker, setShowMusicPicker] = useState(false)
   const [song, setSong] = useState<SelectedSong | null>(initialDraft?.photo?.song ?? null)
+  const [songOffset, setSongOffset] = useState(initialDraft?.photo?.songOffset ?? 0)
+  const [showMusicAdjust, setShowMusicAdjust] = useState(false)
   const [storyDuration, setStoryDuration] = useState(initialDraft?.photo?.storyDuration ?? 5)
   const [textStart, setTextStart] = useState(initialDraft?.photo?.textStart ?? 0)
   const [textDuration, setTextDuration] = useState(initialDraft?.photo?.textDuration ?? 5)
@@ -138,12 +141,12 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
     if (!file) return
     const draft: StoryDraftRecord = {
       userId, kind: 'photo', file, fileName: file.name, fileType: file.type, lastModified: file.lastModified,
-      photo: { overlayText, overlayX, overlayY, font, song, storyDuration, textStart, textDuration, songStart, songDuration },
+      photo: { overlayText, overlayX, overlayY, font, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset },
       updatedAt: Date.now(),
     }
     const timer = window.setTimeout(() => { void saveStoryDraft(draft).catch(() => {}) }, 120)
     return () => window.clearTimeout(timer)
-  }, [userId, file, overlayText, overlayX, overlayY, font, song, storyDuration, textStart, textDuration, songStart, songDuration])
+  }, [userId, file, overlayText, overlayX, overlayY, font, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset])
 
   const onTextPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     dragging.current = true
@@ -176,7 +179,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       title: song.title,
       artist: song.artist,
       artworkUrl: song.artworkUrl,
-      start: 0,
+      start: songOffset,
       duration: Math.min(songDuration, storyDuration - songStart),
       timelineStart: songStart,
       source: song.source || 'Jamendo',
@@ -299,8 +302,9 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
                 <p className="truncate text-sm font-semibold">{song.title}</p>
                 <p className="truncate text-xs text-muted-foreground">{song.artist}</p>
               </div>
+              <button onClick={() => setShowMusicAdjust(true)} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-muted">Adjust</button>
               <button onClick={() => setShowMusicPicker(true)} className="rounded-lg px-2 py-1 text-xs font-medium hover:bg-muted">Change</button>
-              <button onClick={() => setSong(null)} aria-label="Remove song" className="rounded-lg p-2 hover:bg-muted"><X className="h-4 w-4" /></button>
+              <button onClick={() => { setSong(null); setSongOffset(0) }} aria-label="Remove song" className="rounded-lg p-2 hover:bg-muted"><X className="h-4 w-4" /></button>
             </div>
           )}
           {showTextInput && (
@@ -320,7 +324,6 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
             <Button type="button" variant="outline" className="shrink-0" onClick={() => {
               setPreviewElapsed(0)
               setShowPreview(true)
-              if (song && previewAudioRef.current) { previewAudioRef.current.currentTime = 0; void previewAudioRef.current.play().catch(() => {}) }
             }}><Play className="mr-1.5 h-4 w-4" /> Preview</Button>
             <Button className="min-w-0 flex-1 px-3" disabled={createPhotoStory.isPending} onClick={onShare}>
               {createPhotoStory.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Publishing…</> : 'Share'}
@@ -331,7 +334,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
         </div>
       </main>
 
-      {song && <audio ref={previewAudioRef} src={song.previewUrl} className="hidden" />}
+      {song && <audio ref={previewAudioRef} src={song.previewUrl} preload="metadata" className="hidden" />}
       {showPreview && previewUrl && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Story preview">
           <button onClick={() => { setShowPreview(false); previewAudioRef.current?.pause() }} aria-label="Close story preview" className="absolute right-4 top-4 z-10 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"><X className="h-5 w-5" /></button>
@@ -346,7 +349,8 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
           </div>
         </div>
       )}
-      {showMusicPicker && <MusicPicker onSelect={(selected) => { setSong(selected); setSongStart(0); setSongDuration(Math.min(5, storyDuration)); setShowMusicPicker(false) }} onClose={() => setShowMusicPicker(false)} />}
+      {showMusicPicker && <MusicPicker onSelect={(selected) => { setSong(selected); setSongOffset(0); setSongStart(0); setSongDuration(Math.min(5, storyDuration, selected.duration || storyDuration)); setShowMusicPicker(false) }} onClose={() => setShowMusicPicker(false)} />}
+      {showMusicAdjust && song && <MusicAdjustModal song={song} initialStart={songOffset} initialDuration={Math.min(songDuration, storyDuration - songStart)} maxDuration={Math.max(1, storyDuration - songStart)} onClose={() => setShowMusicAdjust(false)} onApply={(sourceStart, clipDuration) => { setSongOffset(sourceStart); setSongDuration(clipDuration); setShowMusicAdjust(false) }} />}
       {showFontPicker && <FontPicker currentFont={font || ''} onSelect={(value) => setFont(value || null)} onCancel={() => setShowFontPicker(false)} onDone={() => setShowFontPicker(false)} />}
       {showAudience && <StoryAudienceModal userId={userId} isPending={createPhotoStory.isPending} confirmLabel="Confirm Share" onClose={() => setShowAudience(false)} onConfirm={confirmShare} />}
     </div>
