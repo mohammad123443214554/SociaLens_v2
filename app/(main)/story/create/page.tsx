@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { CreateStoryModal } from '@/components/stories/CreateStoryModal'
+import { PhotoStoryModal } from '@/components/stories/PhotoStoryModal'
 import { useUser } from '@/lib/hooks/useUser'
 import { Loader2 } from 'lucide-react'
 
@@ -23,8 +23,8 @@ export default function CreateStoryPage() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-4rem)] bg-black">
-      <CreateStoryModal userId={user.id} onClose={() => router.push('/feed')} />
+    <main className="fixed inset-0 z-[100] bg-black">
+      <PhotoStoryModal userId={user.id} onClose={() => router.push('/feed')} onBack={() => router.push('/feed')} />
     </main>
   )
 }
