@@ -275,6 +275,7 @@ export type GlobalMusic = {
   artworkUrl: string
   start: number
   duration: number
+  timelineStart?: number
 }
 
 export type PhotoScene = {
@@ -282,6 +283,8 @@ export type PhotoScene = {
   imageUrl: string
   duration: number
   overlayText?: string
+  overlayStart?: number
+  overlayDuration?: number
   overlayTextColor?: string
   overlayFontFamily?: string
   overlayX: number
