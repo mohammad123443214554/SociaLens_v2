@@ -75,6 +75,7 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null)
   const [globalMusic, setGlobalMusic] = useState<GlobalMusic | null>(null)
   const [globalFont, setGlobalFont] = useState<string | null>(null)
+  const [timelineZoom, setTimelineZoom] = useState(80)
 
   const [editingCaption, setEditingCaption] = useState(false)
 
@@ -419,6 +420,8 @@ export function VideoStoryModal({ userId, onClose, onBack }: VideoStoryModalProp
           activeSceneId={activeSceneId || scenes[0].id}
           onSelectScene={setActiveSceneId}
           onReorderScenes={handleReorderScenes}
+          canvasZoom={timelineZoom}
+          onCanvasZoomChange={setTimelineZoom}
           onAddScene={handleAddScene}
           onResizeScene={() => {}}
           resizable={false}
