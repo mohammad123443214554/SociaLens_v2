@@ -13,6 +13,7 @@ import type { StoryWithProfile } from '@/lib/types/database.types'
 export function MentionedStoryMessages({ userId, otherUserId }: { userId: string; otherUserId: string }) {
   const supabase = createClient()
   const [stories, setStories] = useState<StoryWithProfile[]>([])
+  const [alreadyAddedStoryIds, setAlreadyAddedStoryIds] = useState<Set<string>>(() => new Set())
   const [loading, setLoading] = useState(true)
   const [selectedStory, setSelectedStory] = useState<StoryWithProfile | null>(null)
   const [error, setError] = useState('')
@@ -44,6 +45,9 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
         return
       }
       const byId = new Map(((storyRows || []) as StoryWithProfile[]).map(story => [story.id, story]))
+      const { data: existingReshares } = await supabase.from('stories').select('original_story_id').eq('user_id', userId).in('original_story_id', ids)
+      const alreadyAdded = new Set((existingReshares || []).map(row => row.original_story_id).filter((id): id is string => !!id))
+      if (active) setAlreadyAddedStoryIds(alreadyAdded)
       const now = Date.now()
       const visible = ids.map(id => byId.get(id)).filter((story): story is StoryWithProfile =>
         !!story && story.user_id === otherUserId && new Date(story.expires_at).getTime() > now
@@ -58,6 +62,7 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
     setNotice('')
     try {
       await reshare.mutateAsync({ storyId: story.id, userId, sourceStory: story })
+      setAlreadyAddedStoryIds(previous => new Set(previous).add(story.id))
       setSelectedStory(null)
       setNotice('Added to your story for 24 hours.')
     } catch (cause) {
@@ -105,7 +110,7 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
         })}
         {(notice || actionError) && <p className={`rounded-lg px-3 py-2 text-xs ${actionError ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-600'}`}>{actionError || notice}</p>}
       </div>
-      {selectedStory && <StoryViewer groups={selectedGroup} startGroupIndex={0} currentUserId={userId} onClose={() => setSelectedStory(null)} onAddToMyStory={addToMyStory} isAddingToMyStory={reshare.isPending} showOriginalAttribution />}
+      {selectedStory && <StoryViewer groups={selectedGroup} startGroupIndex={0} currentUserId={userId} onClose={() => setSelectedStory(null)} onAddToMyStory={alreadyAddedStoryIds.has(selectedStory.id) ? undefined : addToMyStory} isAddingToMyStory={reshare.isPending} showOriginalAttribution />}
     </>
   )
 }
