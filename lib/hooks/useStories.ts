@@ -303,7 +303,7 @@ export function useCreateStory() {
         ? { url: globalMusic.url, title: globalMusic.title, artist: globalMusic.artist, artworkUrl: globalMusic.artworkUrl }
         : { url: first?.musicUrl, title: first?.musicTitle, artist: first?.musicArtist, artworkUrl: first?.musicArtworkUrl }
 
-      const { error } = await supabase.from('stories').insert({
+      const { data: createdStory, error } = await supabase.from('stories').insert({
         user_id: userId,
         story_type: 'photo',
         media_url: first?.imageUrl || null,
@@ -324,8 +324,27 @@ export function useCreateStory() {
         visibility_selected_ids: visibility === 'selected' ? (visibilitySelectedIds || []) : [],
         link_url: linkUrl || null,
         link_label: linkLabel || null,
-      })
+      }).select('id').single()
       if (error) throw error
+
+      const mentionRows = uploaded.flatMap(scene => (scene.mentions || []).map(mention => ({
+        story_id: createdStory.id,
+        creator_id: userId,
+        mentioned_user_id: mention.userId,
+        overlay_id: mention.id,
+        username_at_mention: mention.username,
+        x: mention.x,
+        y: mention.y,
+        scale: mention.scale,
+      })))
+      const uniqueMentions = Array.from(new Map(mentionRows.map(mention => [mention.mentioned_user_id, mention])).values())
+      if (uniqueMentions.length) {
+        const { error: mentionError } = await supabase.from('story_mentions').insert(uniqueMentions)
+        if (mentionError) {
+          await supabase.from('stories').delete().eq('id', createdStory.id)
+          throw new Error('Story mention validation failed. Please remove blocked or unavailable mentions and try again.')
+        }
+      }
     },
     onSuccess: (_, { userId }) => invalidate(userId),
   })
@@ -354,7 +373,7 @@ export function useCreateStory() {
         ? { url: globalMusic.url, title: globalMusic.title, artist: globalMusic.artist, artworkUrl: globalMusic.artworkUrl }
         : { url: first?.musicUrl, title: first?.musicTitle, artist: first?.musicArtist, artworkUrl: first?.musicArtworkUrl }
 
-      const { error } = await supabase.from('stories').insert({
+      const { data: createdStory, error } = await supabase.from('stories').insert({
         user_id: userId,
         story_type: 'video',
         media_url: first?.videoUrl || null,
@@ -374,8 +393,27 @@ export function useCreateStory() {
         visibility_selected_ids: visibility === 'selected' ? (visibilitySelectedIds || []) : [],
         link_url: linkUrl || null,
         link_label: linkLabel || null,
-      })
+      }).select('id').single()
       if (error) throw error
+
+      const mentionRows = uploaded.flatMap(scene => (scene.mentions || []).map(mention => ({
+        story_id: createdStory.id,
+        creator_id: userId,
+        mentioned_user_id: mention.userId,
+        overlay_id: mention.id,
+        username_at_mention: mention.username,
+        x: mention.x,
+        y: mention.y,
+        scale: mention.scale,
+      })))
+      const uniqueMentions = Array.from(new Map(mentionRows.map(mention => [mention.mentioned_user_id, mention])).values())
+      if (uniqueMentions.length) {
+        const { error: mentionError } = await supabase.from('story_mentions').insert(uniqueMentions)
+        if (mentionError) {
+          await supabase.from('stories').delete().eq('id', createdStory.id)
+          throw new Error('Story mention validation failed. Please remove blocked or unavailable mentions and try again.')
+        }
+      }
     },
     onSuccess: (_, { userId }) => invalidate(userId),
   })
