@@ -136,7 +136,7 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
               <button type="button" onClick={() => setShowMentionPicker(true)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><AtSign className="h-4 w-4" /> @ Mention</button>
               <button type="button" onClick={() => setEditing(false)} className="flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted">Done editing</button>
             </div>
-          </div>
+          </div>}
           <div className="flex gap-2">
             <Button variant="outline" className="shrink-0" onClick={() => replaceInput.current?.click()}>Replace video</Button>
             <Button type="button" variant="outline" className="shrink-0" onClick={() => { const video = stageRef.current?.querySelector('video'); if (!video) return; if (previewing) { video.pause(); setPreviewing(false) } else { void video.play().then(() => setPreviewing(true)).catch(() => setError('Video preview could not start.')) } }}>{previewing ? 'Pause' : 'Preview'}</Button>
