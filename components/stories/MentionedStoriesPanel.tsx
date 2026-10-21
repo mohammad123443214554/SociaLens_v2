@@ -55,7 +55,7 @@ export function MentionedStoriesPanel({ userId }: { userId: string }) {
   const handleAddToMyStory = async (story: StoryWithProfile) => {
     setActionError('')
     try {
-      await reshare.mutateAsync({ storyId: story.id, userId })
+      await reshare.mutateAsync({ storyId: story.id, userId, sourceStory: story })
       setSelectedStory(null)
       setNotice('Added to your story for 24 hours.')
     } catch (cause) {
