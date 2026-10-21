@@ -38,7 +38,7 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
         return
       }
       const { data: storyRows, error: storyError } = await supabase.from('stories')
-        .select('*, profiles(*)').in('id', ids)
+        .select('*, profiles!stories_user_id_fkey(*)').in('id', ids)
       if (storyError) {
         if (active) { setStories([]); setError('Mentioned media is unavailable right now.'); setLoading(false) }
         return
