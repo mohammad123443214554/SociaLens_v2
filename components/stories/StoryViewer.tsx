@@ -537,21 +537,13 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
             />
           )}
 
-          {displayOverlayText && story.story_type !== 'text' && (
-            <div
-              style={{ left: `${displayOverlayX}%`, top: `${displayOverlayY}%`, transform: 'translate(-50%, -50%)' }}
-              className="absolute max-w-[85%] text-center px-2"
-            >
-              <p
-                className="text-xl font-bold break-words"
-                style={{
-                  ...getTextFillStyle(displayOverlayColor),
-                  textShadow: displayOverlayColor?.startsWith('gradient:') ? undefined : '0 1px 6px rgba(0,0,0,0.6)',
-                  fontFamily: displayOverlayFont ? `'${displayOverlayFont}', sans-serif` : undefined,
-                }}
-              >
-                {displayOverlayText}
-              </p>
+          {activePhotoScene?.overlayTexts?.length && story.story_type !== 'text' ? activePhotoScene.overlayTexts.filter(layer => elapsedSeconds >= (layer.start ?? 0) && elapsedSeconds < (layer.start ?? 0) + (layer.duration ?? totalDuration)).map(layer => (
+            <div key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, transform: 'translate(-50%, -50%)', fontSize: `${20 * layer.scale}px` }} className="absolute max-w-[85%] text-center px-2 font-bold break-words" >
+              <p style={{ ...getTextFillStyle(displayOverlayColor), textShadow: '0 1px 6px rgba(0,0,0,0.6)', fontFamily: displayOverlayFont ? `'${displayOverlayFont}', sans-serif` : undefined }}>{layer.text}</p>
+            </div>
+          )) : displayOverlayText && story.story_type !== 'text' && (
+            <div style={{ left: `${displayOverlayX}%`, top: `${displayOverlayY}%`, transform: 'translate(-50%, -50%)' }} className="absolute max-w-[85%] text-center px-2">
+              <p className="text-xl font-bold break-words" style={{ ...getTextFillStyle(displayOverlayColor), textShadow: displayOverlayColor?.startsWith('gradient:') ? undefined : '0 1px 6px rgba(0,0,0,0.6)', fontFamily: displayOverlayFont ? `'${displayOverlayFont}', sans-serif` : undefined }}>{displayOverlayText}</p>
             </div>
           )}
 
