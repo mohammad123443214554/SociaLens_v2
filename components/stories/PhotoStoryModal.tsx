@@ -193,6 +193,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       overlayX,
       overlayY,
       ...(textLayers[0] ? { overlayText: textLayers[0].text, overlayTexts: textLayers.map(layer => ({ ...layer, start: layer.start, duration: Math.min(layer.duration, storyDuration - layer.start) })), overlayTextColor: textLayers[0].color, overlayFontFamily: font || undefined, overlayX: textLayers[0].x, overlayY: textLayers[0].y, overlayStart: textStart, overlayDuration: Math.min(textDuration, storyDuration - textStart) } : {}),
+    }
     const globalMusic: GlobalMusic | null = song ? {
       url: song.previewUrl,
       title: song.title,
