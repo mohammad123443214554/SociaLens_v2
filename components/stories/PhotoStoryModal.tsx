@@ -68,6 +68,9 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const timelineDrag = useRef<{ kind: 'photo' | 'text' | 'song'; edge: 'start' | 'end' | 'move'; x: number; start: number; duration: number; textId?: string } | null>(null)
   const timelineRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
+  const getSongAvailableDuration = (offset = songOffset) => Math.max(0, (song?.duration || 30) - offset)
+  const getSongClipLimit = (start = songStart, offset = songOffset) => Math.max(1, Math.min(storyDuration - start, getSongAvailableDuration(offset)))
+
   const beginTimelineDrag = (kind: 'photo' | 'text' | 'song', event: React.PointerEvent<HTMLDivElement>) => {
     const textId = kind === 'text' ? (event.target as HTMLElement).closest('[data-text-id]')?.getAttribute('data-text-id') || selectedTextId || textLayers[0]?.id : undefined
     const textLayer = textId ? textLayers.find(layer => layer.id === textId) : undefined
@@ -78,7 +81,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
     timelineDrag.current = {
       kind, edge, x: event.clientX,
       start: kind === 'text' ? (textLayer?.start ?? textStart) : kind === 'song' ? songStart : 0,
-      duration: kind === 'text' ? (textLayer?.duration ?? textDuration) : kind === 'song' ? songDuration : storyDuration,
+      duration: kind === 'text' ? (textLayer?.duration ?? textDuration) : kind === 'song' ? Math.min(songDuration, getSongClipLimit(songStart)) : storyDuration,
       textId,
     }
     row.setPointerCapture(event.pointerId)
@@ -101,7 +104,8 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
     }
     const updateTiming = (start: number, duration: number) => {
       if (kind === 'text' && drag.textId) setTextLayers(items => items.map(layer => layer.id === drag.textId ? { ...layer, start, duration } : layer))
-      else { (kind === 'text' ? setTextStart : setSongStart)(start); (kind === 'text' ? setTextDuration : setSongDuration)(duration) }
+      else if (kind === 'song') { const safeStart = Math.max(0, Math.min(storyDuration - 1, start)); setSongStart(safeStart); setSongDuration(Math.min(duration, getSongClipLimit(safeStart))) }
+      else { setTextStart(start); setTextDuration(duration) }
     }
     if (drag.edge === 'move') {
       updateTiming(Math.max(0, Math.min(storyDuration - drag.duration, Math.round(drag.start + delta))), drag.duration)
@@ -110,7 +114,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       const nextStart = Math.max(0, Math.min(end - 1, Math.round(drag.start + delta)))
       updateTiming(nextStart, end - nextStart)
     } else {
-      updateTiming(drag.start, Math.max(1, Math.min(storyDuration - drag.start, Math.round(drag.duration + delta))))
+      updateTiming(drag.start, Math.max(1, Math.min(kind === 'song' ? getSongClipLimit(drag.start) : storyDuration - drag.start, Math.round(drag.duration + delta))))
     }
   }
 
@@ -358,7 +362,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
                 className={`relative h-[27px] w-full shrink-0 touch-none overflow-hidden rounded-sm bg-muted ${song ? 'cursor-grab' : 'cursor-default opacity-60'}`}
                 aria-label="Music timeline strip"
               >
-                {song && <div className="absolute inset-y-0 rounded-sm bg-emerald-500/90" style={{ left: `${(songStart / 60) * 100}%`, width: `${Math.max(1.5, (Math.min(songDuration, storyDuration - songStart) / 60) * 100)}%` }}>
+                {song && <div className="absolute inset-y-0 rounded-sm bg-emerald-500/90" style={{ left: `${(songStart / 60) * 100}%`, width: `${Math.max(1.5, (Math.min(songDuration, storyDuration - songStart, getSongAvailableDuration()) / 60) * 100)}%` }}>
                   {song && <><span data-edge="start" className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-sm bg-emerald-200/90" /><span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-sm bg-emerald-200/90" /></>}
                 </div>}
                 <span className="pointer-events-none absolute inset-y-0 left-2 z-20 flex items-center text-[11px] font-semibold text-foreground drop-shadow-sm">Music</span>
@@ -423,7 +427,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       {showTextMenu && selectedTextId && <div className="fixed inset-0 z-[160] flex items-start justify-center bg-black/20 p-4 pt-[18vh]" onClick={() => setShowTextMenu(false)}><div role="dialog" aria-modal="true" aria-label="Text options" className="w-full max-w-xs rounded-2xl border border-border bg-card p-4 text-foreground shadow-xl" onClick={event => event.stopPropagation()}><h3 className="text-base font-semibold">Text options</h3><button className="mt-3 flex w-full items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm hover:bg-muted" onClick={() => { const selected = textLayers.find(layer => layer.id === selectedTextId); setColorDraft(selected?.color || '#ffffff'); setShowTextMenu(false); setShowColorPicker(true) }}><span className="h-4 w-4 rounded-full border border-border" style={{ backgroundColor: textLayers.find(layer => layer.id === selectedTextId)?.color || '#ffffff' }} /> Color</button><button className="mt-2 flex w-full items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm hover:bg-muted" onClick={() => { const selected = textLayers.find(layer => layer.id === selectedTextId); if (selected) { const id = makeId(); setTextLayers(items => { const index = items.findIndex(item => item.id === selected.id); const duplicate = { ...selected, id, x: Math.min(92, selected.x + 4), y: Math.min(92, selected.y + 4) }; const nextItems = [...items]; nextItems.splice(index + 1, 0, duplicate); return nextItems }); setSelectedTextId(id) } setShowTextMenu(false) }}><Copy className="h-4 w-4" /> Duplicate</button><button className="mt-2 flex w-full items-center gap-2 rounded-xl border border-red-500/40 px-3 py-2.5 text-sm text-red-500 hover:bg-red-500/10" onClick={() => { setTextLayers(items => items.filter(item => item.id !== selectedTextId)); setSelectedTextId(null); setShowTextMenu(false) }}><Trash2 className="h-4 w-4" /> Delete</button><button className="mt-3 w-full rounded-xl border border-border px-3 py-2.5 text-sm font-medium hover:bg-muted" onClick={() => setShowTextMenu(false)}>Cancel</button></div></div>}
       {showColorPicker && selectedTextId && <div className="fixed inset-0 z-[170] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Choose text color"><div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl"><h3 className="text-lg font-semibold">Custom text color</h3><p className="mt-1 text-sm text-muted-foreground">Choose a color or enter its HEX value.</p><div className="mt-4 flex items-center gap-3"><input aria-label="Choose text color" type="color" value={colorDraft} onChange={event => setColorDraft(event.target.value)} className="h-12 w-14 cursor-pointer rounded-lg border border-border bg-card p-1" /><input aria-label="HEX color" value={colorDraft} onChange={event => { const value = event.target.value; setColorDraft(value.startsWith('#') ? value : '#' + value) }} maxLength={7} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm uppercase" /></div><div className="mt-4 flex gap-2"><button className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted" onClick={() => setShowColorPicker(false)}>Cancel</button><button className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50" disabled={!/^#[0-9a-fA-F]{6}$/.test(colorDraft)} onClick={() => { setTextLayers(items => items.map(layer => layer.id === selectedTextId ? { ...layer, color: colorDraft } : layer)); setShowColorPicker(false) }}>Apply color</button></div></div></div>}
       {showMusicPicker && <MusicPicker onSelect={(selected) => { setSong(selected); setSongOffset(0); setSongStart(0); setSongDuration(Math.min(5, storyDuration, selected.duration || storyDuration)); setShowMusicPicker(false) }} onClose={() => setShowMusicPicker(false)} />}
-      {showMusicAdjust && song && <MusicAdjustModal song={song} initialStart={songOffset} initialDuration={Math.min(songDuration, storyDuration - songStart)} maxDuration={Math.max(1, storyDuration - songStart)} onClose={() => setShowMusicAdjust(false)} onApply={(sourceStart, clipDuration) => { setSongOffset(sourceStart); setSongDuration(clipDuration); setShowMusicAdjust(false) }} />}
+      {showMusicAdjust && song && <MusicAdjustModal song={song} initialStart={songOffset} initialDuration={Math.min(songDuration, storyDuration - songStart, getSongAvailableDuration())} maxDuration={getSongClipLimit(songStart)} onClose={() => setShowMusicAdjust(false)} onApply={(sourceStart, clipDuration) => { setSongOffset(sourceStart); setSongDuration(clipDuration); setShowMusicAdjust(false) }} />}
       {showFontPicker && <FontPicker currentFont={font || ''} onSelect={(value) => setFont(value || null)} onCancel={() => setShowFontPicker(false)} onDone={() => setShowFontPicker(false)} />}
       {showAudience && <StoryAudienceModal userId={userId} isPending={createPhotoStory.isPending} confirmLabel="Confirm Share" onClose={() => setShowAudience(false)} onConfirm={confirmShare} />}
     </div>
