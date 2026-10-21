@@ -252,14 +252,14 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   }
 
   return (
-    <div className="fixed inset-0 z-[120] flex min-h-dvh flex-col bg-background text-foreground">
+    <div className="fixed inset-0 z-[120] flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3 sm:px-5">
         <button onClick={onBack} aria-label="Back to story upload choices" className="rounded-full p-2 hover:bg-muted"><ArrowLeft className="h-5 w-5" /></button>
         <h1 className="text-sm font-semibold sm:text-base">Photo story</h1>
         <button onClick={onClose} aria-label="Close story creator" className="rounded-full p-2 hover:bg-muted"><X className="h-5 w-5" /></button>
       </header>
 
-      <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-auto px-3 py-4 sm:px-6">
+      <main className="min-h-0 flex-1 flex flex-col items-center justify-start gap-4 overflow-y-auto overscroll-y-contain px-3 py-4 touch-pan-y sm:justify-center sm:px-6">
         <div className="flex w-full max-w-3xl flex-col items-center justify-center gap-3 sm:flex-row sm:items-center sm:gap-4">
         <div className="relative flex h-[min(62dvh,680px)] min-h-0 aspect-[9/16] w-auto max-w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl" ref={stageRef}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -386,7 +386,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
             </div>
           )}
           <div className="grid grid-cols-3 gap-2">
-            <button onClick={() => setShowMusicPicker(true)} aria-label={song ? 'Change song' : 'Add song'} className="flex min-h-11 items-center justify-center gap-1 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Music2 className="h-4 w-4 shrink-0" /><span className="sm:hidden">Change</span><span className="hidden sm:inline">{song ? 'Change song' : 'Add Song'}</span></button>
+            <button onClick={() => setShowMusicPicker(true)} aria-label={song ? 'Change song' : 'Add song'} className="flex min-h-11 items-center justify-center gap-1 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Music2 className="h-4 w-4 shrink-0" /><span className="sm:hidden">{song ? 'Change' : 'Song'}</span><span className="hidden sm:inline">{song ? 'Change song' : 'Add Song'}</span></button>
             <button onClick={() => { setTextDraft(''); setShowTextInput(true) }} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Type className="h-4 w-4" /> Add Text</button>
             <button onClick={() => setShowFontPicker(true)} disabled={!overlayText.trim()} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted disabled:opacity-40"><Type className="h-4 w-4" /> Font</button>
           </div>
