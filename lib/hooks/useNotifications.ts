@@ -14,7 +14,7 @@ export interface AppNotification {
     | 'comment_like' | 'comment_react' | 'comment_reply'
     | 'story_like' | 'story_react' | 'story_comment'
     | 'story_comment_like' | 'story_comment_react' | 'story_comment_reply'
-    | 'call' | 'verified'
+    | 'call' | 'verified' | 'story_mention'
   is_read: boolean
   created_at: string
   message: string | null
@@ -50,7 +50,7 @@ export function getNotifText(n: AppNotification): string {
     case 'comment_like': return `liked your comment: "${clip(n.message)}"`
     case 'comment_react': return `reacted ${n.emoji ?? ''} to your comment: "${clip(n.message)}"`
     case 'comment_reply': return `replied to your comment "${clip(n.context_text, 25)}": "${clip(n.message)}"`
-    case 'story_like': return 'liked your story'
+    case 'story_like': return 'liked your story'\n    case 'story_mention': return `mentioned you in their story${n.context_text ? ` (${clip(n.context_text, 24)})` : ''}`
     case 'story_react': return `reacted ${n.emoji ?? ''} to your story`
     case 'story_comment': return `commented on your story: "${clip(n.message)}"`
     case 'story_comment_like': return `liked your story comment: "${clip(n.message)}"`
@@ -70,7 +70,7 @@ export function getNotifLink(n: AppNotification): string {
   switch (n.type) {
     case 'like': case 'comment': case 'new_post': case 'repost':
     case 'comment_like': case 'comment_react': case 'comment_reply':
-    case 'story_like': case 'story_react': case 'story_comment':
+    case 'story_like': case 'story_mention': case 'story_react': case 'story_comment':
     case 'story_comment_like': case 'story_comment_react': case 'story_comment_reply':
       return '/feed'
     case 'follow': case 'unfollow': return `/profile/${n.actor?.username}`
