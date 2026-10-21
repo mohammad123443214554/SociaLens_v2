@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { X, Music, MoreVertical, Heart, MessageCircle, Send, EyeOff, Trash2, Loader2, Eye, Flag, ExternalLink } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl, formatTimeAgo, cn } from '@/lib/utils/helpers'
@@ -30,7 +31,7 @@ import { ReportModal } from '@/components/shared/ReportModal'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import { loadGoogleFont } from '@/lib/utils/googleFonts'
 import { resolveBackgroundCss, getTextFillStyle } from '@/lib/utils/storyStyle'
-import type { TextScene, PhotoScene, VideoScene } from '@/lib/types/database.types'
+import type { TextScene, PhotoScene, VideoScene, StoryWithProfile } from '@/lib/types/database.types'
 
 interface StoryViewerProps {
   groups: StoryGroup[]
@@ -46,6 +47,9 @@ interface StoryViewerProps {
    *  past the very last story of the very last group - lets the caller
    *  chain into the trailing sponsored story instead of just closing. */
   onReachEnd?: () => void
+  /** Optional action used by the mentioned-story inbox popup. */
+  onAddToMyStory?: (story: StoryWithProfile) => void | Promise<void>
+  isAddingToMyStory?: boolean
 }
 
 // Figures out which scene should be showing right now, given how far into
@@ -62,9 +66,12 @@ function getActiveScene<T extends { duration: number }>(scenes: T[] | null, elap
   return scenes[scenes.length - 1]
 }
 
-export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, currentUserId, onClose, onReachEnd }: StoryViewerProps) {
+export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, currentUserId, onClose, onReachEnd, onAddToMyStory, isAddingToMyStory = false }: StoryViewerProps) {
   const { profile } = useUser()
   const router = useRouter()
+  const supabase = createClient()
+  const [originalStoryInfo, setOriginalStoryInfo] = useState<StoryWithProfile | null>(null)
+  const [originalStoryToOpen, setOriginalStoryToOpen] = useState<StoryWithProfile | null>(null)
   const [groupIndex, setGroupIndex] = useState(startGroupIndex)
   const [storyIndex, setStoryIndex] = useState(startStoryIndex)
   const [progress, setProgress] = useState(0)
@@ -97,7 +104,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
   // Anything that opens a panel or has the person actively typing pauses
   // the auto-advance timer/video, same as Instagram.
-  const paused = showMenu || showHideViewers || showDeleteConfirm || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0
+  const paused = showMenu || showHideViewers || showDeleteConfirm || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0 || !!originalStoryToOpen
   const pausedRef = useRef(paused)
   useEffect(() => { pausedRef.current = paused }, [paused])
 
@@ -115,6 +122,15 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   }, [groupIndex, storyIndex])
 
   const { data: mentionRecords = [] } = useStoryMentions(story?.id)
+
+  useEffect(() => {
+    let active = true
+    if (!story?.original_story_id) { setOriginalStoryInfo(null); return }
+    supabase.from('stories').select('*, profiles(*)').eq('id', story.original_story_id).maybeSingle().then(({ data }) => {
+      if (active) setOriginalStoryInfo(data as StoryWithProfile | null)
+    })
+    return () => { active = false }
+  }, [story?.id, story?.original_story_id])
   const { data: likeData } = useStoryLike(story?.id, currentUserId)
   const toggleLike = useToggleStoryLike()
   const { data: myReaction } = useStoryReaction(story?.id, currentUserId)
@@ -619,6 +635,22 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
         <button onClick={goPrevStory} className="absolute left-0 top-0 h-[calc(100%-84px)] w-1/3 z-10" aria-label="Previous story" />
         <button onClick={goNextStory} className="absolute right-0 top-0 h-[calc(100%-84px)] w-2/3 z-10" aria-label="Next story" />
 
+        {story.original_story_id && (
+          <button type="button" onClick={(event) => { event.stopPropagation(); if (originalStoryInfo) setOriginalStoryToOpen(originalStoryInfo) }} disabled={!originalStoryInfo}
+            className="absolute bottom-[88px] left-3 z-30 max-w-[68%] truncate rounded-full border border-white/20 bg-black/65 px-3 py-2 text-left text-[11px] font-semibold text-white shadow-lg backdrop-blur-md disabled:cursor-default disabled:opacity-80"
+            aria-label={originalStoryInfo ? `View original story by @${story.original_story_username || originalStoryInfo.profiles?.username || 'user'}` : 'Original story is no longer available'}>
+            ↗ Original Story by @{story.original_story_username || originalStoryInfo?.profiles?.username || 'user'}
+          </button>
+        )}
+
+        {onAddToMyStory && !isOwn && (
+          <button type="button" onClick={(event) => { event.stopPropagation(); onAddToMyStory(story) }} disabled={isAddingToMyStory}
+            className="absolute bottom-[88px] right-3 z-30 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-xs font-bold text-black shadow-xl transition hover:bg-white/90 disabled:opacity-60">
+            {isAddingToMyStory ? <Loader2 className="h-4 w-4 animate-spin" /> : <span aria-hidden="true">↗</span>}
+            {isAddingToMyStory ? 'Adding…' : 'Add to My Story'}
+          </button>
+        )}
+
         {/* Bottom action bar */}
         <div className="absolute bottom-0 left-0 right-0 z-30 px-3 pb-4 pt-3 bg-gradient-to-t from-black/60 to-transparent">
           {showReactionBar && (
@@ -850,6 +882,9 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
           onCancel={() => setShowDeleteConfirm(false)}
           onConfirm={handleDelete}
         />
+      )}
+      {originalStoryToOpen && (
+        <StoryViewer groups={[{ userId: originalStoryToOpen.user_id, profile: originalStoryToOpen.profiles, stories: [originalStoryToOpen] }]} startGroupIndex={0} currentUserId={currentUserId} onClose={() => setOriginalStoryToOpen(null)} />
       )}
     </div>
   )

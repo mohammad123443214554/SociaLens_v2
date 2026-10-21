@@ -384,6 +384,10 @@ export type Story = {
   link_label: string | null
   created_at: string
   expires_at: string
+  /** Present when this story was added from another user's mentioned story. */
+  original_story_id?: string | null
+  original_story_user_id?: string | null
+  original_story_username?: string | null
 }
 
 export type StoryWithProfile = Story & {

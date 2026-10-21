@@ -13,6 +13,7 @@ import { useBlockedByOthers, useBlockedRelations, useArchiveLockStatus } from '@
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { ChatListItem } from '@/components/chat/ChatListItem'
 import { ArchivePasswordWizard } from '@/components/chat/ArchivePasswordWizard'
+import { MentionedStoriesPanel } from '@/components/chat/MentionedStoriesPanel'
 import type { Chat } from '@/lib/types/database.types'
 
 interface ChatRow extends Chat {
@@ -239,6 +240,8 @@ export default function ChatPage() {
           <p className="text-xs text-muted-foreground truncate mt-0.5">Ask me anything about SociaLens</p>
         </div>
       </Link>
+
+      {user && <MentionedStoriesPanel userId={user.id} />}
 
       {chats.length === 0 ? (
         <div className="text-center py-20 text-muted-foreground">

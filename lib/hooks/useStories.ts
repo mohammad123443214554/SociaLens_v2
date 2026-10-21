@@ -461,6 +461,70 @@ export function useCreateStory() {
   return { createTextStory, createMediaStory, createPhotoStory, createVideoStory }
 }
 
+
+/**
+ * Adds a story that mentioned the current user to their own Story tray.
+ * A database trigger re-validates the mention, visibility, blocks and expiry;
+ * the inserted row receives the normal 24-hour expiry from the database.
+ */
+export function useReshareMentionedStory() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ storyId, userId }: { storyId: string; userId: string }) => {
+      const { data: source, error: sourceError } = await supabase
+        .from('stories').select('*').eq('id', storyId).maybeSingle()
+      if (sourceError) throw sourceError
+      if (!source || new Date(source.expires_at).getTime() <= Date.now()) {
+        throw new Error('This story is no longer available.')
+      }
+
+      const { data: mention, error: mentionError } = await supabase
+        .from('story_mentions').select('id')
+        .eq('story_id', storyId).eq('mentioned_user_id', userId).maybeSingle()
+      if (mentionError) throw mentionError
+      if (!mention) throw new Error('Only a story that mentioned you can be added to your story.')
+
+      const { data: created, error } = await supabase.from('stories').insert({
+        user_id: userId,
+        story_type: source.story_type,
+        media_url: source.media_url,
+        text_content: source.text_content,
+        background_color: source.background_color,
+        overlay_text: source.overlay_text,
+        overlay_x: source.overlay_x,
+        overlay_y: source.overlay_y,
+        music_url: source.music_url,
+        music_title: source.music_title,
+        music_artist: source.music_artist,
+        music_artwork_url: source.music_artwork_url,
+        duration_seconds: source.duration_seconds,
+        text_color: source.text_color,
+        font_family: source.font_family,
+        overlay_text_color: source.overlay_text_color,
+        overlay_font_family: source.overlay_font_family,
+        text_scenes: source.text_scenes,
+        photo_scenes: source.photo_scenes,
+        video_scenes: source.video_scenes,
+        global_music: source.global_music,
+        global_font_family: source.global_font_family,
+        visibility: 'everyone',
+        visibility_selected_ids: [],
+        link_url: source.link_url,
+        link_label: source.link_label,
+        original_story_id: source.id,
+      }).select('id').single()
+      if (error) throw error
+      return created
+    },
+    onSuccess: (_, { userId }) => {
+      queryClient.invalidateQueries({ queryKey: ['active-stories', userId] })
+      queryClient.invalidateQueries({ queryKey: ['mentioned-stories', userId] })
+    },
+  })
+}
+
 export function useDeleteStory() {
   const supabase = createClient()
   const queryClient = useQueryClient()
