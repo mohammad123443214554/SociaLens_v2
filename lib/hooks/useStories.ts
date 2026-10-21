@@ -515,7 +515,12 @@ export function useReshareMentionedStory() {
         link_label: source.link_label,
         original_story_id: source.id,
       }).select('id').single()
-      if (error) throw error
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('You have already added this story to your story.')
+        }
+        throw error
+      }
       return created
     },
     onSuccess: (_, { userId }) => {
