@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { X, Music, MoreVertical, Heart, MessageCircle, Send, Pencil, EyeOff, Trash2, Loader2, Eye, Flag, ExternalLink } from 'lucide-react'
+import { X, Music, MoreVertical, Heart, MessageCircle, Send, EyeOff, Trash2, Loader2, Eye, Flag, ExternalLink } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl, formatTimeAgo, cn } from '@/lib/utils/helpers'
 import { useDeleteStory } from '@/lib/hooks/useStories'
@@ -25,7 +25,6 @@ import {
 import { useCommentThread, countThread } from '@/lib/hooks/useComments'
 import { CommentThread } from '@/components/shared/CommentThread'
 import { useUser } from '@/lib/hooks/useUser'
-import { StoryEditModal } from './StoryEditModal'
 import { StoryHideViewersModal } from './StoryHideViewersModal'
 import { ReportModal } from '@/components/shared/ReportModal'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
@@ -80,7 +79,6 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
   // --- Interaction UI state -------------------------------------------
   const [showMenu, setShowMenu] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
   const [showHideViewers, setShowHideViewers] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showReport, setShowReport] = useState(false)
@@ -99,7 +97,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
   // Anything that opens a panel or has the person actively typing pauses
   // the auto-advance timer/video, same as Instagram.
-  const paused = showMenu || showEditModal || showHideViewers || showDeleteConfirm || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0
+  const paused = showMenu || showHideViewers || showDeleteConfirm || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0
   const pausedRef = useRef(paused)
   useEffect(() => { pausedRef.current = paused }, [paused])
 
@@ -447,12 +445,6 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
                     <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
                     <div className="absolute right-0 top-8 bg-card rounded-xl shadow-xl overflow-hidden w-48 z-30 text-foreground">
                       <button
-                        onClick={() => { setShowMenu(false); setShowEditModal(true) }}
-                        className="w-full flex items-center gap-2.5 px-4 py-3 text-sm hover:bg-muted transition-colors"
-                      >
-                        <Pencil className="h-4 w-4" /> Edit Story
-                      </button>
-                      <button
                         onClick={() => { setShowMenu(false); setShowHideViewers(true) }}
                         className="w-full flex items-center gap-2.5 px-4 py-3 text-sm hover:bg-muted transition-colors"
                       >
@@ -797,9 +789,6 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
         )}
       </div>
 
-      {showEditModal && (
-        <StoryEditModal story={story} onClose={() => setShowEditModal(false)} />
-      )}
       {showHideViewers && (
         <StoryHideViewersModal ownerId={story.user_id} onClose={() => setShowHideViewers(false)} />
       )}
