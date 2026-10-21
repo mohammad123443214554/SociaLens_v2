@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { X, Music, MoreVertical, Heart, MessageCircle, Send, EyeOff, Trash2, Loader2, Eye, Flag, ExternalLink } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl, formatTimeAgo, cn } from '@/lib/utils/helpers'
-import { useDeleteStory } from '@/lib/hooks/useStories'
+import { useDeleteStory, useStoryMentions } from '@/lib/hooks/useStories'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import type { StoryGroup } from '@/lib/hooks/useStories'
 import {
@@ -114,6 +114,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
     setMessageSent(false)
   }, [groupIndex, storyIndex])
 
+  const { data: mentionRecords = [] } = useStoryMentions(story?.id)
   const { data: likeData } = useStoryLike(story?.id, currentUserId)
   const toggleLike = useToggleStoryLike()
   const { data: myReaction } = useStoryReaction(story?.id, currentUserId)
@@ -300,7 +301,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   if (activeFont) loadGoogleFont(activeFont)
   const activeOverlayTexts = activePhotoScene?.overlayTexts ?? activeVideoScene?.overlayTexts ?? []
   activeOverlayTexts.forEach(layer => { if (layer.fontFamily) loadGoogleFont(layer.fontFamily) })
-  const activeMentions = activePhotoScene?.mentions ?? activeVideoScene?.mentions ?? []
+  const activeMentions = mentionRecords
 
   // Play whichever song is active right now. Deliberately keyed on the
   // resolved music URL (not the scene id) - as long as consecutive scenes
