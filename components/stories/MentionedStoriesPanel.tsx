@@ -12,6 +12,7 @@ import type { StoryWithProfile } from '@/lib/types/database.types'
 export function MentionedStoriesPanel({ userId }: { userId: string }) {
   const supabase = createClient()
   const [stories, setStories] = useState<StoryWithProfile[]>([])
+  const [alreadyAddedStoryIds, setAlreadyAddedStoryIds] = useState<Set<string>>(() => new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedStory, setSelectedStory] = useState<StoryWithProfile | null>(null)
@@ -43,6 +44,9 @@ export function MentionedStoriesPanel({ userId }: { userId: string }) {
         return
       }
       const byId = new Map(((rows || []) as StoryWithProfile[]).map(row => [row.id, row]))
+      const { data: existingReshares } = await supabase.from('stories').select('original_story_id').eq('user_id', userId).in('original_story_id', ids)
+      const alreadyAdded = new Set((existingReshares || []).map(row => row.original_story_id).filter((id): id is string => !!id))
+      if (active) setAlreadyAddedStoryIds(alreadyAdded)
       const now = Date.now()
       const visible = ids.map(id => byId.get(id)).filter((story): story is StoryWithProfile =>
         !!story && new Date(story.expires_at).getTime() > now && story.user_id !== userId
@@ -56,6 +60,7 @@ export function MentionedStoriesPanel({ userId }: { userId: string }) {
     setActionError('')
     try {
       await reshare.mutateAsync({ storyId: story.id, userId, sourceStory: story })
+      setAlreadyAddedStoryIds(previous => new Set(previous).add(story.id))
       setSelectedStory(null)
       setNotice('Added to your story for 24 hours.')
     } catch (cause) {
@@ -112,7 +117,7 @@ export function MentionedStoriesPanel({ userId }: { userId: string }) {
       </section>
       {selectedStory && (
         <StoryViewer groups={selectedGroup} startGroupIndex={0} currentUserId={userId} onClose={() => setSelectedStory(null)}
-          onAddToMyStory={handleAddToMyStory} isAddingToMyStory={reshare.isPending} />
+          onAddToMyStory={alreadyAddedStoryIds.has(selectedStory.id) ? undefined : handleAddToMyStory} isAddingToMyStory={reshare.isPending} />
       )}
     </>
   )
