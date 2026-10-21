@@ -109,13 +109,17 @@ security invoker
 set search_path = public
 as $$
 begin
-  if not exists (
+  if exists (
     select 1 from public.notifications n
     where n.user_id = new.mentioned_user_id
       and n.actor_id = new.creator_id
       and n.story_id = new.story_id
       and n.type = 'story_mention'
-  ) and exists (
+  ) then
+    return new;
+  end if;
+
+  if not exists (
     select 1
     from public.stories s
     join public.profiles recipient on recipient.id = new.mentioned_user_id
