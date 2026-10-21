@@ -278,6 +278,11 @@ export type GlobalMusic = {
   timelineStart?: number
   source?: string
   licenseUrl?: string
+  stickerStyle?: 'pill' | 'cover' | 'square' | 'vinyl' | 'waveform'
+  stickerX?: number
+  stickerY?: number
+  stickerScale?: number
+  stickerRotation?: number
 }
 
 export type PhotoScene = {
