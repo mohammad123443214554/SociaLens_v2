@@ -228,10 +228,27 @@ export type Notification = {
   id: string
   user_id: string
   actor_id: string
-  type: 'like' | 'comment' | 'follow' | 'unfollow' | 'message'
+  type: 'like' | 'comment' | 'follow' | 'unfollow' | 'message' | 'story_mention' | string
   message: string | null
   post_id: string | null
+  story_id?: string | null
+  comment_id?: string | null
+  emoji?: string | null
+  context_text?: string | null
   is_read: boolean
+  created_at: string
+}
+
+export type StoryMention = {
+  id: string
+  story_id: string
+  creator_id: string
+  mentioned_user_id: string
+  overlay_id: string
+  username_at_mention: string
+  x: number
+  y: number
+  scale: number
   created_at: string
 }
 
@@ -470,6 +487,7 @@ export type Database = {
       saved_folders: { Row: SavedFolder; Insert: Omit<SavedFolder, 'id' | 'created_at'>; Update: Partial<SavedFolder> }
       saved_posts: { Row: SavedPost; Insert: Omit<SavedPost, 'id' | 'created_at'>; Update: Partial<SavedPost> }
       stories: { Row: Story; Insert: Omit<Story, 'id' | 'created_at' | 'expires_at'> & { id?: string }; Update: Partial<Story> }
+      story_mentions: { Row: StoryMention; Insert: Omit<StoryMention, 'id' | 'created_at'> & { id?: string }; Update: Partial<StoryMention> }
       story_likes: { Row: StoryLike; Insert: Omit<StoryLike, 'id' | 'created_at'>; Update: Partial<StoryLike> }
       story_reactions: { Row: StoryReaction; Insert: Omit<StoryReaction, 'id' | 'created_at'>; Update: Partial<StoryReaction> }
       story_comments: { Row: StoryComment; Insert: Omit<StoryComment, 'id' | 'created_at'>; Update: Partial<StoryComment> }
