@@ -80,6 +80,11 @@ export function StoryHideViewersModal({ ownerId, onClose }: StoryHideViewersModa
           </div>
         </div>
 
+        {toggleHidden.isError && (
+          <p role="alert" className="px-4 py-2 text-sm text-red-500">
+            Couldn't update story privacy. Please try again.
+          </p>
+        )}
         <div className="overflow-y-auto flex-1 p-2">
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No one found.</p>
@@ -89,8 +94,12 @@ export function StoryHideViewersModal({ ownerId, onClose }: StoryHideViewersModa
               return (
                 <button
                   key={p.id}
-                  onClick={() => toggleHidden.mutate({ ownerId, hiddenUserId: p.id, hide: !isHidden })}
-                  className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors"
+                  onClick={() => {
+                    toggleHidden.reset()
+                    toggleHidden.mutate({ ownerId, hiddenUserId: p.id, hide: !isHidden })
+                  }}
+                  disabled={toggleHidden.isPending}
+                  className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors disabled:opacity-60"
                 >
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={getAvatarUrl(p.avatar_url)} />
