@@ -236,19 +236,12 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
         <div className="relative flex h-[min(62dvh,680px)] min-h-0 aspect-[9/16] w-auto max-w-full items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl" ref={stageRef}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={previewUrl} alt="Photo story preview" className="block h-full w-full object-contain" />
-          {overlayText.trim() && (
-            <div
-              onPointerDown={onTextPointerDown}
-              onPointerMove={onTextPointerMove}
-              onPointerUp={() => { dragging.current = false }}
-              onPointerCancel={() => { dragging.current = false }}
-              className="absolute max-w-[86%] cursor-move select-none touch-none rounded-lg px-2 py-1 text-center text-xl font-bold text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.9)]"
-              style={{ left: overlayX + '%', top: overlayY + '%', transform: 'translate(-50%, -50%)', fontFamily: font ? "'" + font + "', sans-serif" : undefined }}
-              aria-label="Story text overlay; drag to reposition"
-            >
-              {overlayText}
+          {textLayers.map(layer => (
+            <div key={layer.id} onPointerDown={event => { setSelectedTextId(layer.id); dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId) }} onPointerMove={event => { if (!dragging.current || !stageRef.current) return; const rect = stageRef.current.getBoundingClientRect(); const x = Math.min(92, Math.max(8, ((event.clientX - rect.left) / rect.width) * 100)); const y = Math.min(92, Math.max(8, ((event.clientY - rect.top) / rect.height) * 100)); setTextLayers(items => items.map(item => item.id === layer.id ? { ...item, x, y } : item)); setOverlayX(x); setOverlayY(y) }} onPointerUp={() => { dragging.current = false }} onPointerCancel={() => { dragging.current = false }} onClick={() => setSelectedTextId(layer.id)} className={"absolute max-w-[86%] cursor-move select-none touch-none rounded-sm px-2 py-1 text-center font-bold text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.9)] " + (selectedTextId === layer.id ? "outline outline-1 outline-white outline-offset-2" : "")} style={{ left: layer.x + '%', top: layer.y + '%', transform: 'translate(-50%, -50%)', fontSize: (20 * layer.scale) + 'px', fontFamily: font ? "'" + font + "', sans-serif" : undefined }} aria-label="Story text; drag to move and resize">
+              {layer.text}
+              {selectedTextId === layer.id && <button type="button" aria-label="Resize text" onPointerDown={event => { event.stopPropagation(); setResizeDrag({ id: layer.id, startX: event.clientX, scale: layer.scale }); event.currentTarget.setPointerCapture(event.pointerId) }} onPointerMove={event => { if (!resizeDrag || resizeDrag.id !== layer.id) return; const scale = Math.max(0.55, Math.min(3, resizeDrag.scale + (event.clientX - resizeDrag.startX) / 100)); setTextLayers(items => items.map(item => item.id === layer.id ? { ...item, scale } : item)) }} onPointerUp={() => setResizeDrag(null)} onPointerCancel={() => setResizeDrag(null)} className="absolute -bottom-2 -right-2 h-4 w-4 touch-none rounded-full border-2 border-white bg-pink-500 shadow" />}
             </div>
-          )}
+          ))}
         </div>
 
         <div className="w-full max-w-lg space-y-3">
