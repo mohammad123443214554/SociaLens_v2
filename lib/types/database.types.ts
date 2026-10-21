@@ -285,6 +285,7 @@ export type PhotoScene = {
   imageUrl: string
   duration: number
   overlayText?: string
+  overlayTexts?: Array<{ id: string; text: string; x: number; y: number; scale: number; start?: number; duration?: number }>
   overlayStart?: number
   overlayDuration?: number
   overlayTextColor?: string
