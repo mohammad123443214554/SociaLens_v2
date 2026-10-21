@@ -358,7 +358,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       </header>
 
       <main className="min-h-0 flex-1 flex flex-col items-center justify-start gap-4 overflow-y-auto overscroll-y-contain px-3 py-4 touch-pan-y sm:justify-center sm:px-6">
-        <div className="flex w-full max-w-3xl flex-col items-center justify-center gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex w-full max-w-5xl flex-col items-center justify-center gap-4 sm:flex-row sm:items-center sm:justify-center sm:gap-5 lg:gap-6">
         {song && lyricsData && (
           <aside aria-label="Lyrics display options" className="order-2 w-full max-w-[min(100%,28rem)] shrink-0 rounded-xl border border-border bg-card p-3 sm:order-1 sm:w-44 sm:max-w-44">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><Languages className="h-4 w-4" /> Lyrics</div>
@@ -423,7 +423,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
           )}
         </div>
         {song && (
-          <aside aria-label="Song sticker styles" className="w-full max-w-[min(100%,28rem)] sm:w-40 sm:max-w-40">
+          <aside aria-label="Song sticker styles" className="order-3 w-full max-w-[min(100%,28rem)] sm:order-3 sm:w-40 sm:max-w-40">
             <p className="mb-2 text-center text-xs font-semibold text-muted-foreground sm:text-left">Song tag style</p>
             <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-col sm:overflow-visible">
               {SONG_STICKER_OPTIONS.map(option => (
