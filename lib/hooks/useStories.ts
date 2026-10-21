@@ -472,11 +472,12 @@ export function useReshareMentionedStory() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ storyId, userId }: { storyId: string; userId: string }) => {
-      const { data: source, error: sourceError } = await supabase
-        .from('stories').select('*').eq('id', storyId).maybeSingle()
-      if (sourceError) throw sourceError
-      if (!source || new Date(source.expires_at).getTime() <= Date.now()) {
+    mutationFn: async ({ storyId, userId, sourceStory }: { storyId: string; userId: string; sourceStory: StoryWithProfile }) => {
+      // Reuse the story already loaded by the viewer instead of fetching the
+      // same row again. The database trigger remains the final authority for
+      // source-story validity, expiry, visibility, blocks and mention status.
+      const source = sourceStory
+      if (source.id !== storyId || new Date(source.expires_at).getTime() <= Date.now()) {
         throw new Error('This story is no longer available.')
       }
 
