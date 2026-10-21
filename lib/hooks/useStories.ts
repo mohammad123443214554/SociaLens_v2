@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { StoryWithProfile, TextScene, PhotoScene, VideoScene, GlobalMusic, StoryVisibility, StoryHiddenViewer } from '@/lib/types/database.types'
+import { StoryWithProfile, TextScene, PhotoScene, VideoScene, GlobalMusic, StoryVisibility, StoryHiddenViewer, StoryMentionOverlay } from '@/lib/types/database.types'
 import { compressImageIfNeeded, LONG_CACHE_CONTROL } from '@/lib/utils/imageCompression'
 
 export interface StoryGroup {
@@ -134,6 +134,46 @@ export function useActiveStories(userId?: string) {
     },
     enabled: !!userId,
     staleTime: 30000,
+  })
+}
+
+// Only server-validated mention records are used to render tappable mentions in published Stories.
+export function useStoryMentions(storyId?: string) {
+  const supabase = createClient()
+  return useQuery({
+    queryKey: ['story-mentions', storyId],
+    enabled: !!storyId,
+    staleTime: 30000,
+    queryFn: async (): Promise<StoryMentionOverlay[]> => {
+      if (!storyId) return []
+      const { data: rows, error } = await supabase
+        .from('story_mentions')
+        .select('id, story_id, creator_id, mentioned_user_id, overlay_id, username_at_mention, x, y, scale, created_at')
+        .eq('story_id', storyId)
+      if (error) throw error
+      if (!rows?.length) return []
+      const userIds = Array.from(new Set(rows.map(row => row.mentioned_user_id)))
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, avatar_url')
+        .in('id', userIds)
+      if (profileError) throw profileError
+      const profileById = new Map((profiles || []).map(profile => [profile.id, profile]))
+      return rows.flatMap(row => {
+        const profile = profileById.get(row.mentioned_user_id)
+        if (!profile) return []
+        return [{
+          id: row.overlay_id || row.id,
+          userId: row.mentioned_user_id,
+          username: profile.username || row.username_at_mention,
+          fullName: profile.full_name,
+          avatarUrl: profile.avatar_url,
+          x: row.x,
+          y: row.y,
+          scale: row.scale,
+        }]
+      })
+    },
   })
 }
 
