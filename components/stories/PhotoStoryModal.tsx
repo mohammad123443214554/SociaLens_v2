@@ -109,12 +109,12 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const lyricsAtTime = lyricsData?.synced.filter(line => line.time <= Math.max(0, previewElapsed - songStart + songOffset)) || []
   const activeLyricsIndex = Math.max(0, lyricsAtTime.length - 1)
   const karaokeLineCount = 4
-  const formatKaraokeLine = (text: string, wordsPerLine: number) => { const words = text.trim().split(/\\s+/); const chunks: string[] = []; for (let index = 0; index < words.length; index += wordsPerLine) chunks.push(words.slice(index, index + wordsPerLine).join(' ')); return chunks.join('\\n') }
+  const formatKaraokeLine = (text: string, wordsPerLine: number) => { const words = text.trim().split(/\s+/); const chunks: string[] = []; for (let index = 0; index < words.length; index += wordsPerLine) chunks.push(words.slice(index, index + wordsPerLine).join(' ')); return chunks.join('\n') }
   const visibleKaraokeLines = lyricsData?.synced.slice(Math.max(0, activeLyricsIndex - karaokeLineCount + 1), activeLyricsIndex + 1) || []
   const displayLyricsText = lyricsMode === 'english'
-    ? lyricsData?.plain.split(/\\r?\\n/).filter(line => /[A-Za-z]/.test(line)).join('\\n')
+    ? lyricsData?.plain.split(/\r?\n/).filter(line => /[A-Za-z]/.test(line)).join('\n')
     : lyricsMode === 'hindi'
-      ? lyricsData?.plain.split(/\\r?\\n/).filter(line => /[\\u0900-\\u097F]/.test(line)).join('\\n')
+      ? lyricsData?.plain.split(/\r?\n/).filter(line => /[\u0900-\u097F]/.test(line)).join('\n')
       : ''
 
   const getSongAvailableDuration = (offset = songOffset) => Math.max(0, (song?.duration || 30) - offset)
