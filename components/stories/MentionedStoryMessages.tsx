@@ -64,7 +64,7 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
       await reshare.mutateAsync({ storyId: story.id, userId, sourceStory: story })
       setAlreadyAddedStoryIds(previous => new Set(previous).add(story.id))
       setSelectedStory(null)
-      setNotice('Added to your story for 24 hours.')
+      setNotice('Successful Added')
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : 'Could not add this story.')
     }
