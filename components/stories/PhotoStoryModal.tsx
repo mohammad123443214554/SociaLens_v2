@@ -63,6 +63,8 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const [lyricsData, setLyricsData] = useState<LyricsData | null>(null)
   const [lyricsMode, setLyricsMode] = useState<LyricsMode>('off')
   const [lyricsLoading, setLyricsLoading] = useState(false)
+  const [lyricsBox, setLyricsBox] = useState({ x: 50, y: 70, width: 82, height: 26 })
+  const lyricsBoxDrag = useRef<{ mode: 'move' | 'resize'; pointerX: number; pointerY: number; x: number; y: number; width: number; height: number } | null>(null)
   const [storyDuration, setStoryDuration] = useState(initialDraft?.photo?.storyDuration ?? 5)
   const [textStart, setTextStart] = useState(initialDraft?.photo?.textStart ?? 0)
   const [textDuration, setTextDuration] = useState(initialDraft?.photo?.textDuration ?? 5)
@@ -116,6 +118,27 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
     : lyricsMode === 'hindi'
       ? lyricsData?.plain.split(/\r?\n/).filter(line => /[\u0900-\u097F]/.test(line)).join('\n')
       : ''
+
+  const beginLyricsBoxDrag = (event: React.PointerEvent<HTMLDivElement>, mode: 'move' | 'resize') => {
+    if (lyricsMode === 'off' || !displayLyricsText && !visibleKaraokeLines.length) return
+    event.preventDefault()
+    event.stopPropagation()
+    lyricsBoxDrag.current = { mode, pointerX: event.clientX, pointerY: event.clientY, ...lyricsBox }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+  const moveLyricsBoxDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = lyricsBoxDrag.current
+    const rect = stageRef.current?.getBoundingClientRect()
+    if (!drag || !rect) return
+    const dx = (event.clientX - drag.pointerX) / rect.width * 100
+    const dy = (event.clientY - drag.pointerY) / rect.height * 100
+    if (drag.mode === 'move') {
+      setLyricsBox(value => ({ ...value, x: Math.max(value.width / 2 + 2, Math.min(98 - value.width / 2, drag.x + dx)), y: Math.max(value.height / 2 + 2, Math.min(98 - value.height / 2, drag.y + dy)) }))
+    } else {
+      setLyricsBox(value => ({ ...value, width: Math.max(30, Math.min(96, drag.width + dx)), height: Math.max(12, Math.min(65, drag.height + dy)) }))
+    }
+  }
+  const endLyricsBoxDrag = () => { lyricsBoxDrag.current = null }
 
   const getSongAvailableDuration = (offset = songOffset) => Math.max(0, (song?.duration || 30) - offset)
   const getSongClipLimit = (start = songStart, offset = songOffset) => Math.max(1, Math.min(storyDuration - start, getSongAvailableDuration(offset)))
@@ -351,15 +374,23 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
         <div className="order-1 relative flex h-[min(62dvh,680px)] sm:order-2 min-h-0 aspect-[9/16] w-auto max-w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl" ref={stageRef}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={previewUrl} alt="Photo story preview" className="block h-full w-full object-contain" />
-          {song && lyricsData && lyricsMode === 'english' && displayLyricsText && (
-            <div aria-label="Song lyrics" className="pointer-events-none absolute inset-x-3 bottom-[12%] z-10 max-h-[34%] overflow-hidden rounded-xl bg-black/55 px-3 py-2 text-center text-sm font-semibold leading-6 text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] whitespace-pre-line">{displayLyricsText}</div>
-          )}
-          {song && lyricsData && lyricsMode === 'hindi' && displayLyricsText && (
-            <div aria-label="Song lyrics" className="pointer-events-none absolute inset-x-3 bottom-[12%] z-10 max-h-[34%] overflow-hidden rounded-xl bg-black/55 px-3 py-2 text-center text-sm font-semibold leading-6 text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] whitespace-pre-line">{displayLyricsText}</div>
-          )}
-          {song && lyricsData?.hasSynced && (lyricsMode === 'karaoke-short' || lyricsMode === 'karaoke-long') && visibleKaraokeLines.length > 0 && (
-            <div aria-label="Synchronized karaoke lyrics" className="pointer-events-none absolute inset-x-3 bottom-[12%] z-10 flex max-h-[30%] flex-col justify-end overflow-hidden rounded-xl bg-black/40 px-3 py-2 text-center text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
-              {visibleKaraokeLines.map((line, index) => <p key={line.time + '-' + index} className="animate-[lyricsRise_500ms_ease-out] whitespace-pre-line text-sm font-semibold leading-6" style={{ opacity: index === visibleKaraokeLines.length - 1 ? 1 : 0.58 }}>{formatKaraokeLine(line.text, lyricsMode === 'karaoke-short' ? 3 : 9)}</p>)}
+          {song && lyricsData && lyricsMode !== 'off' && (displayLyricsText || visibleKaraokeLines.length > 0) && (
+            <div
+              aria-label="Draggable and resizable song lyrics"
+              onPointerDown={event => beginLyricsBoxDrag(event, 'move')}
+              onPointerMove={moveLyricsBoxDrag}
+              onPointerUp={endLyricsBoxDrag}
+              onPointerCancel={endLyricsBoxDrag}
+              className="absolute z-10 flex cursor-move touch-none select-none flex-col justify-end overflow-hidden rounded-xl border border-white/30 bg-black/55 px-3 py-2 text-center font-semibold leading-6 text-white shadow-lg backdrop-blur-[2px] [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]"
+              style={{ left: lyricsBox.x + '%', top: lyricsBox.y + '%', width: lyricsBox.width + '%', height: lyricsBox.height + '%', transform: 'translate(-50%, -50%)', transition: lyricsBoxDrag.current ? 'none' : 'left 80ms linear, top 80ms linear, width 100ms ease, height 100ms ease' }}
+            >
+              {lyricsMode === 'english' || lyricsMode === 'hindi'
+                ? <p className="h-full overflow-hidden whitespace-pre-line text-sm">{displayLyricsText}</p>
+                : visibleKaraokeLines.map((line, index) => <p key={line.time + '-' + index} className="animate-[lyricsRise_500ms_ease-out] whitespace-pre-line text-sm font-semibold leading-5" style={{ opacity: index === visibleKaraokeLines.length - 1 ? 1 : 0.58 }}>{formatKaraokeLine(line.text, lyricsMode === 'karaoke-short' ? 3 : 9)}</p>)}
+              <div className="absolute bottom-1 right-1 flex items-center gap-1">
+                <span className="rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-medium">Drag to move</span>
+                <div role="button" tabIndex={0} aria-label="Resize lyrics box" title="Drag to resize lyrics" onPointerDown={event => beginLyricsBoxDrag(event, 'resize')} onPointerMove={moveLyricsBoxDrag} onPointerUp={endLyricsBoxDrag} onPointerCancel={endLyricsBoxDrag} onKeyDown={event => { if (event.key === 'ArrowRight') setLyricsBox(value => ({ ...value, width: Math.min(96, value.width + 2) })); if (event.key === 'ArrowLeft') setLyricsBox(value => ({ ...value, width: Math.max(30, value.width - 2) })); if (event.key === 'ArrowDown') setLyricsBox(value => ({ ...value, height: Math.min(65, value.height + 2) })); if (event.key === 'ArrowUp') setLyricsBox(value => ({ ...value, height: Math.max(12, value.height - 2) })) }} className="h-4 w-4 cursor-nwse-resize touch-none rounded-sm border border-white/80 bg-white/30" />
+              </div>
             </div>
           )}
           {textLayers.map(layer => (
