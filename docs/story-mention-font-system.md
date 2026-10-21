@@ -26,7 +26,7 @@
 - Published mention records are written to `public.story_mentions`; RLS requires the authenticated story owner, an active owned Story, a valid non-suspended account and no block relationship. Unique `(story_id, mentioned_user_id)` prevents duplicate mention records.
 - The Story viewer fetches validated mention rows through `useStoryMentions`, resolves the current username/profile, and renders a profile link that stops pointer/click propagation so Story navigation is not triggered.
 - A database trigger creates `story_mention` notifications after mention rows are inserted. It checks active Story state, blocks, private-account follow state, Story audience, muted notifications, post-notification preferences, and selected notification senders. Existing notification types were retained in the check constraint.
-- Mention rows cascade with Story deletion. RLS prevents reading mention records for expired or inaccessible Stories.
+- Mention rows cascade with Story deletion. RLS prevents reading mention records for expired or inaccessible Stories and rejects anonymous-auth sessions.
 
 ## Supabase migrations
 
@@ -34,6 +34,7 @@
 - `20261022162000_allow_story_mentions_outside_audience.sql`
 - `20261022164000_enforce_story_mention_notification_privacy.sql`
 - `20261022170000_respect_story_mention_notification_preferences.sql`
+- `20261022172000_require_registered_users_for_story_mentions.sql`
 
 These migrations were applied to the connected SociaLens Supabase project and the mention table's RLS/policies, notification type constraint and trigger were read back for verification.
 
