@@ -315,7 +315,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
             </div>
           )}
           <div className="grid grid-cols-3 gap-2">
-            <button onClick={() => setShowMusicPicker(true)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Music2 className="h-4 w-4" /> {song ? 'Change song' : 'Add Song'}</button>
+            <button onClick={() => setShowMusicPicker(true)} aria-label={song ? 'Change song' : 'Add song'} className="flex min-h-11 items-center justify-center gap-1 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Music2 className="h-4 w-4 shrink-0" /><span className="sm:hidden">Change</span><span className="hidden sm:inline">{song ? 'Change song' : 'Add Song'}</span></button>
             <button onClick={() => setShowTextInput(true)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Type className="h-4 w-4" /> Add Text</button>
             <button onClick={() => setShowFontPicker(true)} disabled={!overlayText.trim()} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted disabled:opacity-40"><Type className="h-4 w-4" /> Font</button>
           </div>
