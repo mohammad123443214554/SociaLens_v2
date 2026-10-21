@@ -348,7 +348,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
             </div>
           </aside>
         )}
-        <div className="relative flex h-[min(62dvh,680px)] min-h-0 aspect-[9/16] w-auto max-w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl" ref={stageRef}>
+        <div className="order-1 relative flex h-[min(62dvh,680px)] sm:order-2 min-h-0 aspect-[9/16] w-auto max-w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl" ref={stageRef}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={previewUrl} alt="Photo story preview" className="block h-full w-full object-contain" />
           {song && lyricsData && lyricsMode === 'english' && displayLyricsText && (
