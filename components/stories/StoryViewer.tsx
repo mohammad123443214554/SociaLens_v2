@@ -298,6 +298,9 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   // once per font, cached after that - see loadGoogleFont).
   const activeFont = story.story_type === 'text' ? displayFont : (story.story_type === 'photo' || story.story_type === 'video' ? displayOverlayFont : story.overlay_font_family)
   if (activeFont) loadGoogleFont(activeFont)
+  const activeOverlayTexts = activePhotoScene?.overlayTexts ?? activeVideoScene?.overlayTexts ?? []
+  activeOverlayTexts.forEach(layer => { if (layer.fontFamily) loadGoogleFont(layer.fontFamily) })
+  const activeMentions = activePhotoScene?.mentions ?? activeVideoScene?.mentions ?? []
 
   // Play whichever song is active right now. Deliberately keyed on the
   // resolved music URL (not the scene id) - as long as consecutive scenes
@@ -529,9 +532,9 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
             />
           )}
 
-          {activePhotoScene?.overlayTexts?.length && story.story_type !== 'text' ? activePhotoScene.overlayTexts.filter(layer => elapsedSeconds >= (layer.start ?? 0) && elapsedSeconds < (layer.start ?? 0) + (layer.duration ?? totalDuration)).map(layer => (
-            <div key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, transform: `translate(-50%, -50%) rotate(${layer.rotation ?? 0}deg)`, fontSize: `${20 * layer.scale}px`, color: layer.color || undefined }} className="absolute max-w-[85%] text-center px-2 font-bold break-words" >
-              <p style={{ ...(layer.color ? { color: layer.color } : getTextFillStyle(displayOverlayColor)), textShadow: '0 1px 6px rgba(0,0,0,0.6)', fontFamily: displayOverlayFont ? `'${displayOverlayFont}', sans-serif` : undefined }}>{layer.text}</p>
+          {activeOverlayTexts.length > 0 && story.story_type !== 'text' ? activeOverlayTexts.filter(layer => story.story_type === 'video' || (elapsedSeconds >= (layer.start ?? 0) && elapsedSeconds < (layer.start ?? 0) + (layer.duration ?? totalDuration))).map(layer => (
+            <div key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, transform: `translate(-50%, -50%) rotate(${layer.rotation ?? 0}deg)`, fontSize: `${20 * layer.scale}px`, color: layer.color || undefined, pointerEvents: 'none' }} className="absolute max-w-[85%] px-2 text-center font-bold break-words">
+              <p style={{ ...(layer.color ? { color: layer.color } : getTextFillStyle(displayOverlayColor)), textShadow: '0 1px 6px rgba(0,0,0,0.6)', fontFamily: layer.fontFamily !== undefined ? (layer.fontFamily ? `'${layer.fontFamily}', sans-serif` : undefined) : (displayOverlayFont ? `'${displayOverlayFont}', sans-serif` : undefined) }}>{layer.text}</p>
             </div>
           )) : displayOverlayText && story.story_type !== 'text' && (
             <div style={{ left: `${displayOverlayX}%`, top: `${displayOverlayY}%`, transform: 'translate(-50%, -50%)' }} className="absolute max-w-[85%] text-center px-2">
@@ -539,6 +542,12 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
             </div>
           )}
 
+          {activeMentions.map(mention => (
+            <button key={mention.id} type="button" onPointerDown={event => { event.stopPropagation() }} onClick={event => { event.stopPropagation(); router.push(`/profile/${encodeURIComponent(mention.username)}`) }} aria-label={`Open @${mention.username}'s profile`} className="absolute z-20 flex max-w-[88%] items-center gap-2 rounded-full border border-white/50 bg-black/75 px-3 py-2 text-left text-white shadow-lg backdrop-blur-sm hover:bg-black/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400" style={{ left: `${mention.x}%`, top: `${mention.y}%`, transform: `translate(-50%, -50%) scale(${mention.scale})` }}>
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-pink-500/25 text-xs font-bold text-pink-100">@</span>
+              <span className="max-w-40 truncate text-sm font-semibold">@{mention.username}</span>
+            </button>
+          ))}
           {activeMusicTitle && (
             <div
               className="absolute z-10 max-w-[88%]"
