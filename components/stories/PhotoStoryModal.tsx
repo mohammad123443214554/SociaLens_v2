@@ -193,29 +193,6 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       overlayX,
       overlayY,
       ...(textLayers[0] ? { overlayText: textLayers[0].text, overlayTexts: textLayers.map(layer => ({ ...layer, start: layer.start, duration: Math.min(layer.duration, storyDuration - layer.start) })), overlayTextColor: textLayers[0].color, overlayFontFamily: font || undefined, overlayX: textLayers[0].x, overlayY: textLayers[0].y, overlayStart: textStart, overlayDuration: Math.min(textDuration, storyDuration - textStart) } : {}),
-      ...(song && lyricsData && (lyricsMode === 'english' || lyricsMode === 'hindi') && displayLyricsText ? {
-        overlayTexts: [
-          ...textLayers.map(layer => ({ ...layer, start: layer.start, duration: Math.min(layer.duration, storyDuration - layer.start) })),
-          { id: 'lyrics-static', text: displayLyricsText, x: 50, y: 78, scale: 0.62, rotation: 0, color: '#ffffff', start: songStart, duration: Math.min(songDuration, storyDuration - songStart) },
-        ],
-      } : {}),
-      ...(song && lyricsData?.hasSynced && (lyricsMode === 'karaoke-short' || lyricsMode === 'karaoke-long') ? {
-        overlayTexts: [
-          ...textLayers.map(layer => ({ ...layer, start: layer.start, duration: Math.min(layer.duration, storyDuration - layer.start) })),
-          ...lyricsData.synced.filter(line => line.time >= songOffset && line.time < songOffset + Math.min(songDuration, storyDuration - songStart)).map((line, index, lines) => ({
-            id: 'lyrics-' + index,
-            text: formatKaraokeLine(line.text, lyricsMode === 'karaoke-short' ? 3 : 9),
-            x: 50,
-            y: 68 + (index % 4) * 5,
-            scale: lyricsMode === 'karaoke-short' ? 0.8 : 0.72,
-            rotation: 0,
-            color: '#ffffff',
-            start: songStart + Math.max(0, line.time - songOffset),
-            duration: Math.max(0.15, Math.min((lines[index + 1]?.time ?? (songOffset + songDuration)) - line.time, songOffset + songDuration - line.time)),
-          })),
-        ],
-      } : {}),
-    }
     const globalMusic: GlobalMusic | null = song ? {
       url: song.previewUrl,
       title: song.title,
