@@ -52,8 +52,7 @@ export async function GET(request: NextRequest) {
         const normalize = (value: string) => value.toLocaleLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
         const expectedTitle = normalize(title)
         const expectedArtist = normalize(artist)
-        record = matches.find(item => normalize(item.trackName || '') === expectedTitle && normalize(item.artistName || '').includes(expectedArtist))
-          || matches.find(item => normalize(item.trackName || '') === expectedTitle)
+        record = matches.find(item => normalize(item.trackName || '') === expectedTitle && normalize(item.artistName || '') === expectedArtist)
           || null
       }
     }
