@@ -21,6 +21,14 @@ interface PhotoStoryModalProps {
 
 const makeId = () => Math.random().toString(36).slice(2, 10)
 type StoryTextLayer = { id: string; text: string; x: number; y: number; scale: number; rotation: number; color: string; start: number; duration: number }
+type SongStickerStyle = 'pill' | 'cover' | 'square' | 'vinyl' | 'waveform'
+const SONG_STICKER_OPTIONS: { id: SongStickerStyle; label: string; description: string }[] = [
+  { id: 'pill', label: 'Classic', description: 'Rounded music tag' },
+  { id: 'cover', label: 'Cover bar', description: 'Artwork with title' },
+  { id: 'square', label: 'Album card', description: 'Square artwork card' },
+  { id: 'vinyl', label: 'Vinyl', description: 'Record-inspired tag' },
+  { id: 'waveform', label: 'Waveform', description: 'Wide music strip' },
+]
 
 export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialDraft }: PhotoStoryModalProps) {
   const [file, setFile] = useState<File | null>(initialFile || null)
@@ -42,6 +50,12 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const [showMusicPicker, setShowMusicPicker] = useState(false)
   const [song, setSong] = useState<SelectedSong | null>(initialDraft?.photo?.song ?? null)
   const [songOffset, setSongOffset] = useState(initialDraft?.photo?.songOffset ?? 0)
+  const [songStickerStyle, setSongStickerStyle] = useState<SongStickerStyle>((initialDraft?.photo as any)?.songStickerStyle || 'pill')
+  const [songStickerX, setSongStickerX] = useState<number>((initialDraft?.photo as any)?.songStickerX ?? 50)
+  const [songStickerY, setSongStickerY] = useState<number>((initialDraft?.photo as any)?.songStickerY ?? 82)
+  const [songStickerScale, setSongStickerScale] = useState<number>((initialDraft?.photo as any)?.songStickerScale ?? 1)
+  const [songStickerRotation, setSongStickerRotation] = useState<number>((initialDraft?.photo as any)?.songStickerRotation ?? 0)
+  const songStickerDragging = useRef(false)
   const [showMusicAdjust, setShowMusicAdjust] = useState(false)
   const [storyDuration, setStoryDuration] = useState(initialDraft?.photo?.storyDuration ?? 5)
   const [textStart, setTextStart] = useState(initialDraft?.photo?.textStart ?? 0)
@@ -154,12 +168,12 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
     if (!file) return
     const draft: StoryDraftRecord = {
       userId, kind: 'photo', file, fileName: file.name, fileType: file.type, lastModified: file.lastModified,
-      photo: { overlayText, overlayX, overlayY, font, textLayers, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset },
+      photo: { overlayText, overlayX, overlayY, font, textLayers, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset, songStickerStyle, songStickerX, songStickerY, songStickerScale, songStickerRotation },
       updatedAt: Date.now(),
     }
     const timer = window.setTimeout(() => { void saveStoryDraft(draft).catch(() => {}) }, 120)
     return () => window.clearTimeout(timer)
-  }, [userId, file, overlayText, overlayX, overlayY, font, textLayers, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset])
+  }, [userId, file, overlayText, overlayX, overlayY, font, textLayers, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset, songStickerStyle, songStickerX, songStickerY, songStickerScale, songStickerRotation])
 
   const onTextPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     dragging.current = true
@@ -197,6 +211,11 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       timelineStart: songStart,
       source: song.source || 'Jamendo',
       licenseUrl: song.licenseUrl || undefined,
+      stickerStyle: songStickerStyle,
+      stickerX: songStickerX,
+      stickerY: songStickerY,
+      stickerScale: songStickerScale,
+      stickerRotation: songStickerRotation,
     } : null
     try {
       await createPhotoStory.mutateAsync({
@@ -241,7 +260,8 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-auto px-3 py-4 sm:px-6">
-        <div className="relative flex h-[min(62dvh,680px)] min-h-0 aspect-[9/16] w-auto max-w-full items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl" ref={stageRef}>
+        <div className="flex w-full max-w-3xl flex-col items-center justify-center gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="relative flex h-[min(62dvh,680px)] min-h-0 aspect-[9/16] w-auto max-w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl" ref={stageRef}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={previewUrl} alt="Photo story preview" className="block h-full w-full object-contain" />
           {textLayers.map(layer => (
@@ -252,6 +272,41 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
               {selectedTextId === layer.id && <button type="button" aria-label="Resize text" onPointerDown={event => { event.stopPropagation(); setResizeDrag({ id: layer.id, startX: event.clientX, scale: layer.scale }); event.currentTarget.setPointerCapture(event.pointerId) }} onPointerMove={event => { event.stopPropagation(); if (!resizeDrag || resizeDrag.id !== layer.id) return; const scale = Math.max(0.55, Math.min(3, resizeDrag.scale + (event.clientX - resizeDrag.startX) / 100)); setTextLayers(items => items.map(item => item.id === layer.id ? { ...item, scale } : item)) }} onPointerUp={() => setResizeDrag(null)} onPointerCancel={() => setResizeDrag(null)} className="absolute -bottom-2 -right-2 h-4 w-4 touch-none rounded-full border-2 border-white bg-pink-500 shadow" />}
             </div>
           ))}
+          {song && (
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Song sticker; drag to move it on your story"
+              onPointerDown={event => { event.stopPropagation(); songStickerDragging.current = true; event.currentTarget.setPointerCapture(event.pointerId) }}
+              onPointerMove={event => { if (!songStickerDragging.current || !stageRef.current) return; const rect = stageRef.current.getBoundingClientRect(); setSongStickerX(Math.min(90, Math.max(10, ((event.clientX - rect.left) / rect.width) * 100))); setSongStickerY(Math.min(92, Math.max(8, ((event.clientY - rect.top) / rect.height) * 100)) }}
+              onPointerUp={() => { songStickerDragging.current = false }}
+              onPointerCancel={() => { songStickerDragging.current = false }}
+              onKeyDown={event => { if (event.key === 'ArrowLeft') setSongStickerX(x => Math.max(10, x - 1)); if (event.key === 'ArrowRight') setSongStickerX(x => Math.min(90, x + 1)); if (event.key === 'ArrowUp') setSongStickerY(y => Math.max(8, y - 1)); if (event.key === 'ArrowDown') setSongStickerY(y => Math.min(92, y + 1)) }}
+              className="absolute z-20 max-w-[88%] cursor-move select-none touch-none"
+              style={{ left: `${songStickerX}%`, top: `${songStickerY}%`, transform: `translate(-50%, -50%) rotate(${songStickerRotation}deg) scale(${songStickerScale})` }}
+            >
+              {songStickerStyle === 'pill' && <div className="flex max-w-full items-center gap-2 rounded-full bg-black/50 py-1.5 pl-1.5 pr-3 text-white shadow backdrop-blur-sm"><img src={song.artworkUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" /><div className="min-w-0"><p className="max-w-44 truncate text-xs font-semibold">{song.title}</p><p className="max-w-44 truncate text-[10px] opacity-80">{song.artist}</p></div></div>}
+              {songStickerStyle === 'cover' && <div className="flex w-56 max-w-full items-center gap-2 rounded-lg border border-white/15 bg-black/70 p-2 text-white shadow-lg backdrop-blur"><img src={song.artworkUrl} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" /><div className="min-w-0"><p className="truncate text-sm font-bold">{song.title}</p><p className="truncate text-xs text-white/75">{song.artist}</p><div className="mt-1 h-1 rounded-full bg-white/25"><div className="h-full w-2/3 rounded-full bg-white/80" /></div></div></div>}
+              {songStickerStyle === 'square' && <div className="w-36 overflow-hidden rounded-xl bg-white text-black shadow-xl"><img src={song.artworkUrl} alt="" className="aspect-square w-full object-cover" /><div className="px-2.5 py-2"><p className="truncate text-sm font-semibold">{song.title}</p><p className="truncate text-xs text-neutral-600">♫ {song.artist}</p></div></div>}
+              {songStickerStyle === 'vinyl' && <div className="flex max-w-full items-center gap-2 rounded-xl bg-neutral-950/90 p-2 text-white shadow-xl"><div className="relative h-12 w-12 shrink-0 rounded-full border border-white/20 bg-gradient-to-br from-neutral-700 via-black to-neutral-900 p-1"><div className="h-full w-full rounded-full border border-white/15 p-1"><img src={song.artworkUrl} alt="" className="h-full w-full rounded-full object-cover" /></div></div><div className="min-w-0"><p className="max-w-40 truncate text-sm font-bold">{song.title}</p><p className="max-w-40 truncate text-xs text-white/70">{song.artist}</p><div className="mt-1 flex gap-[2px]">{Array.from({ length: 16 }, (_, i) => <span key={i} className="h-2 w-[2px] rounded-full bg-white/75" style={{ height: `${4 + (i * 7 % 11)}px` }} />)}</div></div></div>}
+              {songStickerStyle === 'waveform' && <div className="flex w-60 max-w-full items-center gap-2 rounded-md bg-neutral-950/85 px-3 py-2 text-white shadow-lg"><img src={song.artworkUrl} alt="" className="h-10 w-10 shrink-0 rounded object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{song.title}</p><p className="truncate text-[10px] text-white/70">{song.artist}</p></div><div className="flex h-7 items-center gap-[2px]">{Array.from({ length: 13 }, (_, i) => <span key={i} className="w-[2px] rounded-full bg-white/80" style={{ height: `${5 + (i * 5 % 19)}px` }} />)}</div></div>}
+            </div>
+          )}
+        </div>
+        {song && (
+          <aside aria-label="Song sticker styles" className="w-full max-w-[min(100%,28rem)] sm:w-40 sm:max-w-40">
+            <p className="mb-2 text-center text-xs font-semibold text-muted-foreground sm:text-left">Song tag style</p>
+            <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-col sm:overflow-visible">
+              {SONG_STICKER_OPTIONS.map(option => (
+                <button key={option.id} type="button" onClick={() => setSongStickerStyle(option.id)} aria-pressed={songStickerStyle === option.id} className={`min-w-28 shrink-0 rounded-xl border p-2 text-left transition-colors sm:min-w-0 ${songStickerStyle === option.id ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border bg-card hover:bg-muted'}`}>
+                  <span className="block truncate text-xs font-semibold">{option.label}</span>
+                  <span className="mt-0.5 block text-[10px] leading-tight text-muted-foreground">{option.description}</span>
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 hidden text-[11px] text-muted-foreground sm:block">Choose a style, then drag the song tag anywhere on the story.</p>
+          </aside>
+        )}
         </div>
 
         <div className="w-full max-w-lg space-y-3">
@@ -361,7 +416,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
               <div key={layer.id} className="absolute max-w-[86%] rounded-lg px-2 py-1 text-center font-bold [text-shadow:0_2px_8px_rgba(0,0,0,0.9)]" style={{ left: layer.x + '%', top: layer.y + '%', transform: 'translate(-50%, -50%) rotate(' + layer.rotation + 'deg)', fontSize: (20 * layer.scale) + 'px', color: layer.color, fontFamily: font ? "'" + font + "', sans-serif" : undefined }}>{layer.text}</div>
             ))}
             <div className="absolute inset-x-0 top-0 h-1 bg-white/30"><div className="h-full bg-white" style={{ width: (Math.min(100, (previewElapsed / storyDuration) * 100)) + '%' }} /></div>
-            {song && previewElapsed >= songStart && previewElapsed < songStart + Math.min(songDuration, storyDuration - songStart) && <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 rounded-xl bg-black/60 p-2 text-white"><Music2 className="h-4 w-4 shrink-0" /><div className="min-w-0"><p className="truncate text-xs font-semibold">{song.title}</p><p className="truncate text-[10px] opacity-80">{song.artist}</p></div></div>}
+            {song && previewElapsed >= songStart && previewElapsed < songStart + Math.min(songDuration, storyDuration - songStart) && <div className="absolute z-20 max-w-[88%]" style={{ left: `${songStickerX}%`, top: `${songStickerY}%`, transform: `translate(-50%, -50%) rotate(${songStickerRotation}deg) scale(${songStickerScale})` }}>{songStickerStyle === 'pill' ? <div className="flex items-center gap-2 rounded-full bg-black/50 py-1.5 pl-1.5 pr-3 text-white"><img src={song.artworkUrl} alt="" className="h-8 w-8 rounded-full object-cover" /><div className="min-w-0"><p className="max-w-44 truncate text-xs font-semibold">{song.title}</p><p className="max-w-44 truncate text-[10px] opacity-80">{song.artist}</p></div></div> : <div className="flex items-center gap-2 rounded-xl bg-black/80 p-2 text-white"><img src={song.artworkUrl} alt="" className="h-10 w-10 rounded object-cover" /><div className="min-w-0"><p className="max-w-40 truncate text-xs font-semibold">{song.title}</p><p className="max-w-40 truncate text-[10px] opacity-80">{song.artist}</p></div></div>}</div>}
           </div>
         </div>
       )}
