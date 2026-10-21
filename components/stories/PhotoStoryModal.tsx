@@ -177,7 +177,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       duration: storyDuration,
       overlayX,
       overlayY,
-      ...(overlayText.trim() ? { overlayText: overlayText.trim(), overlayTextColor: '#ffffff', overlayFontFamily: font || undefined, overlayStart: textStart, overlayDuration: Math.min(textDuration, storyDuration - textStart) } : {}),
+      ...(textLayers[0] ? { overlayText: textLayers[0].text, overlayTexts: textLayers.map(layer => ({ ...layer, start: textStart, duration: Math.min(textDuration, storyDuration - textStart) })), overlayTextColor: '#ffffff', overlayFontFamily: font || undefined, overlayX: textLayers[0].x, overlayY: textLayers[0].y, overlayStart: textStart, overlayDuration: Math.min(textDuration, storyDuration - textStart) } : {}),
     }
     const globalMusic: GlobalMusic | null = song ? {
       url: song.previewUrl,
