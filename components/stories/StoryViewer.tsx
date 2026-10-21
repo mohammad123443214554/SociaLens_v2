@@ -50,6 +50,8 @@ interface StoryViewerProps {
   /** Optional action used by the mentioned-story inbox popup. */
   onAddToMyStory?: (story: StoryWithProfile) => void | Promise<void>
   isAddingToMyStory?: boolean
+  /** Shows original-author attribution for a story opened from a mention message. */
+  showOriginalAttribution?: boolean
 }
 
 // Figures out which scene should be showing right now, given how far into
@@ -66,7 +68,7 @@ function getActiveScene<T extends { duration: number }>(scenes: T[] | null, elap
   return scenes[scenes.length - 1]
 }
 
-export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, currentUserId, onClose, onReachEnd, onAddToMyStory, isAddingToMyStory = false }: StoryViewerProps) {
+export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, currentUserId, onClose, onReachEnd, onAddToMyStory, isAddingToMyStory = false, showOriginalAttribution = false }: StoryViewerProps) {
   const { profile } = useUser()
   const router = useRouter()
   const supabase = createClient()
@@ -635,11 +637,19 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
         <button onClick={goPrevStory} className="absolute left-0 top-0 h-[calc(100%-84px)] w-1/3 z-10" aria-label="Previous story" />
         <button onClick={goNextStory} className="absolute right-0 top-0 h-[calc(100%-84px)] w-2/3 z-10" aria-label="Next story" />
 
-        {story.original_story_id && (
-          <button type="button" onClick={(event) => { event.stopPropagation(); if (originalStoryInfo) setOriginalStoryToOpen(originalStoryInfo) }} disabled={!originalStoryInfo}
+        {(story.original_story_id || showOriginalAttribution) && (
+          <button type="button" onClick={(event) => {
+            event.stopPropagation()
+            if (story.original_story_id) {
+              if (originalStoryInfo) setOriginalStoryToOpen(originalStoryInfo)
+            } else {
+              const username = story.profiles?.username
+              if (username) router.push(`/profile/${encodeURIComponent(username)}`)
+            }
+          }} disabled={story.original_story_id ? !originalStoryInfo : !story.profiles?.username}
             className="absolute bottom-[88px] left-3 z-30 max-w-[68%] truncate rounded-full border border-white/20 bg-black/65 px-3 py-2 text-left text-[11px] font-semibold text-white shadow-lg backdrop-blur-md disabled:cursor-default disabled:opacity-80"
-            aria-label={originalStoryInfo ? `View original story by @${story.original_story_username || originalStoryInfo.profiles?.username || 'user'}` : 'Original story is no longer available'}>
-            ↗ Original Story by @{story.original_story_username || originalStoryInfo?.profiles?.username || 'user'}
+            aria-label={`View original story by @${story.original_story_username || originalStoryInfo?.profiles?.username || story.profiles?.username || 'user'}`}>
+            ↗ Original Story by @{story.original_story_username || originalStoryInfo?.profiles?.username || story.profiles?.username || 'user'}
           </button>
         )}
 

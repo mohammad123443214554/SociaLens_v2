@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { Message } from '@/lib/types/database.types'
@@ -20,9 +20,11 @@ interface RealtimeMessagesProps {
   onLoadOlder?: () => void
   hasMoreOlder?: boolean
   isLoadingOlder?: boolean
+  /** Story-mention media cards that belong in this conversation's message timeline. */
+  mentionedStories?: ReactNode
 }
 
-export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsername, onReply, onRemoveMessage, onPatchMessage, onCallAgain, isMessageUnavailable, wallpaperUrl, wallpaperPosition, onLoadOlder, hasMoreOlder, isLoadingOlder }: RealtimeMessagesProps) {
+export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsername, onReply, onRemoveMessage, onPatchMessage, onCallAgain, isMessageUnavailable, wallpaperUrl, wallpaperPosition, onLoadOlder, hasMoreOlder, isLoadingOlder, mentionedStories }: RealtimeMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const lastMessageIdRef = useRef<string | null>(null)
@@ -135,6 +137,7 @@ export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsern
           unavailable={isMessageUnavailable?.(msg.sender_id)}
         />
       ))}
+      {mentionedStories}
       {isTyping && (
         <div className="flex gap-1 items-center px-3 py-2 bg-muted rounded-2xl rounded-bl-sm w-fit mb-2">
           <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.3s]" />

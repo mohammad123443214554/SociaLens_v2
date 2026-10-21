@@ -28,6 +28,7 @@ import { isRestricted } from '@/lib/utils/restrictionCheck'
 import { RestrictionPopup } from '@/components/shared/RestrictionPopup'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
+import { MentionedStoryMessages } from '@/components/stories/MentionedStoryMessages'
 
 export default function ChatRoomPage() {
   const params = useParams()
@@ -400,6 +401,7 @@ export default function ChatRoomPage() {
         onLoadOlder={loadOlderMessages}
         hasMoreOlder={hasMoreOlder}
         isLoadingOlder={isLoadingOlder}
+        mentionedStories={<MentionedStoryMessages userId={user.id} otherUserId={other.id} />}
       />
 
       {/* Input */}
