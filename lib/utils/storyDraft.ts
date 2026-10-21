@@ -23,6 +23,11 @@ export interface StoryDraftRecord {
     songStart: number
     songDuration: number
     songOffset?: number
+    songStickerStyle?: 'pill' | 'cover' | 'square' | 'vinyl' | 'waveform'
+    songStickerX?: number
+    songStickerY?: number
+    songStickerScale?: number
+    songStickerRotation?: number
   }
   video?: { duration: number }
   updatedAt: number
