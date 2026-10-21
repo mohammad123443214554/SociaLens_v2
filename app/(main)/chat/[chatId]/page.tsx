@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Circle, Settings, Phone, Loader2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -164,15 +164,38 @@ export default function ChatRoomPage() {
     check()
   }, [chat, user])
 
+  // Mark only newly observed incoming unread messages as read. The previous
+  // version PATCHed every incoming message whenever the message array changed;
+  // read-receipt UPDATE events then changed that array again, creating a
+  // realtime request loop and exhausting the browser's network resources.
+  const readReceiptInFlightRef = useRef(new Set<string>())
   useEffect(() => {
-    if (!user || !chatId) return
-    supabase
+    if (!user?.id || !chatId || messages.length === 0) return
+
+    const unreadIds = messages
+      .filter(message => message.sender_id !== user.id && !message.is_read && !message._uploading)
+      .map(message => message.id)
+      .filter(id => !readReceiptInFlightRef.current.has(id))
+
+    if (unreadIds.length === 0) return
+    unreadIds.forEach(id => readReceiptInFlightRef.current.add(id))
+
+    void supabase
       .from('messages')
       .update({ is_read: true })
       .eq('chat_id', chatId)
-      .neq('sender_id', user.id)
-      .then(() => {})
-  }, [messages, chatId, user])
+      .eq('is_read', false)
+      .in('id', unreadIds)
+      .then(({ error }) => {
+        if (error) {
+          unreadIds.forEach(id => readReceiptInFlightRef.current.delete(id))
+          return
+        }
+        // Update local state immediately so polling/realtime doesn't trigger
+        // another read request while the database event is in flight.
+        unreadIds.forEach(id => patchMessageLocally(id, { is_read: true }))
+      })
+  }, [messages, chatId, user?.id, patchMessageLocally])
 
   // Calling is limited to people who follow me or whom I follow (either
   // direction) - not open to everyone the way messaging can be.
