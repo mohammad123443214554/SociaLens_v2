@@ -403,7 +403,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
             <div className="flex gap-2">
               <input autoFocus value={textDraft} onChange={(e) => setTextDraft(e.target.value)} maxLength={150} placeholder="Write something..." className="min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500" />
               <button onClick={() => { setTextDraft(''); setShowTextInput(false) }} aria-label="Cancel adding text" className="rounded-xl border border-border px-3 hover:bg-muted"><X className="h-4 w-4" /></button>
-              <button onClick={() => { const value = textDraft.trim(); if (value) { const id = makeId(); setTextLayers(items => [...items, { id, text: value, x: 50, y: 50, scale: 1, rotation: 0, color: '#ffffff', fontFamily: font, start: 0, duration: storyDuration }]); setSelectedTextId(id); if (!overlayText.trim()) setOverlayText(value) } setTextDraft(''); setShowTextInput(false) }} aria-label="Add text to story" className="rounded-xl bg-muted px-3"><Check className="h-4 w-4" /></button>
+              <button onClick={() => { const value = textDraft.trim(); if (value) { const id = makeId(); setTextLayers(items => [...items, { id, text: value, x: 50, y: 50, scale: 1, rotation: 0, color: '#ffffff', fontFamily: null, start: 0, duration: storyDuration }]); setSelectedTextId(id); if (!overlayText.trim()) setOverlayText(value) } setTextDraft(''); setShowTextInput(false) }} aria-label="Add text to story" className="rounded-xl bg-muted px-3"><Check className="h-4 w-4" /></button>
             </div>
           )}
           <div className="grid grid-cols-3 gap-2">
