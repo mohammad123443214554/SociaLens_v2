@@ -255,24 +255,29 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
         </div>
 
         <div className="w-full max-w-lg space-y-3">
-          <section aria-label="Story timeline" className="mx-auto box-border h-[121px] w-[min(652px,calc(100vw-24px))] shrink-0 overflow-hidden rounded-md border border-border bg-card px-[9px] py-[4px]">
+          <section aria-label="Story timeline" style={{ height: 121 + Math.max(0, textLayers.length - 1) * 29 }} className="mx-auto box-border w-[min(652px,calc(100vw-24px))] shrink-0 overflow-hidden rounded-md border border-border bg-card px-[9px] py-[4px]">
             <div className="flex h-full w-full flex-col gap-[2px]">
               <div
                 ref={(node) => { timelineRowRefs.current.text = node }}
                 onPointerMove={(event) => moveTimelineDrag('text', event)}
                 onPointerUp={endTimelineDrag}
                 onPointerCancel={endTimelineDrag}
-                className="relative h-[27px] w-full shrink-0 touch-none overflow-hidden rounded-sm bg-muted"
-                aria-label="Text timeline strip"
+                className="flex w-full shrink-0 flex-col gap-[2px] touch-none"
+                aria-label="Text timeline tracks"
               >
-                {textLayers.map((layer) => (
-                  <div key={layer.id} data-text-id={layer.id} onPointerDown={(event) => { setSelectedTextId(layer.id); beginTimelineDrag('text', event) }} className={"absolute inset-y-0 overflow-hidden rounded-sm bg-violet-500/90 " + (selectedTextId === layer.id ? "ring-1 ring-white" : "")} style={{ left: `${(layer.start / 60) * 100}%`, width: `${Math.max(2.5, (Math.min(layer.duration, storyDuration - layer.start) / 60) * 100)}%` }} title={layer.text}>
-                    <span data-edge="start" className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-sm bg-violet-200/90" />
-                    <span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-sm bg-violet-200/90" />
-                    <span className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-2 text-[10px] font-semibold text-white whitespace-nowrap">{layer.text.length > 16 ? layer.text.slice(0, 16).trimEnd() + '...' : layer.text}</span>
+                {textLayers.length === 0 ? (
+                  <div className="relative h-[27px] w-full shrink-0 overflow-hidden rounded-sm bg-muted">
+                    <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[11px] font-semibold text-foreground">Text</span>
+                  </div>
+                ) : textLayers.map((layer) => (
+                  <div key={layer.id} className="relative h-[27px] w-full shrink-0 overflow-hidden rounded-sm bg-muted/70">
+                    <div data-text-id={layer.id} onPointerDown={(event) => { setSelectedTextId(layer.id); beginTimelineDrag('text', event) }} className={"absolute inset-y-0 overflow-hidden rounded-sm bg-violet-500/90 " + (selectedTextId === layer.id ? "ring-1 ring-white" : "")} style={{ left: `${(layer.start / 60) * 100}%`, width: `${Math.max(4, (Math.min(layer.duration, storyDuration - layer.start) / 60) * 100)}%` }} title={layer.text}>
+                      <span data-edge="start" className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-sm bg-violet-200/90" />
+                      <span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-sm bg-violet-200/90" />
+                      <span className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-2 text-[10px] font-semibold text-white whitespace-nowrap">{layer.text.length > 16 ? layer.text.slice(0, 16).trimEnd() + '...' : layer.text}</span>
+                    </div>
                   </div>
                 ))}
-                <span className="pointer-events-none absolute inset-y-0 left-2 z-20 flex items-center text-[11px] font-semibold text-foreground drop-shadow-sm">{textLayers.length ? '' : 'Text'}</span>
               </div>
               <div
                 ref={(node) => { timelineRowRefs.current.photo = node }}
