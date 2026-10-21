@@ -31,7 +31,7 @@ export function FontPicker({ currentFont, onSelect, onCancel, onDone }: FontPick
     // side so the story canvas stays visible and picking a font previews
     // live behind it. X cancels (reverts to whatever font was set before
     // this panel opened); Done keeps whatever's currently previewed.
-    <div className="fixed right-0 top-0 h-full w-full sm:w-80 max-w-[88vw] z-[110] bg-card border-l shadow-2xl flex flex-col">
+    <div className="fixed inset-x-0 bottom-0 top-auto z-[160] flex h-[min(78dvh,620px)] w-full max-w-none flex-col rounded-t-2xl border-t border-border bg-card shadow-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:top-0 sm:h-full sm:w-80 sm:max-w-[88vw] sm:rounded-none sm:border-l sm:border-t-0">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b shrink-0">
         <h2 className="font-bold text-lg">Choose Font</h2>
