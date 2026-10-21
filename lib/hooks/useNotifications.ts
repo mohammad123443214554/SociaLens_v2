@@ -50,7 +50,8 @@ export function getNotifText(n: AppNotification): string {
     case 'comment_like': return `liked your comment: "${clip(n.message)}"`
     case 'comment_react': return `reacted ${n.emoji ?? ''} to your comment: "${clip(n.message)}"`
     case 'comment_reply': return `replied to your comment "${clip(n.context_text, 25)}": "${clip(n.message)}"`
-    case 'story_like': return 'liked your story'\n    case 'story_mention': return `mentioned you in their story${n.context_text ? ` (${clip(n.context_text, 24)})` : ''}`
+    case 'story_like': return 'liked your story'
+    case 'story_mention': return `mentioned you in their story${n.context_text ? ` (${clip(n.context_text, 24)})` : ''}`
     case 'story_react': return `reacted ${n.emoji ?? ''} to your story`
     case 'story_comment': return `commented on your story: "${clip(n.message)}"`
     case 'story_comment_like': return `liked your story comment: "${clip(n.message)}"`
