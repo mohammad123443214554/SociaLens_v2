@@ -481,11 +481,10 @@ export function useReshareMentionedStory() {
         throw new Error('This story is no longer available.')
       }
 
-      const { data: mention, error: mentionError } = await supabase
-        .from('story_mentions').select('id')
-        .eq('story_id', storyId).eq('mentioned_user_id', userId).maybeSingle()
-      if (mentionError) throw mentionError
-      if (!mention) throw new Error('Only a story that mentioned you can be added to your story.')
+      // Do not perform a separate story_mentions SELECT here. Its RLS policy
+      // joins back to stories and can be very slow under load. The insert's
+      // SECURITY DEFINER validation trigger checks the mention, expiry, privacy,
+      // blocks and visibility atomically, so this extra round-trip is redundant.
 
       const { data: created, error } = await supabase.from('stories').insert({
         user_id: userId,
