@@ -29,7 +29,7 @@ export function useActiveStories(userId?: string) {
 
       const { data, error } = await supabase
         .from('stories')
-        .select('*, profiles(*)')
+        .select('*, profiles!stories_user_id_fkey(*)')
         .order('created_at', { ascending: false })
 
       if (error) throw error
