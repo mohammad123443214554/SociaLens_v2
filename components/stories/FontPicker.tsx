@@ -6,12 +6,13 @@ import { GOOGLE_FONTS, loadGoogleFontsBatch } from '@/lib/utils/googleFonts'
 
 interface FontPickerProps {
   currentFont: string | null
+  previewText?: string
   onSelect: (font: string) => void
   onCancel: () => void
   onDone: () => void
 }
 
-export function FontPicker({ currentFont, onSelect, onCancel, onDone }: FontPickerProps) {
+export function FontPicker({ currentFont, previewText = 'Your story text', onSelect, onCancel, onDone }: FontPickerProps) {
   const [query, setQuery] = useState('')
 
   // Load every font in the list up front (in a handful of batched requests)
@@ -51,6 +52,13 @@ export function FontPicker({ currentFont, onSelect, onCancel, onDone }: FontPick
             placeholder="Search fonts..."
             className="w-full bg-muted rounded-full pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500/40"
           />
+        </div>
+      </div>
+
+      <div className="shrink-0 px-4 pb-2">
+        <div className="rounded-xl border border-border bg-background px-3 py-3 text-center">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Live preview</p>
+          <p className="break-words text-lg font-semibold" style={{ fontFamily: currentFont ? `'${currentFont}', sans-serif` : undefined }}>{previewText || 'Your story text'}</p>
         </div>
       </div>
 
