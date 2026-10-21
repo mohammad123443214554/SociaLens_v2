@@ -95,7 +95,9 @@ export default function ChatPage() {
     fetchChats()
     const channel = supabase
       .channel('chat-list')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, fetchChats)
+      // New messages can change the inbox preview/unread badge. Read-receipt
+      // UPDATEs should not refetch the entire chat list and unread-message table.
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, fetchChats)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, fetchChats)
       .subscribe()
     return () => { supabase.removeChannel(channel) }
