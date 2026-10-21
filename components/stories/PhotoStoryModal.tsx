@@ -278,7 +278,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
               tabIndex={0}
               aria-label="Song sticker; drag to move it on your story"
               onPointerDown={event => { event.stopPropagation(); songStickerDragging.current = true; event.currentTarget.setPointerCapture(event.pointerId) }}
-              onPointerMove={event => { if (!songStickerDragging.current || !stageRef.current) return; const rect = stageRef.current.getBoundingClientRect(); setSongStickerX(Math.min(90, Math.max(10, ((event.clientX - rect.left) / rect.width) * 100))); setSongStickerY(Math.min(92, Math.max(8, ((event.clientY - rect.top) / rect.height) * 100)) }}
+              onPointerMove={event => { if (!songStickerDragging.current || !stageRef.current) return; const rect = stageRef.current.getBoundingClientRect(); setSongStickerX(Math.min(90, Math.max(10, ((event.clientX - rect.left) / rect.width) * 100))); setSongStickerY(Math.min(92, Math.max(8, ((event.clientY - rect.top) / rect.height) * 100))) }}
               onPointerUp={() => { songStickerDragging.current = false }}
               onPointerCancel={() => { songStickerDragging.current = false }}
               onKeyDown={event => { if (event.key === 'ArrowLeft') setSongStickerX(x => Math.max(10, x - 1)); if (event.key === 'ArrowRight') setSongStickerX(x => Math.min(90, x + 1)); if (event.key === 'ArrowUp') setSongStickerY(y => Math.max(8, y - 1)); if (event.key === 'ArrowDown') setSongStickerY(y => Math.min(92, y + 1)) }}
