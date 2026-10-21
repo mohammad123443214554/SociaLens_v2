@@ -1,5 +1,7 @@
 'use client'
 
+import type { StoryMentionOverlay } from '@/lib/types/database.types'
+
 export type StoryDraftKind = 'photo' | 'video'
 
 export interface StoryDraftRecord {
@@ -15,7 +17,8 @@ export interface StoryDraftRecord {
     overlayY: number
     font: string | null
     /** Independently positioned text overlays saved by the photo-story editor. */
-    textLayers?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; start?: number; duration?: number }>
+    textLayers?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null; start?: number; duration?: number }>
+    mentions?: StoryMentionOverlay[]
     song: { title: string; artist: string; artworkUrl: string; previewUrl: string; duration?: number; licenseUrl?: string; source?: string } | null
     storyDuration: number
     textStart: number
