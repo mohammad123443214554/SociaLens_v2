@@ -14,6 +14,8 @@ export interface StoryDraftRecord {
     overlayX: number
     overlayY: number
     font: string | null
+    /** Independently positioned text overlays saved by the photo-story editor. */
+    textLayers?: Array<{ id: string; text: string; x: number; y: number; scale: number }>
     song: { title: string; artist: string; artworkUrl: string; previewUrl: string; duration?: number; licenseUrl?: string; source?: string } | null
     storyDuration: number
     textStart: number
