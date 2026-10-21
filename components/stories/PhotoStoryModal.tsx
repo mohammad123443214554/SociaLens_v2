@@ -409,7 +409,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
           <div className="grid grid-cols-3 gap-2">
             <button onClick={() => setShowMusicPicker(true)} aria-label={song ? 'Change song' : 'Add song'} className="flex min-h-11 items-center justify-center gap-1 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Music2 className="h-4 w-4 shrink-0" /><span className="sm:hidden">{song ? 'Change' : 'Song'}</span><span className="hidden sm:inline">{song ? 'Change song' : 'Add Song'}</span></button>
             <button onClick={() => { setTextDraft(''); setShowTextInput(true) }} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Type className="h-4 w-4" /> Add Text</button>
-            <button onClick={() => setShowMentionPicker(true)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><AtSign className="h-4 w-4 shrink-0" /><span>@ Mention</span></button>
+            <button onClick={() => setShowMentionPicker(true)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><AtSign className="h-4 w-4 shrink-0" /><span>Mention</span></button>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" className="shrink-0" onClick={() => replaceInput.current?.click()}><ImagePlus className="mr-2 h-4 w-4" /> Replace</Button>
