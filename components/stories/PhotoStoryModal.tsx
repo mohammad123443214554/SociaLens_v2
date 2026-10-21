@@ -108,7 +108,8 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const hasHindiLyrics = Boolean(lyricsData?.plain && /[\u0900-\u097F]/.test(lyricsData.plain))
   const lyricsAtTime = lyricsData?.synced.filter(line => line.time <= Math.max(0, previewElapsed - songStart + songOffset)) || []
   const activeLyricsIndex = Math.max(0, lyricsAtTime.length - 1)
-  const karaokeLineCount = lyricsMode === 'karaoke-short' ? 4 : 4
+  const karaokeLineCount = 4
+  const formatKaraokeLine = (text: string, wordsPerLine: number) => { const words = text.trim().split(/\\s+/); const chunks: string[] = []; for (let index = 0; index < words.length; index += wordsPerLine) chunks.push(words.slice(index, index + wordsPerLine).join(' ')); return chunks.join('\\n') }
   const visibleKaraokeLines = lyricsData?.synced.slice(Math.max(0, activeLyricsIndex - karaokeLineCount + 1), activeLyricsIndex + 1) || []
   const displayLyricsText = lyricsMode === 'english'
     ? lyricsData?.plain.split(/\\r?\\n/).filter(line => /[A-Za-z]/.test(line)).join('\\n')
@@ -252,19 +253,25 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       overlayX,
       overlayY,
       ...(textLayers[0] ? { overlayText: textLayers[0].text, overlayTexts: textLayers.map(layer => ({ ...layer, start: layer.start, duration: Math.min(layer.duration, storyDuration - layer.start) })), overlayTextColor: textLayers[0].color, overlayFontFamily: font || undefined, overlayX: textLayers[0].x, overlayY: textLayers[0].y, overlayStart: textStart, overlayDuration: Math.min(textDuration, storyDuration - textStart) } : {}),
+      ...(song && lyricsData && (lyricsMode === 'english' || lyricsMode === 'hindi') && displayLyricsText ? {
+        overlayTexts: [
+          ...textLayers.map(layer => ({ ...layer, start: layer.start, duration: Math.min(layer.duration, storyDuration - layer.start) })),
+          { id: 'lyrics-static', text: displayLyricsText, x: 50, y: 78, scale: 0.62, rotation: 0, color: '#ffffff', start: songStart, duration: Math.min(songDuration, storyDuration - songStart) },
+        ],
+      } : {}),
       ...(song && lyricsData?.hasSynced && (lyricsMode === 'karaoke-short' || lyricsMode === 'karaoke-long') ? {
         overlayTexts: [
           ...textLayers.map(layer => ({ ...layer, start: layer.start, duration: Math.min(layer.duration, storyDuration - layer.start) })),
-          ...lyricsData.synced.filter(line => line.time < Math.min(songDuration, storyDuration - songStart)).map((line, index, lines) => ({
+          ...lyricsData.synced.filter(line => line.time >= songOffset && line.time < songOffset + Math.min(songDuration, storyDuration - songStart)).map((line, index, lines) => ({
             id: 'lyrics-' + index,
-            text: line.text,
+            text: formatKaraokeLine(line.text, lyricsMode === 'karaoke-short' ? 3 : 9),
             x: 50,
-            y: lyricsMode === 'karaoke-short' ? 68 + (index % 4) * 5 : 67 + (index % 4) * 5,
+            y: 68 + (index % 4) * 5,
             scale: lyricsMode === 'karaoke-short' ? 0.8 : 0.72,
             rotation: 0,
             color: '#ffffff',
             start: songStart + Math.max(0, line.time - songOffset),
-            duration: Math.max(0.15, Math.min((lines[index + 1]?.time ?? songDuration) - line.time, songDuration - line.time)),
+            duration: Math.max(0.15, Math.min((lines[index + 1]?.time ?? (songOffset + songDuration)) - line.time, songOffset + songDuration - line.time)),
           })),
         ],
       } : {}),
@@ -352,7 +359,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
           )}
           {song && lyricsData?.hasSynced && (lyricsMode === 'karaoke-short' || lyricsMode === 'karaoke-long') && visibleKaraokeLines.length > 0 && (
             <div aria-label="Synchronized karaoke lyrics" className="pointer-events-none absolute inset-x-3 bottom-[12%] z-10 flex max-h-[30%] flex-col justify-end overflow-hidden rounded-xl bg-black/40 px-3 py-2 text-center text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
-              {visibleKaraokeLines.map((line, index) => <p key={line.time + '-' + index} className="animate-[lyricsRise_500ms_ease-out] text-sm font-semibold leading-6" style={{ opacity: index === visibleKaraokeLines.length - 1 ? 1 : 0.58 }}>{lyricsMode === 'karaoke-short' ? line.text.split(/\\s+/).reduce((chunks: string[], word: string, wordIndex: number) => { if (wordIndex % 3 === 0) chunks.push(word); else chunks[chunks.length - 1] += ' ' + word; return chunks }, []).join(' ') : line.text}</p>)}
+              {visibleKaraokeLines.map((line, index) => <p key={line.time + '-' + index} className="animate-[lyricsRise_500ms_ease-out] whitespace-pre-line text-sm font-semibold leading-6" style={{ opacity: index === visibleKaraokeLines.length - 1 ? 1 : 0.58 }}>{formatKaraokeLine(line.text, lyricsMode === 'karaoke-short' ? 3 : 9)}</p>)}
             </div>
           )}
           {textLayers.map(layer => (
@@ -508,7 +515,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
             )}
             {song && lyricsData?.hasSynced && (lyricsMode === 'karaoke-short' || lyricsMode === 'karaoke-long') && visibleKaraokeLines.length > 0 && (
               <div aria-label="Synchronized karaoke lyrics" className="pointer-events-none absolute inset-x-3 bottom-[12%] z-10 flex max-h-[30%] flex-col justify-end overflow-hidden rounded-xl bg-black/40 px-3 py-2 text-center text-white">
-                {visibleKaraokeLines.map((line, index) => <p key={line.time + '-' + index} className="animate-[lyricsRise_500ms_ease-out] text-sm font-semibold leading-6" style={{ opacity: index === visibleKaraokeLines.length - 1 ? 1 : 0.58 }}>{line.text}</p>)}
+                {visibleKaraokeLines.map((line, index) => <p key={line.time + '-' + index} className="animate-[lyricsRise_500ms_ease-out] whitespace-pre-line text-sm font-semibold leading-6" style={{ opacity: index === visibleKaraokeLines.length - 1 ? 1 : 0.58 }}>{line.text}</p>)}
               </div>
             )}
             {textLayers.filter(layer => previewElapsed >= layer.start && previewElapsed < layer.start + Math.min(layer.duration, storyDuration - layer.start)).map(layer => (
