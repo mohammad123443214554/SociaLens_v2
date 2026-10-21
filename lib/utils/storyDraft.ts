@@ -32,7 +32,7 @@ export interface StoryDraftRecord {
     songStickerScale?: number
     songStickerRotation?: number
   }
-  video?: { duration: number }
+  video?: { duration: number; textLayers?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null }>; mentions?: StoryMentionOverlay[] }
   updatedAt: number
 }
 
