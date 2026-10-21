@@ -20,11 +20,16 @@ interface PhotoStoryModalProps {
 }
 
 const makeId = () => Math.random().toString(36).slice(2, 10)
+type StoryTextLayer = { id: string; text: string; x: number; y: number; scale: number }
 
 export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialDraft }: PhotoStoryModalProps) {
   const [file, setFile] = useState<File | null>(initialFile || null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [overlayText, setOverlayText] = useState(initialDraft?.photo?.overlayText || '')
+  const [textLayers, setTextLayers] = useState<StoryTextLayer[]>(() => { const saved = (initialDraft?.photo as any)?.textLayers as StoryTextLayer[] | undefined; if (saved?.length) return saved; const oldText = initialDraft?.photo?.overlayText || ''; return oldText ? [{ id: makeId(), text: oldText, x: initialDraft?.photo?.overlayX ?? 50, y: initialDraft?.photo?.overlayY ?? 50, scale: 1 }] : [] })
+  const [textDraft, setTextDraft] = useState('')
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
+  const [resizeDrag, setResizeDrag] = useState<{ id: string; startX: number; scale: number } | null>(null)
   const [overlayX, setOverlayX] = useState(initialDraft?.photo?.overlayX ?? 50)
   const [overlayY, setOverlayY] = useState(initialDraft?.photo?.overlayY ?? 50)
   const [font, setFont] = useState<string | null>(initialDraft?.photo?.font ?? null)
@@ -141,12 +146,12 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
     if (!file) return
     const draft: StoryDraftRecord = {
       userId, kind: 'photo', file, fileName: file.name, fileType: file.type, lastModified: file.lastModified,
-      photo: { overlayText, overlayX, overlayY, font, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset },
+      photo: { overlayText, overlayX, overlayY, font, textLayers, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset },
       updatedAt: Date.now(),
     }
     const timer = window.setTimeout(() => { void saveStoryDraft(draft).catch(() => {}) }, 120)
     return () => window.clearTimeout(timer)
-  }, [userId, file, overlayText, overlayX, overlayY, font, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset])
+  }, [userId, file, overlayText, overlayX, overlayY, font, textLayers, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset])
 
   const onTextPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     dragging.current = true
