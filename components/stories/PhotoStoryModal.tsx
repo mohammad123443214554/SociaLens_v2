@@ -307,14 +307,14 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
           )}
           {showTextInput && (
             <div className="flex gap-2">
-              <input autoFocus value={overlayText} onChange={(e) => setOverlayText(e.target.value)} maxLength={150} placeholder="Write something..." className="min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500" />
-              <button onClick={() => { setOverlayText(''); setShowTextInput(false) }} aria-label="Remove text" className="rounded-xl border border-border px-3 hover:bg-muted"><X className="h-4 w-4" /></button>
-              <button onClick={() => setShowTextInput(false)} aria-label="Done editing text" className="rounded-xl bg-muted px-3"><Check className="h-4 w-4" /></button>
+              <input autoFocus value={textDraft} onChange={(e) => setTextDraft(e.target.value)} maxLength={150} placeholder="Write something..." className="min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500" />
+              <button onClick={() => { setTextDraft(''); setShowTextInput(false) }} aria-label="Cancel adding text" className="rounded-xl border border-border px-3 hover:bg-muted"><X className="h-4 w-4" /></button>
+              <button onClick={() => { const value = textDraft.trim(); if (value) { const id = makeId(); setTextLayers(items => [...items, { id, text: value, x: 50, y: 50, scale: 1 }]); setSelectedTextId(id); if (!overlayText.trim()) setOverlayText(value) } setTextDraft(''); setShowTextInput(false) }} aria-label="Add text to story" className="rounded-xl bg-muted px-3"><Check className="h-4 w-4" /></button>
             </div>
           )}
           <div className="grid grid-cols-3 gap-2">
             <button onClick={() => setShowMusicPicker(true)} aria-label={song ? 'Change song' : 'Add song'} className="flex min-h-11 items-center justify-center gap-1 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Music2 className="h-4 w-4 shrink-0" /><span className="sm:hidden">Change</span><span className="hidden sm:inline">{song ? 'Change song' : 'Add Song'}</span></button>
-            <button onClick={() => setShowTextInput(true)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Type className="h-4 w-4" /> Add Text</button>
+            <button onClick={() => { setTextDraft(''); setShowTextInput(true) }} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Type className="h-4 w-4" /> Add Text</button>
             <button onClick={() => setShowFontPicker(true)} disabled={!overlayText.trim()} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted disabled:opacity-40"><Type className="h-4 w-4" /> Font</button>
           </div>
           <div className="flex gap-2">
