@@ -285,12 +285,24 @@ export type GlobalMusic = {
   stickerRotation?: number
 }
 
+export type StoryMentionOverlay = {
+  id: string
+  userId: string
+  username: string
+  fullName: string | null
+  avatarUrl: string | null
+  x: number
+  y: number
+  scale: number
+}
+
 export type PhotoScene = {
   id: string
   imageUrl: string
   duration: number
   overlayText?: string
-  overlayTexts?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; start?: number; duration?: number }>
+  overlayTexts?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null; start?: number; duration?: number }>
+  mentions?: StoryMentionOverlay[]
   overlayStart?: number
   overlayDuration?: number
   overlayTextColor?: string
@@ -306,6 +318,8 @@ export type PhotoScene = {
 }
 
 export type VideoScene = {
+  overlayTexts?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null; start?: number; duration?: number }>
+  mentions?: StoryMentionOverlay[]
   id: string
   videoUrl: string
   duration: number
