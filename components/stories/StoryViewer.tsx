@@ -128,7 +128,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   useEffect(() => {
     let active = true
     if (!story?.original_story_id) { setOriginalStoryInfo(null); return }
-    supabase.from('stories').select('*, profiles(*)').eq('id', story.original_story_id).maybeSingle().then(({ data }) => {
+    supabase.from('stories').select('*, profiles!stories_user_id_fkey(*)').eq('id', story.original_story_id).maybeSingle().then(({ data }) => {
       if (active) setOriginalStoryInfo(data as StoryWithProfile | null)
     })
     return () => { active = false }
