@@ -20,13 +20,13 @@ interface PhotoStoryModalProps {
 }
 
 const makeId = () => Math.random().toString(36).slice(2, 10)
-type StoryTextLayer = { id: string; text: string; x: number; y: number; scale: number; rotation: number; color: string }
+type StoryTextLayer = { id: string; text: string; x: number; y: number; scale: number; rotation: number; color: string; start: number; duration: number }
 
 export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialDraft }: PhotoStoryModalProps) {
   const [file, setFile] = useState<File | null>(initialFile || null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [overlayText, setOverlayText] = useState(initialDraft?.photo?.overlayText || '')
-  const [textLayers, setTextLayers] = useState<StoryTextLayer[]>(() => { const saved = (initialDraft?.photo as any)?.textLayers as StoryTextLayer[] | undefined; if (saved?.length) return saved.map(layer => ({ rotation: 0, color: '#ffffff', ...layer })); const oldText = initialDraft?.photo?.overlayText || ''; return oldText ? [{ id: makeId(), text: oldText, x: initialDraft?.photo?.overlayX ?? 50, y: initialDraft?.photo?.overlayY ?? 50, scale: 1, rotation: 0, color: '#ffffff' }] : [] })
+  const [textLayers, setTextLayers] = useState<StoryTextLayer[]>(() => { const saved = (initialDraft?.photo as any)?.textLayers as StoryTextLayer[] | undefined; if (saved?.length) return saved.map(layer => ({ rotation: 0, color: '#ffffff', start: initialDraft?.photo?.textStart ?? 0, duration: initialDraft?.photo?.textDuration ?? 5, ...layer })); const oldText = initialDraft?.photo?.overlayText || ''; return oldText ? [{ id: makeId(), text: oldText, x: initialDraft?.photo?.overlayX ?? 50, y: initialDraft?.photo?.overlayY ?? 50, scale: 1, rotation: 0, color: '#ffffff', start: initialDraft?.photo?.textStart ?? 0, duration: initialDraft?.photo?.textDuration ?? 5 }] : [] })
   const [textDraft, setTextDraft] = useState('')
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
   const [resizeDrag, setResizeDrag] = useState<{ id: string; startX: number; scale: number } | null>(null)
@@ -51,18 +51,21 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const [showPreview, setShowPreview] = useState(false)
   const [previewElapsed, setPreviewElapsed] = useState(0)
   const previewAudioRef = useRef<HTMLAudioElement>(null)
-  const timelineDrag = useRef<{ kind: 'photo' | 'text' | 'song'; edge: 'start' | 'end' | 'move'; x: number; start: number; duration: number } | null>(null)
+  const timelineDrag = useRef<{ kind: 'photo' | 'text' | 'song'; edge: 'start' | 'end' | 'move'; x: number; start: number; duration: number; textId?: string } | null>(null)
   const timelineRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const beginTimelineDrag = (kind: 'photo' | 'text' | 'song', event: React.PointerEvent<HTMLDivElement>) => {
-    if (kind === 'text' && !overlayText.trim()) return
+    const textId = kind === 'text' ? (event.target as HTMLElement).closest('[data-text-id]')?.getAttribute('data-text-id') || selectedTextId || textLayers[0]?.id : undefined
+    const textLayer = textId ? textLayers.find(layer => layer.id === textId) : undefined
+    if (kind === 'text' && !textLayer) return
     if (kind === 'song' && !song) return
     const row = event.currentTarget
     const edge = kind === 'photo' ? 'end' : ((event.target as HTMLElement).closest('[data-edge]')?.getAttribute('data-edge') as 'start' | 'end' | null) || 'move'
     timelineDrag.current = {
       kind, edge, x: event.clientX,
-      start: kind === 'text' ? textStart : kind === 'song' ? songStart : 0,
-      duration: kind === 'text' ? textDuration : kind === 'song' ? songDuration : storyDuration,
+      start: kind === 'text' ? (textLayer?.start ?? textStart) : kind === 'song' ? songStart : 0,
+      duration: kind === 'text' ? (textLayer?.duration ?? textDuration) : kind === 'song' ? songDuration : storyDuration,
+      textId,
     }
     row.setPointerCapture(event.pointerId)
     event.preventDefault()
@@ -82,17 +85,18 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       setSongDuration((value) => Math.min(value, next - Math.min(songStart, next - 1)))
       return
     }
-    const startSetter = kind === 'text' ? setTextStart : setSongStart
-    const durationSetter = kind === 'text' ? setTextDuration : setSongDuration
+    const updateTiming = (start: number, duration: number) => {
+      if (kind === 'text' && drag.textId) setTextLayers(items => items.map(layer => layer.id === drag.textId ? { ...layer, start, duration } : layer))
+      else { (kind === 'text' ? setTextStart : setSongStart)(start); (kind === 'text' ? setTextDuration : setSongDuration)(duration) }
+    }
     if (drag.edge === 'move') {
-      startSetter(Math.max(0, Math.min(storyDuration - drag.duration, Math.round(drag.start + delta))))
+      updateTiming(Math.max(0, Math.min(storyDuration - drag.duration, Math.round(drag.start + delta))), drag.duration)
     } else if (drag.edge === 'start') {
       const end = drag.start + drag.duration
       const nextStart = Math.max(0, Math.min(end - 1, Math.round(drag.start + delta)))
-      startSetter(nextStart)
-      durationSetter(end - nextStart)
+      updateTiming(nextStart, end - nextStart)
     } else {
-      durationSetter(Math.max(1, Math.min(storyDuration - drag.start, Math.round(drag.duration + delta))))
+      updateTiming(drag.start, Math.max(1, Math.min(storyDuration - drag.start, Math.round(drag.duration + delta))))
     }
   }
 
@@ -181,7 +185,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       duration: storyDuration,
       overlayX,
       overlayY,
-      ...(textLayers[0] ? { overlayText: textLayers[0].text, overlayTexts: textLayers.map(layer => ({ ...layer, start: textStart, duration: Math.min(textDuration, storyDuration - textStart) })), overlayTextColor: textLayers[0].color, overlayFontFamily: font || undefined, overlayX: textLayers[0].x, overlayY: textLayers[0].y, overlayStart: textStart, overlayDuration: Math.min(textDuration, storyDuration - textStart) } : {}),
+      ...(textLayers[0] ? { overlayText: textLayers[0].text, overlayTexts: textLayers.map(layer => ({ ...layer, start: layer.start, duration: Math.min(layer.duration, storyDuration - layer.start) })), overlayTextColor: textLayers[0].color, overlayFontFamily: font || undefined, overlayX: textLayers[0].x, overlayY: textLayers[0].y, overlayStart: textStart, overlayDuration: Math.min(textDuration, storyDuration - textStart) } : {}),
     }
     const globalMusic: GlobalMusic | null = song ? {
       url: song.previewUrl,
@@ -255,17 +259,20 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
             <div className="flex h-full w-full flex-col gap-[2px]">
               <div
                 ref={(node) => { timelineRowRefs.current.text = node }}
-                onPointerDown={(event) => beginTimelineDrag('text', event)}
                 onPointerMove={(event) => moveTimelineDrag('text', event)}
                 onPointerUp={endTimelineDrag}
                 onPointerCancel={endTimelineDrag}
-                className={`relative h-[27px] w-full shrink-0 touch-none overflow-hidden rounded-sm bg-muted ${overlayText.trim() ? 'cursor-grab' : 'cursor-default opacity-60'}`}
+                className="relative h-[27px] w-full shrink-0 touch-none overflow-hidden rounded-sm bg-muted"
                 aria-label="Text timeline strip"
               >
-                {overlayText.trim() && <div className="absolute inset-y-0 rounded-sm bg-violet-500/90" style={{ left: `${(textStart / 60) * 100}%`, width: `${Math.max(1.5, (Math.min(textDuration, storyDuration - textStart) / 60) * 100)}%` }}>
-                  {overlayText.trim() && <><span data-edge="start" className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-sm bg-violet-200/90" /><span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-sm bg-violet-200/90" /></>}
-                </div>}
-                <span className="pointer-events-none absolute inset-y-0 left-2 z-20 flex items-center text-[11px] font-semibold text-foreground drop-shadow-sm">Text</span>
+                {textLayers.map((layer) => (
+                  <div key={layer.id} data-text-id={layer.id} onPointerDown={(event) => { setSelectedTextId(layer.id); beginTimelineDrag('text', event) }} className={"absolute inset-y-0 overflow-hidden rounded-sm bg-violet-500/90 " + (selectedTextId === layer.id ? "ring-1 ring-white" : "")} style={{ left: `${(layer.start / 60) * 100}%`, width: `${Math.max(2.5, (Math.min(layer.duration, storyDuration - layer.start) / 60) * 100)}%` }} title={layer.text}>
+                    <span data-edge="start" className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-sm bg-violet-200/90" />
+                    <span data-edge="end" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-sm bg-violet-200/90" />
+                    <span className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-2 text-[10px] font-semibold text-white whitespace-nowrap">{layer.text.length > 16 ? layer.text.slice(0, 16).trimEnd() + '...' : layer.text}</span>
+                  </div>
+                ))}
+                <span className="pointer-events-none absolute inset-y-0 left-2 z-20 flex items-center text-[11px] font-semibold text-foreground drop-shadow-sm">{textLayers.length ? '' : 'Text'}</span>
               </div>
               <div
                 ref={(node) => { timelineRowRefs.current.photo = node }}
@@ -315,7 +322,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
             <div className="flex gap-2">
               <input autoFocus value={textDraft} onChange={(e) => setTextDraft(e.target.value)} maxLength={150} placeholder="Write something..." className="min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500" />
               <button onClick={() => { setTextDraft(''); setShowTextInput(false) }} aria-label="Cancel adding text" className="rounded-xl border border-border px-3 hover:bg-muted"><X className="h-4 w-4" /></button>
-              <button onClick={() => { const value = textDraft.trim(); if (value) { const id = makeId(); setTextLayers(items => [...items, { id, text: value, x: 50, y: 50, scale: 1, rotation: 0, color: '#ffffff' }]); setSelectedTextId(id); if (!overlayText.trim()) setOverlayText(value) } setTextDraft(''); setShowTextInput(false) }} aria-label="Add text to story" className="rounded-xl bg-muted px-3"><Check className="h-4 w-4" /></button>
+              <button onClick={() => { const value = textDraft.trim(); if (value) { const id = makeId(); setTextLayers(items => [...items, { id, text: value, x: 50, y: 50, scale: 1, rotation: 0, color: '#ffffff', start: 0, duration: storyDuration }]); setSelectedTextId(id); if (!overlayText.trim()) setOverlayText(value) } setTextDraft(''); setShowTextInput(false) }} aria-label="Add text to story" className="rounded-xl bg-muted px-3"><Check className="h-4 w-4" /></button>
             </div>
           )}
           <div className="grid grid-cols-3 gap-2">
@@ -345,7 +352,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
           <div className="relative flex h-[min(82dvh,760px)] aspect-[9/16] max-w-full items-center justify-center overflow-hidden rounded-2xl bg-black">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={previewUrl} alt="Story preview" className="h-full w-full object-contain" />
-            {textLayers.length > 0 && previewElapsed >= textStart && previewElapsed < textStart + Math.min(textDuration, storyDuration - textStart) && textLayers.map(layer => (
+            {textLayers.filter(layer => previewElapsed >= layer.start && previewElapsed < layer.start + Math.min(layer.duration, storyDuration - layer.start)).map(layer => (
               <div key={layer.id} className="absolute max-w-[86%] rounded-lg px-2 py-1 text-center font-bold [text-shadow:0_2px_8px_rgba(0,0,0,0.9)]" style={{ left: layer.x + '%', top: layer.y + '%', transform: 'translate(-50%, -50%) rotate(' + layer.rotation + 'deg)', fontSize: (20 * layer.scale) + 'px', color: layer.color, fontFamily: font ? "'" + font + "', sans-serif" : undefined }}>{layer.text}</div>
             ))}
             <div className="absolute inset-x-0 top-0 h-1 bg-white/30"><div className="h-full bg-white" style={{ width: (Math.min(100, (previewElapsed / storyDuration) * 100)) + '%' }} /></div>
