@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { MusicPicker, SelectedSong } from './MusicPicker'
 import { MusicAdjustModal } from './MusicAdjustModal'
 import { FontPicker } from './FontPicker'
-import { StoryMentionPicker, type MentionPerson } from './StoryMentionPicker'
+import { StoryMentionPicker } from './StoryMentionPicker'
 import { useCreateStory, DraftPhotoScene } from '@/lib/hooks/useStories'
 import { StoryAudienceModal } from './StoryAudienceModal'
 import type { GlobalMusic, StoryVisibility, StoryMentionOverlay } from '@/lib/types/database.types'
@@ -210,7 +210,8 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       duration: storyDuration,
       overlayX,
       overlayY,
-      ...(textLayers[0] ? { overlayText: textLayers[0].text, overlayTexts: textLayers.map(layer => ({ ...layer, start: layer.start, duration: Math.min(layer.duration, storyDuration - layer.start) })), mentions: mentionOverlays, overlayTextColor: textLayers[0].color, overlayFontFamily: font || undefined, overlayX: textLayers[0].x, overlayY: textLayers[0].y, overlayStart: textStart, overlayDuration: Math.min(textDuration, storyDuration - textStart) } : {}),
+      mentions: mentionOverlays,
+      ...(textLayers[0] ? { overlayText: textLayers[0].text, overlayTexts: textLayers.map(layer => ({ ...layer, start: layer.start, duration: Math.min(layer.duration, storyDuration - layer.start) })), overlayTextColor: textLayers[0].color, overlayFontFamily: font || undefined, overlayX: textLayers[0].x, overlayY: textLayers[0].y, overlayStart: textStart, overlayDuration: Math.min(textDuration, storyDuration - textStart) } : {}),
     }
     const globalMusic: GlobalMusic | null = song ? {
       url: song.previewUrl,
