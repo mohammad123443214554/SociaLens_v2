@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Check, ImagePlus, Loader2, MoreVertical, Music2, Play, RotateCw, Type, X, Copy, Trash2, Languages } from 'lucide-react'
+import { ArrowLeft, Check, ImagePlus, Loader2, MoreVertical, Music2, Play, RotateCw, Type, X, Copy, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MusicPicker, SelectedSong } from './MusicPicker'
 import { MusicAdjustModal } from './MusicAdjustModal'
@@ -57,89 +57,6 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const [songStickerRotation, setSongStickerRotation] = useState<number>((initialDraft?.photo as any)?.songStickerRotation ?? 0)
   const songStickerDragging = useRef(false)
   const [showMusicAdjust, setShowMusicAdjust] = useState(false)
-  type LyricsLine = { time: number; text: string }
-  type LyricsData = { plain: string; synced: LyricsLine[]; hasSynced: boolean; trackName: string; artistName: string }
-  type LyricsMode = 'off' | 'english' | 'hindi' | 'karaoke-short' | 'karaoke-long'
-  const [lyricsData, setLyricsData] = useState<LyricsData | null>(null)
-  const [lyricsMode, setLyricsMode] = useState<LyricsMode>('off')
-  const [lyricsLoading, setLyricsLoading] = useState(false)
-  const [lyricsBox, setLyricsBox] = useState({ x: 50, y: 70, width: 82, height: 26 })
-  const lyricsBoxDrag = useRef<{ mode: 'move' | 'resize'; pointerX: number; pointerY: number; x: number; y: number; width: number; height: number } | null>(null)
-  const [storyDuration, setStoryDuration] = useState(initialDraft?.photo?.storyDuration ?? 5)
-  const [textStart, setTextStart] = useState(initialDraft?.photo?.textStart ?? 0)
-  const [textDuration, setTextDuration] = useState(initialDraft?.photo?.textDuration ?? 5)
-  const [songStart, setSongStart] = useState(initialDraft?.photo?.songStart ?? 0)
-  const [songDuration, setSongDuration] = useState(initialDraft?.photo?.songDuration ?? 5)
-  const [showPreview, setShowPreview] = useState(false)
-  const [previewElapsed, setPreviewElapsed] = useState(0)
-  const previewAudioRef = useRef<HTMLAudioElement>(null)
-  const timelineDrag = useRef<{ kind: 'photo' | 'text' | 'song'; edge: 'start' | 'end' | 'move'; x: number; start: number; duration: number; textId?: string } | null>(null)
-  const timelineRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
-
-  useEffect(() => {
-    let cancelled = false
-    setLyricsData(null)
-    setLyricsMode('off')
-    if (!song?.title || !song?.artist) {
-      setLyricsLoading(false)
-      return
-    }
-    setLyricsLoading(true)
-    const params = new URLSearchParams({ title: song.title, artist: song.artist })
-    fetch('/api/music/lyrics?' + params.toString())
-      .then(response => response.ok ? response.json() : null)
-      .then(data => {
-        if (cancelled) return
-        const value = data?.available && data?.lyrics
-        if (value && (typeof value.plain === 'string' || Array.isArray(value.synced))) {
-          setLyricsData({
-            plain: typeof value.plain === 'string' ? value.plain : '',
-            synced: Array.isArray(value.synced) ? value.synced.filter((line: any) => Number.isFinite(line?.time) && typeof line?.text === 'string' && line.text.trim()) : [],
-            hasSynced: Boolean(value.hasSynced),
-            trackName: String(value.trackName || song.title),
-            artistName: String(value.artistName || song.artist),
-          })
-        }
-      })
-      .catch(() => { if (!cancelled) setLyricsData(null) })
-      .finally(() => { if (!cancelled) setLyricsLoading(false) })
-    return () => { cancelled = true }
-  }, [song?.title, song?.artist])
-
-  const hasEnglishLyrics = Boolean(lyricsData?.plain && /[A-Za-z]/.test(lyricsData.plain))
-  const hasHindiLyrics = Boolean(lyricsData?.plain && /[\u0900-\u097F]/.test(lyricsData.plain))
-  const lyricsAtTime = lyricsData?.synced.filter(line => line.time <= Math.max(0, previewElapsed - songStart + songOffset)) || []
-  const activeLyricsIndex = Math.max(0, lyricsAtTime.length - 1)
-  const karaokeLineCount = 4
-  const formatKaraokeLine = (text: string, wordsPerLine: number) => { const words = text.trim().split(/\s+/); const chunks: string[] = []; for (let index = 0; index < words.length; index += wordsPerLine) chunks.push(words.slice(index, index + wordsPerLine).join(' ')); return chunks.join('\n') }
-  const visibleKaraokeLines = lyricsData?.synced.slice(Math.max(0, activeLyricsIndex - karaokeLineCount + 1), activeLyricsIndex + 1) || []
-  const displayLyricsText = lyricsMode === 'english'
-    ? lyricsData?.plain.split(/\r?\n/).filter(line => /[A-Za-z]/.test(line)).join('\n')
-    : lyricsMode === 'hindi'
-      ? lyricsData?.plain.split(/\r?\n/).filter(line => /[\u0900-\u097F]/.test(line)).join('\n')
-      : ''
-
-  const beginLyricsBoxDrag = (event: React.PointerEvent<HTMLDivElement>, mode: 'move' | 'resize') => {
-    if (lyricsMode === 'off' || !displayLyricsText && !visibleKaraokeLines.length) return
-    event.preventDefault()
-    event.stopPropagation()
-    lyricsBoxDrag.current = { mode, pointerX: event.clientX, pointerY: event.clientY, ...lyricsBox }
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-  const moveLyricsBoxDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = lyricsBoxDrag.current
-    const rect = stageRef.current?.getBoundingClientRect()
-    if (!drag || !rect) return
-    const dx = (event.clientX - drag.pointerX) / rect.width * 100
-    const dy = (event.clientY - drag.pointerY) / rect.height * 100
-    if (drag.mode === 'move') {
-      setLyricsBox(value => ({ ...value, x: Math.max(value.width / 2 + 2, Math.min(98 - value.width / 2, drag.x + dx)), y: Math.max(value.height / 2 + 2, Math.min(98 - value.height / 2, drag.y + dy)) }))
-    } else {
-      setLyricsBox(value => ({ ...value, width: Math.max(30, Math.min(96, drag.width + dx)), height: Math.max(12, Math.min(65, drag.height + dy)) }))
-    }
-  }
-  const endLyricsBoxDrag = () => { lyricsBoxDrag.current = null }
-
   const getSongAvailableDuration = (offset = songOffset) => Math.max(0, (song?.duration || 30) - offset)
   const getSongClipLimit = (start = songStart, offset = songOffset) => Math.max(1, Math.min(storyDuration - start, getSongAvailableDuration(offset)))
 
@@ -359,40 +276,9 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
 
       <main className="min-h-0 flex-1 flex flex-col items-center justify-start gap-4 overflow-y-auto overscroll-y-contain px-3 py-4 touch-pan-y sm:justify-center sm:px-6">
         <div className="flex w-full max-w-5xl flex-col items-center justify-center gap-4 sm:flex-row sm:items-center sm:justify-center sm:gap-5 lg:gap-6">
-        {song && lyricsData && (
-          <aside aria-label="Lyrics display options" className="order-2 w-full max-w-[min(100%,28rem)] shrink-0 rounded-xl border border-border bg-card p-3 sm:order-1 sm:w-44 sm:max-w-44">
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><Languages className="h-4 w-4" /> Lyrics</div>
-            <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-col sm:overflow-visible">
-              <button type="button" onClick={() => setLyricsMode('off')} aria-pressed={lyricsMode === 'off'} className={`shrink-0 rounded-lg border px-2.5 py-2 text-left text-xs font-medium sm:w-full ${lyricsMode === 'off' ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}>Off</button>
-              {hasEnglishLyrics && <button type="button" onClick={() => setLyricsMode('english')} aria-pressed={lyricsMode === 'english'} className={`shrink-0 rounded-lg border px-2.5 py-2 text-left text-xs font-medium sm:w-full ${lyricsMode === 'english' ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}>English lyrics</button>}
-              {hasHindiLyrics && <button type="button" onClick={() => setLyricsMode('hindi')} aria-pressed={lyricsMode === 'hindi'} className={`shrink-0 rounded-lg border px-2.5 py-2 text-left text-xs font-medium sm:w-full ${lyricsMode === 'hindi' ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}>Hindi lyrics</button>}
-              {lyricsData.hasSynced && <button type="button" onClick={() => setLyricsMode('karaoke-short')} aria-pressed={lyricsMode === 'karaoke-short'} className={`shrink-0 rounded-lg border px-2.5 py-2 text-left text-xs font-medium sm:w-full ${lyricsMode === 'karaoke-short' ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}>Karaoke · Short lines</button>}
-              {lyricsData.hasSynced && <button type="button" onClick={() => setLyricsMode('karaoke-long')} aria-pressed={lyricsMode === 'karaoke-long'} className={`shrink-0 rounded-lg border px-2.5 py-2 text-left text-xs font-medium sm:w-full ${lyricsMode === 'karaoke-long' ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}>Karaoke · Long lines</button>}
-            </div>
-          </aside>
-        )}
         <div className="order-1 relative flex h-[min(62dvh,680px)] sm:order-2 min-h-0 aspect-[9/16] w-auto max-w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl" ref={stageRef}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={previewUrl} alt="Photo story preview" className="block h-full w-full object-contain" />
-          {song && lyricsData && lyricsMode !== 'off' && (displayLyricsText || visibleKaraokeLines.length > 0) && (
-            <div
-              aria-label="Draggable and resizable song lyrics"
-              onPointerDown={event => beginLyricsBoxDrag(event, 'move')}
-              onPointerMove={moveLyricsBoxDrag}
-              onPointerUp={endLyricsBoxDrag}
-              onPointerCancel={endLyricsBoxDrag}
-              className="absolute z-10 flex cursor-move touch-none select-none flex-col justify-end overflow-hidden rounded-xl border border-white/30 bg-black/55 px-3 py-2 text-center font-semibold leading-6 text-white shadow-lg backdrop-blur-[2px] [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]"
-              style={{ left: lyricsBox.x + '%', top: lyricsBox.y + '%', width: lyricsBox.width + '%', height: lyricsBox.height + '%', transform: 'translate(-50%, -50%)', transition: lyricsBoxDrag.current ? 'none' : 'left 80ms linear, top 80ms linear, width 100ms ease, height 100ms ease' }}
-            >
-              {lyricsMode === 'english' || lyricsMode === 'hindi'
-                ? <p className="h-full overflow-hidden whitespace-pre-line text-sm">{displayLyricsText}</p>
-                : visibleKaraokeLines.map((line, index) => <p key={line.time + '-' + index} className="animate-[lyricsRise_500ms_ease-out] whitespace-pre-line text-sm font-semibold leading-5" style={{ opacity: index === visibleKaraokeLines.length - 1 ? 1 : 0.58 }}>{formatKaraokeLine(line.text, lyricsMode === 'karaoke-short' ? 3 : 9)}</p>)}
-              <div className="absolute bottom-1 right-1 flex items-center gap-1">
-                <span className="rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-medium">Drag to move</span>
-                <div role="button" tabIndex={0} aria-label="Resize lyrics box" title="Drag to resize lyrics" onPointerDown={event => beginLyricsBoxDrag(event, 'resize')} onPointerMove={moveLyricsBoxDrag} onPointerUp={endLyricsBoxDrag} onPointerCancel={endLyricsBoxDrag} onKeyDown={event => { if (event.key === 'ArrowRight') setLyricsBox(value => ({ ...value, width: Math.min(96, value.width + 2) })); if (event.key === 'ArrowLeft') setLyricsBox(value => ({ ...value, width: Math.max(30, value.width - 2) })); if (event.key === 'ArrowDown') setLyricsBox(value => ({ ...value, height: Math.min(65, value.height + 2) })); if (event.key === 'ArrowUp') setLyricsBox(value => ({ ...value, height: Math.max(12, value.height - 2) })) }} className="h-4 w-4 cursor-nwse-resize touch-none rounded-sm border border-white/80 bg-white/30" />
-              </div>
-            </div>
-          )}
           {textLayers.map(layer => (
             <div key={layer.id} onPointerDown={event => { setSelectedTextId(layer.id); dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId) }} onPointerMove={event => { if (!dragging.current || !stageRef.current) return; const rect = stageRef.current.getBoundingClientRect(); const x = Math.min(92, Math.max(8, ((event.clientX - rect.left) / rect.width) * 100)); const y = Math.min(92, Math.max(8, ((event.clientY - rect.top) / rect.height) * 100)); setTextLayers(items => items.map(item => item.id === layer.id ? { ...item, x, y } : item)); setOverlayX(x); setOverlayY(y) }} onPointerUp={() => { dragging.current = false }} onPointerCancel={() => { dragging.current = false }} onClick={() => setSelectedTextId(layer.id)} className={"absolute max-w-[86%] cursor-move select-none touch-none rounded-sm px-2 py-1 text-center font-bold [text-shadow:0_2px_8px_rgba(0,0,0,0.9)] " + (selectedTextId === layer.id ? "outline outline-1 outline-white outline-offset-2" : "")} style={{ left: layer.x + '%', top: layer.y + '%', transform: 'translate(-50%, -50%) rotate(' + layer.rotation + 'deg)', fontSize: (20 * layer.scale) + 'px', color: layer.color, fontFamily: font ? "'" + font + "', sans-serif" : undefined }} aria-label="Story text; drag to move and resize">
               {layer.text}
@@ -433,7 +319,13 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
                 </button>
               ))}
             </div>
-            <p className="mt-2 hidden text-[11px] text-muted-foreground sm:block">Choose a style, then drag the song tag anywhere on the story.</p>
+            <p className="mt-2 hidden text-[11px] text-muted-foreground sm:block">Drag the song tag on the story to move it.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setSongStickerScale(value => Math.max(0.55, Math.round((value - 0.1) * 100) / 100))} aria-label="Make song tag smaller" className="rounded-lg border border-border bg-card px-2 py-2 text-xs font-medium hover:bg-muted">− Smaller</button>
+              <button type="button" onClick={() => setSongStickerScale(value => Math.min(1.8, Math.round((value + 0.1) * 100) / 100))} aria-label="Make song tag larger" className="rounded-lg border border-border bg-card px-2 py-2 text-xs font-medium hover:bg-muted">+ Larger</button>
+              <button type="button" onClick={() => setSongStickerRotation(value => Math.max(-180, value - 15))} aria-label="Rotate song tag left" className="rounded-lg border border-border bg-card px-2 py-2 text-xs font-medium hover:bg-muted">↶ Rotate</button>
+              <button type="button" onClick={() => setSongStickerRotation(value => Math.min(180, value + 15))} aria-label="Rotate song tag right" className="rounded-lg border border-border bg-card px-2 py-2 text-xs font-medium hover:bg-muted">Rotate ↷</button>
+            </div>
           </aside>
         )}
         </div>
@@ -541,14 +433,6 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
           <div className="relative flex h-[min(82dvh,760px)] aspect-[9/16] max-w-full items-center justify-center overflow-hidden rounded-2xl bg-black">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={previewUrl} alt="Story preview" className="h-full w-full object-contain" />
-            {song && lyricsData && (lyricsMode === 'english' || lyricsMode === 'hindi') && displayLyricsText && (
-              <div aria-label="Song lyrics" className="pointer-events-none absolute inset-x-3 bottom-[12%] z-10 max-h-[34%] overflow-hidden rounded-xl bg-black/55 px-3 py-2 text-center text-sm font-semibold leading-6 text-white whitespace-pre-line">{displayLyricsText}</div>
-            )}
-            {song && lyricsData?.hasSynced && (lyricsMode === 'karaoke-short' || lyricsMode === 'karaoke-long') && visibleKaraokeLines.length > 0 && (
-              <div aria-label="Synchronized karaoke lyrics" className="pointer-events-none absolute inset-x-3 bottom-[12%] z-10 flex max-h-[30%] flex-col justify-end overflow-hidden rounded-xl bg-black/40 px-3 py-2 text-center text-white">
-                {visibleKaraokeLines.map((line, index) => <p key={line.time + '-' + index} className="animate-[lyricsRise_500ms_ease-out] whitespace-pre-line text-sm font-semibold leading-6" style={{ opacity: index === visibleKaraokeLines.length - 1 ? 1 : 0.58 }}>{line.text}</p>)}
-              </div>
-            )}
             {textLayers.filter(layer => previewElapsed >= layer.start && previewElapsed < layer.start + Math.min(layer.duration, storyDuration - layer.start)).map(layer => (
               <div key={layer.id} className="absolute max-w-[86%] rounded-lg px-2 py-1 text-center font-bold [text-shadow:0_2px_8px_rgba(0,0,0,0.9)]" style={{ left: layer.x + '%', top: layer.y + '%', transform: 'translate(-50%, -50%) rotate(' + layer.rotation + 'deg)', fontSize: (20 * layer.scale) + 'px', color: layer.color, fontFamily: font ? "'" + font + "', sans-serif" : undefined }}>{layer.text}</div>
             ))}
@@ -562,7 +446,6 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       {showMusicPicker && <MusicPicker onSelect={(selected) => { setSong(selected); setSongOffset(0); setSongStart(0); setSongDuration(Math.min(5, storyDuration, selected.duration || storyDuration)); setShowMusicPicker(false) }} onClose={() => setShowMusicPicker(false)} />}
       {showMusicAdjust && song && <MusicAdjustModal song={song} initialStart={songOffset} initialDuration={Math.min(songDuration, storyDuration - songStart, getSongAvailableDuration())} maxDuration={getSongClipLimit(songStart)} onClose={() => setShowMusicAdjust(false)} onApply={(sourceStart, clipDuration) => { setSongOffset(sourceStart); setSongDuration(clipDuration); setShowMusicAdjust(false) }} />}
       {showFontPicker && <FontPicker currentFont={font || ''} onSelect={(value) => setFont(value || null)} onCancel={() => setShowFontPicker(false)} onDone={() => setShowFontPicker(false)} />}
-      <style jsx global>{`@keyframes lyricsRise { from { opacity: 0; transform: translateY(10px); } to { transform: translateY(0); } }`}</style>
       {showAudience && <StoryAudienceModal userId={userId} isPending={createPhotoStory.isPending} confirmLabel="Confirm Share" onClose={() => setShowAudience(false)} onConfirm={confirmShare} />}
     </div>
   )
