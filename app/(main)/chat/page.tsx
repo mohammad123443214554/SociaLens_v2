@@ -13,7 +13,7 @@ import { useBlockedByOthers, useBlockedRelations, useArchiveLockStatus } from '@
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { ChatListItem } from '@/components/chat/ChatListItem'
 import { ArchivePasswordWizard } from '@/components/chat/ArchivePasswordWizard'
-import { MentionedStoriesPanel } from '@/components/chat/MentionedStoriesPanel'
+import { MentionedStoriesPanel } from '@/components/stories/MentionedStoriesPanel'
 import type { Chat } from '@/lib/types/database.types'
 
 interface ChatRow extends Chat {
