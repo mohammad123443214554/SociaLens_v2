@@ -540,17 +540,47 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
           )}
 
           {activeMusicTitle && (
-            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full pl-1.5 pr-4 py-1.5 max-w-[85%] z-10">
-              {activeMusicArtwork ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={activeMusicArtwork} alt={activeMusicTitle} className="h-7 w-7 rounded-full object-cover shrink-0" />
-              ) : (
-                <Music className="h-4 w-4 text-white shrink-0" />
+            <div
+              className="absolute z-10 max-w-[88%]"
+              style={{
+                left: `${story.global_music?.stickerX ?? 50}%`,
+                top: `${story.global_music?.stickerY ?? 82}%`,
+                transform: `translate(-50%, -50%) rotate(${story.global_music?.stickerRotation ?? 0}deg) scale(${story.global_music?.stickerScale ?? 1})`,
+                transformOrigin: 'center',
+              }}
+            >
+              {(story.global_music?.stickerStyle ?? 'pill') === 'pill' && (
+                <div className="flex max-w-full items-center gap-2 rounded-full bg-black/50 py-1.5 pl-1.5 pr-3 text-white shadow backdrop-blur-sm">
+                  {activeMusicArtwork ? <img src={activeMusicArtwork} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <Music className="h-4 w-4 shrink-0" />}
+                  <span className="max-w-56 truncate text-xs font-medium">{activeMusicTitle}{activeMusicArtist ? ` · ${activeMusicArtist}` : ''}</span>
+                  {activeMusicLicenseUrl && <a href={activeMusicLicenseUrl} onClick={e => e.stopPropagation()} target="_blank" rel="noreferrer" aria-label="View music licence" className="shrink-0 text-[10px] underline">Licence</a>}
+                </div>
               )}
-              <span className="text-white text-xs font-medium truncate">
-                {activeMusicTitle}{activeMusicArtist ? ` \u00b7 ${activeMusicArtist}` : ''}
-              </span>
-              {activeMusicLicenseUrl && <a href={activeMusicLicenseUrl} target="_blank" rel="noreferrer" aria-label="View music licence" title="View music licence" className="shrink-0 text-[10px] text-white/80 underline underline-offset-2">Licence</a>}
+              {(story.global_music?.stickerStyle ?? 'pill') === 'cover' && (
+                <div className="flex w-56 max-w-full items-center gap-2 rounded-lg border border-white/15 bg-black/75 p-2 text-white shadow-lg backdrop-blur">
+                  {activeMusicArtwork && <img src={activeMusicArtwork} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />}
+                  <div className="min-w-0"><p className="truncate text-sm font-bold">{activeMusicTitle}</p><p className="truncate text-xs text-white/75">{activeMusicArtist}</p><div className="mt-1 h-1 rounded-full bg-white/25"><div className="h-full w-2/3 rounded-full bg-white/80" /></div></div>
+                </div>
+              )}
+              {(story.global_music?.stickerStyle ?? 'pill') === 'square' && (
+                <div className="w-36 max-w-full overflow-hidden rounded-xl bg-white text-black shadow-xl">
+                  {activeMusicArtwork && <img src={activeMusicArtwork} alt="" className="aspect-square w-full object-cover" />}
+                  <div className="px-2.5 py-2"><p className="truncate text-sm font-semibold">{activeMusicTitle}</p><p className="truncate text-xs text-neutral-600">♫ {activeMusicArtist}</p></div>
+                </div>
+              )}
+              {(story.global_music?.stickerStyle ?? 'pill') === 'vinyl' && (
+                <div className="flex max-w-full items-center gap-2 rounded-xl bg-neutral-950/90 p-2 text-white shadow-xl">
+                  <div className="relative h-12 w-12 shrink-0 rounded-full border border-white/20 bg-gradient-to-br from-neutral-700 via-black to-neutral-900 p-1"><div className="h-full w-full rounded-full border border-white/15 p-1">{activeMusicArtwork ? <img src={activeMusicArtwork} alt="" className="h-full w-full rounded-full object-cover" /> : <Music className="h-full w-full p-2" />}</div></div>
+                  <div className="min-w-0"><p className="max-w-40 truncate text-sm font-bold">{activeMusicTitle}</p><p className="max-w-40 truncate text-xs text-white/70">{activeMusicArtist}</p><div className="mt-1 flex items-center gap-[2px]">{Array.from({ length: 16 }, (_, i) => <span key={i} className="w-[2px] rounded-full bg-white/75" style={{ height: `${4 + (i * 7 % 11)}px` }} />)}</div></div>
+                </div>
+              )}
+              {(story.global_music?.stickerStyle ?? 'pill') === 'waveform' && (
+                <div className="flex w-60 max-w-full items-center gap-2 rounded-md bg-neutral-950/85 px-3 py-2 text-white shadow-lg">
+                  {activeMusicArtwork && <img src={activeMusicArtwork} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />}
+                  <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{activeMusicTitle}</p><p className="truncate text-[10px] text-white/70">{activeMusicArtist}</p></div>
+                  <div className="flex h-7 items-center gap-[2px]">{Array.from({ length: 13 }, (_, i) => <span key={i} className="w-[2px] rounded-full bg-white/80" style={{ height: `${5 + (i * 5 % 19)}px` }} />)}</div>
+                </div>
+              )}
             </div>
           )}
 
