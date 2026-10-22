@@ -64,6 +64,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const [songStart, setSongStart] = useState<number>((initialDraft?.photo as any)?.songStart ?? 0)
   const [songDuration, setSongDuration] = useState<number>((initialDraft?.photo as any)?.songDuration ?? 5)
   const [showPreview, setShowPreview] = useState(false)
+  const [exitAction, setExitAction] = useState<'close' | 'back' | null>(null)
   const [previewElapsed, setPreviewElapsed] = useState(0)
   const previewAudioRef = useRef<HTMLAudioElement>(null)
   const timelineDrag = useRef<{ kind: 'photo' | 'text' | 'song'; edge: 'start' | 'end' | 'move'; x: number; start: number; duration: number; textId?: string } | null>(null)
@@ -312,9 +313,9 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   return (
     <div className="fixed inset-0 z-[120] flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3 sm:px-5">
-        <button onClick={onBack} aria-label="Back to story upload choices" className="rounded-full p-2 hover:bg-muted"><ArrowLeft className="h-5 w-5" /></button>
+        <button onClick={() => setExitAction('back')} aria-label="Back to story upload choices" className="rounded-full p-2 hover:bg-muted"><ArrowLeft className="h-5 w-5" /></button>
         <h1 className="text-sm font-semibold sm:text-base">Photo story</h1>
-        <button onClick={onClose} aria-label="Close story creator" className="rounded-full p-2 hover:bg-muted"><X className="h-5 w-5" /></button>
+        <button onClick={() => setExitAction('close')} aria-label="Close story creator" className="rounded-full p-2 hover:bg-muted"><X className="h-5 w-5" /></button>
       </header>
 
       <main className="min-h-0 flex-1 flex flex-col items-center justify-start gap-4 overflow-y-auto overscroll-y-contain px-3 py-4 touch-pan-y sm:justify-center sm:px-6">
@@ -473,6 +474,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
         </div>
       </main>
 
+      {exitAction && <div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/60 p-4" role="alertdialog" aria-modal="true" aria-labelledby="photo-exit-title" aria-describedby="photo-exit-description"><div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl"><h2 id="photo-exit-title" className="text-lg font-semibold">Leave photo editor?</h2><p id="photo-exit-description" className="mt-2 text-sm text-muted-foreground">If you leave now, your current edits may be lost. Do you want to continue editing or discard your changes?</p><div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button type="button" variant="outline" onClick={() => setExitAction(null)}>Continue editing</Button><Button type="button" variant="destructive" onClick={() => { const action = exitAction; setExitAction(null); if (action === 'back') onBack(); else onClose() }}>Discard changes</Button></div></div></div>}
       {song && <audio ref={previewAudioRef} src={song.previewUrl} preload="metadata" className="hidden" />}
       {showMentionPicker && <StoryMentionPicker userId={userId} selected={mentionOverlays.map(item => ({ id: item.userId, username: item.username, full_name: item.fullName, avatar_url: item.avatarUrl }))} onClose={() => setShowMentionPicker(false)} onConfirm={(people) => { setMentionOverlays(current => { const retained = current.filter(item => people.some(person => person.id === item.userId)); const retainedIds = new Set(retained.map(item => item.userId)); const added = people.filter(person => !retainedIds.has(person.id)).map((person, index) => ({ id: makeId(), userId: person.id, username: person.username, fullName: person.full_name, avatarUrl: person.avatar_url, x: 50, y: Math.min(88, 64 + index * 8), scale: 1 })); return [...retained, ...added] }); setShowMentionPicker(false) }} />}
       {showPreview && previewUrl && (
