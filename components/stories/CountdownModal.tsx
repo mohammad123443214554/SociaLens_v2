@@ -17,15 +17,16 @@ export function CountdownModal({ onClose, onAdd, initialTitle = '', initialTarge
   const [now, setNow] = useState(() => Date.now())
   const [title, setTitle] = useState(initialTitle)
   const [targetAt, setTargetAt] = useState(() => {
-    const t = initialTargetAt ? new Date(initialTargetAt).getTime() : Date.now() + 60 * 60 * 1000
-    return localValue(new Date(clampTarget(t, Date.now())))
+    if (!initialTargetAt) return ''
+    const t = new Date(initialTargetAt).getTime()
+    return Number.isFinite(t) && t > Date.now() && t <= Date.now() + MAX_MS ? localValue(new Date(t)) : ''
   })
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id) }, [])
   const minDate = useMemo(() => localValue(new Date(minTarget(now))).slice(0,10), [now])
   const maxDate = useMemo(() => localValue(new Date(maxTarget(now))).slice(0,10), [now])
   const target = parseLocal(targetAt)
   const validTarget = Number.isFinite(target) && target > now && target <= now + MAX_MS
-  useEffect(() => { const parsed = parseLocal(targetAt); if (!Number.isFinite(parsed) || parsed <= now || parsed > now + MAX_MS) setTargetAt(localValue(new Date(clampTarget(Number.isFinite(parsed) ? parsed : now + 3_600_000, now)))) }, [now, targetAt])
+  useEffect(() => { if (!targetAt) return; const parsed = parseLocal(targetAt); if (!Number.isFinite(parsed) || parsed <= now || parsed > now + MAX_MS) setTargetAt('') }, [now, targetAt])
   const updateTarget = (value: string) => {
     const parsed = parseLocal(value)
     if (!Number.isFinite(parsed)) return
