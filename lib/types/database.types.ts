@@ -315,6 +315,17 @@ export type StoryMentionOverlay = {
   color?: string
 }
 
+export type StoryCountdownOverlay = {
+  id: string
+  title: string
+  targetAt: string
+  x: number
+  y: number
+  scale: number
+  rotation: number
+  color?: string
+}
+
 export type StoryLinkOverlay = {
   id: string
   url: string
@@ -339,6 +350,7 @@ export type PhotoScene = {
   overlayTexts?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null; start?: number; duration?: number }>
   mentions?: StoryMentionOverlay[]
   links?: StoryLinkOverlay[]
+  countdowns?: StoryCountdownOverlay[]
   overlayStart?: number
   overlayDuration?: number
   overlayTextColor?: string
@@ -361,6 +373,7 @@ export type VideoScene = {
   overlayTexts?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null; start?: number; duration?: number }>
   mentions?: StoryMentionOverlay[]
   links?: StoryLinkOverlay[]
+  countdowns?: StoryCountdownOverlay[]
   id: string
   videoUrl: string
   duration: number
