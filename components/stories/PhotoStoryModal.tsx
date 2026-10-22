@@ -34,6 +34,7 @@ const SONG_STICKER_OPTIONS: { id: SongStickerStyle; label: string; description: 
 export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialDraft }: PhotoStoryModalProps) {
   const [file, setFile] = useState<File | null>(initialFile || null)
   const [photoScale, setPhotoScale] = useState<number>(() => Math.max(1, Math.min(4, (initialDraft?.photo as any)?.photoScale ?? 1)))
+  const [photoOffset, setPhotoOffset] = useState<{ x: number; y: number }>(() => ({ x: (initialDraft?.photo as any)?.photoOffsetX ?? 0, y: (initialDraft?.photo as any)?.photoOffsetY ?? 0 }))
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [overlayText, setOverlayText] = useState(initialDraft?.photo?.overlayText || '')
   const [textLayers, setTextLayers] = useState<StoryTextLayer[]>(() => { const saved = (initialDraft?.photo as any)?.textLayers as StoryTextLayer[] | undefined; if (saved?.length) return saved.map(layer => ({ rotation: 0, color: '#ffffff', start: initialDraft?.photo?.textStart ?? 0, duration: initialDraft?.photo?.textDuration ?? 5, ...layer })); const oldText = initialDraft?.photo?.overlayText || ''; return oldText ? [{ id: makeId(), text: oldText, x: initialDraft?.photo?.overlayX ?? 50, y: initialDraft?.photo?.overlayY ?? 50, scale: 1, rotation: 0, color: '#ffffff', start: initialDraft?.photo?.textStart ?? 0, duration: initialDraft?.photo?.textDuration ?? 5 }] : [] })
@@ -168,6 +169,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const stageRef = useRef<HTMLDivElement>(null)
   const gesturePointers = useRef(new Map<number, { x: number; y: number }>())
   const pinchStart = useRef<{ distance: number; scale: number } | null>(null)
+  const photoDragStart = useRef<{ pointerId: number; x: number; y: number; offsetX: number; offsetY: number } | null>(null)
   const dragging = useRef(false)
   const { createPhotoStory } = useCreateStory()
 
@@ -182,12 +184,12 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
     if (!file) return
     const draft: StoryDraftRecord = {
       userId, kind: 'photo', file, fileName: file.name, fileType: file.type, lastModified: file.lastModified,
-      photo: { overlayText, overlayX, overlayY, font, textLayers, mentions: mentionOverlays, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset, songStickerStyle, songStickerX, songStickerY, songStickerScale, songStickerRotation, photoScale },
+      photo: { overlayText, overlayX, overlayY, font, textLayers, mentions: mentionOverlays, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset, songStickerStyle, songStickerX, songStickerY, songStickerScale, songStickerRotation, photoScale, photoOffsetX: photoOffset.x, photoOffsetY: photoOffset.y },
       updatedAt: Date.now(),
     }
     const timer = window.setTimeout(() => { void saveStoryDraft(draft).catch(() => {}) }, 120)
     return () => window.clearTimeout(timer)
-  }, [userId, file, overlayText, overlayX, overlayY, font, textLayers, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset, songStickerStyle, songStickerX, songStickerY, songStickerScale, songStickerRotation, mentionOverlays, photoScale])
+  }, [userId, file, overlayText, overlayX, overlayY, font, textLayers, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset, songStickerStyle, songStickerX, songStickerY, songStickerScale, songStickerRotation, mentionOverlays, photoScale, photoOffset])
 
   const onTextPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     dragging.current = true
@@ -200,6 +202,10 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
     setOverlayY(Math.min(92, Math.max(8, ((event.clientY - rect.top) / rect.height) * 100)))
   }
   const onStagePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement
+    if (target.closest('[data-photo-canvas-image]')) {
+      photoDragStart.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, offsetX: photoOffset.x, offsetY: photoOffset.y }
+    }
     if (event.pointerType !== 'touch') return
     gesturePointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
     if (gesturePointers.current.size === 2) {
@@ -208,14 +214,25 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
     }
   }
   const onStagePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch' && gesturePointers.current.has(event.pointerId)) gesturePointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    if (gesturePointers.current.size >= 2 && pinchStart.current) {
+      const points = Array.from(gesturePointers.current.values())
+      const distance = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y)
+      if (pinchStart.current.distance > 0) setPhotoScale(Math.max(1, Math.min(4, pinchStart.current.scale * distance / pinchStart.current.distance)))
+      return
+    }
+    const drag = photoDragStart.current
+    const rect = stageRef.current?.getBoundingClientRect()
+    if (drag && drag.pointerId === event.pointerId && rect) {
+      setPhotoOffset({ x: Math.max(-150, Math.min(150, drag.offsetX + (event.clientX - drag.x) / rect.width * 100)), y: Math.max(-150, Math.min(150, drag.offsetY + (event.clientY - drag.y) / rect.height * 100)) })
+    }
     if (event.pointerType !== 'touch' || !gesturePointers.current.has(event.pointerId)) return
-    gesturePointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
-    if (gesturePointers.current.size < 2 || !pinchStart.current) return
     const points = Array.from(gesturePointers.current.values())
     const distance = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y)
     if (pinchStart.current.distance > 0) setPhotoScale(Math.max(1, Math.min(4, pinchStart.current.scale * distance / pinchStart.current.distance)))
   }
   const onStagePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (photoDragStart.current?.pointerId === event.pointerId) photoDragStart.current = null
     gesturePointers.current.delete(event.pointerId)
     if (gesturePointers.current.size < 2) pinchStart.current = null
   }
@@ -238,6 +255,8 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       file,
       duration: storyDuration,
       photoScale,
+      photoOffsetX: photoOffset.x,
+      photoOffsetY: photoOffset.y,
       overlayX,
       overlayY,
       mentions: mentionOverlays,
@@ -305,7 +324,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
         <div className="flex w-full max-w-5xl flex-col items-center justify-center gap-4 sm:flex-row sm:items-center sm:justify-center sm:gap-5 lg:gap-6">
         <div className="order-1 relative flex h-[min(62dvh,680px)] sm:order-2 min-h-0 aspect-[9/16] w-auto max-w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl touch-none" ref={stageRef} onPointerDown={onStagePointerDown} onPointerMove={onStagePointerMove} onPointerUp={onStagePointerEnd} onPointerCancel={onStagePointerEnd} onWheel={onStageWheel}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={previewUrl} alt="Photo story preview" draggable={false} className="block h-full w-full object-contain transition-transform duration-75 ease-out" style={{ transform: `scale(${photoScale})`, transformOrigin: 'center center', willChange: photoScale > 1 ? 'transform' : undefined }} />
+          <img src={previewUrl} alt="Photo story preview" data-photo-canvas-image draggable={false} className="block h-full w-full object-contain cursor-grab active:cursor-grabbing transition-transform duration-75 ease-out" style={{ transform: `translate(${photoOffset.x}%, ${photoOffset.y}%) scale(${photoScale})`, transformOrigin: 'center center', willChange: photoScale > 1 || photoOffset.x !== 0 || photoOffset.y !== 0 ? 'transform' : undefined }} />
           {textLayers.map(layer => (
             <div key={layer.id} onPointerDown={event => { setSelectedTextId(layer.id); dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId) }} onPointerMove={event => { if (!dragging.current || !stageRef.current) return; const rect = stageRef.current.getBoundingClientRect(); const x = Math.min(92, Math.max(8, ((event.clientX - rect.left) / rect.width) * 100)); const y = Math.min(92, Math.max(8, ((event.clientY - rect.top) / rect.height) * 100)); setTextLayers(items => items.map(item => item.id === layer.id ? { ...item, x, y } : item)); setOverlayX(x); setOverlayY(y) }} onPointerUp={() => { dragging.current = false }} onPointerCancel={() => { dragging.current = false }} onClick={() => setSelectedTextId(layer.id)} className={"absolute max-w-[86%] cursor-move select-none touch-none rounded-sm px-2 py-1 text-center font-bold [text-shadow:0_2px_8px_rgba(0,0,0,0.9)] " + (selectedTextId === layer.id ? "outline outline-1 outline-white outline-offset-2" : "")} style={{ left: layer.x + '%', top: layer.y + '%', transform: 'translate(-50%, -50%) rotate(' + layer.rotation + 'deg)', fontSize: (20 * layer.scale) + 'px', color: layer.color, fontFamily: layer.fontFamily !== undefined ? (layer.fontFamily ? "'" + layer.fontFamily + "', sans-serif" : undefined) : (font ? "'" + font + "', sans-serif" : undefined) }} aria-label="Story text; drag to move and resize">
               {layer.text}
@@ -463,7 +482,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
           <button onClick={() => { setShowPreview(false); previewAudioRef.current?.pause() }} aria-label="Close story preview" className="absolute right-4 top-4 z-10 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"><X className="h-5 w-5" /></button>
           <div className="relative flex h-[min(82dvh,760px)] aspect-[9/16] max-w-full items-center justify-center overflow-hidden rounded-2xl bg-black">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewUrl} alt="Story preview" className="h-full w-full object-contain" style={{ transform: `scale(${photoScale})`, transformOrigin: 'center center' }} />
+            <img src={previewUrl} alt="Story preview" className="h-full w-full object-contain" style={{ transform: `translate(${photoOffset.x}%, ${photoOffset.y}%) scale(${photoScale})`, transformOrigin: 'center center' }} />
             {mentionOverlays.map(mention => <div key={mention.id} className="absolute z-20 flex max-w-[88%] items-center gap-2 rounded-full border border-white/50 bg-black/70 px-3 py-2 text-white shadow-lg" style={{ left: `${mention.x}%`, top: `${mention.y}%`, transform: `translate(-50%, -50%) scale(${mention.scale})` }}><AtSign className="h-4 w-4 text-pink-300" /><span className="max-w-40 truncate text-sm font-semibold">@{mention.username}</span></div>)}
             {textLayers.filter(layer => previewElapsed >= layer.start && previewElapsed < layer.start + Math.min(layer.duration, storyDuration - layer.start)).map(layer => (
               <div key={layer.id} className="absolute max-w-[86%] rounded-lg px-2 py-1 text-center font-bold [text-shadow:0_2px_8px_rgba(0,0,0,0.9)]" style={{ left: layer.x + '%', top: layer.y + '%', transform: 'translate(-50%, -50%) rotate(' + layer.rotation + 'deg)', fontSize: (20 * layer.scale) + 'px', color: layer.color, fontFamily: layer.fontFamily !== undefined ? (layer.fontFamily ? "'" + layer.fontFamily + "', sans-serif" : undefined) : (font ? "'" + font + "', sans-serif" : undefined) }}>{layer.text}</div>
