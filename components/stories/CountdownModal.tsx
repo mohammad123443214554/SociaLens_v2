@@ -13,7 +13,6 @@ const minTarget = (now: number) => Math.ceil((now + 60_000) / 60_000) * 60_000
 const maxTarget = (now: number) => Math.floor((now + MAX_MS) / 60_000) * 60_000
 const dateKey = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`
 const monthLabel = (date: Date) => date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 interface Props { onClose: () => void; onAdd: (title: string, targetAt: string) => void; initialTitle?: string; initialTargetAt?: string }
 type Picker = 'date' | 'time' | null
 
@@ -25,6 +24,16 @@ export function CountdownModal({ onClose, onAdd, initialTitle = '', initialTarge
     const t = new Date(initialTargetAt).getTime()
     return Number.isFinite(t) && t > Date.now() && t <= Date.now() + MAX_MS ? localValue(new Date(t)) : ''
   })
+  const [selectedDate, setSelectedDate] = useState(() => {
+    if (!initialTargetAt) return ''
+    const t = new Date(initialTargetAt).getTime()
+    return Number.isFinite(t) && t > Date.now() && t <= Date.now() + MAX_MS ? dateKey(new Date(t)) : ''
+  })
+  const [selectedTime, setSelectedTime] = useState(() => {
+    if (!initialTargetAt) return ''
+    const t = new Date(initialTargetAt).getTime()
+    return Number.isFinite(t) && t > Date.now() && t <= Date.now() + MAX_MS ? localValue(new Date(t)).slice(11, 16) : ''
+  })
   const [activePicker, setActivePicker] = useState<Picker>(null)
   const [visibleMonth, setVisibleMonth] = useState(() => new Date())
   const [hour, setHour] = useState('')
@@ -33,8 +42,8 @@ export function CountdownModal({ onClose, onAdd, initialTitle = '', initialTarge
 
   const minDate = useMemo(() => dateKey(new Date(minTarget(now))), [now])
   const maxDate = useMemo(() => dateKey(new Date(maxTarget(now))), [now])
-  const chosenDate = targetAt ? targetAt.slice(0, 10) : ''
-  const chosenTime = targetAt ? targetAt.slice(11, 16) : ''
+  const chosenDate = selectedDate
+  const chosenTime = selectedTime
   const target = parseLocal(targetAt)
   const validTarget = !!targetAt && Number.isFinite(target) && target > now && target <= now + MAX_MS
   const minDay = new Date(`${minDate}T12:00:00`)
@@ -45,24 +54,24 @@ export function CountdownModal({ onClose, onAdd, initialTitle = '', initialTarge
   const updateTarget = (date: string, time: string) => {
     if (!date || !time) { setTargetAt(''); return }
     const parsed = parseLocal(`${date}T${time}`)
-    if (!Number.isFinite(parsed) || parsed <= Date.now() || parsed > Date.now() + MAX_MS) return
+    if (!Number.isFinite(parsed) || parsed <= Date.now() || parsed > Date.now() + MAX_MS) { setTargetAt(''); return }
     setTargetAt(localValue(new Date(parsed)))
   }
   const selectDate = (day: number) => {
     const date = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), day, 12)
     const key = dateKey(date)
     if (key < minDate || key > maxDate) return
-    const currentTime = chosenTime || ''
+    setSelectedDate(key)
     setTargetAt('')
-    if (currentTime) {
-      const parsed = parseLocal(`${key}T${currentTime}`)
+    if (chosenTime) {
+      const parsed = parseLocal(`${key}T${chosenTime}`)
       if (parsed > Date.now() && parsed <= Date.now() + MAX_MS) setTargetAt(localValue(new Date(parsed)))
-      else { setHour(''); setMinute('') }
-    } else { setHour(''); setMinute('') }
+      else { setSelectedTime(''); setHour(''); setMinute('') }
+    }
     setActivePicker(null)
   }
   const chooseTime = (h: string, m: string) => {
-    setHour(h); setMinute(m)
+    setHour(h); setMinute(m); setSelectedTime(`${h}:${m}`)
     if (!chosenDate) return
     updateTarget(chosenDate, `${h}:${m}`)
   }
