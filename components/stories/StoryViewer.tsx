@@ -221,20 +221,37 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
     if (!video) return
 
     const scenes = story.video_scenes
+    const scene = scenes?.[videoSceneIndex]
+    const trimStart = Math.max(0, scene?.trimStart ?? 0)
+    const trimEnd = Math.max(trimStart + 0.1, scene?.trimEnd ?? (trimStart + (scene?.duration ?? video.duration ?? 1)))
     const priorDuration = scenes ? scenes.slice(0, videoSceneIndex).reduce((s, x) => s + x.duration, 0) : 0
+    let completed = false
 
-    const onTimeUpdate = () => {
-      const total = story.duration_seconds || video.duration || 1
-      setProgress(Math.min(100, ((priorDuration + video.currentTime) / total) * 100))
-    }
-    const onEnded = () => {
+    const advance = () => {
+      if (completed) return
+      completed = true
+      video.pause()
       if (scenes && videoSceneIndex < scenes.length - 1) {
         setVideoSceneIndex((i) => i + 1)
       } else {
         goNextStory()
       }
     }
+    const onTimeUpdate = () => {
+      if (video.currentTime < trimStart) {
+        video.currentTime = trimStart
+        return
+      }
+      const elapsedInClip = Math.max(0, Math.min(scene?.duration ?? trimEnd - trimStart, video.currentTime - trimStart))
+      const total = story.duration_seconds || video.duration || 1
+      setProgress(Math.min(100, ((priorDuration + elapsedInClip) / total) * 100))
+      if (video.currentTime >= trimEnd - 0.05) advance()
+    }
+    const onEnded = () => advance()
 
+    if (video.readyState >= 1 && Math.abs(video.currentTime - trimStart) > 0.1) {
+      video.currentTime = trimStart
+    }
     video.addEventListener('timeupdate', onTimeUpdate)
     video.addEventListener('ended', onEnded)
     return () => {
@@ -548,6 +565,10 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
               // If a song was picked, the clip's own sound is muted so the
               // chosen song plays instead - same as Instagram/Reels behavior.
               muted={!!activeMusicUrl}
+              onLoadedMetadata={event => {
+                const start = Math.max(0, activeVideoScene?.trimStart ?? 0)
+                if (Math.abs(event.currentTarget.currentTime - start) > 0.1) event.currentTarget.currentTime = start
+              }}
             />
           )}
 
