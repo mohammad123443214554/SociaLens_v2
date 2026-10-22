@@ -319,6 +319,9 @@ export type PhotoScene = {
   duration: number
   /** Zoom level applied to the photo within the story frame (1 = fit). */
   photoScale?: number
+  /** Position offset of the photo within the story frame, as percentages. */
+  photoOffsetX?: number
+  photoOffsetY?: number
   overlayText?: string
   overlayTexts?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null; start?: number; duration?: number }>
   mentions?: StoryMentionOverlay[]
