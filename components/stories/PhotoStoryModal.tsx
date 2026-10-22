@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, AtSign, Check, ImagePlus, Loader2, MoreVertical, Music2, Play, RotateCw, Type, X, Copy, Trash2 } from 'lucide-react'
+import { ArrowLeft, AtSign, Check, ImagePlus, Loader2, MoreVertical, Music2, Play, RotateCw, Type, X, Copy, Trash2, Sticker } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MusicPicker, SelectedSong } from './MusicPicker'
 import { MusicAdjustModal } from './MusicAdjustModal'
 import { FontPicker } from './FontPicker'
 import { StoryMentionPicker } from './StoryMentionPicker'
+import { StoryStickerSidebar } from './StoryStickerSidebar'
 import { useCreateStory, DraftPhotoScene } from '@/lib/hooks/useStories'
 import { StoryAudienceModal } from './StoryAudienceModal'
 import type { GlobalMusic, StoryVisibility, StoryMentionOverlay } from '@/lib/types/database.types'
@@ -50,6 +51,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const [font, setFont] = useState<string | null>(initialDraft?.photo?.font ?? null)
   const [showFontPicker, setShowFontPicker] = useState(false)
   const [showMentionPicker, setShowMentionPicker] = useState(false)
+  const [showStickerSidebar, setShowStickerSidebar] = useState(false)
   const [mentionOverlays, setMentionOverlays] = useState<StoryMentionOverlay[]>(() => ((initialDraft?.photo as any)?.mentions || []) as StoryMentionOverlay[])
   const mentionDragId = useRef<string | null>(null)
   const mentionResizeDrag = useRef<{ id: string; startX: number; scale: number } | null>(null)
@@ -457,7 +459,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
           <div className="grid grid-cols-3 gap-2">
             <button onClick={() => setShowMusicPicker(true)} aria-label={song ? 'Change song' : 'Add song'} className="flex min-h-11 items-center justify-center gap-1 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Music2 className="h-4 w-4 shrink-0" /><span className="sm:hidden">{song ? 'Change' : 'Song'}</span><span className="hidden sm:inline">{song ? 'Change song' : 'Add Song'}</span></button>
             <button onClick={() => { setTextDraft(''); setShowTextInput(true) }} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Type className="h-4 w-4" /> Add Text</button>
-            <button onClick={() => setShowMentionPicker(true)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><AtSign className="h-4 w-4 shrink-0" /><span>Mention</span></button>
+            <button onClick={() => setShowStickerSidebar(true)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-2 text-sm font-medium hover:bg-muted"><Sticker className="h-4 w-4 shrink-0" /><span>Sticker</span></button>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" className="shrink-0" onClick={() => replaceInput.current?.click()}><ImagePlus className="mr-2 h-4 w-4" /> Replace</Button>
@@ -476,6 +478,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
 
       {exitAction && <div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/60 p-4" role="alertdialog" aria-modal="true" aria-labelledby="photo-exit-title" aria-describedby="photo-exit-description"><div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl"><h2 id="photo-exit-title" className="text-lg font-semibold">Leave photo editor?</h2><p id="photo-exit-description" className="mt-2 text-sm text-muted-foreground">If you leave now, your current edits may be lost. Do you want to continue editing or discard your changes?</p><div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button type="button" variant="outline" onClick={() => setExitAction(null)}>Continue editing</Button><Button type="button" variant="destructive" onClick={() => { const action = exitAction; setExitAction(null); if (action === 'back') onBack(); else onClose() }}>Discard changes</Button></div></div></div>}
       {song && <audio ref={previewAudioRef} src={song.previewUrl} preload="metadata" className="hidden" />}
+      {showStickerSidebar && <StoryStickerSidebar onClose={() => setShowStickerSidebar(false)} onMention={() => { setShowStickerSidebar(false); setShowMentionPicker(true) }} />}
       {showMentionPicker && <StoryMentionPicker userId={userId} selected={mentionOverlays.map(item => ({ id: item.userId, username: item.username, full_name: item.fullName, avatar_url: item.avatarUrl }))} onClose={() => setShowMentionPicker(false)} onConfirm={(people) => { setMentionOverlays(current => { const retained = current.filter(item => people.some(person => person.id === item.userId)); const retainedIds = new Set(retained.map(item => item.userId)); const added = people.filter(person => !retainedIds.has(person.id)).map((person, index) => ({ id: makeId(), userId: person.id, username: person.username, fullName: person.full_name, avatarUrl: person.avatar_url, x: 50, y: Math.min(88, 64 + index * 8), scale: 1 })); return [...retained, ...added] }); setShowMentionPicker(false) }} />}
       {showPreview && previewUrl && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Story preview">
