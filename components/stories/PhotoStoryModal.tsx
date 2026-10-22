@@ -226,10 +226,6 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
     if (drag && drag.pointerId === event.pointerId && rect) {
       setPhotoOffset({ x: Math.max(-150, Math.min(150, drag.offsetX + (event.clientX - drag.x) / rect.width * 100)), y: Math.max(-150, Math.min(150, drag.offsetY + (event.clientY - drag.y) / rect.height * 100)) })
     }
-    if (event.pointerType !== 'touch' || !gesturePointers.current.has(event.pointerId)) return
-    const points = Array.from(gesturePointers.current.values())
-    const distance = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y)
-    if (pinchStart.current.distance > 0) setPhotoScale(Math.max(1, Math.min(4, pinchStart.current.scale * distance / pinchStart.current.distance)))
   }
   const onStagePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
     if (photoDragStart.current?.pointerId === event.pointerId) photoDragStart.current = null
