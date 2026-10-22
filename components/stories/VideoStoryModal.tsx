@@ -12,9 +12,7 @@ import { StoryStickerSidebar } from './StoryStickerSidebar'
 import { StoryLinkModal } from './StoryLinkModal'
 import { CountdownModal } from './CountdownModal'
 import { CountdownSticker } from './CountdownSticker'
-import type { StoryCountdownOverlay } from '@/lib/types/database.types'
-import type { StoryCountdownOverlay, StoryLinkOverlay, StoryMentionOverlay } from '@/lib/types/database.types'
-import type { StoryVisibility } from '@/lib/types/database.types'
+import type { StoryCountdownOverlay, StoryLinkOverlay, StoryMentionOverlay, StoryVisibility } from '@/lib/types/database.types'
 import { clearStoryDraft, saveStoryDraft, type StoryDraftRecord } from '@/lib/utils/storyDraft'
 
 interface VideoStoryModalProps {
