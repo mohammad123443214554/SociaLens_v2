@@ -1,6 +1,6 @@
 'use client'
 
-import type { StoryLinkOverlay, StoryMentionOverlay } from '@/lib/types/database.types'
+import type { StoryCountdownOverlay, StoryLinkOverlay, StoryMentionOverlay } from '@/lib/types/database.types'
 
 export type StoryDraftKind = 'photo' | 'video'
 
@@ -20,6 +20,7 @@ export interface StoryDraftRecord {
     textLayers?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null; start?: number; duration?: number }>
     mentions?: StoryMentionOverlay[]
     links?: StoryLinkOverlay[]
+    countdowns?: StoryCountdownOverlay[]
     song: { title: string; artist: string; artworkUrl: string; previewUrl: string; duration?: number; licenseUrl?: string; source?: string } | null
     storyDuration: number
     textStart: number
@@ -38,7 +39,7 @@ export interface StoryDraftRecord {
     photoOffsetX?: number
     photoOffsetY?: number
   }
-  video?: { duration: number; trimStart?: number; trimEnd?: number; textLayers?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null }>; mentions?: StoryMentionOverlay[]; links?: StoryLinkOverlay[] }
+  video?: { duration: number; trimStart?: number; trimEnd?: number; textLayers?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null }>; mentions?: StoryMentionOverlay[]; links?: StoryLinkOverlay[]; countdowns?: StoryCountdownOverlay[] }
   updatedAt: number
 }
 
