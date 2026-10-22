@@ -340,6 +340,10 @@ export type PhotoScene = {
 }
 
 export type VideoScene = {
+  /** Source video time in seconds where the published story clip begins. */
+  trimStart?: number
+  /** Source video time in seconds where the published story clip ends. */
+  trimEnd?: number
   overlayTexts?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null; start?: number; duration?: number }>
   mentions?: StoryMentionOverlay[]
   id: string
