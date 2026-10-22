@@ -509,7 +509,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
         </div>
 
         {/* Content */}
-        <div className="relative w-full h-full flex items-center justify-center">
+        <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
           {story.story_type === 'text' && (
             <div
               className="w-full h-full relative"
