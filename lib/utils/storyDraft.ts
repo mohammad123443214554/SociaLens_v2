@@ -33,6 +33,9 @@ export interface StoryDraftRecord {
     songStickerRotation?: number
     /** Canvas photo zoom, preserved when the editor is reopened. */
     photoScale?: number
+    /** Canvas photo position, preserved when the editor is reopened. */
+    photoOffsetX?: number
+    photoOffsetY?: number
   }
   video?: { duration: number; textLayers?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null }>; mentions?: StoryMentionOverlay[] }
   updatedAt: number
