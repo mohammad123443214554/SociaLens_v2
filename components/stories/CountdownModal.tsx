@@ -29,7 +29,7 @@ export function CountdownModal({ onClose, onAdd, initialTitle = '', initialTarge
   const target = parseLocal(targetAt)
   const minTime = targetAt.slice(0,10) === localValue(new Date(minTarget(now))).slice(0,10) ? localValue(new Date(minTarget(now))).slice(11,16) : '00:00'
   const maxTime = targetAt.slice(0,10) === localValue(new Date(maxTarget(now))).slice(0,10) ? localValue(new Date(maxTarget(now))).slice(11,16) : '23:59'
-  const openPicker = (input: HTMLInputElement | null) => { if (!input) return; try { if ('showPicker' in input) input.showPicker(); else input.focus() } catch { input.focus() } }
+  const openPicker = (input: HTMLInputElement | null) => { if (!input) return; const picker = input as HTMLInputElement & { showPicker?: () => void }; try { if (typeof picker.showPicker === 'function') picker.showPicker(); else picker.focus() } catch { picker.focus() } }
   const validTarget = Number.isFinite(target) && target > now && target <= now + MAX_MS
   useEffect(() => { if (!targetAt) return; const parsed = parseLocal(targetAt); if (!Number.isFinite(parsed) || parsed <= now || parsed > now + MAX_MS) setTargetAt('') }, [now, targetAt])
   const updateTarget = (value: string) => {
