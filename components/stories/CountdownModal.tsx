@@ -25,6 +25,7 @@ export function CountdownModal({ onClose, onAdd, initialTitle = '', initialTarge
   const maxDate = useMemo(() => localValue(new Date(maxTarget(now))).slice(0,10), [now])
   const target = parseLocal(targetAt)
   const validTarget = Number.isFinite(target) && target > now && target <= now + MAX_MS
+  useEffect(() => { const parsed = parseLocal(targetAt); if (!Number.isFinite(parsed) || parsed <= now || parsed > now + MAX_MS) setTargetAt(localValue(new Date(clampTarget(Number.isFinite(parsed) ? parsed : now + 3_600_000, now)))) }, [now, targetAt])
   const updateTarget = (value: string) => {
     const parsed = parseLocal(value)
     if (!Number.isFinite(parsed)) return
