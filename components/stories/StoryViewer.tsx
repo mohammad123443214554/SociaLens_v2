@@ -572,7 +572,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
             />
           )}
 
-          {activeOverlayTexts.length > 0 && story.story_type !== 'text' ? activeOverlayTexts.filter(layer => story.story_type === 'video' || (elapsedSeconds >= (layer.start ?? 0) && elapsedSeconds < (layer.start ?? 0) + (layer.duration ?? totalDuration))).map(layer => (
+          {activeOverlayTexts.length > 0 && story.story_type !== 'text' ? activeOverlayTexts.filter(layer => elapsedSeconds >= (layer.start ?? 0) && elapsedSeconds < (layer.start ?? 0) + (layer.duration ?? totalDuration)).map(layer => (
             <div key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, transform: `translate(-50%, -50%) rotate(${layer.rotation ?? 0}deg)`, fontSize: `${20 * layer.scale}px`, color: layer.color || undefined, pointerEvents: 'none' }} className="absolute max-w-[85%] px-2 text-center font-bold break-words">
               <p style={{ ...(layer.color ? { color: layer.color } : getTextFillStyle(displayOverlayColor)), textShadow: '0 1px 6px rgba(0,0,0,0.6)', fontFamily: layer.fontFamily !== undefined ? (layer.fontFamily ? `'${layer.fontFamily}', sans-serif` : undefined) : (displayOverlayFont ? `'${displayOverlayFont}', sans-serif` : undefined) }}>{layer.text}</p>
             </div>
