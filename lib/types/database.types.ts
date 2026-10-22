@@ -317,6 +317,8 @@ export type PhotoScene = {
   id: string
   imageUrl: string
   duration: number
+  /** Zoom level applied to the photo within the story frame (1 = fit). */
+  photoScale?: number
   overlayText?: string
   overlayTexts?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null; start?: number; duration?: number }>
   mentions?: StoryMentionOverlay[]
