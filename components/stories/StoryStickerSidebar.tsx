@@ -5,7 +5,7 @@ import { AtSign, Link2, X } from 'lucide-react'
 interface StoryStickerSidebarProps {
   onClose: () => void
   onMention: () => void
-  onLink: () => void
+  onLink?: () => void
 }
 
 export function StoryStickerSidebar({ onClose, onMention, onLink }: StoryStickerSidebarProps) {
@@ -22,10 +22,10 @@ export function StoryStickerSidebar({ onClose, onMention, onLink }: StorySticker
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pink-500/10 text-pink-500"><AtSign className="h-5 w-5" /></span>
           <span className="min-w-0"><span className="block text-sm font-semibold">Mention</span><span className="mt-0.5 block text-xs text-muted-foreground">Tag someone in your story</span></span>
         </button>
-        <button type="button" onClick={onLink} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:bg-muted">
+        {onLink && <button type="button" onClick={onLink} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:bg-muted">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500"><Link2 className="h-5 w-5" /></span>
           <span className="min-w-0"><span className="block text-sm font-semibold">Link</span><span className="mt-0.5 block text-xs text-muted-foreground">Add a clickable website sticker</span></span>
-        </button>
+        </button>}
       </div>
     </div>
   )
