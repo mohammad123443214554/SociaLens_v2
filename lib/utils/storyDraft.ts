@@ -37,7 +37,7 @@ export interface StoryDraftRecord {
     photoOffsetX?: number
     photoOffsetY?: number
   }
-  video?: { duration: number; textLayers?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null }>; mentions?: StoryMentionOverlay[] }
+  video?: { duration: number; trimStart?: number; trimEnd?: number; textLayers?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null }>; mentions?: StoryMentionOverlay[] }
   updatedAt: number
 }
 
