@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { X, Timer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CountdownSticker } from './CountdownSticker'
@@ -14,6 +14,8 @@ const maxTarget = (now: number) => Math.floor((now + MAX_MS) / 60_000) * 60_000
 const clampTarget = (target: number, now: number) => Math.min(maxTarget(now), Math.max(minTarget(now), target))
 interface Props { onClose: () => void; onAdd: (title: string, targetAt: string) => void; initialTitle?: string; initialTargetAt?: string }
 export function CountdownModal({ onClose, onAdd, initialTitle = '', initialTargetAt }: Props) {
+  const dateInputRef = useRef<HTMLInputElement>(null)
+  const timeInputRef = useRef<HTMLInputElement>(null)
   const [now, setNow] = useState(() => Date.now())
   const [title, setTitle] = useState(initialTitle)
   const [targetAt, setTargetAt] = useState(() => {
@@ -25,6 +27,9 @@ export function CountdownModal({ onClose, onAdd, initialTitle = '', initialTarge
   const minDate = useMemo(() => localValue(new Date(minTarget(now))).slice(0,10), [now])
   const maxDate = useMemo(() => localValue(new Date(maxTarget(now))).slice(0,10), [now])
   const target = parseLocal(targetAt)
+  const minTime = targetAt.slice(0,10) === localValue(new Date(minTarget(now))).slice(0,10) ? localValue(new Date(minTarget(now))).slice(11,16) : '00:00'
+  const maxTime = targetAt.slice(0,10) === localValue(new Date(maxTarget(now))).slice(0,10) ? localValue(new Date(maxTarget(now))).slice(11,16) : '23:59'
+  const openPicker = (input: HTMLInputElement | null) => { if (!input) return; try { if ('showPicker' in input) input.showPicker(); else input.focus() } catch { input.focus() } }
   const validTarget = Number.isFinite(target) && target > now && target <= now + MAX_MS
   useEffect(() => { if (!targetAt) return; const parsed = parseLocal(targetAt); if (!Number.isFinite(parsed) || parsed <= now || parsed > now + MAX_MS) setTargetAt('') }, [now, targetAt])
   const updateTarget = (value: string) => {
@@ -38,8 +43,8 @@ export function CountdownModal({ onClose, onAdd, initialTitle = '', initialTarge
       <label className="mt-4 block text-sm font-medium">Countdown title</label>
       <input value={title} onChange={e => setTitle(e.target.value.slice(0,60))} maxLength={60} placeholder="e.g. My birthday" className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm"/>
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <div><label className="block text-sm font-medium">Date</label><input type="date" min={minDate} max={maxDate} value={targetAt.slice(0,10)} onChange={e => updateTarget(e.target.value + 'T' + (targetAt.slice(11,16) || localValue(new Date(Date.now() + 3600000)).slice(11,16)))} className="mt-1.5 w-full min-w-0 rounded-xl border border-border bg-background px-2 py-2.5 text-sm"/></div>
-        <div><label className="block text-sm font-medium">Time</label><input type="time" value={targetAt.slice(11,16)} onChange={e => updateTarget(targetAt.slice(0,10) + 'T' + e.target.value)} className="mt-1.5 w-full min-w-0 rounded-xl border border-border bg-background px-2 py-2.5 text-sm"/></div>
+        <div><label className="block text-sm font-medium">Date</label><input ref={dateInputRef} type="date" min={minDate} max={maxDate} value={targetAt.slice(0,10)} onClick={() => openPicker(dateInputRef.current)} onChange={e => updateTarget(e.target.value + 'T' + (targetAt.slice(11,16) || localValue(new Date(Date.now() + 3600000)).slice(11,16)))} className="mt-1.5 w-full min-w-0 rounded-xl border border-border bg-background px-2 py-2.5 text-sm"/></div>
+        <div><label className="block text-sm font-medium">Time</label><input ref={timeInputRef} type="time" min={minTime} max={maxTime} step={60} value={targetAt.slice(11,16)} onClick={() => openPicker(timeInputRef.current)} onChange={e => updateTarget(targetAt.slice(0,10) + 'T' + e.target.value)} className="mt-1.5 w-full min-w-0 rounded-xl border border-border bg-background px-2 py-2.5 text-sm"/></div>
       </div>
       <div className="mt-5 rounded-2xl bg-black/90 px-4 py-5 text-center text-white"><p className="mb-3 text-sm font-semibold">{title.trim() || 'Countdown'}</p><CountdownSticker title={title.trim() || 'Countdown'} targetAt={new Date(clampTarget(Number.isFinite(target) ? target : now+3600000, now)).toISOString()} x={50} y={50} scale={1} rotation={0} preview/></div>
       <div className="mt-5 flex gap-2"><Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button><Button type="button" className="flex-1" disabled={!title.trim() || !validTarget} onClick={() => onAdd(title.trim(), new Date(target).toISOString())}>Add to Story</Button></div>
