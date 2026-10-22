@@ -37,6 +37,9 @@ begin
           v_old_scene := (select value from jsonb_array_elements(coalesce(v_old_scenes,'[]'::jsonb)) as o(value) where value->>'id'=v_scene->>'id' limit 1);
           v_old_countdown := (select value from jsonb_array_elements(coalesce(v_old_scene->'countdowns','[]'::jsonb)) as oc(value) where value->>'id'=v_id limit 1);
           if tg_op = 'UPDATE' and v_old_countdown->>'targetAt' is not distinct from v_target_text then continue; end if;
+          if v_target_text is null or btrim(v_target_text) = '' then
+            raise exception 'Invalid countdown target' using errcode = '23514';
+          end if;
           begin
             v_target := v_target_text::timestamptz;
           exception when others then
