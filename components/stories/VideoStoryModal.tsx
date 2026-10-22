@@ -44,6 +44,7 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const [showMentionPicker, setShowMentionPicker] = useState(false)
   const [mentions, setMentions] = useState<StoryMentionOverlay[]>(() => initialDraft?.video?.mentions || [])
   const [showPreview, setShowPreview] = useState(false)
+  const [exitAction, setExitAction] = useState<'close' | 'back' | null>(null)
   const [previewTime, setPreviewTime] = useState(0)
   const previewVideoRef = useRef<HTMLVideoElement>(null)
   const [showAudience, setShowAudience] = useState(false)
@@ -127,9 +128,9 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
   return (
     <div className="fixed inset-0 z-[120] flex min-h-dvh flex-col bg-background text-foreground">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3 sm:px-5">
-        <button onClick={onBack} aria-label="Back to story upload choices" className="rounded-full p-2 hover:bg-muted"><ArrowLeft className="h-5 w-5" /></button>
+        <button onClick={() => setExitAction('back')} aria-label="Back to story upload choices" className="rounded-full p-2 hover:bg-muted"><ArrowLeft className="h-5 w-5" /></button>
         <h1 className="text-sm font-semibold sm:text-base">Video story</h1>
-        <button onClick={onClose} aria-label="Close story creator" className="rounded-full p-2 hover:bg-muted"><X className="h-5 w-5" /></button>
+        <button onClick={() => setExitAction('close')} aria-label="Close story creator" className="rounded-full p-2 hover:bg-muted"><X className="h-5 w-5" /></button>
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-auto p-3 sm:p-6">
@@ -172,6 +173,7 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
         </div>
       </main>
 
+      {exitAction && <div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/60 p-4" role="alertdialog" aria-modal="true" aria-labelledby="video-exit-title" aria-describedby="video-exit-description"><div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl"><h2 id="video-exit-title" className="text-lg font-semibold">Leave video editor?</h2><p id="video-exit-description" className="mt-2 text-sm text-muted-foreground">If you leave now, your current edits may be lost. Do you want to continue editing or discard your changes?</p><div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button type="button" variant="outline" onClick={() => setExitAction(null)}>Continue editing</Button><Button type="button" variant="destructive" onClick={() => { const action = exitAction; setExitAction(null); if (action === 'back') onBack(); else onClose() }}>Discard changes</Button></div></div></div>}
       {showPreview && previewUrl && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Edited video story preview">
           <button type="button" onClick={() => { previewVideoRef.current?.pause(); setShowPreview(false) }} aria-label="Close story preview" className="absolute right-4 top-4 z-50 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"><X className="h-5 w-5" /></button>
