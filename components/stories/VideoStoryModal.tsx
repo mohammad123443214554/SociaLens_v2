@@ -43,7 +43,9 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
   const [showFontPicker, setShowFontPicker] = useState(false)
   const [showMentionPicker, setShowMentionPicker] = useState(false)
   const [mentions, setMentions] = useState<StoryMentionOverlay[]>(() => initialDraft?.video?.mentions || [])
-  const [previewing, setPreviewing] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewTime, setPreviewTime] = useState(0)
+  const previewVideoRef = useRef<HTMLVideoElement>(null)
   const [showAudience, setShowAudience] = useState(false)
   const [showLimit, setShowLimit] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -160,7 +162,7 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
           </div>
           <div className="flex gap-2">
             <Button variant="outline" className="shrink-0" onClick={() => replaceInput.current?.click()}>Replace video</Button>
-            <Button type="button" variant="outline" className="shrink-0" onClick={() => { const video = stageRef.current?.querySelector('video'); if (!video) return; if (previewing) { video.pause(); setPreviewing(false) } else { void video.play().then(() => setPreviewing(true)).catch(() => setError('Video preview could not start.')) } }}>{previewing ? 'Pause' : 'Preview'}</Button>
+            <Button type="button" variant="outline" className="shrink-0" onClick={() => { if (!previewUrl || trimEnd <= trimStart) { setError('Choose a valid video segment to preview.'); return } const editorVideo = stageRef.current?.querySelector('video'); editorVideo?.pause(); setPreviewTime(trimStart); setShowPreview(true) }}>Preview</Button>
             <Button className="flex-1" onClick={onShare} disabled={!file || !duration || duration > MAX_STORY_VIDEO_SECONDS || trimEnd <= trimStart || createVideoStory.isPending}>
               {createVideoStory.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing…</> : 'Share'}
             </Button>
@@ -170,6 +172,30 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
         </div>
       </main>
 
+      {showPreview && previewUrl && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Edited video story preview">
+          <button type="button" onClick={() => { previewVideoRef.current?.pause(); setShowPreview(false) }} aria-label="Close story preview" className="absolute right-4 top-4 z-50 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"><X className="h-5 w-5" /></button>
+          <div className="relative flex h-[min(84dvh,760px)] aspect-[9/16] max-w-full items-center justify-center overflow-hidden rounded-2xl bg-black">
+            <video
+              ref={previewVideoRef}
+              key={previewUrl + '-story-preview'}
+              src={previewUrl}
+              playsInline
+              autoPlay
+              preload="metadata"
+              onLoadedMetadata={event => { const video = event.currentTarget; video.currentTime = trimStart; setPreviewTime(trimStart); void video.play().catch(() => setError('Video preview could not start.')) }}
+              onTimeUpdate={event => { const video = event.currentTarget; setPreviewTime(video.currentTime); if (video.currentTime >= trimEnd) video.pause() }}
+              onError={() => setError('This video could not be played. Please choose another supported video file.')}
+              className="h-full w-full object-contain"
+            />
+            {textLayers.filter(layer => { const elapsed = previewTime - trimStart; const start = layer.start ?? 0; const length = layer.duration ?? Math.max(1, trimEnd - trimStart); return elapsed >= start && elapsed < start + Math.min(length, Math.max(0, trimEnd - trimStart - start)) }).map(layer => (
+              <div key={layer.id} className="pointer-events-none absolute z-20 max-w-[85%] rounded-sm px-2 py-1 text-center font-bold [text-shadow:0_2px_8px_rgba(0,0,0,0.9)]" style={{ left: `${layer.x}%`, top: `${layer.y}%`, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`, fontSize: `${20 * layer.scale}px`, color: layer.color, fontFamily: layer.fontFamily ? `'${layer.fontFamily}', sans-serif` : undefined }}>{layer.text}</div>
+            ))}
+            {mentions.map(mention => <div key={mention.id} className="pointer-events-none absolute z-30 flex max-w-[88%] items-center gap-2 rounded-full border border-white/50 bg-black/75 px-3 py-2 text-white shadow-lg" style={{ left: `${mention.x}%`, top: `${mention.y}%`, transform: `translate(-50%, -50%) rotate(${mention.rotation ?? 0}deg) scale(${mention.scale})` }}><AtSign className="h-4 w-4 text-pink-300" /><span className="max-w-40 truncate text-sm font-semibold">@{mention.username}</span></div>)}
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-40 h-1 bg-white/30"><div className="h-full bg-white" style={{ width: `${Math.max(0, Math.min(100, ((previewTime - trimStart) / Math.max(trimEnd - trimStart, 0.001)) * 100))}%` }} /></div>
+          </div>
+        </div>
+      )}
       {showTextMenu && selectedTextId && <div className="fixed inset-0 z-[160] flex items-start justify-center bg-black/20 p-4 pt-[18vh]" onClick={() => setShowTextMenu(false)}><div role="dialog" aria-modal="true" aria-label="Text options" className="w-full max-w-xs rounded-2xl border border-border bg-card p-4 text-foreground shadow-xl" onClick={event => event.stopPropagation()}><h3 className="text-base font-semibold">Text options</h3><button className="mt-3 flex w-full items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm hover:bg-muted" onClick={() => { setShowTextMenu(false); setShowFontPicker(true) }}><Type className="h-4 w-4" /> Font</button><button className="mt-2 flex w-full items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm hover:bg-muted" onClick={() => { const selected = textLayers.find(layer => layer.id === selectedTextId); setColorDraft(selected?.color || '#ffffff'); setShowTextMenu(false); setShowColorPicker(true) }}><span className="h-4 w-4 rounded-full border border-border" style={{ backgroundColor: textLayers.find(layer => layer.id === selectedTextId)?.color || '#ffffff' }} /> Color</button><button className="mt-2 flex w-full items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm hover:bg-muted" onClick={() => { const selected = textLayers.find(layer => layer.id === selectedTextId); if (selected) { const id = Math.random().toString(36).slice(2,10); setTextLayers(items => { const index = items.findIndex(item => item.id === selected.id); const next = [...items]; next.splice(index+1,0,{...selected,id,x:Math.min(92,selected.x+4),y:Math.min(92,selected.y+4)}); return next }); setSelectedTextId(id) } setShowTextMenu(false) }}><Copy className="h-4 w-4" /> Duplicate</button><button className="mt-2 flex w-full items-center gap-2 rounded-xl border border-red-500/40 px-3 py-2.5 text-sm text-red-500 hover:bg-red-500/10" onClick={() => { setTextLayers(items => items.filter(item => item.id !== selectedTextId)); setSelectedTextId(null); setShowTextMenu(false) }}><Trash2 className="h-4 w-4" /> Delete</button><button className="mt-3 w-full rounded-xl border border-border px-3 py-2.5 text-sm font-medium hover:bg-muted" onClick={() => setShowTextMenu(false)}>Cancel</button></div></div>}
       {showColorPicker && selectedTextId && <div className="fixed inset-0 z-[170] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Choose text color"><div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl"><h3 className="text-lg font-semibold">Custom text color</h3><p className="mt-1 text-sm text-muted-foreground">Choose a color or enter its HEX value.</p><div className="mt-4 flex items-center gap-3"><input aria-label="Choose text color" type="color" value={colorDraft} onChange={event => setColorDraft(event.target.value)} className="h-12 w-14 cursor-pointer rounded-lg border border-border bg-card p-1" /><input aria-label="HEX color" value={colorDraft} onChange={event => { const value = event.target.value; setColorDraft(value.startsWith('#') ? value : '#'+value) }} maxLength={7} className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm uppercase" /></div><div className="mt-4 flex gap-2"><button className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted" onClick={() => setShowColorPicker(false)}>Cancel</button><button className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50" disabled={!/^#[0-9a-fA-F]{6}$/.test(colorDraft)} onClick={() => { setTextLayers(items => items.map(layer => layer.id === selectedTextId ? {...layer,color:colorDraft} : layer)); setShowColorPicker(false) }}>Apply color</button></div></div></div>}
       {showFontPicker && selectedTextId && <FontPicker previewText={textLayers.find(layer => layer.id === selectedTextId)?.text} currentFont={textLayers.find(layer => layer.id === selectedTextId)?.fontFamily || ''} onSelect={value => setTextLayers(items => items.map(layer => layer.id === selectedTextId ? { ...layer, fontFamily: value || null } : layer))} onCancel={() => setShowFontPicker(false)} onDone={() => setShowFontPicker(false)} />}
