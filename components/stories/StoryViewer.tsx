@@ -534,7 +534,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
           {story.story_type === 'photo' && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={displayImageUrl || ''} alt="Story" className="max-w-full max-h-full object-contain" style={{ transform: `scale(${activePhotoScene?.photoScale ?? 1})`, transformOrigin: 'center center' }} />
+            <img src={displayImageUrl || ''} alt="Story" className="max-w-full max-h-full object-contain" style={{ transform: `translate(${activePhotoScene?.photoOffsetX ?? 0}%, ${activePhotoScene?.photoOffsetY ?? 0}%) scale(${activePhotoScene?.photoScale ?? 1})`, transformOrigin: 'center center' }} />
           )}
 
           {story.story_type === 'video' && (
