@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import type { FormEvent } from 'react'
 import { ExternalLink, Link2, X } from 'lucide-react'
 
 interface StoryLinkModalProps {
@@ -13,7 +14,7 @@ export function StoryLinkModal({ onClose, onAdd }: StoryLinkModalProps) {
   const [label, setLabel] = useState('Visit Site')
   const [error, setError] = useState('')
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     let normalized = url.trim()
     if (!normalized) { setError('Enter a website URL.'); return }
