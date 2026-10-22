@@ -312,6 +312,7 @@ export type StoryMentionOverlay = {
   y: number
   scale: number
   rotation?: number
+  color?: string
 }
 
 export type StoryLinkOverlay = {
