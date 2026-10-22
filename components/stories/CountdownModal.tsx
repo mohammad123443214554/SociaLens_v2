@@ -9,7 +9,9 @@ const MAX_MS = 24 * 60 * 60 * 1000
 const pad = (n: number) => String(n).padStart(2, '0')
 const localValue = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 const parseLocal = (value: string) => new Date(value).getTime()
-const clampTarget = (target: number, now: number) => Math.min(now + MAX_MS, Math.max(now + 60_000, target))
+const minTarget = (now: number) => Math.ceil((now + 60_000) / 60_000) * 60_000
+const maxTarget = (now: number) => Math.floor((now + MAX_MS) / 60_000) * 60_000
+const clampTarget = (target: number, now: number) => Math.min(maxTarget(now), Math.max(minTarget(now), target))
 interface Props { onClose: () => void; onAdd: (title: string, targetAt: string) => void; initialTitle?: string; initialTargetAt?: string }
 export function CountdownModal({ onClose, onAdd, initialTitle = '', initialTargetAt }: Props) {
   const [now, setNow] = useState(() => Date.now())
@@ -19,8 +21,8 @@ export function CountdownModal({ onClose, onAdd, initialTitle = '', initialTarge
     return localValue(new Date(clampTarget(t, Date.now())))
   })
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id) }, [])
-  const minDate = useMemo(() => localValue(new Date(now + 60_000)).slice(0,10), [now])
-  const maxDate = useMemo(() => localValue(new Date(now + MAX_MS)).slice(0,10), [now])
+  const minDate = useMemo(() => localValue(new Date(minTarget(now))).slice(0,10), [now])
+  const maxDate = useMemo(() => localValue(new Date(maxTarget(now))).slice(0,10), [now])
   const target = parseLocal(targetAt)
   const validTarget = Number.isFinite(target) && target > now && target <= now + MAX_MS
   const updateTarget = (value: string) => {
