@@ -311,6 +311,7 @@ export type StoryMentionOverlay = {
   x: number
   y: number
   scale: number
+  rotation?: number
 }
 
 export type PhotoScene = {
