@@ -315,6 +315,8 @@ export type StoryMentionOverlay = {
   color?: string
 }
 
+export type StoryGIFOverlay = { id: string; providerId: string; url: string; previewUrl: string; title: string; x: number; y: number; scale: number; rotation: number }
+
 export type StoryCountdownOverlay = {
   id: string
   title: string
@@ -351,6 +353,7 @@ export type PhotoScene = {
   mentions?: StoryMentionOverlay[]
   links?: StoryLinkOverlay[]
   countdowns?: StoryCountdownOverlay[]
+  gifStickers?: StoryGIFOverlay[]
   overlayStart?: number
   overlayDuration?: number
   overlayTextColor?: string
