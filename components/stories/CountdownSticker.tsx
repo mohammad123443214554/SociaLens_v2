@@ -28,6 +28,5 @@ export function CountdownSticker({ title, targetAt, x, y, scale, rotation, color
         {index < 2 && <span className="text-sm font-bold text-white/90">:</span>}
       </div>)}
     </div>}
-    <span className="mt-1.5 text-[9px] font-semibold text-white/85">{p.ended ? 'Countdown finished' : 'Set end date and time'}</span>
   </div>
 }
