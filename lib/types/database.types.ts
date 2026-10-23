@@ -377,6 +377,7 @@ export type VideoScene = {
   mentions?: StoryMentionOverlay[]
   links?: StoryLinkOverlay[]
   countdowns?: StoryCountdownOverlay[]
+  gifStickers?: StoryGIFOverlay[]
   id: string
   videoUrl: string
   duration: number
