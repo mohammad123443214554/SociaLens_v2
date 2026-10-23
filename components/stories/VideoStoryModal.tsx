@@ -147,6 +147,7 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
       mentions,
       links,
       countdowns,
+      gifStickers,
       ...(textLayers[0] ? { overlayText: textLayers[0].text, overlayFontFamily: textLayers[0].fontFamily || undefined, overlayX: textLayers[0].x, overlayY: textLayers[0].y } : {}),
     }
     try {
