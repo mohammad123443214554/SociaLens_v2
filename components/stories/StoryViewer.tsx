@@ -340,6 +340,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const activeMentions = mentionRecords
   const activeLinks = (activePhotoScene?.links ?? activeVideoScene?.links ?? []).filter(link => /^https?:\/\//i.test(link.url))
   const activeCountdowns = activePhotoScene?.countdowns ?? activeVideoScene?.countdowns ?? []
+  const activeGIFStickers = activePhotoScene?.gifStickers ?? activeVideoScene?.gifStickers ?? []
 
   // Play whichever song is active right now. Deliberately keyed on the
   // resolved music URL (not the scene id) - as long as consecutive scenes
@@ -591,7 +592,8 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
               <span className="max-w-40 truncate text-sm font-semibold">@{mention.username}</span>
             </button>
           ))}
-          {activeCountdowns.map(item => <CountdownSticker key={item.id} title={item.title} targetAt={item.targetAt} x={item.x} y={item.y} scale={item.scale} rotation={item.rotation} color={item.color}/>)}
+          {activeGIFStickers.map(sticker => <div key={sticker.id} className="pointer-events-none absolute z-30" style={{ left: `${sticker.x}%`, top: `${sticker.y}%`, transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg) scale(${sticker.scale})` }}><img src={sticker.url} alt={sticker.title || 'GIF sticker'} draggable={false} className="max-h-40 max-w-[min(55vw,220px)] object-contain" /></div>)}
+                    {activeCountdowns.map(item => <CountdownSticker key={item.id} title={item.title} targetAt={item.targetAt} x={item.x} y={item.y} scale={item.scale} rotation={item.rotation} color={item.color}/>)}
           {activeLinks.map(link => (
             <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} aria-label={`Open link: ${link.label}`} className="absolute z-30 flex max-w-[88%] items-center gap-2 rounded-full border border-white/70 px-3 py-2 text-sm font-semibold text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ left: `${link.x}%`, top: `${link.y}%`, backgroundColor: link.color || '#2563eb', transform: `translate(-50%, -50%) rotate(${link.rotation ?? 0}deg) scale(${link.scale})` }}><ExternalLink className="h-4 w-4 shrink-0"/><span className="max-w-40 truncate">{link.label || 'Visit Site'}</span></a>
           ))}
