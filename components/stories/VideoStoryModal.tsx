@@ -243,6 +243,7 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
               onError={() => setError('This video could not be played. Please choose another supported video file.')}
               className="h-full w-full object-contain"
             />
+            {pollStickers.map(poll => <PollSticker key={poll.id} poll={poll} preview />)}
             {gifStickers.map(sticker => <div key={sticker.id} className="pointer-events-none absolute z-30" style={{ left: `${sticker.x}%`, top: `${sticker.y}%`, transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg) scale(${sticker.scale})` }}><img src={sticker.url} alt={sticker.title || 'GIF sticker'} className="max-h-40 max-w-[min(55vw,220px)] object-contain" /></div>)}
              {textLayers.filter(layer => { const elapsed = previewTime - trimStart; const start = layer.start ?? 0; const length = layer.duration ?? Math.max(1, trimEnd - trimStart); return elapsed >= start && elapsed < start + Math.min(length, Math.max(0, trimEnd - trimStart - start)) }).map(layer => (
               <div key={layer.id} className="pointer-events-none absolute z-20 max-w-[85%] rounded-sm px-2 py-1 text-center font-bold [text-shadow:0_2px_8px_rgba(0,0,0,0.9)]" style={{ left: `${layer.x}%`, top: `${layer.y}%`, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`, fontSize: `${20 * layer.scale}px`, color: layer.color, fontFamily: layer.fontFamily ? `'${layer.fontFamily}', sans-serif` : undefined }}>{layer.text}</div>
