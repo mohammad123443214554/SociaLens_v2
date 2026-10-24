@@ -362,7 +362,7 @@ export type PhotoScene = {
   countdowns?: StoryCountdownOverlay[]
   gifStickers?: StoryGIFOverlay[]
   pollStickers?: StoryPollOverlay[]
-  quizStickers?: StoryQuizOverlay[]\n  quizStickers?: StoryQuizOverlay[]
+  quizStickers?: StoryQuizOverlay[]
   overlayStart?: number
   overlayDuration?: number
   overlayTextColor?: string
