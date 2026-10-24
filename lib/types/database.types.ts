@@ -320,7 +320,9 @@ export type StoryMentionOverlay = {
 
 export type StoryGIFOverlay = { id: string; providerId: string; url: string; previewUrl: string; title: string; x: number; y: number; scale: number; rotation: number }
 
-export type StoryPollOverlay = { id: string; question: string; options: Array<{ id: string; label: string }>; color: string; x: number; y: number; scale: number; rotation: number }\n\nexport type StoryQuizOverlay = { id: string; question: string; options: Array<{ id: string; label: string }>; correctOptionId: string; color: string; x: number; y: number; scale: number; rotation: number }
+export type StoryPollOverlay = { id: string; question: string; options: Array<{ id: string; label: string }>; color: string; x: number; y: number; scale: number; rotation: number }
+
+export type StoryQuizOverlay = { id: string; question: string; options: Array<{ id: string; label: string }>; correctOptionId: string; color: string; x: number; y: number; scale: number; rotation: number }
 
 export type StoryCountdownOverlay = {
   id: string
@@ -359,7 +361,8 @@ export type PhotoScene = {
   links?: StoryLinkOverlay[]
   countdowns?: StoryCountdownOverlay[]
   gifStickers?: StoryGIFOverlay[]
-  pollStickers?: StoryPollOverlay[]\n  quizStickers?: StoryQuizOverlay[]
+  pollStickers?: StoryPollOverlay[]
+  quizStickers?: StoryQuizOverlay[]\n  quizStickers?: StoryQuizOverlay[]
   overlayStart?: number
   overlayDuration?: number
   overlayTextColor?: string
@@ -385,6 +388,7 @@ export type VideoScene = {
   countdowns?: StoryCountdownOverlay[]
   gifStickers?: StoryGIFOverlay[]
   pollStickers?: StoryPollOverlay[]
+  quizStickers?: StoryQuizOverlay[]
   id: string
   videoUrl: string
   duration: number
