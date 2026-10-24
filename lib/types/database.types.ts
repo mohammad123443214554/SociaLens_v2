@@ -546,6 +546,8 @@ export type Database = {
       story_mentions: { Row: StoryMention; Insert: Omit<StoryMention, 'id' | 'created_at'> & { id?: string }; Update: Partial<StoryMention> }
       story_polls: { Row: StoryPoll; Insert: Omit<StoryPoll, 'created_at' | 'vote_counts'> & { vote_counts?: Record<string, number> }; Update: Partial<Pick<StoryPoll, 'question' | 'options' | 'color'>> }
       story_poll_votes: { Row: StoryPollVote; Insert: Omit<StoryPollVote, 'id' | 'created_at'> & { id?: string }; Update: never }
+      story_quizzes: { Row: any; Insert: any; Update: any }
+      story_quiz_answers: { Row: any; Insert: any; Update: any }
       story_likes: { Row: StoryLike; Insert: Omit<StoryLike, 'id' | 'created_at'>; Update: Partial<StoryLike> }
       story_reactions: { Row: StoryReaction; Insert: Omit<StoryReaction, 'id' | 'created_at'>; Update: Partial<StoryReaction> }
       story_comments: { Row: StoryComment; Insert: Omit<StoryComment, 'id' | 'created_at'>; Update: Partial<StoryComment> }
