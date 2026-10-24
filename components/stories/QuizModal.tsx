@@ -14,7 +14,7 @@ export function QuizModal({ initialQuiz, onClose, onSave }: {
   const [question, setQuestion] = useState(initialQuiz?.question || '')
   const [options, setOptions] = useState(() => initialQuiz?.options?.map(option => ({ ...option })) || [{ id: makeId(), label: '' }, { id: makeId(), label: '' }])
   const [correctOptionId, setCorrectOptionId] = useState(initialQuiz?.correctOptionId || '')
-  const [color, setColor] = useState(initialQuiz?.color || '#7c3aed')
+  const color = initialQuiz?.color || '#7c3aed'
   const [error, setError] = useState('')
   const clean = options.map(option => option.label.trim())
   const duplicate = clean.some((label, index) => label && clean.findIndex(other => other.toLocaleLowerCase() === label.toLocaleLowerCase()) !== index)
@@ -39,9 +39,8 @@ export function QuizModal({ initialQuiz, onClose, onSave }: {
         <p className="mb-3 break-words whitespace-pre-wrap text-center text-base font-bold">{question.trim() || 'Your quiz question appears here'}</p>
         <div className="space-y-2">{options.map((option,index) => <div key={option.id} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${correctOptionId === option.id ? 'border-emerald-300 bg-emerald-500/30' : 'border-white/60 bg-black/10'}`}>{option.label.trim() || `Option ${index+1}`}{correctOptionId === option.id && <span className="float-right text-xs">Correct</span>}</div>)}</div>
       </div>
-      <label className="mt-3 flex items-center gap-3 text-sm"><span className="font-medium">Sticker color</span><input aria-label="Quiz sticker color" type="color" value={color} onChange={event => setColor(event.target.value)} className="h-9 w-12 cursor-pointer rounded border border-border bg-card p-1"/></label>
       {error && <p role="alert" className="mt-3 text-sm text-red-500">{error}</p>}
-      <p className="mt-2 text-xs text-muted-foreground">Tap the numbered circle beside an option to mark it as the correct answer.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Tap the numbered circle beside an option to mark it as correct. The green check shows your selection; select another circle to change it.</p>
       <div className="mt-5 flex gap-2"><button type="button" onClick={onClose} className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold hover:bg-muted">Cancel</button><button type="button" disabled={!valid} onClick={save} className="flex-1 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50">{initialQuiz ? 'Save changes' : 'Add to Story'}</button></div>
     </div>
   </div>
