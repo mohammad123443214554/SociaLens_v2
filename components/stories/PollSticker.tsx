@@ -58,10 +58,14 @@ export function PollSticker({ poll, selected = false, editable = false, preview 
       if (voteError.code === '23505') {
         const { data } = await supabase.from('story_poll_votes').select('option_id').eq('poll_id', poll.id).eq('user_id', userId).maybeSingle()
         setMyVote(data?.option_id || null)
+        const { data: refreshed } = await supabase.from('story_polls').select('vote_counts').eq('id', poll.id).eq('story_id', storyId).maybeSingle()
+        if (refreshed) setVoteCounts((refreshed.vote_counts || {}) as Record<string, number>)
       } else setError(voteError.message.includes('expired') ? 'This poll has expired.' : 'Your vote could not be saved. Please try again.')
     } else {
       setMyVote(optionId)
-      setVoteCounts(counts => ({ ...counts, [optionId]: (counts[optionId] || 0) + 1 }))
+      const { data: refreshed } = await supabase.from('story_polls').select('vote_counts').eq('id', poll.id).eq('story_id', storyId).maybeSingle()
+      if (refreshed) setVoteCounts((refreshed.vote_counts || {}) as Record<string, number>)
+      else setVoteCounts(counts => ({ ...counts, [optionId]: (counts[optionId] || 0) + 1 }))
     }
     setVoting(false)
   }
