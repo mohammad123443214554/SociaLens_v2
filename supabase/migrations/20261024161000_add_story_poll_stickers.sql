@@ -66,25 +66,51 @@ for insert to authenticated with check (
 
 create or replace function public.get_story_poll_results(p_poll_id uuid)
 returns table (option_id text, vote_count bigint, total_votes bigint)
-language sql
+language plpgsql
 stable
-security invoker
+security definer
 set search_path = ''
 as $$
-  with poll as (
-    select p.id, p.options
-    from public.story_polls p
-    join public.stories s on s.id = p.story_id
-    where p.id = p_poll_id and s.expires_at > now()
-  ), counts as (
-    select v.option_id, count(*)::bigint as votes
-    from public.story_poll_votes v
-    where v.poll_id = p_poll_id
-    group by v.option_id
-  )
-  select option->>'id', coalesce(counts.votes, 0)::bigint,
-         (select count(*)::bigint from public.story_poll_votes where poll_id = p_poll_id)
-  from poll cross join lateral jsonb_array_elements(poll.options) option
-  left join counts on counts.option_id = option->>'id'
+declare
+  v_story_id uuid;
+  v_owner_id uuid;
+  v_visibility text;
+  v_selected_ids uuid[];
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  select p.story_id, s.user_id, coalesce(s.visibility, 'everyone'), coalesce(s.visibility_selected_ids, '{}')
+    into v_story_id, v_owner_id, v_visibility, v_selected_ids
+  from public.story_polls p
+  join public.stories s on s.id = p.story_id
+  where p.id = p_poll_id and s.expires_at > now();
+  if v_story_id is null then raise exception 'Poll is unavailable'; end if;
+  if v_owner_id <> auth.uid() and not exists (
+    select 1 from public.stories s
+    join public.profiles author on author.id = s.user_id
+    where s.id = v_story_id and s.expires_at > now()
+      and not public.is_story_hidden_from_viewer(s.user_id, auth.uid())
+      and (not author.is_private or exists (
+        select 1 from public.follows f where f.follower_id = auth.uid() and f.following_id = s.user_id and f.status = 'accepted'
+      ))
+      and (
+        v_visibility = 'everyone'
+        or (v_visibility = 'followers' and exists (select 1 from public.follows f where f.follower_id = auth.uid() and f.following_id = s.user_id and f.status = 'accepted'))
+        or (v_visibility = 'following' and exists (select 1 from public.follows f where f.follower_id = s.user_id and f.following_id = auth.uid() and f.status = 'accepted'))
+        or (v_visibility = 'selected' and auth.uid() = any(v_selected_ids))
+      )
+  ) then raise exception 'Poll is unavailable'; end if;
+  return query
+    with poll as (
+      select p.options from public.story_polls p where p.id = p_poll_id
+    ), counts as (
+      select v.option_id, count(*)::bigint as votes
+      from public.story_poll_votes v where v.poll_id = p_poll_id group by v.option_id
+    )
+    select option->>'id', coalesce(counts.votes, 0)::bigint,
+      (select count(*)::bigint from public.story_poll_votes where poll_id = p_poll_id)
+    from poll cross join lateral jsonb_array_elements(poll.options) option
+    left join counts on counts.option_id = option->>'id';
+end;
 $$;
+revoke all on function public.get_story_poll_results(uuid) from public, anon;
 grant execute on function public.get_story_poll_results(uuid) to authenticated;
