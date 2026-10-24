@@ -367,6 +367,22 @@ export function useCreateStory() {
       }).select('id').single()
       if (error) throw error
 
+      const pollRows = uploaded.flatMap(scene => (scene.pollStickers || []).map(poll => ({
+        id: poll.id,
+        story_id: createdStory.id,
+        owner_id: userId,
+        question: poll.question,
+        options: poll.options,
+        color: poll.color,
+      })))
+      if (pollRows.length) {
+        const { error: pollError } = await supabase.from('story_polls').insert(pollRows)
+        if (pollError) {
+          await supabase.from('stories').delete().eq('id', createdStory.id)
+          throw new Error('Poll stickers could not be saved securely. Please try sharing again.')
+        }
+      }
+
       const mentionRows = uploaded.flatMap(scene => (scene.mentions || []).map(mention => ({
         story_id: createdStory.id,
         creator_id: userId,
@@ -435,6 +451,22 @@ export function useCreateStory() {
         link_label: linkLabel || null,
       }).select('id').single()
       if (error) throw error
+
+      const pollRows = uploaded.flatMap(scene => (scene.pollStickers || []).map(poll => ({
+        id: poll.id,
+        story_id: createdStory.id,
+        owner_id: userId,
+        question: poll.question,
+        options: poll.options,
+        color: poll.color,
+      })))
+      if (pollRows.length) {
+        const { error: pollError } = await supabase.from('story_polls').insert(pollRows)
+        if (pollError) {
+          await supabase.from('stories').delete().eq('id', createdStory.id)
+          throw new Error('Poll stickers could not be saved securely. Please try sharing again.')
+        }
+      }
 
       const mentionRows = uploaded.flatMap(scene => (scene.mentions || []).map(mention => ({
         story_id: createdStory.id,
