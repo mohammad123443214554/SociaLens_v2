@@ -5,6 +5,13 @@ import { MoreVertical, RotateCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { StoryPollOverlay } from '@/lib/types/database.types'
 
+function pollForeground(hex: string) {
+  const value = hex.replace('#', '')
+  if (!/^[0-9a-fA-F]{6}$/.test(value)) return '#ffffff'
+  const rgb = [0, 2, 4].map(index => parseInt(value.slice(index, index + 2), 16) / 255).map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+  return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) > 0.42 ? '#111827' : '#ffffff'
+}
+
 export function PollSticker({ poll, selected = false, editable = false, preview = false, storyId, userId, isOwner = false, onSelect, onMove, onResize, onRotate, onMenu }: {
   poll: StoryPollOverlay
   selected?: boolean
@@ -58,6 +65,7 @@ export function PollSticker({ poll, selected = false, editable = false, preview 
     }
     setVoting(false)
   }
+  const foreground = pollForeground(poll.color || '#ec4899')
   const total = Object.values(voteCounts).reduce((sum, count) => sum + (Number(count)||0), 0)
   const moveStart = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!editable) return
@@ -66,7 +74,7 @@ export function PollSticker({ poll, selected = false, editable = false, preview 
     event.currentTarget.setPointerCapture(event.pointerId)
   }
   return <div className={`absolute z-40 w-[min(240px,72vw)] select-none rounded-2xl p-3 shadow-xl ${editable ? 'touch-none cursor-move' : 'pointer-events-auto'} ${selected ? 'outline outline-1 outline-white outline-offset-2' : ''}`}
-    style={{left:`${poll.x}%`,top:`${poll.y}%`,transform:`translate(-50%,-50%) rotate(${poll.rotation}deg) scale(${poll.scale})`,backgroundColor:poll.color||'#ec4899',color:'#fff'}}
+    style={{left:`${poll.x}%`,top:`${poll.y}%`,transform:`translate(-50%,-50%) rotate(${poll.rotation}deg) scale(${poll.scale})`,backgroundColor:poll.color||'#ec4899',color:foreground}}
     onPointerDown={moveStart}
     onPointerMove={event => { const d=drag.current; if(!editable||!d||!event.currentTarget.hasPointerCapture(event.pointerId))return; const rect=event.currentTarget.parentElement?.getBoundingClientRect(); if(!rect)return; const dx=(event.clientX-d.x)/rect.width*100; const dy=(event.clientY-d.y)/rect.height*100; onMove?.(Math.max(12,Math.min(88,d.originX+dx)),Math.max(10,Math.min(90,d.originY+dy))) }}
     onPointerUp={event=>{drag.current=null;if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId)}}
