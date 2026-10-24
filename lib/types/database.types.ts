@@ -239,6 +239,9 @@ export type Notification = {
   created_at: string
 }
 
+export type StoryPoll = { id: string; story_id: string; owner_id: string; question: string; options: Array<{ id: string; label: string }>; color: string; vote_counts: Record<string, number>; created_at: string }
+export type StoryPollVote = { id: string; poll_id: string; user_id: string; option_id: string; created_at: string }
+
 export type StoryMention = {
   id: string
   story_id: string
@@ -317,6 +320,8 @@ export type StoryMentionOverlay = {
 
 export type StoryGIFOverlay = { id: string; providerId: string; url: string; previewUrl: string; title: string; x: number; y: number; scale: number; rotation: number }
 
+export type StoryPollOverlay = { id: string; question: string; options: Array<{ id: string; label: string }>; color: string; x: number; y: number; scale: number; rotation: number }
+
 export type StoryCountdownOverlay = {
   id: string
   title: string
@@ -354,6 +359,7 @@ export type PhotoScene = {
   links?: StoryLinkOverlay[]
   countdowns?: StoryCountdownOverlay[]
   gifStickers?: StoryGIFOverlay[]
+  pollStickers?: StoryPollOverlay[]
   overlayStart?: number
   overlayDuration?: number
   overlayTextColor?: string
@@ -378,6 +384,7 @@ export type VideoScene = {
   links?: StoryLinkOverlay[]
   countdowns?: StoryCountdownOverlay[]
   gifStickers?: StoryGIFOverlay[]
+  pollStickers?: StoryPollOverlay[]
   id: string
   videoUrl: string
   duration: number
@@ -533,6 +540,8 @@ export type Database = {
       saved_posts: { Row: SavedPost; Insert: Omit<SavedPost, 'id' | 'created_at'>; Update: Partial<SavedPost> }
       stories: { Row: Story; Insert: Omit<Story, 'id' | 'created_at' | 'expires_at'> & { id?: string }; Update: Partial<Story> }
       story_mentions: { Row: StoryMention; Insert: Omit<StoryMention, 'id' | 'created_at'> & { id?: string }; Update: Partial<StoryMention> }
+      story_polls: { Row: StoryPoll; Insert: Omit<StoryPoll, 'created_at' | 'vote_counts'> & { vote_counts?: Record<string, number> }; Update: Partial<Pick<StoryPoll, 'question' | 'options' | 'color'>> }
+      story_poll_votes: { Row: StoryPollVote; Insert: Omit<StoryPollVote, 'id' | 'created_at'> & { id?: string }; Update: never }
       story_likes: { Row: StoryLike; Insert: Omit<StoryLike, 'id' | 'created_at'>; Update: Partial<StoryLike> }
       story_reactions: { Row: StoryReaction; Insert: Omit<StoryReaction, 'id' | 'created_at'>; Update: Partial<StoryReaction> }
       story_comments: { Row: StoryComment; Insert: Omit<StoryComment, 'id' | 'created_at'>; Update: Partial<StoryComment> }
