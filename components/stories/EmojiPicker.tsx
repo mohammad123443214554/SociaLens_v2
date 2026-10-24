@@ -17,7 +17,7 @@ export function EmojiPicker({ onClose, onSelect }: { onClose: () => void; onSele
   const items = useMemo(() => {
     if (!query.trim()) return CATEGORIES.find(item => item.label === category)?.emojis ?? CATEGORIES[0].emojis
     const term = query.trim().toLowerCase()
-    return UNIQUE_EMOJIS.filter(emoji => emoji.includes(query.trim()) || (ALIASES[emoji] || '').toLowerCase().includes(term) || CATEGORIES.some(c => c.label.toLowerCase().includes(term) && c.emojis.includes(emoji)))
+    return UNIQUE_EMOJIS.filter(emoji => emoji.includes(query.trim()) || (ALIASES[emoji] || '').toLowerCase().includes(term) || CATEGORIES.some(c => c.label.toLowerCase().includes(term) && (c.emojis as readonly string[]).includes(emoji)))
   }, [category, query])
   return <div className="fixed inset-0 z-[190] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Emoji picker">
     <div className="flex max-h-[92dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card text-foreground shadow-2xl sm:rounded-2xl">
