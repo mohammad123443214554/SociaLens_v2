@@ -2,7 +2,10 @@
 -- Upsert requires UPDATE table privileges and an UPDATE RLS policy; without
 -- these, Supabase returns "permission denied for table story_poll_votes".
 
-grant update (option_id) on public.story_poll_votes to authenticated;
+-- PostgREST upsert updates option_id, poll_id, and user_id in its conflict clause.
+-- Table-level UPDATE privilege is required; the RLS policy restricts which row and
+-- values the authenticated voter may update.
+grant update on public.story_poll_votes to authenticated;
 
 drop policy if exists "Voters can change their own poll vote" on public.story_poll_votes;
 create policy "Voters can change their own poll vote"
