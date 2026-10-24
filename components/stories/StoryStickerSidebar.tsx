@@ -1,6 +1,6 @@
 'use client'
 
-import { AtSign, Image, Link2, Timer, X } from 'lucide-react'
+import { AtSign, Image, Link2, Timer, X, Smile } from 'lucide-react'
 
 interface StoryStickerSidebarProps {
   onClose: () => void
@@ -8,9 +8,10 @@ interface StoryStickerSidebarProps {
   onLink?: () => void
   onCountdown?: () => void
   onGIF?: () => void
+  onEmoji?: () => void
 }
 
-export function StoryStickerSidebar({ onClose, onMention, onLink, onCountdown, onGIF }: StoryStickerSidebarProps) {
+export function StoryStickerSidebar({ onClose, onMention, onLink, onCountdown, onGIF, onEmoji }: StoryStickerSidebarProps) {
   return (
     <div className="fixed inset-x-0 bottom-0 top-auto z-[165] flex h-[min(78dvh,620px)] w-full max-w-none flex-col rounded-t-2xl border-t border-border bg-card text-foreground shadow-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:top-0 sm:h-full sm:w-80 sm:max-w-[88vw] sm:rounded-none sm:border-l sm:border-t-0" role="dialog" aria-modal="true" aria-label="Story stickers">
       <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
@@ -25,6 +26,7 @@ export function StoryStickerSidebar({ onClose, onMention, onLink, onCountdown, o
           <span className="min-w-0"><span className="block text-sm font-semibold">Mention</span><span className="mt-0.5 block text-xs text-muted-foreground">Tag someone in your story</span></span>
         </button>
         {onGIF && <button type="button" onClick={onGIF} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:bg-muted"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-fuchsia-500/10 text-fuchsia-500"><Image className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-sm font-semibold">GIF</span><span className="mt-0.5 block text-xs text-muted-foreground">Search animated GIF stickers</span></span></button>}
+        {onEmoji && <button type="button" onClick={onEmoji} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:bg-muted"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500"><Smile className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-sm font-semibold">Emojis</span><span className="mt-0.5 block text-xs text-muted-foreground">Add searchable emoji stickers</span></span></button>}
         {onCountdown && <button type="button" onClick={onCountdown} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:bg-muted"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500"><Timer className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-sm font-semibold">Countdown</span><span className="mt-0.5 block text-xs text-muted-foreground">Add a live countdown to your story</span></span></button>}
         {onLink && <button type="button" onClick={onLink} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:bg-muted">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500"><Link2 className="h-5 w-5" /></span>
