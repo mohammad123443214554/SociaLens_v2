@@ -79,7 +79,7 @@ export function PollSticker({ poll, selected = false, editable = false, preview 
   }
   return <div className={`absolute z-40 w-[min(240px,72vw)] select-none rounded-2xl p-3 shadow-xl ${editable ? 'touch-none cursor-move' : 'pointer-events-auto'} ${selected ? 'outline outline-1 outline-white outline-offset-2' : ''}`}
     style={{left:`${poll.x}%`,top:`${poll.y}%`,transform:`translate(-50%,-50%) rotate(${poll.rotation}deg) scale(${poll.scale})`,backgroundColor:poll.color||'#ec4899',color:foreground}}
-    onPointerDown={moveStart}
+    onPointerDown={event => { if (!editable) { event.stopPropagation(); return } moveStart(event) }}
     onPointerMove={event => { const d=drag.current; if(!editable||!d||!event.currentTarget.hasPointerCapture(event.pointerId))return; const rect=event.currentTarget.parentElement?.getBoundingClientRect(); if(!rect)return; const dx=(event.clientX-d.x)/rect.width*100; const dy=(event.clientY-d.y)/rect.height*100; onMove?.(Math.max(12,Math.min(88,d.originX+dx)),Math.max(10,Math.min(90,d.originY+dy))) }}
     onPointerUp={event=>{drag.current=null;if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId)}}
     onPointerCancel={()=>{drag.current=null}}
