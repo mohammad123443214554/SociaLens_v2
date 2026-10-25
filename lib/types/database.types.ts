@@ -324,7 +324,7 @@ export type StoryPollOverlay = { id: string; question: string; options: Array<{ 
 
 export type StorySnapDropOverlay = { id: string; prompt: string; x: number; y: number; scale: number; rotation: number; color?: string }
 
-export type StoryEmojiSliderOverlay = { id: string; question: string; emoji: string; x: number; y: number; scale: number; rotation: number }
+export type StoryEmojiSliderOverlay = { id: string; question: string; emoji: string; x: number; y: number; scale: number; rotation: number; color?: string }
 
 export type StoryQuizOverlay = { id: string; question: string; options: Array<{ id: string; label: string }>; correctOptionId: string; color: string; x: number; y: number; scale: number; rotation: number }
 
