@@ -81,6 +81,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const [groupIndex, setGroupIndex] = useState(startGroupIndex)
   const [storyIndex, setStoryIndex] = useState(startStoryIndex)
   const [progress, setProgress] = useState(0)
+  const [snapDropEditing, setSnapDropEditing] = useState(false)
   const progressRef = useRef(0)
   useEffect(() => { progressRef.current = progress }, [progress])
   const [videoSceneIndex, setVideoSceneIndex] = useState(0)
@@ -110,7 +111,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
   // Anything that opens a panel or has the person actively typing pauses
   // the auto-advance timer/video, same as Instagram.
-  const paused = isAddingToMyStory || showMenu || showHideViewers || showDeleteConfirm || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0 || !!originalStoryToOpen
+  const paused = snapDropEditing || isAddingToMyStory || showMenu || showHideViewers || showDeleteConfirm || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0 || !!originalStoryToOpen
   const pausedRef = useRef(paused)
   useEffect(() => { pausedRef.current = paused }, [paused])
 
@@ -602,7 +603,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
                     {activeCountdowns.map(item => <CountdownSticker key={item.id} title={item.title} targetAt={item.targetAt} x={item.x} y={item.y} scale={item.scale} rotation={item.rotation} color={item.color}/>)}
                     {activePolls.map(poll => <PollSticker key={poll.id} poll={poll} storyId={story.id} userId={currentUserId || profile?.id} isOwner={isOwn} />)}
                     {activeQuizzes.map(quiz => <QuizSticker key={quiz.id} quiz={quiz} storyId={story.id} userId={currentUserId || profile?.id} isOwner={isOwn} />)}
-                    {activeSnapdrops.map(snapdrop => <SnapDropSticker key={snapdrop.id} snapdrop={snapdrop} storyId={story.id} userId={currentUserId || profile?.id} isOwner={isOwn} />)}
+                    {activeSnapdrops.map(snapdrop => <SnapDropSticker key={snapdrop.id} snapdrop={snapdrop} storyId={story.id} userId={currentUserId || profile?.id} isOwner={isOwn} onModalOpenChange={setSnapDropEditing} />)}
           {activeLinks.map(link => (
             <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} aria-label={`Open link: ${link.label}`} className="absolute z-30 flex max-w-[88%] items-center gap-2 rounded-full border border-white/70 px-3 py-2 text-sm font-semibold text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ left: `${link.x}%`, top: `${link.y}%`, backgroundColor: link.color || '#2563eb', transform: `translate(-50%, -50%) rotate(${link.rotation ?? 0}deg) scale(${link.scale})` }}><ExternalLink className="h-4 w-4 shrink-0"/><span className="max-w-40 truncate">{link.label || 'Visit Site'}</span></a>
           ))}
