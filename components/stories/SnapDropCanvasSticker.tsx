@@ -5,10 +5,11 @@ import { MoreVertical, RotateCw, Camera } from 'lucide-react'
 import type { StorySnapDropOverlay } from '@/lib/types/database.types'
 
 export function SnapDropCanvasSticker({
-  snapdrop, selected = false, onSelect, onMove, onResize, onRotate, onMenu,
+  snapdrop, selected = false, interactive = true, onSelect, onMove, onResize, onRotate, onMenu,
 }: {
   snapdrop: StorySnapDropOverlay
   selected?: boolean
+  interactive?: boolean
   onSelect?: () => void
   onMove?: (x: number, y: number) => void
   onResize?: (scale: number) => void
@@ -20,24 +21,24 @@ export function SnapDropCanvasSticker({
   const rotate = useRef<{ angle: number; rotation: number; cx: number; cy: number } | null>(null)
 
   return <div
-    className={`absolute z-[60] w-[min(220px,70vw)] select-none rounded-2xl p-3 text-center text-white shadow-xl touch-none cursor-move ${selected ? 'outline outline-1 outline-white outline-offset-2' : ''}`}
+    className={`absolute z-[60] w-[min(220px,70vw)] select-none rounded-2xl p-3 text-center text-white shadow-xl ${interactive ? 'touch-none cursor-move' : 'pointer-events-none'} ${selected ? 'outline outline-1 outline-white outline-offset-2' : ''}`}
     style={{ left: `${snapdrop.x}%`, top: `${snapdrop.y}%`, backgroundColor: snapdrop.color || '#7c3aed', transform: `translate(-50%,-50%) rotate(${snapdrop.rotation}deg) scale(${snapdrop.scale})` }}
     onPointerDown={event => {
-      if ((event.target as HTMLElement).closest('button')) return
+      if (!interactive || (event.target as HTMLElement).closest('button')) return
       event.preventDefault(); event.stopPropagation(); onSelect?.()
       drag.current = { x: event.clientX, y: event.clientY, originX: snapdrop.x, originY: snapdrop.y }
       event.currentTarget.setPointerCapture(event.pointerId)
     }}
     onPointerMove={event => {
       const d = drag.current
-      if (!d || !event.currentTarget.hasPointerCapture(event.pointerId)) return
+      if (!interactive || !d || !event.currentTarget.hasPointerCapture(event.pointerId)) return
       const rect = event.currentTarget.parentElement?.getBoundingClientRect()
       if (!rect) return
       onMove?.(Math.max(12, Math.min(88, d.originX + (event.clientX - d.x) / rect.width * 100)), Math.max(10, Math.min(90, d.originY + (event.clientY - d.y) / rect.height * 100)))
     }}
     onPointerUp={event => { drag.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId) }}
     onPointerCancel={() => { drag.current = null }}
-    onClick={event => { event.stopPropagation(); onSelect?.() }}
+    onClick={event => { if (!interactive) return; event.stopPropagation(); onSelect?.() }}
     aria-label="SnapDrop sticker; drag to move"
   >
     {selected && <>
