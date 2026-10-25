@@ -33,6 +33,7 @@ import { PollSticker } from './PollSticker'
 import { QuizSticker } from './QuizSticker'
 import { SnapDropSticker } from './SnapDropSticker'
 import { EmojiSliderSticker } from './EmojiSliderSticker'
+import { PhotoCollageSticker } from './PhotoCollageSticker'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import { loadGoogleFont } from '@/lib/utils/googleFonts'
 import { resolveBackgroundCss, getTextFillStyle } from '@/lib/utils/storyStyle'
@@ -350,6 +351,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const activeQuizzes = activePhotoScene?.quizStickers ?? activeVideoScene?.quizStickers ?? []
   const activeEmojiSliders = activePhotoScene?.emojiSliderStickers ?? activeVideoScene?.emojiSliderStickers ?? []
   const activeSnapdrops = activePhotoScene?.snapdrops ?? activeVideoScene?.snapdrops ?? []
+  const activeCollages = activePhotoScene?.collageStickers ?? activeVideoScene?.collageStickers ?? []
   const activeGIFStickers = activePhotoScene?.gifStickers ?? activeVideoScene?.gifStickers ?? []
 
   // Play whichever song is active right now. Deliberately keyed on the
@@ -602,6 +604,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
               <span className="max-w-40 truncate text-sm font-semibold">@{mention.username}</span>
             </button>
           ))}
+          {activeCollages.map(collage => <PhotoCollageSticker key={collage.id} collage={collage} preview />)}
           {activeGIFStickers.map(sticker => <div key={sticker.id} className="pointer-events-none absolute z-30" style={{ left: `${sticker.x}%`, top: `${sticker.y}%`, transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg) scale(${sticker.scale})` }}><img src={sticker.url} alt={sticker.title || 'GIF sticker'} draggable={false} className="max-h-40 max-w-[min(55vw,220px)] object-contain" /></div>)}
                     {activeCountdowns.map(item => <CountdownSticker key={item.id} title={item.title} targetAt={item.targetAt} x={item.x} y={item.y} scale={item.scale} rotation={item.rotation} color={item.color}/>)}
                     {activePolls.map(poll => <PollSticker key={poll.id} poll={poll} storyId={story.id} userId={currentUserId || profile?.id} isOwner={isOwn} />)}
