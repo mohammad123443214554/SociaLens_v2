@@ -9,12 +9,13 @@ import { validateEmojiSliderScore } from '@/lib/utils/emojiSlider'
 
 type Results = { response_count: number; average_score: number | null; bucket_0_20: number; bucket_21_40: number; bucket_41_60: number; bucket_61_80: number; bucket_81_100: number }
 
-export function EmojiSliderSticker({ slider, selected = false, editable = false, preview = false, storyId, userId, isOwner = false, onSelect, onMove, onResize, onRotate, onMenu, onInteractionChange }: {
-  slider: StoryEmojiSliderOverlay; selected?: boolean; editable?: boolean; preview?: boolean; storyId?: string; userId?: string; isOwner?: boolean
+export function EmojiSliderSticker({ slider, selected = false, editable = false, preview = false, storyId, storyExpiresAt, userId, isOwner = false, onSelect, onMove, onResize, onRotate, onMenu, onInteractionChange }: {
+  slider: StoryEmojiSliderOverlay; selected?: boolean; editable?: boolean; preview?: boolean; storyId?: string; storyExpiresAt?: string; userId?: string; isOwner?: boolean
   onSelect?: () => void; onMove?: (x:number,y:number) => void; onResize?: (scale:number) => void; onRotate?: (rotation:number) => void; onMenu?: () => void; onInteractionChange?: (active: boolean) => void
 }) {
   const supabase = createClient()
   const router = useRouter()
+  const storyExpired = !!storyExpiresAt && Number.isFinite(Date.parse(storyExpiresAt)) && Date.parse(storyExpiresAt) <= Date.now()
   const [value, setValue] = useState(50)
   const [savedValue, setSavedValue] = useState<number | null>(null)
   const [loading, setLoading] = useState(!editable && !preview)
@@ -31,6 +32,7 @@ export function EmojiSliderSticker({ slider, selected = false, editable = false,
 
   useEffect(() => {
     if (editable || preview || !storyId || !userId) { setLoading(false); return }
+    if (storyExpiresAt && Date.parse(storyExpiresAt) <= Date.now()) { setError('This story has expired.'); setLoading(false); return }
     let alive = true
     ;(async () => {
       const { data: ownResponse, error: ownError } = await (supabase as any).from('story_emoji_slider_responses').select('score').eq('sticker_id', slider.id).maybeSingle()
@@ -40,7 +42,7 @@ export function EmojiSliderSticker({ slider, selected = false, editable = false,
       setLoading(false)
     })()
     return () => { alive = false }
-  }, [editable, preview, slider.id, storyId, userId])
+  }, [editable, preview, slider.id, storyId, storyExpiresAt, userId])
 
   const scoreFromPointer = (clientX: number) => {
     const rect = trackRef.current?.getBoundingClientRect()
@@ -48,6 +50,7 @@ export function EmojiSliderSticker({ slider, selected = false, editable = false,
     setValue(Math.max(0, Math.min(100, Math.round(((clientX - rect.left) / rect.width) * 100))))
   }
   const submit = async () => {
+    if (storyExpired) { setError('This story has expired.'); return }
     if (!storyId || !userId || saving || loading || savedValue !== null || preview || editable) return
     setSaving(true); setError(''); setNotice('')
     const score = validateEmojiSliderScore(value)
@@ -64,6 +67,7 @@ export function EmojiSliderSticker({ slider, selected = false, editable = false,
   }
   const loadResults = async () => {
     if (!storyId || !isOwner || resultsLoading) return
+    if (storyExpired) { setError('This story has expired.'); return }
     setShowResults(true)
     setResultsLoading(true)
     setError('')
@@ -73,7 +77,7 @@ export function EmojiSliderSticker({ slider, selected = false, editable = false,
     setResultsLoading(false)
   }
   const moveStart = (event: React.PointerEvent<HTMLDivElement>) => { if(!editable)return;event.preventDefault();event.stopPropagation();onSelect?.();drag.current={x:event.clientX,y:event.clientY,originX:slider.x,originY:slider.y};event.currentTarget.setPointerCapture(event.pointerId) }
-  const interactive = !editable && !preview && !!userId && savedValue === null && !loading
+  const interactive = !editable && !preview && !!userId && savedValue === null && !loading && !storyExpired
 
   return <div className={`absolute z-[62] w-[min(280px,82vw)] select-none rounded-2xl border border-white/30 bg-zinc-900/90 p-3.5 text-white shadow-xl backdrop-blur-sm ${editable?'touch-none cursor-move': 'pointer-events-auto'} ${selected?'outline outline-1 outline-white outline-offset-2':''}`}
     style={{left:`${slider.x}%`,top:`${slider.y}%`,transform:`translate(-50%,-50%) rotate(${slider.rotation}deg) scale(${slider.scale})`}}
@@ -86,7 +90,7 @@ export function EmojiSliderSticker({ slider, selected = false, editable = false,
     <p className="mb-3 break-words text-center text-sm font-bold leading-snug">{slider.question}</p>
     <div className="flex items-center gap-2.5"><span className="text-[10px] text-white/80">0</span><div ref={trackRef} role="slider" tabIndex={interactive?0:-1} aria-label={slider.question} aria-valuemin={0} aria-valuemax={100} aria-valuenow={savedValue ?? value} aria-disabled={!interactive} onKeyDown={event=>{if(!interactive)return;let next=value;if(event.key==='ArrowRight'||event.key==='ArrowUp')next=Math.min(100,value+1);else if(event.key==='ArrowLeft'||event.key==='ArrowDown')next=Math.max(0,value-1);else if(event.key==='Home')next=0;else if(event.key==='End')next=100;else return;event.preventDefault();event.stopPropagation();setValue(next)}} onFocus={()=>onInteractionChange?.(true)} onBlur={()=>onInteractionChange?.(false)} onPointerDown={event=>{if(!interactive)return;event.preventDefault();event.stopPropagation();onInteractionChange?.(true);event.currentTarget.setPointerCapture(event.pointerId);scoreFromPointer(event.clientX)}} onPointerMove={event=>{if(interactive&&event.currentTarget.hasPointerCapture(event.pointerId)){event.stopPropagation();scoreFromPointer(event.clientX)}}} onPointerUp={event=>{event.stopPropagation();onInteractionChange?.(false);if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId)}} onPointerCancel={()=>onInteractionChange?.(false)} className={`relative h-2.5 min-w-0 flex-1 rounded-full bg-white/25 ${interactive?'cursor-pointer touch-none':'cursor-default'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white`}><div className="absolute inset-y-0 left-0 rounded-full bg-white/80" style={{width:`${savedValue ?? value}%`}}/><span className="absolute top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-white text-2xl shadow-lg" style={{left:`${savedValue ?? value}%`}}>{slider.emoji}</span></div><span className="text-[10px] text-white/80">100</span></div>
     <div className="mt-3 flex items-center justify-between gap-2 text-[10px] text-white/70"><span>Not much</span><span className="font-semibold text-white">{savedValue ?? value}/100</span><span>A lot</span></div>
-    {!editable&&!preview&&<div className="mt-3">{isOwner?<button type="button" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();void loadResults()}} className="w-full rounded-lg bg-white/15 px-3 py-2 text-xs font-semibold hover:bg-white/25">View results</button>:savedValue!==null?<p className="text-center text-xs font-medium text-emerald-200">{notice||'Your response is saved.'}</p>:<button type="button" disabled={loading||saving||savedValue!==null} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();if(!userId){router.push('/login');return}void submit()}} className="w-full rounded-lg bg-white px-3 py-2 text-xs font-bold text-zinc-900 disabled:opacity-60">{loading?'Loading…':saving?'Submitting…':!userId?'Sign in to respond':'Submit response'}</button>}</div>}
+    {!editable&&!preview&&<div className="mt-3">{isOwner?<button type="button" disabled={storyExpired} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();void loadResults()}} className="w-full rounded-lg bg-white/15 px-3 py-2 text-xs font-semibold hover:bg-white/25">View results</button>:savedValue!==null?<p className="text-center text-xs font-medium text-emerald-200">{notice||'Your response is saved.'}</p>:<button type="button" disabled={loading||saving||savedValue!==null} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();if(!userId){router.push('/login');return}void submit()}} className="w-full rounded-lg bg-white px-3 py-2 text-xs font-bold text-zinc-900 disabled:opacity-60">{storyExpired?'Story expired':loading?'Loading…':saving?'Submitting…':!userId?'Sign in to respond':'Submit response'}</button>}</div>}
     {error&&<p role="alert" className="mt-2 text-center text-[11px] text-red-200">{error}</p>}
     {showResults&&<div className="mt-3 rounded-xl bg-black/30 p-3" role="dialog" aria-label="Emoji slider results"><div className="flex items-center justify-between"><strong className="text-xs">Results</strong><button type="button" onClick={e=>{e.stopPropagation();setShowResults(false)}} aria-label="Close results" className="text-xs underline">Close</button></div>{resultsLoading?<p className="mt-2 text-xs">Loading results…</p>:results?<><p className="mt-2 text-xs">{results.response_count} responses · Average {results.average_score===null?'—':Math.round(results.average_score)}/100</p><div className="mt-3 space-y-2">{[['0–20',results.bucket_0_20],['21–40',results.bucket_21_40],['41–60',results.bucket_41_60],['61–80',results.bucket_61_80],['81–100',results.bucket_81_100]].map(([label,count])=><div key={String(label)} className="flex items-center gap-2 text-[10px]"><span className="w-12">{label}</span><div className="h-1.5 flex-1 rounded-full bg-white/15"><div className="h-1.5 rounded-full bg-white/80" style={{width:`${results.response_count?Number(count)/results.response_count*100:0}%`}}/></div><span>{count}</span></div>)}</div></>:<p className="mt-2 text-xs">Loading results…</p>}</div>}
   </div>
