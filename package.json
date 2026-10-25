@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:recommendation": "node --experimental-strip-types --test tests/recommendation-scoring.test.ts"
+    "test:recommendation": "node --experimental-strip-types --test tests/recommendation-scoring.test.ts",
+    "test:emoji-slider": "node --experimental-strip-types --test tests/emoji-slider.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
