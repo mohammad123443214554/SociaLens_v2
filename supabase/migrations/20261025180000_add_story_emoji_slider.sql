@@ -42,6 +42,9 @@ with check (owner_id = (select auth.uid()) and exists (
 create policy "Story owners delete emoji sliders" on public.story_emoji_sliders
 for delete to authenticated using (owner_id = (select auth.uid()));
 
+grant select, insert, update, delete on public.story_emoji_sliders to authenticated;
+grant select, insert on public.story_emoji_slider_responses to authenticated;
+
 create policy "View own emoji slider response" on public.story_emoji_slider_responses
 for select to authenticated using (user_id = (select auth.uid()));
 create policy "Respond once to accessible emoji slider" on public.story_emoji_slider_responses
@@ -50,7 +53,7 @@ for insert to authenticated with check (
   and exists (
     select 1 from public.story_emoji_sliders e
     join public.stories s on s.id = e.story_id
-    where e.id = sticker_id and e.story_id = story_id and s.expires_at > now()
+    where e.id = story_emoji_slider_responses.sticker_id and e.story_id = story_emoji_slider_responses.story_id and s.expires_at > now()
       and s.user_id <> (select auth.uid())
       and not exists (select 1 from public.blocks b where
         (b.blocker_id = (select auth.uid()) and b.blocked_id = s.user_id)
