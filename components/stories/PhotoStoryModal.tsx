@@ -560,6 +560,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
             <img src={previewUrl} alt="Story preview" className="h-full w-full object-contain" style={{ transform: `translate(${photoOffset.x}%, ${photoOffset.y}%) scale(${photoScale})`, transformOrigin: 'center center' }} />
              {pollStickers.map(poll => <PollSticker key={poll.id} poll={poll} preview />)}
           {quizStickers.map(quiz => <QuizSticker key={quiz.id} quiz={quiz} preview />)}
+            {snapdrops.map(item => <SnapDropCanvasSticker key={item.id} snapdrop={item} interactive={false} />)}
             {gifStickers.map(sticker => <div key={sticker.id} className="pointer-events-none absolute z-30" style={{ left: `${sticker.x}%`, top: `${sticker.y}%`, transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg) scale(${sticker.scale})` }}><img src={sticker.url} alt={sticker.title || 'GIF sticker'} className="max-h-40 max-w-[min(55vw,220px)] object-contain" /></div>)}
              
             {mentionOverlays.map(mention => <div key={mention.id} className="absolute z-20 flex max-w-[88%] items-center gap-2 rounded-full border border-white/50 px-3 py-2 text-white shadow-lg" style={{ left: `${mention.x}%`, top: `${mention.y}%`, backgroundColor: mention.color || '#111827', transform: `translate(-50%, -50%) rotate(${mention.rotation ?? 0}deg) scale(${mention.scale})` }}><AtSign className="h-4 w-4 text-pink-300" /><span className="max-w-40 truncate text-sm font-semibold">@{mention.username}</span></div>)}
