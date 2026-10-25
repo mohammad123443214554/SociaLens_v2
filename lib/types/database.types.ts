@@ -326,6 +326,9 @@ export type StorySnapDropOverlay = { id: string; prompt: string; x: number; y: n
 
 export type StoryEmojiSliderOverlay = { id: string; question: string; emoji: string; x: number; y: number; scale: number; rotation: number; color?: string }
 
+export type StoryCollagePhoto = { id: string; url?: string; file?: File; x: number; y: number; width: number; height: number; rotation: number }
+export type StoryCollageOverlay = { id: string; layout: 'grid' | 'horizontal' | 'editorial' | 'scrapbook'; mode: 'layout' | 'free'; photos: StoryCollagePhoto[]; x: number; y: number; scale: number; rotation: number }
+
 export type StoryQuizOverlay = { id: string; question: string; options: Array<{ id: string; label: string }>; correctOptionId: string; color: string; x: number; y: number; scale: number; rotation: number }
 
 export type StoryCountdownOverlay = {
@@ -368,6 +371,7 @@ export type PhotoScene = {
   pollStickers?: StoryPollOverlay[]
   quizStickers?: StoryQuizOverlay[]
   emojiSliderStickers?: StoryEmojiSliderOverlay[]
+  collageStickers?: StoryCollageOverlay[]
   snapdrops?: StorySnapDropOverlay[]
   overlayStart?: number
   overlayDuration?: number
