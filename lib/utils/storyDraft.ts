@@ -1,6 +1,6 @@
 'use client'
 
-import type { StoryCountdownOverlay, StoryGIFOverlay, StoryLinkOverlay, StoryMentionOverlay, StoryPollOverlay, StoryQuizOverlay, StorySnapDropOverlay, StoryEmojiSliderOverlay } from '@/lib/types/database.types'
+import type { StoryCountdownOverlay, StoryGIFOverlay, StoryLinkOverlay, StoryMentionOverlay, StoryPollOverlay, StoryQuizOverlay, StorySnapDropOverlay, StoryEmojiSliderOverlay, StoryCollageOverlay } from '@/lib/types/database.types'
 
 export type StoryDraftKind = 'photo' | 'video'
 
@@ -25,6 +25,7 @@ export interface StoryDraftRecord {
     pollStickers?: StoryPollOverlay[]
     quizStickers?: StoryQuizOverlay[]
     emojiSliderStickers?: StoryEmojiSliderOverlay[]
+    collageStickers?: StoryCollageOverlay[]
     snapdrops?: StorySnapDropOverlay[]
     song: { title: string; artist: string; artworkUrl: string; previewUrl: string; duration?: number; licenseUrl?: string; source?: string } | null
     storyDuration: number
@@ -44,7 +45,7 @@ export interface StoryDraftRecord {
     photoOffsetX?: number
     photoOffsetY?: number
   }
-  video?: { duration: number; trimStart?: number; trimEnd?: number; textLayers?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null }>; mentions?: StoryMentionOverlay[]; links?: StoryLinkOverlay[]; countdowns?: StoryCountdownOverlay[]; gifStickers?: StoryGIFOverlay[]; pollStickers?: StoryPollOverlay[]; quizStickers?: StoryQuizOverlay[]; emojiSliderStickers?: StoryEmojiSliderOverlay[]; snapdrops?: StorySnapDropOverlay[] }
+  video?: { duration: number; trimStart?: number; trimEnd?: number; textLayers?: Array<{ id: string; text: string; x: number; y: number; scale: number; rotation?: number; color?: string; fontFamily?: string | null }>; mentions?: StoryMentionOverlay[]; links?: StoryLinkOverlay[]; countdowns?: StoryCountdownOverlay[]; gifStickers?: StoryGIFOverlay[]; pollStickers?: StoryPollOverlay[]; quizStickers?: StoryQuizOverlay[]; emojiSliderStickers?: StoryEmojiSliderOverlay[]; collageStickers?: StoryCollageOverlay[]; snapdrops?: StorySnapDropOverlay[] }
   updatedAt: number
 }
 
