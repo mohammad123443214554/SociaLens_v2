@@ -37,12 +37,15 @@ export function PhotoCollageModal({ initialCollage, onClose, onSave }: { initial
   const stageRef = useRef<HTMLDivElement>(null)
   const photoDrag = useRef<{id:string;pointerId:number;startX:number;startY:number;originX:number;originY:number}|null>(null)
   const [previews, setPreviews] = useState<Record<string,string>>({})
+  const fileSignature = photos.map(p => p.file ? `${p.id}:${p.file.name}:${p.file.lastModified}:${p.file.size}` : `${p.id}:url`).join('|')
   useEffect(() => {
     const created: Record<string,string> = {}
     photos.forEach(p => { if (p.file) created[p.id] = URL.createObjectURL(p.file) })
     setPreviews(created)
     return () => Object.values(created).forEach(URL.revokeObjectURL)
-  }, [photos])
+  // Recreate object URLs only when selected files change, not on every drag.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileSignature])
   const canSave = photos.length >= 2 && photos.length <= 6
   const addFiles = (list: FileList | null) => {
     if (!list) return
