@@ -409,6 +409,20 @@ export function useCreateStory() {
         }
       }
 
+      const snapdropRows = uploaded.flatMap(scene => (scene.snapdrops || []).map(snapdrop => ({
+        story_id: createdStory.id,
+        owner_id: userId,
+        sticker_id: snapdrop.id,
+        prompt: snapdrop.prompt,
+      })))
+      if (snapdropRows.length) {
+        const { error: snapdropError } = await (supabase as any).from('story_snapdrops').insert(snapdropRows)
+        if (snapdropError) {
+          await supabase.from('stories').delete().eq('id', createdStory.id)
+          throw new Error('SnapDrop prompts could not be saved securely. Please share again.')
+        }
+      }
+
       const mentionRows = uploaded.flatMap(scene => (scene.mentions || []).map(mention => ({
         story_id: createdStory.id,
         creator_id: userId,
