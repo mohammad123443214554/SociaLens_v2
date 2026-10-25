@@ -395,6 +395,17 @@ export function useCreateStory() {
         }
       }
 
+      const emojiSliderRows = uploaded.flatMap(scene => (scene.emojiSliderStickers || []).map(slider => ({
+        id: slider.id, story_id: createdStory.id, owner_id: userId, question: slider.question.trim(), emoji: slider.emoji,
+      })))
+      if (emojiSliderRows.length) {
+        const { error: emojiSliderError } = await (supabase as any).from('story_emoji_sliders').insert(emojiSliderRows)
+        if (emojiSliderError) {
+          await supabase.from('stories').delete().eq('id', createdStory.id)
+          throw new Error('Emoji Slider stickers could not be saved securely. Please share again.')
+        }
+      }
+
       const snapdropRows = uploaded.flatMap(scene => (scene.snapdrops || []).map(snapdrop => ({
         story_id: createdStory.id,
         owner_id: userId,
@@ -503,6 +514,17 @@ export function useCreateStory() {
         if (quizError) {
           await supabase.from('stories').delete().eq('id', createdStory.id)
           throw new Error('Quiz stickers could not be saved securely. Please share again.')
+        }
+      }
+
+      const emojiSliderRows = uploaded.flatMap(scene => (scene.emojiSliderStickers || []).map(slider => ({
+        id: slider.id, story_id: createdStory.id, owner_id: userId, question: slider.question.trim(), emoji: slider.emoji,
+      })))
+      if (emojiSliderRows.length) {
+        const { error: emojiSliderError } = await (supabase as any).from('story_emoji_sliders').insert(emojiSliderRows)
+        if (emojiSliderError) {
+          await supabase.from('stories').delete().eq('id', createdStory.id)
+          throw new Error('Emoji Slider stickers could not be saved securely. Please share again.')
         }
       }
 
