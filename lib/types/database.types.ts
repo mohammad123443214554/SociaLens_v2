@@ -322,7 +322,7 @@ export type StoryGIFOverlay = { id: string; providerId: string; url: string; pre
 
 export type StoryPollOverlay = { id: string; question: string; options: Array<{ id: string; label: string }>; color: string; x: number; y: number; scale: number; rotation: number }
 
-export type StorySnapDropOverlay = { id: string; prompt: string; x: number; y: number; scale: number; rotation: number }
+export type StorySnapDropOverlay = { id: string; prompt: string; x: number; y: number; scale: number; rotation: number; color?: string }
 
 export type StoryQuizOverlay = { id: string; question: string; options: Array<{ id: string; label: string }>; correctOptionId: string; color: string; x: number; y: number; scale: number; rotation: number }
 
