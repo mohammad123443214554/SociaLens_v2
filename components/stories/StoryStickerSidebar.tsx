@@ -1,6 +1,6 @@
 'use client'
 
-import { AtSign, Image, Link2, Timer, X, Smile, BarChart3, Brain } from 'lucide-react'
+import { AtSign, Image, Link2, Timer, X, Smile, BarChart3, Brain, Camera } from 'lucide-react'
 
 interface StoryStickerSidebarProps {
   onClose: () => void
@@ -11,9 +11,10 @@ interface StoryStickerSidebarProps {
   onEmoji?: () => void
   onPoll?: () => void
   onQuiz?: () => void
+  onSnapDrop?: () => void
 }
 
-export function StoryStickerSidebar({ onClose, onMention, onLink, onCountdown, onGIF, onEmoji, onPoll, onQuiz }: StoryStickerSidebarProps) {
+export function StoryStickerSidebar({ onClose, onMention, onLink, onCountdown, onGIF, onEmoji, onPoll, onQuiz, onSnapDrop }: StoryStickerSidebarProps) {
   return (
     <div className="fixed inset-x-0 bottom-0 top-auto z-[165] flex h-[min(78dvh,620px)] w-full max-w-none flex-col rounded-t-2xl border-t border-border bg-card text-foreground shadow-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:top-0 sm:h-full sm:w-80 sm:max-w-[88vw] sm:rounded-none sm:border-l sm:border-t-0" role="dialog" aria-modal="true" aria-label="Story stickers">
       <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
@@ -31,6 +32,7 @@ export function StoryStickerSidebar({ onClose, onMention, onLink, onCountdown, o
         {onEmoji && <button type="button" onClick={onEmoji} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:bg-muted"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500"><Smile className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-sm font-semibold">Emojis</span><span className="mt-0.5 block text-xs text-muted-foreground">Add searchable emoji stickers</span></span></button>}
         {onPoll && <button type="button" onClick={onPoll} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:bg-muted"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pink-500/10 text-pink-500"><BarChart3 className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-sm font-semibold">Poll</span><span className="mt-0.5 block text-xs text-muted-foreground">Ask a question and collect votes</span></span></button>}
         {onQuiz && <button type="button" onClick={onQuiz} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:bg-muted"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500"><Brain className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-sm font-semibold">Quiz</span><span className="mt-0.5 block text-xs text-muted-foreground">Ask a question with one correct answer</span></span></button>}
+        {onSnapDrop && <button type="button" onClick={onSnapDrop} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:bg-muted"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500"><Camera className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-sm font-semibold">SnapDrop</span><span className="mt-0.5 block text-xs text-muted-foreground">Invite people to add a photo</span></span></button>}
         {onCountdown && <button type="button" onClick={onCountdown} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:bg-muted"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500"><Timer className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-sm font-semibold">Countdown</span><span className="mt-0.5 block text-xs text-muted-foreground">Add a live countdown to your story</span></span></button>}
         {onLink && <button type="button" onClick={onLink} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:bg-muted">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500"><Link2 className="h-5 w-5" /></span>
