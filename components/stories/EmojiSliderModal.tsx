@@ -34,6 +34,7 @@ export function EmojiSliderModal({ initialSlider, onClose, onSave }: {
       y: initialSlider?.y ?? 50,
       scale: initialSlider?.scale ?? 1,
       rotation: initialSlider?.rotation ?? 0,
+      color: initialSlider?.color || '#7c3aed',
     })
   }
 
