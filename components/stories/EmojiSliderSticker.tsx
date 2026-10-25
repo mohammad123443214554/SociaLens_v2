@@ -66,7 +66,6 @@ export function EmojiSliderSticker({ slider, selected = false, editable = false,
   }
   const moveStart = (event: React.PointerEvent<HTMLDivElement>) => { if(!editable)return;event.preventDefault();event.stopPropagation();onSelect?.();drag.current={x:event.clientX,y:event.clientY,originX:slider.x,originY:slider.y};event.currentTarget.setPointerCapture(event.pointerId) }
   const interactive = !editable && !preview && !!userId && savedValue === null && !loading
-  const foreground = '#27272a'
 
   return <div className={`absolute z-[62] w-[min(280px,82vw)] select-none rounded-2xl border border-white/30 bg-zinc-900/90 p-3.5 text-white shadow-xl backdrop-blur-sm ${editable?'touch-none cursor-move': 'pointer-events-auto'} ${selected?'outline outline-1 outline-white outline-offset-2':''}`}
     style={{left:`${slider.x}%`,top:`${slider.y}%`,transform:`translate(-50%,-50%) rotate(${slider.rotation}deg) scale(${slider.scale})`}}
