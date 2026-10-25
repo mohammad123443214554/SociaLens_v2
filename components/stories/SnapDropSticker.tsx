@@ -59,7 +59,7 @@ export function SnapDropSticker({ snapdrop, storyId, userId, isOwner = false }: 
   const count = rows.length
   const displayed = rows.slice(0,3)
   return <>
-    <div className="absolute z-[60] w-[min(250px,76vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 p-3 text-white shadow-xl" style={{left:snapdrop.x+'%',top:snapdrop.y+'%',transform:'translate(-50%,-50%) rotate('+(snapdrop.rotation||0)+'deg) scale('+(snapdrop.scale||1)+')'}}>
+    <div className="absolute z-[60] w-[min(250px,76vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl p-3 text-white shadow-xl" style={{left:snapdrop.x+'%',top:snapdrop.y+'%',backgroundColor:snapdrop.color||'#7c3aed',transform:'translate(-50%,-50%) rotate('+(snapdrop.rotation||0)+'deg) scale('+(snapdrop.scale||1)+')'}}>
       <div className="flex items-center justify-center gap-1.5 text-[10px] font-extrabold tracking-[.18em]"><Camera className="h-3.5 w-3.5"/> SNAPDROP</div>
       <p className="mt-1.5 break-words text-center text-sm font-semibold">{snapdrop.prompt}</p>
       <div className="mt-2 flex items-center justify-center">
