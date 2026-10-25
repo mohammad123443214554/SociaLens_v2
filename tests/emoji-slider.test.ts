@@ -21,8 +21,10 @@ test('Emoji Slider question is trimmed and constrained to 1–100 characters', (
   assert.equal(normalizeEmojiSliderQuestion(null), null)
 })
 
-test('Emoji Slider emoji must be one of the supported single reaction choices', () => {
+test('Emoji Slider accepts one emoji grapheme, including custom emoji, and rejects text or multiple emoji', () => {
   assert.equal(isValidEmojiSliderEmoji('🔥'), true)
+  assert.equal(isValidEmojiSliderEmoji('🧑‍🚀'), true)
   assert.equal(isValidEmojiSliderEmoji('not emoji'), false)
   assert.equal(isValidEmojiSliderEmoji('🔥🔥'), false)
+  assert.equal(isValidEmojiSliderEmoji('🔥a'), false)
 })
