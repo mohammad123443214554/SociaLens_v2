@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { X, Loader2, ImagePlus } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { X, Loader2, ImagePlus, Upload, CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { StorySnapDropOverlay } from '@/lib/types/database.types'
 
 type Contribution = { id:string; user_id:string; storage_path:string; message:string; created_at:string; profiles?:{username:string;avatar_url:string|null}|null; imageUrl?:string }
-export function SnapDropSticker({ snapdrop, storyId, userId, isOwner = false }: { snapdrop:StorySnapDropOverlay; storyId:string; userId?:string; isOwner?:boolean }) {
+export function SnapDropSticker({ snapdrop, storyId, userId, isOwner = false, onModalOpenChange }: { snapdrop:StorySnapDropOverlay; storyId:string; userId?:string; isOwner?:boolean; onModalOpenChange?: (open:boolean)=>void }) {
   const supabase = createClient()
   const [rows,setRows] = useState<Contribution[]>([])
   const [loading,setLoading] = useState(true)
@@ -16,6 +16,8 @@ export function SnapDropSticker({ snapdrop, storyId, userId, isOwner = false }: 
   const [message,setMessage] = useState('')
   const [saving,setSaving] = useState(false)
   const [error,setError] = useState('')
+  const [dragging,setDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [selected,setSelected] = useState<Contribution|null>(null)
   const refresh = async () => {
     setLoading(true)
@@ -60,11 +62,13 @@ export function SnapDropSticker({ snapdrop, storyId, userId, isOwner = false }: 
         : await (supabase as any).from('story_snapdrop_contributions').insert(payload)
       if(saveError){await supabase.storage.from('story-snapdrop').remove([path]);throw new Error(saveError.code==='23505'?'You already contributed to this prompt. Refresh and edit your photo.':'Could not submit your photo. The Story may have expired or your access changed.')}
       if(myRow && myRow.storage_path!==path) await supabase.storage.from('story-snapdrop').remove([myRow.storage_path])
-      setOpen(false);setPhoto(null);setMessage('');await refresh()
+      setOpen(false);onModalOpenChange?.(false);setPhoto(null);setMessage('');await refresh()
     } catch(e) { setError(e instanceof Error?e.message:'Something went wrong. Please try again.') }
     finally {setSaving(false)}
   }
-  const choose = async (file:File|null) => {setError('');if(!file)return;if(!file.type.startsWith('image/')){setError('Please select a photo, not a video.');return}setPhoto(file);setMessage(myRow?.message||'')}
+  const choose = async (file:File|null) => {setError('');if(!file)return;if(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)){setError('Please choose a JPG, PNG, WebP, or GIF photo.');return}if(file.size>10*1024*1024){setError('Your photo must be 10 MB or smaller.');return}setPhoto(file);setMessage(myRow?.message||'')}
+  const closeEditor = () => {if(saving)return;setOpen(false);onModalOpenChange?.(false);setPhoto(null);setError('')}
+  const openEditor = () => {setPhoto(null);setError('');setMessage(myRow?.message||'');setOpen(true);onModalOpenChange?.(true)}
   const count = rows.length
   const displayed = rows.slice(0,3)
   return <>
@@ -74,7 +78,7 @@ export function SnapDropSticker({ snapdrop, storyId, userId, isOwner = false }: 
         {displayed.map((row,i)=><button key={row.id} type="button" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelected(row)}} aria-label={'View photo from '+(row.profiles?.username||'participant')} className={'relative h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-white/20 '+(i?' -ml-2':'')}><img src={row.imageUrl} alt="" className="h-full w-full object-cover"/></button>)}
         {count>3&&<button type="button" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setGallery(true)}} className="-ml-1 rounded-full border-2 border-white bg-black/30 px-2 py-1 text-[10px] font-bold">{count-3>99?'99+':'+'+(count-3)}</button>}
       </div>
-      {userId && <button type="button" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setPhoto(null);setMessage(myRow?.message||'');setOpen(true)}} className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/70 bg-white px-3 py-2.5 text-xs font-extrabold text-violet-800 shadow-sm transition hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><ImagePlus className="h-4 w-4"/>{myRow?'Change your photo':'Add your photo'}</button>}
+      {userId && <button type="button" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();openEditor()}} className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/70 bg-white px-3 py-2.5 text-xs font-extrabold text-violet-800 shadow-sm transition hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><ImagePlus className="h-4 w-4"/>{myRow?'Change your photo':'Add your photo'}</button>}
       {!userId && <p className="mt-2 text-center text-[11px] font-semibold text-white">Sign in to add a photo</p>}
       <p className="mt-2 text-center text-[10px] text-white/80">{count} {count===1?'photo':'photos'} contributed</p>
     </div>
