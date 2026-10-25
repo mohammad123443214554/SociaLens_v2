@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Check, X } from 'lucide-react'
 import type { StoryEmojiSliderOverlay } from '@/lib/types/database.types'
-
-const EMOJIS = ['🔥','❤️','😍','😂','😮','😢','😡','👏','👍','😎','🥰','💯','✨','🤩','🥹','🙌','💖','🎉','💀','🤔']
+import { EMOJI_SLIDER_CHOICES, isValidEmojiSliderEmoji, normalizeEmojiSliderQuestion } from '@/lib/utils/emojiSlider'
 
 export function EmojiSliderModal({ initialSlider, onClose, onSave }: {
   initialSlider?: StoryEmojiSliderOverlay | null
@@ -15,6 +14,7 @@ export function EmojiSliderModal({ initialSlider, onClose, onSave }: {
   const [emoji, setEmoji] = useState(initialSlider?.emoji || '🔥')
   const [error, setError] = useState('')
   const normalized = question.trim()
+  const validQuestion = normalizeEmojiSliderQuestion(question)
   const previewValue = 50
 
   useEffect(() => {
@@ -24,12 +24,11 @@ export function EmojiSliderModal({ initialSlider, onClose, onSave }: {
   }, [onClose])
 
   const save = () => {
-    if (!normalized) { setError('Enter a question to continue.'); return }
-    if (normalized.length > 100) { setError('Your question must be 100 characters or fewer.'); return }
-    if (!EMOJIS.includes(emoji)) { setError('Choose a supported emoji.'); return }
+    if (!validQuestion) { setError(!normalized ? 'Enter a question to continue.' : 'Your question must be 100 characters or fewer.'); return }
+    if (!isValidEmojiSliderEmoji(emoji)) { setError('Choose a supported emoji.'); return }
     onSave({
       id: initialSlider?.id || Math.random().toString(36).slice(2, 12),
-      question: normalized,
+      question: validQuestion,
       emoji,
       x: initialSlider?.x ?? 50,
       y: initialSlider?.y ?? 50,
@@ -48,7 +47,7 @@ export function EmojiSliderModal({ initialSlider, onClose, onSave }: {
       <input id="emoji-slider-question" autoFocus value={question} maxLength={100} onChange={event => { setQuestion(event.target.value); setError('') }} placeholder="How much are you enjoying this?" className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
       <div className="mt-1 flex justify-between text-xs text-muted-foreground"><span>{error || 'Keep it short and fun.'}</span><span>{question.length}/100</span></div>
       <p className="mt-4 text-sm font-semibold">Choose your emoji</p>
-      <div className="mt-2 grid grid-cols-5 gap-2">{EMOJIS.map(item => <button key={item} type="button" aria-label={`Select ${item}`} aria-pressed={emoji===item} onClick={() => setEmoji(item)} className={`flex h-11 items-center justify-center rounded-xl border text-2xl transition ${emoji===item?'border-primary bg-primary/10 ring-2 ring-primary/30':'border-border bg-background hover:bg-muted'}`}>{item}</button>)}</div>
+      <div className="mt-2 grid grid-cols-5 gap-2">{EMOJI_SLIDER_CHOICES.map(item => <button key={item} type="button" aria-label={`Select ${item}`} aria-pressed={emoji===item} onClick={() => setEmoji(item)} className={`flex h-11 items-center justify-center rounded-xl border text-2xl transition ${emoji===item?'border-primary bg-primary/10 ring-2 ring-primary/30':'border-border bg-background hover:bg-muted'}`}>{item}</button>)}</div>
       <div className="mt-5 rounded-2xl bg-gradient-to-br from-zinc-800 to-zinc-950 p-4 text-white shadow-inner">
         <p className="break-words text-center text-sm font-bold">{normalized || 'Your question will appear here'}</p>
         <div className="mt-5 flex items-center gap-3"><span className="text-xs text-white/75">0</span><div className="relative h-2 flex-1 rounded-full bg-white/25"><div className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-white/80" /><span className="absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-white text-2xl shadow-lg">{emoji}</span></div><span className="text-xs text-white/75">100</span></div>
