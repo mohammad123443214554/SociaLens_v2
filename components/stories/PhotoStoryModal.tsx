@@ -569,11 +569,12 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       {showPreview && previewUrl && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Story preview">
           <button onClick={() => { setShowPreview(false); previewAudioRef.current?.pause() }} aria-label="Close story preview" className="absolute right-4 top-4 z-10 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"><X className="h-5 w-5" /></button>
-          <div className="relative flex h-[min(82dvh,760px)] aspect-[9/16] max-w-full items-center justify-center overflow-hidden rounded-2xl bg-black">
+          <div className="relative isolate flex h-[min(82dvh,760px)] aspect-[9/16] max-w-full items-center justify-center overflow-hidden rounded-2xl bg-black">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={previewUrl} alt="Story preview" className="h-full w-full object-contain" style={{ transform: `translate(${photoOffset.x}%, ${photoOffset.y}%) scale(${photoScale})`, transformOrigin: 'center center' }} />
              {pollStickers.map(poll => <PollSticker key={poll.id} poll={poll} preview />)}
           {quizStickers.map(quiz => <QuizSticker key={quiz.id} quiz={quiz} preview />)}
+            {emojiSliderStickers.map(slider => <EmojiSliderSticker key={slider.id} slider={slider} preview />)}
             {snapdrops.map(item => <SnapDropCanvasSticker key={item.id} snapdrop={item} interactive={false} />)}
             {gifStickers.map(sticker => <div key={sticker.id} className="pointer-events-none absolute z-30" style={{ left: `${sticker.x}%`, top: `${sticker.y}%`, transform: `translate(-50%, -50%) rotate(${sticker.rotation}deg) scale(${sticker.scale})` }}><img src={sticker.url} alt={sticker.title || 'GIF sticker'} className="max-h-40 max-w-[min(55vw,220px)] object-contain" /></div>)}
              
