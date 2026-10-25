@@ -400,6 +400,7 @@ export type VideoScene = {
   pollStickers?: StoryPollOverlay[]
   quizStickers?: StoryQuizOverlay[]
   emojiSliderStickers?: StoryEmojiSliderOverlay[]
+  collageStickers?: StoryCollageOverlay[]
   snapdrops?: StorySnapDropOverlay[]
   id: string
   videoUrl: string
