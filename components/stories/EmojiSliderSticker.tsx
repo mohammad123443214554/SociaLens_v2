@@ -22,6 +22,7 @@ export function EmojiSliderSticker({ slider, selected = false, editable = false,
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [results, setResults] = useState<Results | null>(null)
+  const [resultsLoading, setResultsLoading] = useState(false)
   const [showResults, setShowResults] = useState(false)
   const trackRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{x:number;y:number;originX:number;originY:number}|null>(null)
@@ -62,11 +63,14 @@ export function EmojiSliderSticker({ slider, selected = false, editable = false,
     setSaving(false)
   }
   const loadResults = async () => {
-    if (!storyId || !isOwner) return
+    if (!storyId || !isOwner || resultsLoading) return
     setShowResults(true)
+    setResultsLoading(true)
+    setError('')
     const { data, error: resultError } = await (supabase as any).rpc('get_story_emoji_slider_results', { p_sticker_id: slider.id })
-    if (resultError || !data?.[0]) { setError('Results are unavailable.'); return }
-    setResults(data[0] as Results)
+    if (resultError || !data?.[0]) setError('Results are unavailable.')
+    else setResults(data[0] as Results)
+    setResultsLoading(false)
   }
   const moveStart = (event: React.PointerEvent<HTMLDivElement>) => { if(!editable)return;event.preventDefault();event.stopPropagation();onSelect?.();drag.current={x:event.clientX,y:event.clientY,originX:slider.x,originY:slider.y};event.currentTarget.setPointerCapture(event.pointerId) }
   const interactive = !editable && !preview && !!userId && savedValue === null && !loading
@@ -84,6 +88,6 @@ export function EmojiSliderSticker({ slider, selected = false, editable = false,
     <div className="mt-3 flex items-center justify-between gap-2 text-[10px] text-white/70"><span>Not much</span><span className="font-semibold text-white">{savedValue ?? value}/100</span><span>A lot</span></div>
     {!editable&&!preview&&<div className="mt-3">{isOwner?<button type="button" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();void loadResults()}} className="w-full rounded-lg bg-white/15 px-3 py-2 text-xs font-semibold hover:bg-white/25">View results</button>:savedValue!==null?<p className="text-center text-xs font-medium text-emerald-200">{notice||'Your response is saved.'}</p>:<button type="button" disabled={loading||saving||savedValue!==null} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();if(!userId){router.push('/login');return}void submit()}} className="w-full rounded-lg bg-white px-3 py-2 text-xs font-bold text-zinc-900 disabled:opacity-60">{loading?'Loading…':saving?'Submitting…':!userId?'Sign in to respond':'Submit response'}</button>}</div>}
     {error&&<p role="alert" className="mt-2 text-center text-[11px] text-red-200">{error}</p>}
-    {showResults&&<div className="mt-3 rounded-xl bg-black/30 p-3" role="dialog" aria-label="Emoji slider results"><div className="flex items-center justify-between"><strong className="text-xs">Results</strong><button type="button" onClick={e=>{e.stopPropagation();setShowResults(false)}} aria-label="Close results" className="text-xs underline">Close</button></div>{results?<><p className="mt-2 text-xs">{results.response_count} responses · Average {results.average_score===null?'—':Math.round(results.average_score)}/100</p><div className="mt-3 space-y-2">{[['0–20',results.bucket_0_20],['21–40',results.bucket_21_40],['41–60',results.bucket_41_60],['61–80',results.bucket_61_80],['81–100',results.bucket_81_100]].map(([label,count])=><div key={String(label)} className="flex items-center gap-2 text-[10px]"><span className="w-12">{label}</span><div className="h-1.5 flex-1 rounded-full bg-white/15"><div className="h-1.5 rounded-full bg-white/80" style={{width:`${results.response_count?Number(count)/results.response_count*100:0}%`}}/></div><span>{count}</span></div>)}</div></>:<p className="mt-2 text-xs">Loading results…</p>}</div>}
+    {showResults&&<div className="mt-3 rounded-xl bg-black/30 p-3" role="dialog" aria-label="Emoji slider results"><div className="flex items-center justify-between"><strong className="text-xs">Results</strong><button type="button" onClick={e=>{e.stopPropagation();setShowResults(false)}} aria-label="Close results" className="text-xs underline">Close</button></div>{resultsLoading?<p className="mt-2 text-xs">Loading results…</p>:results?<><p className="mt-2 text-xs">{results.response_count} responses · Average {results.average_score===null?'—':Math.round(results.average_score)}/100</p><div className="mt-3 space-y-2">{[['0–20',results.bucket_0_20],['21–40',results.bucket_21_40],['41–60',results.bucket_41_60],['61–80',results.bucket_61_80],['81–100',results.bucket_81_100]].map(([label,count])=><div key={String(label)} className="flex items-center gap-2 text-[10px]"><span className="w-12">{label}</span><div className="h-1.5 flex-1 rounded-full bg-white/15"><div className="h-1.5 rounded-full bg-white/80" style={{width:`${results.response_count?Number(count)/results.response_count*100:0}%`}}/></div><span>{count}</span></div>)}</div></>:<p className="mt-2 text-xs">Loading results…</p>}</div>}
   </div>
 }
