@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, Flame, X } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import type { StoryEmojiSliderOverlay } from '@/lib/types/database.types'
 
 const EMOJIS = ['🔥','❤️','😍','😂','😮','😢','😡','👏','👍','😎','🥰','💯','✨','🤩','🥹','🙌','💖','🎉','💀','🤔']
