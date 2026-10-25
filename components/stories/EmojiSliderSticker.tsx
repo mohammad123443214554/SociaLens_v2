@@ -80,7 +80,7 @@ export function EmojiSliderSticker({ slider, selected = false, editable = false,
   const interactive = !editable && !preview && !!userId && savedValue === null && !loading && !storyExpired
 
   return <div className={`absolute z-[62] w-[min(280px,82vw)] select-none rounded-2xl border border-white/30 bg-zinc-900/90 p-3.5 text-white shadow-xl backdrop-blur-sm ${editable?'touch-none cursor-move': 'pointer-events-auto'} ${selected?'outline outline-1 outline-white outline-offset-2':''}`}
-    style={{left:`${slider.x}%`,top:`${slider.y}%`,transform:`translate(-50%,-50%) rotate(${slider.rotation}deg) scale(${slider.scale})`}}
+    style={{left:`${slider.x}%`,top:`${slider.y}%`,backgroundColor:slider.color || '#7c3aed',transform:`translate(-50%,-50%) rotate(${slider.rotation}deg) scale(${slider.scale})`}}
     onPointerDown={moveStart}
     onPointerMove={event=>{const d=drag.current;if(!editable||!d||!event.currentTarget.hasPointerCapture(event.pointerId))return;const rect=event.currentTarget.parentElement?.getBoundingClientRect();if(!rect)return;onMove?.(Math.max(12,Math.min(88,d.originX+(event.clientX-d.x)/rect.width*100)),Math.max(10,Math.min(90,d.originY+(event.clientY-d.y)/rect.height*100)))}}
     onPointerUp={event=>{drag.current=null;if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId)}} onPointerCancel={()=>{drag.current=null}} onClick={event=>{event.stopPropagation();onSelect?.()}} aria-label={`Emoji slider: ${slider.question}`}>
