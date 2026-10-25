@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { MoreVertical, RotateCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { StoryEmojiSliderOverlay } from '@/lib/types/database.types'
+import { validateEmojiSliderScore } from '@/lib/utils/emojiSlider'
 
 type Results = { response_count: number; average_score: number | null; bucket_0_20: number; bucket_21_40: number; bucket_41_60: number; bucket_61_80: number; bucket_81_100: number }
 
@@ -48,7 +49,8 @@ export function EmojiSliderSticker({ slider, selected = false, editable = false,
   const submit = async () => {
     if (!storyId || !userId || saving || loading || savedValue !== null || preview || editable) return
     setSaving(true); setError(''); setNotice('')
-    const score = Math.max(0, Math.min(100, Math.round(value)))
+    const score = validateEmojiSliderScore(value)
+    if (score === null) { setError('Choose a score between 0 and 100.'); setSaving(false); return }
     const { error: saveError } = await (supabase as any).from('story_emoji_slider_responses').insert({ sticker_id: slider.id, story_id: storyId, user_id: userId, score })
     if (saveError) {
       if (saveError.code === '23505') {
