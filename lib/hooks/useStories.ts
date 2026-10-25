@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { StoryWithProfile, TextScene, PhotoScene, VideoScene, GlobalMusic, StoryVisibility, StoryHiddenViewer, StoryMentionOverlay } from '@/lib/types/database.types'
+import { StoryWithProfile, TextScene, PhotoScene, VideoScene, GlobalMusic, StoryVisibility, StoryHiddenViewer, StoryMentionOverlay, StoryCollageOverlay } from '@/lib/types/database.types'
 import { compressImageIfNeeded, LONG_CACHE_CONTROL } from '@/lib/utils/imageCompression'
 
 export interface StoryGroup {
@@ -333,8 +333,25 @@ export function useCreateStory() {
         })
         if (uploadError) throw uploadError
         const { data: urlData } = supabase.storage.from('stories').getPublicUrl(path)
-        const { file, ...rest } = scene
-        uploaded.push({ ...rest, imageUrl: urlData.publicUrl })
+        const { file, collageStickers: draftCollages, ...rest } = scene
+        const collageStickers: StoryCollageOverlay[] = []
+        for (const collage of draftCollages || []) {
+          const photos = []
+          for (const photo of collage.photos) {
+            if (photo.url && !photo.file) { const { file: _file, ...savedPhoto } = photo; photos.push(savedPhoto); continue }
+            if (!photo.file) throw new Error('A collage photo is missing. Please replace it and try again.')
+            const photoFile = await compressImageIfNeeded(photo.file)
+            const photoExt = photoFile.name.split('.').pop() || 'jpg'
+            const photoPath = `${userId}/collage-${Date.now()}-${Math.random().toString(36).slice(2,8)}.${photoExt}`
+            const { error: collageUploadError } = await supabase.storage.from('stories').upload(photoPath, photoFile, { cacheControl: LONG_CACHE_CONTROL })
+            if (collageUploadError) throw new Error('A collage photo could not be uploaded. Please try again.')
+            const { data: collageUrl } = supabase.storage.from('stories').getPublicUrl(photoPath)
+            const { file: _file, ...photoRest } = photo
+            photos.push({ ...photoRest, url: collageUrl.publicUrl })
+          }
+          collageStickers.push({ ...collage, photos })
+        }
+        uploaded.push({ ...rest, collageStickers, imageUrl: urlData.publicUrl })
       }
 
       const totalDuration = uploaded.reduce((sum, s) => sum + s.duration, 0) || 5
@@ -456,8 +473,25 @@ export function useCreateStory() {
         })
         if (uploadError) throw uploadError
         const { data: urlData } = supabase.storage.from('stories').getPublicUrl(path)
-        const { file, ...rest } = scene
-        uploaded.push({ ...rest, videoUrl: urlData.publicUrl })
+        const { file, collageStickers: draftCollages, ...rest } = scene
+        const collageStickers: StoryCollageOverlay[] = []
+        for (const collage of draftCollages || []) {
+          const photos = []
+          for (const photo of collage.photos) {
+            if (photo.url && !photo.file) { const { file: _file, ...savedPhoto } = photo; photos.push(savedPhoto); continue }
+            if (!photo.file) throw new Error('A collage photo is missing. Please replace it and try again.')
+            const photoFile = await compressImageIfNeeded(photo.file)
+            const photoExt = photoFile.name.split('.').pop() || 'jpg'
+            const photoPath = `${userId}/collage-${Date.now()}-${Math.random().toString(36).slice(2,8)}.${photoExt}`
+            const { error: collageUploadError } = await supabase.storage.from('stories').upload(photoPath, photoFile, { cacheControl: LONG_CACHE_CONTROL })
+            if (collageUploadError) throw new Error('A collage photo could not be uploaded. Please try again.')
+            const { data: collageUrl } = supabase.storage.from('stories').getPublicUrl(photoPath)
+            const { file: _file, ...photoRest } = photo
+            photos.push({ ...photoRest, url: collageUrl.publicUrl })
+          }
+          collageStickers.push({ ...collage, photos })
+        }
+        uploaded.push({ ...rest, collageStickers, videoUrl: urlData.publicUrl })
       }
 
       const totalDuration = uploaded.reduce((sum, s) => sum + s.duration, 0) || 5
