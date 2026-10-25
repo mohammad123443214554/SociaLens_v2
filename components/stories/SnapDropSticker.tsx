@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Camera, X, Loader2, ImagePlus } from 'lucide-react'
+import { X, Loader2, ImagePlus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { StorySnapDropOverlay } from '@/lib/types/database.types'
 
@@ -69,13 +69,13 @@ export function SnapDropSticker({ snapdrop, storyId, userId, isOwner = false }: 
   const displayed = rows.slice(0,3)
   return <>
     <div className="absolute z-[60] w-[min(250px,76vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl p-3 text-white shadow-xl" style={{left:snapdrop.x+'%',top:snapdrop.y+'%',backgroundColor:snapdrop.color||'#7c3aed',transform:'translate(-50%,-50%) rotate('+(snapdrop.rotation||0)+'deg) scale('+(snapdrop.scale||1)+')'}}>
-      <div className="flex items-center justify-center gap-1.5 text-[10px] font-extrabold tracking-[.18em]"><Camera className="h-3.5 w-3.5"/> SNAPDROP</div>
-      <p className="mt-1.5 break-words text-center text-sm font-semibold">{snapdrop.prompt}</p>
+      <p className="break-words text-center text-sm font-bold leading-snug">{snapdrop.prompt}</p>
       <div className="mt-2 flex items-center justify-center">
         {displayed.map((row,i)=><button key={row.id} type="button" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelected(row)}} aria-label={'View photo from '+(row.profiles?.username||'participant')} className={'relative h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-white/20 '+(i?' -ml-2':'')}><img src={row.imageUrl} alt="" className="h-full w-full object-cover"/></button>)}
         {count>3&&<button type="button" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setGallery(true)}} className="-ml-1 rounded-full border-2 border-white bg-black/30 px-2 py-1 text-[10px] font-bold">{count-3>99?'99+':'+'+(count-3)}</button>}
       </div>
-      {!isOwner && userId && <button type="button" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setPhoto(null);setMessage(myRow?.message||'');setOpen(true)}} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/50 bg-white/15 px-3 py-2 text-xs font-bold hover:bg-white/25"><ImagePlus className="h-4 w-4"/>{myRow?'Edit Your Photo':'Add Photo'}</button>}
+      {!isOwner && userId && <button type="button" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setPhoto(null);setMessage(myRow?.message||'');setOpen(true)}} className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/70 bg-white px-3 py-2.5 text-xs font-extrabold text-violet-800 shadow-sm transition hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><ImagePlus className="h-4 w-4"/>{myRow?'Change your photo':'Add your photo'}</button>}
+      {!userId && !isOwner && <p className="mt-2 text-center text-[11px] font-semibold text-white">Sign in to add a photo</p>}
       {isOwner&&<p className="mt-2 text-center text-[10px] text-white/80">{count} {count===1?'photo':'photos'} contributed</p>}
     </div>
     {(open||gallery||selected)&&<div className="fixed inset-0 z-[240] flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-label={open?'Add SnapDrop photo':gallery?'SnapDrop gallery':'SnapDrop photo detail'} onClick={()=>{setOpen(false);setGallery(false);setSelected(null);setError('')}}>
