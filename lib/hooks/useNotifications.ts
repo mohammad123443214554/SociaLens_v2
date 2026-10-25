@@ -41,7 +41,7 @@ export function getNotifText(n: AppNotification): string {
     case 'unblocked': return 'unblocked you'
     case 'new_post': return 'shared a new post'
     case 'share_post': return 'shared a post with you'
-    case 'photo': return 'sent a photo'
+    case 'photo': return n.context_text === 'SnapDrop photo contribution' ? 'New SnapDrop Photo' : 'sent a photo'
     case 'video': return 'sent a video'
     case 'voice_message': return 'sent a voice message'
     case 'story_reply': return `replied to your story: "${clip(n.message)}"`
