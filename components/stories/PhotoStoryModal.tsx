@@ -248,7 +248,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
     }
     const timer = window.setTimeout(() => { void saveStoryDraft(draft).catch(() => {}) }, 120)
     return () => window.clearTimeout(timer)
-  }, [userId, file, overlayText, overlayX, overlayY, font, textLayers, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset, songStickerStyle, songStickerX, songStickerY, songStickerScale, songStickerRotation, mentionOverlays, linkOverlays, countdowns, gifStickers, pollStickers, quizStickers, photoScale, photoOffset])
+  }, [userId, file, overlayText, overlayX, overlayY, font, textLayers, song, storyDuration, textStart, textDuration, songStart, songDuration, songOffset, songStickerStyle, songStickerX, songStickerY, songStickerScale, songStickerRotation, mentionOverlays, linkOverlays, countdowns, gifStickers, pollStickers, quizStickers, snapdrops, photoScale, photoOffset])
 
   const onTextPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     dragging.current = true
