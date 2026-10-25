@@ -324,6 +324,8 @@ export type StoryPollOverlay = { id: string; question: string; options: Array<{ 
 
 export type StorySnapDropOverlay = { id: string; prompt: string; x: number; y: number; scale: number; rotation: number; color?: string }
 
+export type StoryEmojiSliderOverlay = { id: string; question: string; emoji: string; x: number; y: number; scale: number; rotation: number }
+
 export type StoryQuizOverlay = { id: string; question: string; options: Array<{ id: string; label: string }>; correctOptionId: string; color: string; x: number; y: number; scale: number; rotation: number }
 
 export type StoryCountdownOverlay = {
@@ -365,6 +367,7 @@ export type PhotoScene = {
   gifStickers?: StoryGIFOverlay[]
   pollStickers?: StoryPollOverlay[]
   quizStickers?: StoryQuizOverlay[]
+  emojiSliderStickers?: StoryEmojiSliderOverlay[]
   snapdrops?: StorySnapDropOverlay[]
   overlayStart?: number
   overlayDuration?: number
@@ -392,6 +395,7 @@ export type VideoScene = {
   gifStickers?: StoryGIFOverlay[]
   pollStickers?: StoryPollOverlay[]
   quizStickers?: StoryQuizOverlay[]
+  emojiSliderStickers?: StoryEmojiSliderOverlay[]
   snapdrops?: StorySnapDropOverlay[]
   id: string
   videoUrl: string
