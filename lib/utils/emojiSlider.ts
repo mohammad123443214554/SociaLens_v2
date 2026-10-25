@@ -9,7 +9,7 @@ export function normalizeEmojiSliderQuestion(value: unknown): string | null {
 export function isValidEmojiSliderEmoji(value: unknown): value is string {
   if (typeof value !== 'string' || value.length < 1 || value.length > 16 || value.trim() !== value) return false
   const graphemes = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value))
-  return graphemes.length === 1 && /\\p{Extended_Pictographic}|\\p{Regional_Indicator}{2}|(?:[#*0-9]\\uFE0F?\\u20E3)/u.test(value)
+  return graphemes.length === 1 && /\p{Extended_Pictographic}|\p{Regional_Indicator}{2}|(?:[#*0-9]\uFE0F?\u20E3)/u.test(value)
 }
 
 export function validateEmojiSliderScore(value: unknown): number | null {
