@@ -392,6 +392,7 @@ export type VideoScene = {
   gifStickers?: StoryGIFOverlay[]
   pollStickers?: StoryPollOverlay[]
   quizStickers?: StoryQuizOverlay[]
+  snapdrops?: StorySnapDropOverlay[]
   id: string
   videoUrl: string
   duration: number
