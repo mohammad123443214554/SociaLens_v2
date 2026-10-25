@@ -83,6 +83,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const [storyIndex, setStoryIndex] = useState(startStoryIndex)
   const [progress, setProgress] = useState(0)
   const [snapDropEditing, setSnapDropEditing] = useState(false)
+  const [emojiSliderInteracting, setEmojiSliderInteracting] = useState(false)
   const progressRef = useRef(0)
   useEffect(() => { progressRef.current = progress }, [progress])
   const [videoSceneIndex, setVideoSceneIndex] = useState(0)
@@ -112,7 +113,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
   // Anything that opens a panel or has the person actively typing pauses
   // the auto-advance timer/video, same as Instagram.
-  const paused = snapDropEditing || isAddingToMyStory || showMenu || showHideViewers || showDeleteConfirm || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0 || !!originalStoryToOpen
+  const paused = snapDropEditing || emojiSliderInteracting || isAddingToMyStory || showMenu || showHideViewers || showDeleteConfirm || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0 || !!originalStoryToOpen
   const pausedRef = useRef(paused)
   useEffect(() => { pausedRef.current = paused }, [paused])
 
