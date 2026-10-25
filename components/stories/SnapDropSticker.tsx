@@ -21,11 +21,14 @@ export function SnapDropSticker({ snapdrop, storyId, userId, isOwner = false }: 
     setLoading(true)
     const {data:prompt,error:promptError} = await (supabase as any).from('story_snapdrops').select('id').eq('story_id',storyId).eq('sticker_id',snapdrop.id).maybeSingle()
     if(promptError || !prompt){setRows([]);setLoading(false);return}
-    const {data,error:readError} = await (supabase as any).from('story_snapdrop_contributions').select('id,user_id,storage_path,message,created_at,profiles:profiles(username,avatar_url)').eq('snapdrop_id',prompt.id).order('created_at',{ascending:false}).limit(100)
+    const {data,error:readError} = await (supabase as any).from('story_snapdrop_contributions').select('id,user_id,storage_path,message,created_at').eq('snapdrop_id',prompt.id).order('created_at',{ascending:false}).limit(100)
     if(readError || !data){setRows([]);setLoading(false);return}
+    const ids = Array.from(new Set(data.map((row:Contribution)=>row.user_id)))
+    const {data:profiles} = await supabase.from('profiles').select('id,username,avatar_url').in('id',ids)
+    const profileMap = new Map((profiles||[]).map(profile=>[profile.id,profile]))
     const hydrated = await Promise.all(data.map(async (row:Contribution) => {
       const {data:signed} = await supabase.storage.from('story-snapdrop').createSignedUrl(row.storage_path,120)
-      return {...row,imageUrl:signed?.signedUrl || ''}
+      return {...row,profiles:profileMap.get(row.user_id)||null,imageUrl:signed?.signedUrl || ''}
     }))
     setRows(hydrated.filter(row=>!!row.imageUrl));setLoading(false)
   }
