@@ -19,7 +19,16 @@ export function SnapDropSticker({ snapdrop, storyId, userId, isOwner = false }: 
   const [selected,setSelected] = useState<Contribution|null>(null)
   const refresh = async () => {
     setLoading(true)
-    const {data:prompt,error:promptError} = await (supabase as any).from('story_snapdrops').select('id').eq('story_id',storyId).eq('sticker_id',snapdrop.id).maybeSingle()
+    let {data:prompt,error:promptError} = await (supabase as any).from('story_snapdrops').select('id').eq('story_id',storyId).eq('sticker_id',snapdrop.id).maybeSingle()
+    // Older Stories may contain the sticker in their saved scene JSON but predate
+    // the prompt row. Let the owner repair that missing row when viewing their Story.
+    if (!prompt && !promptError && isOwner && userId) {
+      const {data:createdPrompt,error:createPromptError} = await (supabase as any).from('story_snapdrops').insert({
+        story_id:storyId, owner_id:userId, sticker_id:snapdrop.id, prompt:snapdrop.prompt,
+      }).select('id').single()
+      if (!createPromptError && createdPrompt) prompt = createdPrompt
+      else promptError = createPromptError
+    }
     if(promptError || !prompt){setRows([]);setLoading(false);return}
     const {data,error:readError} = await (supabase as any).from('story_snapdrop_contributions').select('id,user_id,storage_path,message,created_at').eq('snapdrop_id',prompt.id).order('created_at',{ascending:false}).limit(100)
     if(readError || !data){setRows([]);setLoading(false);return}
