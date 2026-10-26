@@ -497,8 +497,8 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
                 </button>
                 {showMenu && (
                   <>
-                    <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
-                    <div className="absolute right-0 top-8 bg-card rounded-xl shadow-xl overflow-hidden w-48 z-30 text-foreground">
+                    <div className="fixed inset-0 z-[79]" onClick={() => setShowMenu(false)} />
+                    <div className="absolute right-0 top-8 bg-card rounded-xl shadow-xl overflow-hidden w-48 z-[80] text-foreground">
                       <button
                         onClick={() => { setShowMenu(false); setShowHideViewers(true) }}
                         className="w-full flex items-center gap-2.5 px-4 py-3 text-sm hover:bg-muted transition-colors"
@@ -522,8 +522,8 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
                 </button>
                 {showMenu && (
                   <>
-                    <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
-                    <div className="absolute right-0 top-8 bg-card rounded-xl shadow-xl overflow-hidden w-48 z-30 text-foreground">
+                    <div className="fixed inset-0 z-[79]" onClick={() => setShowMenu(false)} />
+                    <div className="absolute right-0 top-8 bg-card rounded-xl shadow-xl overflow-hidden w-48 z-[80] text-foreground">
                       <button
                         onClick={() => { setShowMenu(false); setShowReport(true) }}
                         className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
