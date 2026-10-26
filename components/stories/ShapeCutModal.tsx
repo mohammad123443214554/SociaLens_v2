@@ -52,7 +52,7 @@ export function ShapeCutModal({ initialShapeCut, onClose, onSave }: {
           <div className="relative aspect-square w-full max-w-[320px]">
             {previewUrl ? <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible" role="img" aria-label={`Photo clipped to ${SHAPECUT_SHAPES.find(s=>s.id===shapeId)?.name || 'selected shape'}`}>
               <defs><clipPath id="shapecut-preview-mask"><path d={shapePath}/></clipPath></defs>
-              <image href={previewUrl} x={-cropX} y={-cropY} width={100*zoom} height={100*zoom} preserveAspectRatio="xMidYMid slice" clipPath="url(#shapecut-preview-mask)"/>
+              <image href={previewUrl} x={50 - 50 * zoom - cropX} y={50 - 50 * zoom - cropY} width={100*zoom} height={100*zoom} preserveAspectRatio="xMidYMid slice" clipPath="url(#shapecut-preview-mask)"/>
               <path d={shapePath} fill="none" stroke={initialShapeCut?.borderColor ?? "#ffffff"} strokeWidth={initialShapeCut?.borderWidth ?? 2} vectorEffect="non-scaling-stroke"/>
             </svg> : <label className="flex h-full cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-white/30 text-white/80"><ImagePlus className="h-10 w-10"/><span className="text-sm font-semibold">Choose a photo</span><input type="file" accept="image/*" className="sr-only" onChange={e=>{chooseFile(e.target.files?.[0]);e.currentTarget.value=''}}/></label>}
           </div>
