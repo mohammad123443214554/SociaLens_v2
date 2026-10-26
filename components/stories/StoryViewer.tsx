@@ -472,7 +472,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
         </div>
 
         {/* Header */}
-        <div className="absolute top-5 left-2 right-2 z-20 flex items-center justify-between">
+        <div className="absolute top-5 left-2 right-2 z-[90] flex items-center justify-between">
           <button
             onClick={() => router.push(`/profile/${group.profile?.username}`)}
             className="flex items-center gap-2"
@@ -589,7 +589,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
           )}
 
           {activeOverlayTexts.length > 0 && story.story_type !== 'text' ? activeOverlayTexts.filter(layer => elapsedSeconds >= (layer.start ?? 0) && elapsedSeconds < (layer.start ?? 0) + (layer.duration ?? totalDuration)).map(layer => (
-            <div key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, transform: `translate(-50%, -50%) rotate(${layer.rotation ?? 0}deg)`, fontSize: `${20 * layer.scale}px`, color: layer.color || undefined, pointerEvents: 'none' }} className="absolute max-w-[85%] px-2 text-center font-bold break-words">
+            <div key={layer.id} style={{ left: `${layer.x}%`, top: `${layer.y}%`, transform: `translate(-50%, -50%) rotate(${layer.rotation ?? 0}deg)`, fontSize: `${20 * layer.scale}px`, color: layer.color || undefined, pointerEvents: 'none' }} className="absolute z-[70] max-w-[85%] px-2 text-center font-bold break-words">
               <p style={{ ...(layer.color ? { color: layer.color } : getTextFillStyle(displayOverlayColor)), textShadow: '0 1px 6px rgba(0,0,0,0.6)', fontFamily: layer.fontFamily !== undefined ? (layer.fontFamily ? `'${layer.fontFamily}', sans-serif` : undefined) : (displayOverlayFont ? `'${displayOverlayFont}', sans-serif` : undefined) }}>{layer.text}</p>
             </div>
           )) : displayOverlayText && story.story_type !== 'text' && (
