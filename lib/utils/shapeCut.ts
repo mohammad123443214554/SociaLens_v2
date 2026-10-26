@@ -709,7 +709,6 @@ const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(ma
 const polygon = (points: Array<[number,number]>) => 'M ' + points.map(([x,y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ') + ' Z'
 const regularPolygon = (count:number, rx=42, ry=42, offset=-Math.PI/2) => Array.from({length:count},(_,i)=>[50+Math.cos(offset+i*Math.PI*2/count)*rx,50+Math.sin(offset+i*Math.PI*2/count)*ry] as [number,number])
 const star = (points:number, outer=44, inner=20, offset=-Math.PI/2) => Array.from({length:points*2},(_,i)=>{const r=i%2?inner:outer;const a=offset+i*Math.PI/points;return [50+Math.cos(a)*r,50+Math.sin(a)*r] as [number,number]})
-const smoothBlob = (seed:number) => { const points=Array.from({length:12},(_,i)=>{const a=-Math.PI/2+i*Math.PI/6;const r=29+((seed*17+i*13+(i%3)*seed)%17);return [50+Math.cos(a)*r* (i%2?0.94:1.05),50+Math.sin(a)*r*(i%4===0?0.88:1)] as [number,number]}); return 'M '+points.map(([x,y])=>`${x.toFixed(2)} ${y.toFixed(2)}`).join(' Q ')+' Z' }
 
 /** Returns a stable vector silhouette for a ShapeCut template. All coordinates use a 100×100 viewBox. */
 export function getShapeCutPath(shapeId:string):string {
@@ -749,7 +748,6 @@ export function getShapeCutPath(shapeId:string):string {
   if(i>=6&&i<=8)return 'M8 50 C24 13 63 2 92 8 C88 43 60 82 8 50 Z';
   if(i===10||i===11)return 'M6 57 C6 35 26 24 39 31 C46 5 75 5 81 30 C103 29 105 61 86 67 H22 Q6 67 6 57 Z';if(i===12)return 'M2 50 Q14 20 26 50 T50 50 T74 50 T98 50 V100 H2 Z';if(i===13)return 'M50 2 C39 20 16 44 16 63 A34 34 0 0 0 84 63 C84 44 61 20 50 2 Z';return 'M50 3 C37 23 12 44 17 66 C23 91 49 100 67 83 C84 67 77 49 62 37 C64 57 46 64 42 50 C37 37 47 23 50 3 Z'
  }
- if(s.category==='Organic Blobs')return smoothBlob(i+1)
  if(s.category==='Frames & Arches') {
   const arch=['M5 95 V48 A45 45 0 0 1 95 48 V95 Z','M15 95 V35 A35 35 0 0 1 85 35 V95 Z','M3 95 V65 A47 47 0 0 1 97 65 V95 Z','M8 95 V44 Q8 5 50 5 Q92 5 92 44 V95 Z','M5 95 V45 L50 3 L95 45 V95 Z','M8 95 V45 L50 5 L92 45 V95 Z','M50 4 A44 44 0 1 1 49.9 4 Z','M8 20 L20 8 H80 L92 20 V80 L80 92 H20 L8 80 Z','M5 25 Q15 5 25 25 T45 25 T65 25 T85 25 T95 25 V75 Q85 95 75 75 T55 75 T35 75 T15 75 T5 75 Z','M5 18 Q25 8 45 18 T85 18 L95 82 Q75 92 55 82 T15 82 L5 18 Z','M12 8 H88 Q94 8 94 14 V92 H6 V14 Q6 8 12 8 Z','M4 20 H96 V80 H4 Z','M5 20 L15 5 H85 L95 20 V80 L85 95 H15 L5 80 Z','M5 95 V50 A30 30 0 0 1 50 25 A30 30 0 0 1 95 50 V95 Z','M12 12 H88 V88 H12 Z'];return arch[i]
  }
