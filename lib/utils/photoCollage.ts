@@ -63,7 +63,7 @@ export function getPhotoCollagePositions(count: number, layout: PhotoCollageLayo
     if (layout === 'scrapbook') {
       // Preserve the layered scrapbook look for small sets, while ensuring every
       // selected image remains visible when users add larger collections.
-      if (count <= 6) return { x: 8 + (i % 3) * 25, y: 8 + (i % 2) * 32, width: 48, height: 58 }
+      if (count <= 6) return { x: 4 + (i % 3) * 29, y: 5 + (i % 2) * 38, width: 36, height: 55 }
       return gridPosition(i, count, Math.min(3, count))
     }
     const cols = count === 2 ? 2 : count === 3 ? 2 : count <= 4 ? 2 : Math.min(4, Math.ceil(Math.sqrt(count)))
