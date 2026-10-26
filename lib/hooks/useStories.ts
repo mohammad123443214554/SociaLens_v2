@@ -504,7 +504,20 @@ export function useCreateStory() {
           }
           collageStickers.push({ ...collage, photos })
         }
-        uploaded.push({ ...rest, collageStickers, videoUrl: urlData.publicUrl })
+        const shapeCutStickers: StoryShapeCutOverlay[] = []
+        for (const sticker of draftShapeCuts || []) {
+          if (sticker.photoUrl && !sticker.file) { const { file: _file, ...savedSticker } = sticker; shapeCutStickers.push(savedSticker); continue }
+          if (!sticker.file) throw new Error('A ShapeCut photo is missing. Please edit the sticker and choose its photo again.')
+          const shapeFile = await compressImageIfNeeded(sticker.file)
+          const shapeExt = shapeFile.name.split('.').pop() || 'jpg'
+          const shapePath = `${userId}/shapecut-${Date.now()}-${Math.random().toString(36).slice(2,8)}.${shapeExt}`
+          const { error: shapeUploadError } = await supabase.storage.from('stories').upload(shapePath, shapeFile, { cacheControl: LONG_CACHE_CONTROL })
+          if (shapeUploadError) throw new Error('A ShapeCut photo could not be uploaded. Please try again.')
+          const { data: shapeUrl } = supabase.storage.from('stories').getPublicUrl(shapePath)
+          const { file: _file, ...savedSticker } = sticker
+          shapeCutStickers.push({ ...savedSticker, photoUrl: shapeUrl.publicUrl })
+        }
+        uploaded.push({ ...rest, collageStickers, shapeCutStickers, videoUrl: urlData.publicUrl })
       }
 
       const totalDuration = uploaded.reduce((sum, s) => sum + s.duration, 0) || 5
