@@ -24,11 +24,9 @@ const makeId = () => globalThis.crypto?.randomUUID?.() || Math.random().toString
 export function PhotoCollageModal({ initialCollage, onClose, onSave }: { initialCollage?: StoryCollageOverlay | null; onClose: () => void; onSave: (collage: StoryCollageOverlay) => void }) {
   const [photos, setPhotos] = useState<StoryCollagePhoto[]>(initialCollage?.photos?.map(p => ({...p})) || [])
   const [layout, setLayout] = useState<Layout>(initialCollage?.layout || 'grid')
-  const mode: 'layout' | 'free' = 'layout'
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const stageRef = useRef<HTMLDivElement>(null)
-  const photoDrag = useRef<{id:string;pointerId:number;startX:number;startY:number;originX:number;originY:number}|null>(null)
   const [previews, setPreviews] = useState<Record<string,string>>({})
   const fileSignature = photos.map(p => p.file ? `${p.id}:${p.file.name}:${p.file.lastModified}:${p.file.size}` : `${p.id}:url`).join('|')
   useEffect(() => {
@@ -73,7 +71,7 @@ export function PhotoCollageModal({ initialCollage, onClose, onSave }: { initial
       <div className="grid min-h-0 flex-1 touch-pan-y gap-4 overflow-y-auto overscroll-contain p-3 sm:p-4 md:grid-cols-[minmax(0,1fr)_240px]">
         <div className="order-2 flex h-[30dvh] min-h-[170px] items-center justify-center rounded-xl bg-neutral-950 p-2 md:order-1 md:h-auto md:min-h-[300px] md:p-3">
           <div ref={stageRef} className="relative aspect-[9/14] h-full w-auto max-w-full overflow-hidden rounded-lg bg-neutral-900 md:h-auto md:w-full md:max-w-[320px]">
-            {photos.map(p=><div key={p.id} onClick={()=>setSelectedId(p.id)} onPointerDown={e=>{if((e.target as HTMLElement).closest('button,input'))return;e.preventDefault();e.stopPropagation();setSelectedId(p.id);photoDrag.current={id:p.id,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,originX:p.x,originY:p.y};e.currentTarget.setPointerCapture(e.pointerId)}} onPointerMove={e=>{const d=photoDrag.current;if(mode!=='free'||!d||d.id!==p.id||d.pointerId!==e.pointerId||!stageRef.current)return;const rect=stageRef.current.getBoundingClientRect();updatePhoto(p.id,{x:Math.max(0,Math.min(96,d.originX+(e.clientX-d.startX)/rect.width*100)),y:Math.max(0,Math.min(96,d.originY+(e.clientY-d.startY)/rect.height*100))})}} onPointerUp={e=>{photoDrag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId)}} onPointerCancel={()=>{photoDrag.current=null}} className={`absolute overflow-hidden rounded-md border-2 bg-neutral-800 ${selectedId===p.id?'border-violet-400 ring-2 ring-violet-300':'border-white/70'}`} style={{left:`${p.x}%`,top:`${p.y}%`,width:`${p.width}%`,height:`${p.height}%`,transform:`rotate(${p.rotation}deg)`,zIndex:layout==='scrapbook'?photos.indexOf(p)+1:1}}>
+            {photos.map(p=><div key={p.id} onClick={()=>setSelectedId(p.id)} className={`absolute overflow-hidden rounded-md border-2 bg-neutral-800 ${selectedId===p.id?'border-violet-400 ring-2 ring-violet-300':'border-white/70'}`} style={{left:`${p.x}%`,top:`${p.y}%`,width:`${p.width}%`,height:`${p.height}%`,transform:`rotate(${p.rotation}deg)`,zIndex:layout==='scrapbook'?photos.indexOf(p)+1:1}}>
               {/* eslint-disable-next-line @next/next/no-img-element */}<img src={p.file?previews[p.id]||'':p.url||''} alt={`Collage photo ${photos.indexOf(p)+1}`} className="h-full w-full object-cover" />
             </div>)}
             {photos.length===0&&<div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-white/70"><ImagePlus className="h-8 w-8"/><span>Select 2 or more photos</span></div>}
