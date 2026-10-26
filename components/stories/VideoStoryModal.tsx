@@ -37,6 +37,8 @@ interface VideoStoryModalProps {
   initialDraft?: StoryDraftRecord | null
 }
 
+const makeId = () => globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2, 12)
+
 const MAX_STORY_VIDEO_SECONDS = 5 * 60
 
 export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialDraft }: VideoStoryModalProps) {
