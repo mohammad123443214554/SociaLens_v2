@@ -56,7 +56,7 @@ export function PhotoCollageModal({ initialCollage, onClose, onSave }: { initial
   }
   const applyLayout = (nextLayout: Layout) => {
     setLayout(nextLayout)
-    if (mode === 'layout') setPhotos(current => current.map((p,i) => ({...p,...getPhotoCollagePositions(current.length,nextLayout)[i],rotation:nextLayout==='scrapbook'?(i%2?5:-4):0})))
+    setPhotos(current => current.map((p,i) => ({...p,...getPhotoCollagePositions(current.length,nextLayout)[i],rotation:nextLayout==='scrapbook'?(i%2?5:-4):0})))
   }
   const updatePhoto = (id: string, patch: Partial<StoryCollagePhoto>) => setPhotos(current => current.map(p => p.id === id ? {...p,...patch} : p))
   const removePhoto = (id: string) => setPhotos(current => { const next=current.filter(p=>p.id!==id); return next.map((p,i)=>({...p,...getPhotoCollagePositions(next.length,layout)[i]})) })
