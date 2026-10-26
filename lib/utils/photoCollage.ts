@@ -4,31 +4,69 @@ export type PhotoCollageLayout = StoryCollageOverlay['layout']
 export type PhotoCollagePosition = Pick<StoryCollageOverlay['photos'][number], 'x' | 'y' | 'width' | 'height'>
 
 export function isValidPhotoCollageCount(count: number): boolean {
-  return Number.isInteger(count) && count >= 2 && count <= 6
+  return Number.isInteger(count) && count >= 2
+}
+
+function gridPosition(index: number, count: number, columns: number, bounds = { x: 2, y: 2, width: 96, height: 96 }): PhotoCollagePosition {
+  const rows = Math.ceil(count / columns)
+  const cellWidth = bounds.width / columns
+  const cellHeight = bounds.height / rows
+  const col = index % columns
+  const row = Math.floor(index / columns)
+  const gap = Math.min(2, cellWidth * 0.04, cellHeight * 0.04)
+  return {
+    x: bounds.x + col * cellWidth + gap / 2,
+    y: bounds.y + row * cellHeight + gap / 2,
+    width: Math.max(1, cellWidth - gap),
+    height: Math.max(1, cellHeight - gap),
+  }
 }
 
 export function getPhotoCollagePositions(count: number, layout: PhotoCollageLayout): PhotoCollagePosition[] {
-  if (!Number.isInteger(count) || count < 1 || count > 6) return []
+  if (!Number.isInteger(count) || count < 1) return []
+
   return Array.from({ length: count }, (_, i): PhotoCollagePosition => {
-    if (layout === 'vertical') {
-      return count === 2
-        ? (i === 0 ? { x: 2, y: 2, width: 96, height: 48 } : { x: 2, y: 50, width: 96, height: 48 })
-        : { x: 2, y: 2 + i * (96 / count), width: 96, height: 96 / count - 2 }
+    if (layout === 'vertical') return gridPosition(i, count, 1)
+    if (layout === 'horizontal') return gridPosition(i, count, count)
+    if (layout === 'editorial' || layout === 'vintage') {
+      if (count === 1) return { x: 2, y: 2, width: 96, height: 96 }
+      if (i === 0) return { x: 2, y: 2, width: 60, height: 96 }
+      return gridPosition(i - 1, count - 1, 1, { x: 64, y: 2, width: 34, height: 96 })
     }
-    if (layout === 'horizontal') {
-      return count === 2
-        ? (i === 0 ? { x: 2, y: 2, width: 48, height: 96 } : { x: 50, y: 2, width: 48, height: 96 })
-        : { x: 2 + i * (96 / count), y: 2, width: 96 / count - 2, height: 96 }
+    if (layout === 'birthday') {
+      if (count === 1) return { x: 2, y: 2, width: 96, height: 96 }
+      if (i === 0) return { x: 2, y: 2, width: 96, height: 56 }
+      return gridPosition(i - 1, count - 1, Math.min(3, count - 1), { x: 2, y: 60, width: 96, height: 38 })
     }
-    if (layout === 'editorial' && count > 2) {
-      return i === 0
-        ? { x: 2, y: 2, width: 62, height: 96 }
-        : { x: 66, y: 2 + (i - 1) * (94 / (count - 1)), width: 32, height: 94 / (count - 1) - 2 }
+    if (layout === 'memory-wall') {
+      const cols = count === 2 ? 2 : 2
+      const rows = Math.ceil(count / cols)
+      const col = i % cols
+      const row = Math.floor(i / cols)
+      const cellWidth = 48
+      const cellHeight = 96 / rows
+      const offset = col === 0 ? 2 : 50
+      return { x: offset, y: 2 + row * cellHeight, width: cellWidth - 2, height: Math.max(1, cellHeight - 2) }
     }
-    if (layout === 'scrapbook') return { x: 8 + (i % 3) * 25, y: 8 + (i % 2) * 32, width: 48, height: 58 }
-    const cols = count === 2 ? 2 : count === 3 ? 2 : count === 5 || count === 6 ? 3 : 2
-    const rows = Math.ceil(count / cols)
-    const col = i % cols, row = Math.floor(i / cols)
-    return { x: col * (96 / cols) + 2, y: row * (96 / rows) + 2, width: 96 / cols - 2, height: 96 / rows - 2 }
+    if (layout === 'film-strip') {
+      return gridPosition(i, count, Math.min(3, count))
+    }
+    if (layout === 'torn-paper') {
+      const cols = count === 2 ? 2 : count === 3 ? 2 : 3
+      const pos = gridPosition(i, count, cols)
+      return pos
+    }
+    if (layout === 'polaroid-wall') {
+      const cols = count <= 2 ? count : count <= 4 ? 2 : 3
+      return gridPosition(i, count, cols)
+    }
+    if (layout === 'scrapbook') {
+      // Preserve the layered scrapbook look for small sets, while ensuring every
+      // selected image remains visible when users add larger collections.
+      if (count <= 6) return { x: 8 + (i % 3) * 25, y: 8 + (i % 2) * 32, width: 48, height: 58 }
+      return gridPosition(i, count, Math.min(3, count))
+    }
+    const cols = count === 2 ? 2 : count === 3 ? 2 : count <= 4 ? 2 : Math.min(4, Math.ceil(Math.sqrt(count)))
+    return gridPosition(i, count, cols)
   })
 }
