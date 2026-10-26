@@ -42,8 +42,7 @@ export function PhotoCollageModal({ initialCollage, onClose, onSave }: { initial
   const canSave = isValidPhotoCollageCount(photos.length)
   const addFiles = (list: FileList | null) => {
     if (!list) return
-    const remaining = 6 - photos.length
-    const incoming = Array.from(list).slice(0, remaining)
+    const incoming = Array.from(list)
     const valid: StoryCollagePhoto[] = []
     for (const file of incoming) {
       if (!file.type.startsWith('image/')) { setError('Please select image files only.'); continue }
