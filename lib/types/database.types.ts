@@ -373,6 +373,7 @@ export type PhotoScene = {
   emojiSliderStickers?: StoryEmojiSliderOverlay[]
   collageStickers?: StoryCollageOverlay[]
   shapeCutStickers?: StoryShapeCutOverlay[]
+  shapeCutStickers?: StoryShapeCutOverlay[]
   snapdrops?: StorySnapDropOverlay[]
   overlayStart?: number
   overlayDuration?: number
@@ -402,6 +403,7 @@ export type VideoScene = {
   quizStickers?: StoryQuizOverlay[]
   emojiSliderStickers?: StoryEmojiSliderOverlay[]
   collageStickers?: StoryCollageOverlay[]
+  shapeCutStickers?: StoryShapeCutOverlay[]
   snapdrops?: StorySnapDropOverlay[]
   id: string
   videoUrl: string
