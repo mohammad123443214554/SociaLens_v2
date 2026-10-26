@@ -1,7 +1,7 @@
-export type ShapeCutCategory = 'Basic' | 'Geometric' | 'Stars & Symbols' | 'Nature & Flowers' | 'Organic Blobs' | 'Frames & Arches' | 'Creative'
+export type ShapeCutCategory = 'Basic' | 'Geometric' | 'Stars & Symbols' | 'Nature & Flowers' | 'Frames & Arches' | 'Creative'
 export type ShapeCutTemplate = { id: string; name: string; category: ShapeCutCategory; kind: number; index: number }
 
-export const SHAPECUT_CATEGORIES: ShapeCutCategory[] = ["Basic","Geometric","Stars & Symbols","Nature & Flowers","Organic Blobs","Frames & Arches","Creative"]
+export const SHAPECUT_CATEGORIES: ShapeCutCategory[] = ["Basic","Geometric","Stars & Symbols","Nature & Flowers","Frames & Arches","Creative"]
 export const SHAPECUT_SHAPES: ShapeCutTemplate[] = [
   {
     "id": "sc-001",
@@ -459,146 +459,6 @@ export const SHAPECUT_SHAPES: ShapeCutTemplate[] = [
     "index": 14
   },
   {
-    "id": "sc-066",
-    "name": "Organic Blob 01",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 0
-  },
-  {
-    "id": "sc-067",
-    "name": "Organic Blob 02",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 1
-  },
-  {
-    "id": "sc-068",
-    "name": "Organic Blob 03",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 2
-  },
-  {
-    "id": "sc-069",
-    "name": "Organic Blob 04",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 3
-  },
-  {
-    "id": "sc-070",
-    "name": "Organic Blob 05",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 4
-  },
-  {
-    "id": "sc-071",
-    "name": "Organic Blob 06",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 5
-  },
-  {
-    "id": "sc-072",
-    "name": "Organic Blob 07",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 6
-  },
-  {
-    "id": "sc-073",
-    "name": "Organic Blob 08",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 7
-  },
-  {
-    "id": "sc-074",
-    "name": "Organic Blob 09",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 8
-  },
-  {
-    "id": "sc-075",
-    "name": "Organic Blob 10",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 9
-  },
-  {
-    "id": "sc-076",
-    "name": "Organic Blob 11",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 10
-  },
-  {
-    "id": "sc-077",
-    "name": "Organic Blob 12",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 11
-  },
-  {
-    "id": "sc-078",
-    "name": "Organic Blob 13",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 12
-  },
-  {
-    "id": "sc-079",
-    "name": "Organic Blob 14",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 13
-  },
-  {
-    "id": "sc-080",
-    "name": "Organic Blob 15",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 14
-  },
-  {
-    "id": "sc-081",
-    "name": "Organic Blob 16",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 15
-  },
-  {
-    "id": "sc-082",
-    "name": "Organic Blob 17",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 16
-  },
-  {
-    "id": "sc-083",
-    "name": "Organic Blob 18",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 17
-  },
-  {
-    "id": "sc-084",
-    "name": "Organic Blob 19",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 18
-  },
-  {
-    "id": "sc-085",
-    "name": "Organic Blob 20",
-    "category": "Organic Blobs",
-    "kind": 4,
-    "index": 19
-  },
-  {
     "id": "sc-086",
     "name": "Classic Arch",
     "category": "Frames & Arches",
@@ -897,4 +757,4 @@ export function getShapeCutPath(shapeId:string):string {
  if(i===0)return 'M5 12 H70 Q94 12 94 36 V67 Q94 86 72 86 H42 L24 98 V86 H15 Q5 86 5 76 Z';if(i===1)return 'M6 12 H85 Q95 12 95 22 V76 Q95 86 85 86 H60 L76 98 L43 86 H16 Q6 86 6 76 Z';if(i===2)return 'M20 5 H80 Q95 5 95 20 V60 Q95 75 80 75 H58 L45 95 L42 75 H20 Q5 75 5 60 V20 Q5 5 20 5 Z';if(i===3||i===4||i===12)return polygon(star(i===3?12:i===4?16:10,46,31));if(i===5)return 'M14 5 H86 Q96 5 91 18 Q83 32 93 45 Q83 58 92 72 Q96 95 82 95 H18 Q4 95 8 78 Q17 64 7 50 Q17 36 7 22 Q4 5 14 5 Z';if(i===6)return 'M8 18 Q50 4 92 18 Q98 50 92 82 Q50 96 8 82 Q2 50 8 18 Z';if(i===7)return polygon(regularPolygon(7,44,42,-Math.PI/2+i*.13));if(i===8)return polygon([[8,15],[92,15],[74,50],[92,85],[8,85],[26,50]]);if(i===9)return 'M5 24 Q5 5 24 5 H76 Q95 5 95 24 Q80 32 95 40 V60 Q80 68 95 76 Q95 95 76 95 H24 Q5 95 5 76 Q20 68 5 60 V40 Q20 32 5 24 Z';if(i===10)return polygon(star(20,46,40));if(i===11)return polygon(star(16,46,34));if(i===13)return 'M2 40 Q25 10 50 40 T98 40 V62 Q75 92 50 62 T2 62 Z';if(i===14)return 'M40 2 H60 V40 H98 V60 H60 V98 H40 V60 H2 V40 H40 Z';if(i===15)return 'M50 5 A30 30 0 0 1 80 35 A30 30 0 0 1 50 65 A30 30 0 0 1 20 35 A30 30 0 0 1 50 5 Z M50 35 A30 30 0 0 1 80 65 A30 30 0 0 1 50 95 A30 30 0 0 1 20 65 A30 30 0 0 1 50 35 Z';if(i===16)return 'M35 8 A27 27 0 0 1 62 35 A27 27 0 0 1 35 62 A27 27 0 0 1 8 35 A27 27 0 0 1 35 8 Z M65 38 A27 27 0 0 1 92 65 A27 27 0 0 1 65 92 A27 27 0 0 1 38 65 A27 27 0 0 1 65 38 Z';if(i===17)return 'M30 4 H70 V30 H96 V70 H70 V96 H30 V70 H4 V30 H30 Z';if(i===18)return 'M5 5 H95 V25 L78 25 L78 78 L95 78 V95 H5 V78 H22 V25 H5 Z';return polygon(patterns[i%patterns.length] as [number, number][])
 }
 
-export function searchShapeCutShapes(query:string):ShapeCutTemplate[] { const q=query.trim().toLowerCase(); if(!q)return SHAPECUT_SHAPES; const aliases:Record<string,string[]>={heart:['double heart'],star:['spark','sun symbol','burst'],circle:['oval','ellipse','round','blob'],arch:['gothic arch','pointed arch','rounded arch'],blob:['organic blob'],flower:['daisy','petal','rose','sunflower'],speech:['bubble','comic'],frame:['arch','polaroid','film','stamp']}; return SHAPECUT_SHAPES.filter(s=>s.name.toLowerCase().includes(q)||s.category.toLowerCase().includes(q)||(aliases[q]||[]).some(a=>s.name.toLowerCase().includes(a))) }
+export function searchShapeCutShapes(query:string):ShapeCutTemplate[] { const q=query.trim().toLowerCase(); if(!q)return SHAPECUT_SHAPES; const aliases:Record<string,string[]>={heart:['double heart'],star:['spark','sun symbol','burst'],circle:['oval','ellipse','round'],arch:['gothic arch','pointed arch','rounded arch'],flower:['daisy','petal','rose','sunflower'],speech:['bubble','comic'],frame:['arch','polaroid','film','stamp']}; return SHAPECUT_SHAPES.filter(s=>s.name.toLowerCase().includes(q)||s.category.toLowerCase().includes(q)||(aliases[q]||[]).some(a=>s.name.toLowerCase().includes(a))) }
