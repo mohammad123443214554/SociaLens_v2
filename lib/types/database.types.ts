@@ -329,7 +329,9 @@ export type StoryEmojiSliderOverlay = { id: string; question: string; emoji: str
 export type StoryCollagePhoto = { id: string; url?: string; file?: File; x: number; y: number; width: number; height: number; rotation: number }
 export type StoryCollageOverlay = { id: string; layout: 'grid' | 'horizontal' | 'vertical' | 'editorial' | 'scrapbook' | 'vintage' | 'birthday' | 'torn-paper' | 'memory-wall' | 'film-strip' | 'polaroid-wall' | 'mosaic'; mode: 'layout' | 'free'; photos: StoryCollagePhoto[]; x: number; y: number; scale: number; rotation: number; frameColor?: string }
 
-export type StoryShapeCutOverlay = { id: string; shapeId: string; category: 'Basic' | 'Geometric' | 'Stars & Symbols' | 'Nature & Flowers' | 'Organic Blobs' | 'Frames & Arches' | 'Creative'; file?: File; photoUrl?: string; cropX: number; cropY: number; zoom: number; borderColor: string; borderWidth: number; x: number; y: number; scale: number; rotation: number }\n\nexport type StoryQuizOverlay = { id: string; question: string; options: Array<{ id: string; label: string }>; correctOptionId: string; color: string; x: number; y: number; scale: number; rotation: number }
+export type StoryShapeCutOverlay = { id: string; shapeId: string; category: 'Basic' | 'Geometric' | 'Stars & Symbols' | 'Nature & Flowers' | 'Organic Blobs' | 'Frames & Arches' | 'Creative'; file?: File; photoUrl?: string; cropX: number; cropY: number; zoom: number; borderColor: string; borderWidth: number; x: number; y: number; scale: number; rotation: number }
+
+export type StoryQuizOverlay = { id: string; question: string; options: Array<{ id: string; label: string }>; correctOptionId: string; color: string; x: number; y: number; scale: number; rotation: number }
 
 export type StoryCountdownOverlay = {
   id: string
