@@ -24,7 +24,7 @@ const makeId = () => globalThis.crypto?.randomUUID?.() || Math.random().toString
 export function PhotoCollageModal({ initialCollage, onClose, onSave }: { initialCollage?: StoryCollageOverlay | null; onClose: () => void; onSave: (collage: StoryCollageOverlay) => void }) {
   const [photos, setPhotos] = useState<StoryCollagePhoto[]>(initialCollage?.photos?.map(p => ({...p})) || [])
   const [layout, setLayout] = useState<Layout>(initialCollage?.layout || 'grid')
-  const mode = 'layout' as const
+  const mode: 'layout' | 'free' = 'layout'
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const stageRef = useRef<HTMLDivElement>(null)
