@@ -22,6 +22,8 @@ test('every layout returns one valid position per photo for small and large coll
         assert.ok(Number.isFinite(p.y) && p.y >= 0 && p.y <= 100, `${layout}: y=${p.y}`)
         assert.ok(Number.isFinite(p.width) && p.width > 0 && p.width <= 100, `${layout}: width=${p.width}`)
         assert.ok(Number.isFinite(p.height) && p.height > 0 && p.height <= 100, `${layout}: height=${p.height}`)
+        assert.ok(p.x + p.width <= 100.001, `${layout}: photo exceeds right edge`)
+        assert.ok(p.y + p.height <= 100.001, `${layout}: photo exceeds bottom edge`)
       }
     }
   }
