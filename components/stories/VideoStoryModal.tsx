@@ -221,7 +221,7 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-auto p-3 sm:p-6">
-        <div ref={stageRef} className="relative isolate flex w-full max-w-sm items-center justify-center overflow-hidden rounded-2xl bg-black" style={{ aspectRatio: "9 / 16", height: "min(62dvh, 680px)", width: "auto", maxWidth: "100%" }}>
+        <div ref={stageRef} className="relative isolate flex w-full max-w-sm items-center justify-center overflow-hidden rounded-2xl bg-black" style={{ aspectRatio: "9 / 16", width: "min(100%, calc(min(62dvh, 680px) * 9 / 16))", maxHeight: "min(62dvh, 680px)" }}>
           {previewUrl ? (
            <video key={previewUrl} src={previewUrl} controls autoPlay muted playsInline preload="metadata" onLoadedMetadata={event => { onVideoMetadata(event); const video = event.currentTarget; setVideoDimensions({ width: video.videoWidth || 9, height: video.videoHeight || 16 }); video.currentTime = trimStart; void video.play().catch(() => {}) }} onTimeUpdate={event => { const video = event.currentTarget; if (video.currentTime >= trimEnd && trimEnd > trimStart) { video.currentTime = trimStart; void video.play().catch(() => {}) } }} onPlay={event => { const video = event.currentTarget; if (video.currentTime < trimStart || video.currentTime >= trimEnd) video.currentTime = trimStart }} onError={() => setError('This video could not be played. Please choose another supported video file.')} className="absolute inset-0 h-full w-full object-contain" />
           ) : (
