@@ -13,7 +13,7 @@ export function ShapeCutModal({ initialShapeCut, onClose, onSave }: {
   const [file, setFile] = useState<File | null>(initialShapeCut?.file ?? null)
   const [photoUrl, setPhotoUrl] = useState(initialShapeCut?.photoUrl ?? '')
   const [shapeId, setShapeId] = useState(initialShapeCut?.shapeId ?? SHAPECUT_SHAPES[0].id)
-  const [category, setCategory] = useState<(typeof SHAPECUT_CATEGORIES)[number]>(initialShapeCut?.category ?? 'Basic')
+  const [category, setCategory] = useState<(typeof SHAPECUT_CATEGORIES)[number]>(SHAPECUT_CATEGORIES.find(item => item === initialShapeCut?.category) ?? 'Basic')
   const [search, setSearch] = useState('')
   const [zoom, setZoom] = useState(initialShapeCut?.zoom ?? 1)
   const [cropX, setCropX] = useState(initialShapeCut?.cropX ?? 0)
