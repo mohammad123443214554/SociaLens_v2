@@ -372,6 +372,7 @@ export type PhotoScene = {
   quizStickers?: StoryQuizOverlay[]
   emojiSliderStickers?: StoryEmojiSliderOverlay[]
   collageStickers?: StoryCollageOverlay[]
+  shapeCutStickers?: StoryShapeCutOverlay[]
   snapdrops?: StorySnapDropOverlay[]
   overlayStart?: number
   overlayDuration?: number
