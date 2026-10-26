@@ -156,7 +156,7 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
     if (!file) return
     const draft: StoryDraftRecord = {
       userId, kind: 'video', file, fileName: file.name, fileType: file.type, lastModified: file.lastModified,
-      video: { duration, trimStart, trimEnd, textLayers, mentions, links, countdowns, gifStickers, pollStickers, quizStickers, emojiSliderStickers, collageStickers },
+      video: { duration, trimStart, trimEnd, textLayers, mentions, links, countdowns, gifStickers, pollStickers, quizStickers, emojiSliderStickers, collageStickers, shapeCutStickers, snapdrops },
       updatedAt: Date.now(),
     }
     const timer = window.setTimeout(() => { void saveStoryDraft(draft).catch(() => {}) }, 120)
@@ -207,6 +207,7 @@ export function VideoStoryModal({ userId, onClose, onBack, initialFile, initialD
       quizStickers,
       emojiSliderStickers,
       collageStickers,
+      shapeCutStickers,
       snapdrops,
       ...(textLayers[0] ? { overlayText: textLayers[0].text, overlayFontFamily: textLayers[0].fontFamily || undefined, overlayX: textLayers[0].x, overlayY: textLayers[0].y } : {}),
     }
