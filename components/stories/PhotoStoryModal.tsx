@@ -320,6 +320,7 @@ export function PhotoStoryModal({ userId, onClose, onBack, initialFile, initialD
       quizStickers,
       emojiSliderStickers,
       collageStickers,
+      shapeCutStickers,
       snapdrops,
       ...(textLayers[0] ? { overlayText: textLayers[0].text, overlayTexts: textLayers.map(layer => ({ ...layer, start: layer.start, duration: Math.min(layer.duration, storyDuration - layer.start) })), overlayTextColor: textLayers[0].color, overlayFontFamily: font || undefined, overlayX: textLayers[0].x, overlayY: textLayers[0].y, overlayStart: textStart, overlayDuration: Math.min(textDuration, storyDuration - textStart) } : {}),
     }
