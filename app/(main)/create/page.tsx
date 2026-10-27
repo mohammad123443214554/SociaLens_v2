@@ -9,6 +9,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { useQueryClient } from '@tanstack/react-query'
 import { isRestricted } from '@/lib/utils/restrictionCheck'
 import { RestrictionPopup } from '@/components/shared/RestrictionPopup'
+import { compressImageIfNeeded, LONG_CACHE_CONTROL } from '@/lib/utils/imageCompression'
 
 type ContentType = 'post' | 'reel'
 type MediaType = 'image' | 'video' | 'none'
@@ -88,6 +89,7 @@ export default function CreateEditorPage() {
   }, [contentType, title, caption, hashtags, mediaType, mediaPath, mediaName, mediaSize])
 
   const applyDraft = useCallback(async (draft: Draft) => {
+    await saveQueueRef.current
     draftIdRef.current = draft.id
     setDraftId(draft.id)
     setContentType(draft.content_type)
@@ -146,10 +148,12 @@ export default function CreateEditorPage() {
   const persistDraft = useCallback(() => {
     const snapshot = { ...dataRef.current }
     if (!user || uploadingRef.current || postingRef.current) return
-    if (!snapshot.title.trim() && !snapshot.caption.trim() && !snapshot.hashtags.trim() && !snapshot.mediaPath) return
+    if (!snapshot.title.trim() && !snapshot.caption.trim() && !snapshot.hashtags.trim() && !snapshot.mediaPath && !draftIdRef.current) return
     const revision = revisionRef.current
+    const targetDraftId = draftIdRef.current
     setSaveState('saving')
     saveQueueRef.current = saveQueueRef.current.then(async () => {
+      if (revisionRef.current !== revision) return
       const row = {
         user_id: user.id,
         content_type: snapshot.contentType,
@@ -164,8 +168,8 @@ export default function CreateEditorPage() {
         updated_at: new Date().toISOString(),
       }
       let result: any
-      if (draftIdRef.current) {
-        result = await db.from('create_drafts').update(row).eq('id', draftIdRef.current).eq('user_id', user.id).select('*').single()
+      if (targetDraftId) {
+        result = await db.from('create_drafts').update(row).eq('id', targetDraftId).eq('user_id', user.id).select('*').single()
       } else {
         result = await db.from('create_drafts').insert(row).select('*').single()
       }
@@ -174,9 +178,11 @@ export default function CreateEditorPage() {
         setError('Draft could not be saved. Check your connection; your current editor content is still here.')
         return
       }
-      draftIdRef.current = result.data.id
-      setDraftId(result.data.id)
-      if (revisionRef.current === revision) setSaveState('saved')
+      if (revisionRef.current === revision) {
+        draftIdRef.current = result.data.id
+        setDraftId(result.data.id)
+        setSaveState('saved')
+      }
       setDrafts(previous => [result.data as Draft, ...previous.filter(d => d.id !== result.data.id)])
     }).catch(err => {
       console.error('Draft autosave failed', err)
@@ -342,12 +348,15 @@ export default function CreateEditorPage() {
         const { data: blob, error: downloadError } = await supabase.storage.from('create-drafts').download(mediaPath)
         if (downloadError || !blob) throw downloadError || new Error('Could not recover your uploaded media.')
         setUploadProgress(40)
-        const extension = mediaName?.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || (mediaType === 'video' ? 'mp4' : 'jpg')
+        const originalName = mediaName || (mediaType === 'video' ? 'video.mp4' : 'image.jpg')
+        const originalFile = new File([blob], originalName, { type: blob.type || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg') })
+        const fileToPublish = mediaType === 'image' ? await compressImageIfNeeded(originalFile) : originalFile
+        const extension = fileToPublish.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || (mediaType === 'video' ? 'mp4' : 'jpg')
         const finalPath = `${user.id}/${crypto.randomUUID()}.${extension}`
-        const { error: finalUploadError } = await supabase.storage.from('posts').upload(finalPath, blob, {
+        const { error: finalUploadError } = await supabase.storage.from('posts').upload(finalPath, fileToPublish, {
           upsert: false,
-          contentType: mediaType === 'video' ? 'video/mp4' : blob.type || 'image/jpeg',
-          cacheControl: '31536000',
+          contentType: fileToPublish.type || blob.type || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg'),
+          cacheControl: LONG_CACHE_CONTROL,
         })
         if (finalUploadError) throw finalUploadError
         publicMediaUrl = supabase.storage.from('posts').getPublicUrl(finalPath).data.publicUrl
