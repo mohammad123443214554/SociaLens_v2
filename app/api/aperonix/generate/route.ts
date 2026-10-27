@@ -92,7 +92,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ result })
   } catch (error: any) {
+    if (error?.code === 'APERONIX_TIMEOUT' || error?.name === 'AbortError' || error?.name === 'TimeoutError') {
+      console.warn('Aperonix generate request reached its bounded time budget.')
+      return NextResponse.json(
+        { error: 'Aperonix is taking longer than expected. Please try again; your post has not been lost.' },
+        { status: 504 }
+      )
+    }
     console.error('Aperonix generate error:', error)
-    return NextResponse.json({ error: 'Try again later.' }, { status: 500 })
+    return NextResponse.json({ error: 'Aperonix could not generate this right now. Please try again.' }, { status: 503 })
   }
 }
