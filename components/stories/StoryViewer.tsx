@@ -89,6 +89,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const activeProgressTrackRef = useRef<HTMLDivElement>(null)
   const isSeekingProgressRef = useRef(false)
   const pendingVideoSeekRef = useRef<{ sceneIndex: number; time: number } | null>(null)
+  const musicSeekPendingRef = useRef(false)
   const [snapDropEditing, setSnapDropEditing] = useState(false)
   const [emojiSliderInteracting, setEmojiSliderInteracting] = useState(false)
   const progressRef = useRef(0)
@@ -341,6 +342,23 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
     progressRef.current = nextProgress
     setProgress(nextProgress)
 
+    // Keep the selected background song in sync with the story timeline.
+    // Photo stories can have a delayed music window; other stories start music at 0.
+    if (audioRef.current && activeMusicUrl) {
+      const elapsed = fraction * (story.duration_seconds || 5)
+      const trackStart = musicTimelineStart
+      const trackEnd = trackStart + (musicClipDuration || (story.duration_seconds || 5))
+      if (elapsed >= trackStart && elapsed < trackEnd) {
+        audioRef.current.currentTime = Math.max(0, musicStart + elapsed - trackStart)
+        musicSeekPendingRef.current = true
+        if (pausedRef.current) audioRef.current.pause()
+        else audioRef.current.play().catch(() => {})
+      } else {
+        audioRef.current.pause()
+        musicSeekPendingRef.current = false
+      }
+    }
+
     if (story.story_type !== 'video') {
       isSeekingProgressRef.current = true
       return
@@ -499,13 +517,21 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
       const elapsed = (progressRef.current / 100) * (story.duration_seconds || 5)
       const trackStart = musicTimelineStart
       const trackEnd = trackStart + (musicClipDuration || (story.duration_seconds || 5))
+      if (pausedRef.current) {
+        audio.pause()
+        return
+      }
       if (elapsed < trackStart || elapsed >= trackEnd) {
         audio.pause()
-        if (elapsed >= trackEnd) hasStarted = false
+        hasStarted = false
         return
       }
       if (!hasStarted) {
-        audio.currentTime = musicStart
+        if (musicSeekPendingRef.current) {
+          musicSeekPendingRef.current = false
+        } else {
+          audio.currentTime = musicStart
+        }
         hasStarted = true
       }
       if (audio.paused) audio.play().catch(() => {})
