@@ -1,0 +1,443 @@
+'use client'
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { ArrowLeft, ImagePlus, Film, FileText, Loader2, Save, Trash2, Upload, X, Play, Image as ImageIcon } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { useUser } from '@/lib/hooks/useUser'
+import { useQueryClient } from '@tanstack/react-query'
+import { isRestricted } from '@/lib/utils/restrictionCheck'
+import { RestrictionPopup } from '@/components/shared/RestrictionPopup'
+
+type ContentType = 'post' | 'reel'
+type MediaType = 'image' | 'video' | 'none'
+type SaveState = 'loading' | 'saved' | 'saving' | 'error'
+
+type Draft = {
+  id: string
+  user_id: string
+  content_type: ContentType
+  title: string
+  caption: string
+  hashtags: string
+  media_type: MediaType
+  media_path: string | null
+  media_name: string | null
+  media_size: number | null
+  status: 'draft' | 'publishing'
+  created_at: string
+  updated_at: string
+}
+
+const MAX_VIDEO_SECONDS = 20 * 60
+const MAX_MEDIA_BYTES = 100 * 1024 * 1024
+
+function formatBytes(bytes: number | null | undefined) {
+  if (!bytes) return ''
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function buildPostContent(title: string, caption: string, hashtags: string) {
+  const parts: string[] = []
+  if (title.trim()) parts.push(`**${title.trim()}**`)
+  if (caption.trim()) parts.push(caption.trim())
+  if (hashtags.trim()) parts.push(hashtags.trim().split(/\s+/).map(tag => tag.startsWith('#') ? tag : `#${tag}`).join(' '))
+  return parts.join('\n\n')
+}
+
+export default function CreateEditorPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { user, profile } = useUser()
+  const supabase = useMemo(() => createClient(), [])
+  const db = supabase as any
+  const queryClient = useQueryClient()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const draftIdRef = useRef<string | null>(null)
+  const dataRef = useRef({ contentType: 'post' as ContentType, title: '', caption: '', hashtags: '', mediaType: 'none' as MediaType, mediaPath: null as string | null, mediaName: null as string | null, mediaSize: null as number | null })
+  const revisionRef = useRef(0)
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const uploadingRef = useRef(false)
+  const postingRef = useRef(false)
+
+  const [contentType, setContentType] = useState<ContentType>('post')
+  const [title, setTitle] = useState('')
+  const [caption, setCaption] = useState('')
+  const [hashtags, setHashtags] = useState('')
+  const [mediaType, setMediaType] = useState<MediaType>('none')
+  const [mediaPath, setMediaPath] = useState<string | null>(null)
+  const [mediaName, setMediaName] = useState<string | null>(null)
+  const [mediaSize, setMediaSize] = useState<number | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [drafts, setDrafts] = useState<Draft[]>([])
+  const [showDrafts, setShowDrafts] = useState(false)
+  const [saveState, setSaveState] = useState<SaveState>('loading')
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [publishing, setPublishing] = useState(false)
+  const [error, setError] = useState('')
+  const [showRestriction, setShowRestriction] = useState(false)
+  const [loadingDraft, setLoadingDraft] = useState(true)
+
+  useEffect(() => {
+    dataRef.current = { contentType, title, caption, hashtags, mediaType, mediaPath, mediaName, mediaSize }
+    revisionRef.current += 1
+  }, [contentType, title, caption, hashtags, mediaType, mediaPath, mediaName, mediaSize])
+
+  const applyDraft = useCallback(async (draft: Draft) => {
+    draftIdRef.current = draft.id
+    setDraftId(draft.id)
+    setContentType(draft.content_type)
+    setTitle(draft.title || '')
+    setCaption(draft.caption || '')
+    setHashtags(draft.hashtags || '')
+    setMediaType(draft.media_type || 'none')
+    setMediaPath(draft.media_path || null)
+    setMediaName(draft.media_name || null)
+    setMediaSize(draft.media_size ?? null)
+    setPreviewUrl(null)
+    setError('')
+    if (draft.media_path) {
+      const { data, error: signedError } = await supabase.storage.from('create-drafts').createSignedUrl(draft.media_path, 3600)
+      if (signedError) setError('Draft text was restored, but its media preview could not be loaded. Please reselect the file if needed.')
+      else setPreviewUrl(data.signedUrl)
+    }
+    setSaveState('saved')
+  }, [supabase])
+
+  const refreshDraftList = useCallback(async () => {
+    if (!user) return
+    const { data, error: listError } = await db.from('create_drafts').select('*').eq('user_id', user.id).order('updated_at', { ascending: false })
+    if (listError) {
+      setError('Could not load your drafts. Please try again.')
+      return
+    }
+    setDrafts((data || []) as Draft[])
+  }, [db, user])
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    const init = async () => {
+      setLoadingDraft(true)
+      const { data, error: listError } = await db.from('create_drafts').select('*').eq('user_id', user.id).order('updated_at', { ascending: false })
+      if (cancelled) return
+      if (listError) {
+        setError('Drafts could not be loaded. Your existing posts are not affected.')
+        setSaveState('error')
+        setLoadingDraft(false)
+        return
+      }
+      const loaded = (data || []) as Draft[]
+      setDrafts(loaded)
+      const requestedId = searchParams.get('draft')
+      const selected = requestedId ? loaded.find(d => d.id === requestedId) : loaded[0]
+      if (selected) await applyDraft(selected)
+      else setSaveState('saved')
+      if (!cancelled) setLoadingDraft(false)
+    }
+    void init()
+    return () => { cancelled = true }
+  }, [user?.id, db, applyDraft, searchParams])
+
+  const persistDraft = useCallback(() => {
+    const snapshot = { ...dataRef.current }
+    if (!user || uploadingRef.current || postingRef.current) return
+    if (!snapshot.title.trim() && !snapshot.caption.trim() && !snapshot.hashtags.trim() && !snapshot.mediaPath) return
+    const revision = revisionRef.current
+    setSaveState('saving')
+    saveQueueRef.current = saveQueueRef.current.then(async () => {
+      const row = {
+        user_id: user.id,
+        content_type: snapshot.contentType,
+        title: snapshot.title,
+        caption: snapshot.caption,
+        hashtags: snapshot.hashtags,
+        media_type: snapshot.mediaType,
+        media_path: snapshot.mediaPath,
+        media_name: snapshot.mediaName,
+        media_size: snapshot.mediaSize,
+        status: 'draft',
+        updated_at: new Date().toISOString(),
+      }
+      let result: any
+      if (draftIdRef.current) {
+        result = await db.from('create_drafts').update(row).eq('id', draftIdRef.current).eq('user_id', user.id).select('*').single()
+      } else {
+        result = await db.from('create_drafts').insert(row).select('*').single()
+      }
+      if (result.error) {
+        if (revisionRef.current === revision) setSaveState('error')
+        setError('Draft could not be saved. Check your connection; your current editor content is still here.')
+        return
+      }
+      draftIdRef.current = result.data.id
+      setDraftId(result.data.id)
+      if (revisionRef.current === revision) setSaveState('saved')
+      setDrafts(previous => [result.data as Draft, ...previous.filter(d => d.id !== result.data.id)])
+    }).catch(err => {
+      console.error('Draft autosave failed', err)
+      setSaveState('error')
+      setError('Draft could not be saved. Please retry.')
+    })
+  }, [db, user])
+
+  useEffect(() => {
+    if (loadingDraft || !user || uploading || publishing) return
+    const timer = window.setTimeout(() => persistDraft(), 900)
+    return () => window.clearTimeout(timer)
+  }, [contentType, title, caption, hashtags, mediaType, mediaPath, mediaName, mediaSize, loadingDraft, user, uploading, publishing, persistDraft])
+
+  const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !user) return
+    setError('')
+    if (!(file.type.startsWith('image/') || file.type.startsWith('video/'))) {
+      setError('Choose an image or video file.')
+      return
+    }
+    if (file.size > MAX_MEDIA_BYTES) {
+      setError('This file is larger than 100 MB. Choose a smaller file.')
+      return
+    }
+    const isVideo = file.type.startsWith('video/')
+    if (contentType === 'reel' && !isVideo) {
+      setError('Reels require a video. Please choose a video file.')
+      return
+    }
+    if (isVideo) {
+      const objectUrl = URL.createObjectURL(file)
+      const duration = await new Promise<number>(resolve => {
+        const video = document.createElement('video')
+        video.preload = 'metadata'
+        video.onloadedmetadata = () => { const d = video.duration; URL.revokeObjectURL(objectUrl); resolve(d) }
+        video.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(0) }
+        video.src = objectUrl
+      })
+      if (!duration) {
+        setError('This video could not be read by your browser.')
+        return
+      }
+      if (duration > MAX_VIDEO_SECONDS) {
+        setError('Videos for Posts/Reels must be 20 minutes or shorter.')
+        return
+      }
+    }
+
+    uploadingRef.current = true
+    setUploading(true)
+    setUploadProgress(10)
+    setPreviewUrl(current => {
+      if (current?.startsWith('blob:')) URL.revokeObjectURL(current)
+      return URL.createObjectURL(file)
+    })
+    try {
+      const currentDraftId = draftIdRef.current || crypto.randomUUID()
+      const extension = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || (isVideo ? 'mp4' : 'jpg')
+      const path = `${user.id}/${currentDraftId}/${crypto.randomUUID()}.${extension}`
+      setUploadProgress(25)
+      const { error: uploadError } = await supabase.storage.from('create-drafts').upload(path, file, {
+        upsert: false,
+        contentType: file.type,
+        cacheControl: '3600',
+      })
+      if (uploadError) throw uploadError
+      setUploadProgress(90)
+      setMediaPath(path)
+      setMediaName(file.name)
+      setMediaSize(file.size)
+      setMediaType(isVideo ? 'video' : 'image')
+      setUploadProgress(100)
+      const { data: signed } = await supabase.storage.from('create-drafts').createSignedUrl(path, 3600)
+      if (signed?.signedUrl) setPreviewUrl(signed.signedUrl)
+    } catch (err) {
+      console.error('Draft media upload failed', err)
+      setError('Media upload failed. Please try again. Your caption and other editor fields are still available.')
+      setPreviewUrl(current => current?.startsWith('blob:') ? current : null)
+    } finally {
+      uploadingRef.current = false
+      setUploading(false)
+      setUploadProgress(0)
+    }
+  }
+
+  const removeMedia = async () => {
+    if (mediaPath) {
+      const { error: removeError } = await supabase.storage.from('create-drafts').remove([mediaPath])
+      if (removeError) console.warn('Could not remove old draft media', removeError)
+    }
+    if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
+    setPreviewUrl(null)
+    setMediaPath(null)
+    setMediaName(null)
+    setMediaSize(null)
+    setMediaType('none')
+  }
+
+  const startNewDraft = async () => {
+    await saveQueueRef.current
+    draftIdRef.current = null
+    setDraftId(null)
+    setContentType('post')
+    setTitle('')
+    setCaption('')
+    setHashtags('')
+    setMediaType('none')
+    setMediaPath(null)
+    setMediaName(null)
+    setMediaSize(null)
+    setPreviewUrl(null)
+    setError('')
+    setSaveState('saved')
+    router.replace('/create')
+  }
+
+  const deleteDraft = async (draft: Draft) => {
+    if (!window.confirm('Delete this draft? Published posts and their media will not be affected.')) return
+    const { error: deleteError } = await db.from('create_drafts').delete().eq('id', draft.id).eq('user_id', user?.id)
+    if (deleteError) {
+      setError('Could not delete this draft. Please try again.')
+      return
+    }
+    if (draft.media_path) {
+      const { error: mediaDeleteError } = await supabase.storage.from('create-drafts').remove([draft.media_path])
+      if (mediaDeleteError) console.warn('Draft media cleanup failed', mediaDeleteError)
+    }
+    setDrafts(previous => previous.filter(item => item.id !== draft.id))
+    if (draftIdRef.current === draft.id) await startNewDraft()
+  }
+
+  const publish = async () => {
+    if (!user || postingRef.current || uploading) return
+    if (isRestricted(profile?.restrict_post_until)) {
+      setShowRestriction(true)
+      return
+    }
+    if (contentType === 'reel' && (mediaType !== 'video' || !mediaPath)) {
+      setError('Choose a video before publishing a Reel.')
+      return
+    }
+    if (mediaType !== 'none' && !mediaPath) {
+      setError('Wait for the media upload to finish before publishing.')
+      return
+    }
+    const postContent = buildPostContent(title, caption, hashtags)
+    if (!postContent && !mediaPath) {
+      setError('Add a photo, video, title, or caption before sharing.')
+      return
+    }
+
+    postingRef.current = true
+    setPublishing(true)
+    setSaveState('saving')
+    setError('')
+    try {
+      let publicMediaUrl: string | null = null
+      if (mediaPath && mediaType !== 'none') {
+        setUploadProgress(15)
+        const { data: blob, error: downloadError } = await supabase.storage.from('create-drafts').download(mediaPath)
+        if (downloadError || !blob) throw downloadError || new Error('Could not recover your uploaded media.')
+        setUploadProgress(40)
+        const extension = mediaName?.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || (mediaType === 'video' ? 'mp4' : 'jpg')
+        const finalPath = `${user.id}/${crypto.randomUUID()}.${extension}`
+        const { error: finalUploadError } = await supabase.storage.from('posts').upload(finalPath, blob, {
+          upsert: false,
+          contentType: mediaType === 'video' ? 'video/mp4' : blob.type || 'image/jpeg',
+          cacheControl: '31536000',
+        })
+        if (finalUploadError) throw finalUploadError
+        publicMediaUrl = supabase.storage.from('posts').getPublicUrl(finalPath).data.publicUrl
+      }
+
+      setUploadProgress(75)
+      const { data: createdPost, error: postError } = await supabase.from('posts').insert({
+        user_id: user.id,
+        content: postContent || null,
+        media_url: publicMediaUrl,
+        media_type: mediaType,
+      }).select('id').single()
+      if (postError || !createdPost) throw postError || new Error('Publishing was not confirmed by the server.')
+
+      await supabase.rpc('increment_posts_count', { profile_id: user.id })
+      setUploadProgress(100)
+      await queryClient.invalidateQueries({ queryKey: ['feed-posts'] })
+      await queryClient.invalidateQueries({ queryKey: ['reels-posts'] })
+      await queryClient.invalidateQueries({ queryKey: ['explore-posts'] })
+      await queryClient.invalidateQueries({ queryKey: ['profile-posts'] })
+
+      if (draftIdRef.current) {
+        await db.from('create_drafts').delete().eq('id', draftIdRef.current).eq('user_id', user.id)
+      }
+      if (mediaPath) await supabase.storage.from('create-drafts').remove([mediaPath])
+      router.push('/feed')
+    } catch (err) {
+      console.error('Post/Reel publishing failed', err)
+      setError('Publishing could not be confirmed. Your draft has been kept so you can retry safely.')
+      setSaveState('error')
+    } finally {
+      postingRef.current = false
+      setPublishing(false)
+      setUploadProgress(0)
+    }
+  }
+
+  const saveLabel = saveState === 'loading' ? 'Loading drafts…' : saveState === 'saving' ? 'Saving…' : saveState === 'error' ? 'Save failed' : 'Saved'
+  const isVideo = mediaType === 'video'
+
+  return (
+    <div className="mx-auto min-h-[calc(100vh-3.5rem)] w-full max-w-7xl px-3 pb-8 pt-4 sm:px-6 lg:px-8">
+      {showRestriction && <RestrictionPopup feature="posting" until={profile?.restrict_post_until} onClose={() => setShowRestriction(false)} />}
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link href="/feed" aria-label="Back to Home" className="flex h-10 w-10 items-center justify-center rounded-full border border-border hover:bg-accent"><ArrowLeft className="h-5 w-5" /></Link>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Create</h1>
+            <p className="text-sm text-muted-foreground">Make something worth sharing.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`flex items-center gap-1.5 text-xs ${saveState === 'error' ? 'text-red-500' : 'text-muted-foreground'}`}><Save className="h-3.5 w-3.5" />{saveLabel}</span>
+          <button type="button" onClick={() => setShowDrafts(true)} className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent">Drafts ({drafts.length})</button>
+          <button type="button" onClick={startNewDraft} className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent">New draft</button>
+          <button type="button" onClick={publish} disabled={publishing || uploading || loadingDraft} className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60">{publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}{publishing ? 'Sharing…' : contentType === 'reel' ? 'Share Reel' : 'Share Post'}</button>
+        </div>
+      </div>
+
+      <div className="mb-4 flex rounded-xl border border-border bg-card p-1">
+        <button type="button" onClick={() => { setContentType('post'); setError('') }} className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${contentType === 'post' ? 'bg-accent text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><ImageIcon className="h-4 w-4" /> Post</button>
+        <button type="button" onClick={() => { setContentType('reel'); if (mediaType === 'image') void removeMedia(); setError('') }} className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${contentType === 'reel' ? 'bg-accent text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><Film className="h-4 w-4" /> Reel</button>
+      </div>
+
+      {loadingDraft ? <div className="flex min-h-72 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> Restoring your draft…</div> : (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+          <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="font-semibold">Media</h2><p className="text-xs text-muted-foreground">{contentType === 'reel' ? 'Choose a video for your Reel' : 'Add a photo or video to your post'}</p></div><input ref={fileRef} type="file" accept={contentType === 'reel' ? 'video/*' : 'image/*,video/*'} className="hidden" onChange={handleFile} /><button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"><ImagePlus className="h-4 w-4" />{mediaPath ? 'Replace media' : 'Choose media'}</button></div>
+            <div className="flex min-h-[300px] items-center justify-center bg-muted/35 p-4 sm:min-h-[430px]">
+              {previewUrl ? (isVideo ? <video key={previewUrl} src={previewUrl} controls playsInline className="max-h-[65vh] max-w-full rounded-xl object-contain" /> : <img src={previewUrl} alt="Selected media preview" className="max-h-[65vh] max-w-full rounded-xl object-contain" />) : <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full max-w-sm flex-col items-center rounded-2xl border-2 border-dashed border-border px-6 py-12 text-center hover:border-pink-500/60 hover:bg-accent/40"><div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">{contentType === 'reel' ? <Film className="h-7 w-7" /> : <ImagePlus className="h-7 w-7" />}</div><span className="font-semibold">Add media</span><span className="mt-1 text-sm text-muted-foreground">{contentType === 'reel' ? 'MP4, WebM or QuickTime video' : 'Photo or video, up to 100 MB'}</span></button>}
+            </div>
+            {mediaPath && <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{mediaName || 'Uploaded media'}</p><p className="text-xs text-muted-foreground">{formatBytes(mediaSize)} · Saved privately with this draft</p></div><button type="button" onClick={removeMedia} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" />Remove</button></div>}
+            {uploading && <div className="border-t border-border px-4 py-3"><div className="mb-1 flex justify-between text-xs text-muted-foreground"><span>Uploading media securely…</span><span>{uploadProgress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div>}
+          </section>
+
+          <section className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+            <div><h2 className="font-semibold">Details</h2><p className="text-xs text-muted-foreground">Your changes save automatically.</p></div>
+            <div><label htmlFor="create-title" className="mb-1.5 block text-sm font-medium">Title <span className="text-muted-foreground">(optional)</span></label><input id="create-title" value={title} onChange={e => setTitle(e.target.value)} maxLength={100} placeholder="Add a title…" className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" /><p className="mt-1 text-right text-xs text-muted-foreground">{title.length}/100</p></div>
+            <div><label htmlFor="create-caption" className="mb-1.5 block text-sm font-medium">Caption</label><textarea id="create-caption" value={caption} onChange={e => setCaption(e.target.value)} maxLength={2200} rows={7} placeholder="Write a caption, tell your story…" className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" /><p className="mt-1 text-right text-xs text-muted-foreground">{caption.length}/2200</p></div>
+            <div><label htmlFor="create-hashtags" className="mb-1.5 block text-sm font-medium">Hashtags</label><input id="create-hashtags" value={hashtags} onChange={e => setHashtags(e.target.value)} placeholder="#socialens #photography" className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" /><p className="mt-1 text-xs text-muted-foreground">Separate hashtags with spaces. The editor adds # when missing.</p></div>
+            <div className="rounded-xl border border-border bg-muted/30 p-3"><div className="mb-2 flex items-center gap-2 text-sm font-semibold"><FileText className="h-4 w-4" /> Preview</div>{previewUrl && <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">{isVideo ? <Play className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}{mediaName || (isVideo ? 'Video preview' : 'Photo preview')}</div>}<p className="whitespace-pre-wrap break-words text-sm font-semibold">{title}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm">{caption}</p><p className="mt-2 break-words text-sm text-pink-500">{hashtags.split(/\s+/).filter(Boolean).map(tag => tag.startsWith('#') ? tag : `#${tag}`).join(' ')}</p></div>
+            {error && <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2.5 text-sm text-red-500">{error}</div>}
+            {uploading || publishing ? <div className="space-y-1"><div className="flex justify-between text-xs text-muted-foreground"><span>{uploading ? 'Saving media…' : 'Publishing…'}</span><span>{uploadProgress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div> : null}
+            <button type="button" onClick={publish} disabled={publishing || uploading || loadingDraft} className="w-full rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60">{publishing ? 'Publishing…' : contentType === 'reel' ? 'Share Reel' : 'Share Post'}</button>
+            <p className="text-center text-xs text-muted-foreground">Publishing uses your SociaLens account and existing feed system.</p>
+          </section>
+        </div>
+      )}
+
+      {showDrafts && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-3" onClick={() => setShowDrafts(false)}><div className="max-h-[85vh] w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl" onClick={e => e.stopPropagation()}><div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="font-bold">Your drafts</h2><p className="text-xs text-muted-foreground">Only you can access your unfinished work.</p></div><button type="button" onClick={() => setShowDrafts(false)} aria-label="Close drafts" className="rounded-full p-2 hover:bg-accent"><X className="h-4 w-4" /></button></div><div className="max-h-[65vh] space-y-2 overflow-y-auto p-3">{drafts.length ? drafts.map(draft => <div key={draft.id} className="flex items-center gap-3 rounded-xl border border-border p-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">{draft.content_type === 'reel' ? <Film className="h-5 w-5" /> : <ImageIcon className="h-5 w-5" />}</div><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{draft.content_type === 'reel' ? 'Reel draft' : 'Post draft'}</p><p className="truncate text-xs text-muted-foreground">{draft.title || draft.caption || draft.media_name || 'Untitled draft'}</p><p className="text-[11px] text-muted-foreground">Updated {new Date(draft.updated_at).toLocaleString()}</p></div><button type="button" onClick={async () => { await applyDraft(draft); setShowDrafts(false); router.replace(`/create?draft=${draft.id}`) }} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-accent">Continue</button><button type="button" onClick={() => void deleteDraft(draft)} aria-label="Delete draft" className="rounded-lg p-2 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"><Trash2 className="h-4 w-4" /></button></div>) : <p className="px-4 py-10 text-center text-sm text-muted-foreground">No saved drafts yet. Start writing and they’ll appear here.</p>}</div></div></div>}
+    </div>
+  )
+}
