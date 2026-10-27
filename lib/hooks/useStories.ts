@@ -702,7 +702,8 @@ export function useDeleteStory() {
 
   return useMutation({
     mutationFn: async ({ storyId, mediaUrl }: { storyId: string; mediaUrl?: string | null }) => {
-      await supabase.from('stories').delete().eq('id', storyId)
+      const { error } = await supabase.from('stories').delete().eq('id', storyId)
+      if (error) throw error
 
       // Best-effort - also remove the file immediately rather than waiting
       // for the 24h cleanup job, since the user chose to delete it early.
