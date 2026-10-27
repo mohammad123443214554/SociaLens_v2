@@ -355,7 +355,10 @@ export default function CreateEditorPage() {
     setPublishing(true)
     setSaveState('saving')
     setError('')
+    let uploadedFinalPath: string | null = null
+    let postCreated = false
     try {
+      await saveQueueRef.current
       let publicMediaUrl: string | null = null
       if (mediaPath && mediaType !== 'none') {
         setUploadProgress(15)
@@ -373,6 +376,7 @@ export default function CreateEditorPage() {
           cacheControl: LONG_CACHE_CONTROL,
         })
         if (finalUploadError) throw finalUploadError
+        uploadedFinalPath = finalPath
         publicMediaUrl = supabase.storage.from('posts').getPublicUrl(finalPath).data.publicUrl
       }
 
@@ -384,6 +388,7 @@ export default function CreateEditorPage() {
         media_type: mediaType,
       }).select('id').single()
       if (postError || !createdPost) throw postError || new Error('Publishing was not confirmed by the server.')
+      postCreated = true
 
       await supabase.rpc('increment_posts_count', { profile_id: user.id })
       setUploadProgress(100)
@@ -399,6 +404,10 @@ export default function CreateEditorPage() {
       router.push('/feed')
     } catch (err) {
       console.error('Post/Reel publishing failed', err)
+      if (uploadedFinalPath && !postCreated) {
+        const { error: cleanupError } = await supabase.storage.from('posts').remove([uploadedFinalPath])
+        if (cleanupError) console.warn('Could not clean up unreferenced post media', cleanupError)
+      }
       setError('Publishing could not be confirmed. Your draft has been kept so you can retry safely.')
       setSaveState('error')
     } finally {
