@@ -88,6 +88,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const [isPlaybackPaused, setIsPlaybackPaused] = useState(false)
   const activeProgressTrackRef = useRef<HTMLDivElement>(null)
   const isSeekingProgressRef = useRef(false)
+  const pendingVideoSeekRef = useRef<{ sceneIndex: number; time: number } | null>(null)
   const [snapDropEditing, setSnapDropEditing] = useState(false)
   const [emojiSliderInteracting, setEmojiSliderInteracting] = useState(false)
   const progressRef = useRef(0)
@@ -359,10 +360,14 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
       }
       const targetScene = scenes[targetIndex]
       const targetTime = Math.max(0, (targetScene?.trimStart ?? 0) + remaining)
-      if (targetIndex !== videoSceneIndex) setVideoSceneIndex(targetIndex)
-      requestAnimationFrame(() => {
-        if (videoRef.current) videoRef.current.currentTime = targetTime
-      })
+      if (targetIndex !== videoSceneIndex) {
+        pendingVideoSeekRef.current = { sceneIndex: targetIndex, time: targetTime }
+        setVideoSceneIndex(targetIndex)
+      } else if (videoRef.current) {
+        const video = videoRef.current
+        const boundedTime = Math.min(targetTime, Number.isFinite(video.duration) ? video.duration : targetTime)
+        video.currentTime = boundedTime
+      }
     } else if (videoRef.current) {
       videoRef.current.currentTime = fraction * totalDuration
     }
@@ -375,7 +380,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
     if (!video || !story || story.story_type !== 'video') return
     if (paused) video.pause()
     else video.play().catch(() => {})
-  }, [paused, story])
+  }, [paused, story, videoSceneIndex, story?.id])
 
   // Pause/resume the background music the same way.
   useEffect(() => {
@@ -588,52 +593,43 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   return (
     <div className="fixed inset-0 bg-background text-foreground z-[100] flex items-center justify-center">
       <div className="relative w-full h-full sm:max-w-sm sm:h-[90vh] sm:rounded-2xl overflow-hidden bg-black">
-        {/* Story progress, seeking and playback controls */}
-        <div className="absolute top-2 left-2 right-2 z-[95] flex items-center gap-2">
-          <div className="flex min-w-0 flex-1 gap-1">
-            {group.stories.map((_, i) => (
+        {/* Story progress bars — keep the original placement and layout */}
+        <div className="absolute top-2 left-2 right-2 z-20 flex gap-1">
+          {group.stories.map((_, i) => (
+            <div
+              key={i}
+              ref={i === storyIndex ? activeProgressTrackRef : undefined}
+              className={`relative flex-1 h-1 rounded-full bg-white/30 ${i === storyIndex ? 'cursor-pointer touch-none' : 'overflow-hidden'}`}
+              onPointerDown={i === storyIndex ? event => {
+                event.preventDefault()
+                isSeekingProgressRef.current = true
+                event.currentTarget.setPointerCapture(event.pointerId)
+                seekStoryProgress(event.clientX)
+              } : undefined}
+              onPointerMove={i === storyIndex ? event => {
+                if (isSeekingProgressRef.current && event.buttons === 1) seekStoryProgress(event.clientX)
+              } : undefined}
+              onPointerUp={i === storyIndex ? event => {
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+                isSeekingProgressRef.current = false
+              } : undefined}
+              onPointerCancel={i === storyIndex ? () => { isSeekingProgressRef.current = false } : undefined}
+              role={i === storyIndex ? 'slider' : undefined}
+              aria-label={i === storyIndex ? 'Seek story progress' : undefined}
+              aria-valuemin={i === storyIndex ? 0 : undefined}
+              aria-valuemax={i === storyIndex ? 100 : undefined}
+              aria-valuenow={i === storyIndex ? Math.round(progress) : undefined}
+              tabIndex={i === storyIndex ? 0 : undefined}
+            >
               <div
-                key={i}
-                ref={i === storyIndex ? activeProgressTrackRef : undefined}
-                className={`relative flex-1 h-1.5 rounded-full bg-white/35 ${i === storyIndex ? 'cursor-pointer touch-none' : 'overflow-hidden'}`}
-                onPointerDown={i === storyIndex ? event => {
-                  event.preventDefault()
-                  isSeekingProgressRef.current = true
-                  event.currentTarget.setPointerCapture(event.pointerId)
-                  seekStoryProgress(event.clientX)
-                } : undefined}
-                onPointerMove={i === storyIndex ? event => {
-                  if (isSeekingProgressRef.current && event.buttons === 1) seekStoryProgress(event.clientX)
-                } : undefined}
-                onPointerUp={i === storyIndex ? event => {
-                  if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-                } : undefined}
-                role={i === storyIndex ? 'slider' : undefined}
-                aria-label={i === storyIndex ? 'Seek story progress' : undefined}
-                aria-valuemin={i === storyIndex ? 0 : undefined}
-                aria-valuemax={i === storyIndex ? 100 : undefined}
-                aria-valuenow={i === storyIndex ? Math.round(progress) : undefined}
-                tabIndex={i === storyIndex ? 0 : undefined}
-              >
-                <div
-                  className="h-full rounded-full bg-white"
-                  style={{
-                    width: i < storyIndex ? '100%' : i === storyIndex ? `${progress}%` : '0%',
-                    transition: i === storyIndex ? 'width 50ms linear' : undefined,
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsPlaybackPaused(value => !value)}
-            aria-label={isPlaybackPaused ? 'Play story' : 'Pause story'}
-            title={isPlaybackPaused ? 'Play story' : 'Pause story'}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/55 text-white hover:bg-black/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-          >
-            {isPlaybackPaused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4" />}
-          </button>
+                className="h-full rounded-full bg-white"
+                style={{
+                  width: i < storyIndex ? '100%' : i === storyIndex ? `${progress}%` : '0%',
+                  transition: i === storyIndex ? 'width 50ms linear' : undefined,
+                }}
+              />
+            </div>
+          ))}
         </div>
 
         {/* Header */}
@@ -655,6 +651,15 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
             </div>
           </button>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsPlaybackPaused(value => !value)}
+              aria-label={isPlaybackPaused ? 'Play story' : 'Pause story'}
+              title={isPlaybackPaused ? 'Play story' : 'Pause story'}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white hover:bg-black/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              {isPlaybackPaused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4" />}
+            </button>
             {isOwn ? (
               <div className="relative">
                 <button onClick={() => setShowMenu((v) => !v)} className="text-white/80 hover:text-white">
@@ -747,6 +752,13 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
               // chosen song plays instead - same as Instagram/Reels behavior.
               muted={!!activeMusicUrl}
               onLoadedMetadata={event => {
+                const pendingSeek = pendingVideoSeekRef.current
+                if (pendingSeek && pendingSeek.sceneIndex === videoSceneIndex) {
+                  const maxTime = Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : pendingSeek.time
+                  event.currentTarget.currentTime = Math.max(0, Math.min(pendingSeek.time, maxTime))
+                  pendingVideoSeekRef.current = null
+                  return
+                }
                 const start = Math.max(0, activeVideoScene?.trimStart ?? 0)
                 if (Math.abs(event.currentTarget.currentTime - start) > 0.1) event.currentTarget.currentTime = start
               }}
