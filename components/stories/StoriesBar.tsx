@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Plus } from 'lucide-react'
@@ -34,6 +34,26 @@ export function StoriesBar() {
   // sponsored ring directly - only then does a back-tap on it make sense
   // (there's a real story to return to).
   const [adFromChain, setAdFromChain] = useState(false)
+
+  // Keep a directly opened story addressable after refresh. The viewer writes
+  // its current story ID to ?story=..., and this restores the matching group
+  // once the active-story query has loaded.
+  useEffect(() => {
+    const storyId = new URLSearchParams(window.location.search).get('story')
+    if (!storyId || groups.length === 0) return
+    const groupIndex = groups.findIndex((candidate) => candidate.stories.some((item) => item.id === storyId))
+    if (groupIndex < 0) return
+    const storyIndex = groups[groupIndex].stories.findIndex((item) => item.id === storyId)
+    setViewerStoryIndex(storyIndex >= 0 ? storyIndex : 0)
+    setViewerIndex(groupIndex)
+  }, [groups])
+
+  const closeStoryViewer = () => {
+    setViewerIndex(null)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('story')
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+  }
 
   const myGroup = groups.find((g) => g.userId === user?.id)
   const otherGroups = useMemo(() => groups.filter((g) => g.userId !== user?.id), [groups, user?.id])
@@ -138,7 +158,7 @@ export function StoriesBar() {
           startGroupIndex={viewerIndex}
           startStoryIndex={viewerStoryIndex}
           currentUserId={user?.id}
-          onClose={() => setViewerIndex(null)}
+          onClose={closeStoryViewer}
           onReachEnd={handleReachEndOfStories}
         />
       )}
