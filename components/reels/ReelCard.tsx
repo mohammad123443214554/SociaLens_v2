@@ -89,6 +89,8 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
 
     if (shouldLoad && src) {
       if (videoEl.getAttribute('src') !== src) {
+        // Allow thumbnail capture when the media host supports CORS.
+        videoEl.crossOrigin = 'anonymous'
         videoEl.setAttribute('src', src)
         videoEl.load()
       }
@@ -242,7 +244,6 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   const captureReelThumbnail = () => {
     const video = videoRef.current
     if (thumbnailAttemptedRef.current || !video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return
-    thumbnailAttemptedRef.current = true
     try {
       const canvas = document.createElement('canvas')
       canvas.width = 160
@@ -251,8 +252,9 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
       if (!context) return
       context.drawImage(video, 0, 0, canvas.width, canvas.height)
       setReelThumbnail(canvas.toDataURL('image/jpeg', 0.72))
+      thumbnailAttemptedRef.current = true
     } catch {
-      // Cross-origin video sources may disallow snapshots; the icon fallback remains usable.
+      // Retry on later frames; the media proxy may permit canvas capture.
     }
   }
 
@@ -261,19 +263,30 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
     setLoadingReposters(true)
     setRepostersError('')
     try {
-      const { data, error } = await supabase
+      // Fetch repost rows and profiles separately to avoid relation-shape errors.
+      const { data: repostRows, error: repostError } = await supabase
         .from('reposts')
-        .select('created_at, profiles!reposts_user_id_fkey(id,username,avatar_url,is_verified,verification_type)')
+        .select('user_id, created_at')
         .eq('post_id', post.id)
         .order('created_at', { ascending: false })
-      if (error) throw error
-      // Supabase can return the joined profile relation as an array for this relationship.
-      // Normalize it before building the UI list instead of asserting it is a single object.
-      const rows = (data ?? []) as Array<{
-        created_at: string
-        profiles: Array<{ id: string; username: string; avatar_url: string | null; is_verified?: boolean; verification_type?: 'blue' | 'yellow' | null }> | null
-      }>
-      setReposters(rows.flatMap(row => (row.profiles ?? []).map(profile => ({ ...profile, created_at: row.created_at }))))
+      if (repostError) throw repostError
+
+      const rows = repostRows ?? []
+      const userIds = [...new Set(rows.map(row => row.user_id).filter(Boolean))]
+      if (userIds.length === 0) {
+        setReposters([])
+      } else {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url, is_verified, verification_type')
+          .in('id', userIds)
+        if (profilesError) throw profilesError
+        const profileById = new Map((profiles ?? []).map(profile => [profile.id, profile]))
+        setReposters(rows.flatMap(row => {
+          const profile = profileById.get(row.user_id)
+          return profile ? [{ ...profile, created_at: row.created_at }] : []
+        }))
+      }
     } catch (error) {
       console.error('Unable to load reel reposters', error)
       setRepostersError('Could not load reposts right now. Please try again.')
@@ -422,20 +435,23 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
             )}
           </div>
         )}
+        {(post.reposted_by?.length ?? 0) > 0 && (
+          <button
+            type="button"
+            onClick={(event) => { event.stopPropagation(); void openReposters() }}
+            aria-label="See who reposted this reel"
+            title="Who reposted this reel"
+            className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-white/80 bg-black/70 shadow-lg"
+          >
+            {reelThumbnail ? <img src={reelThumbnail} alt="" className="h-full w-full object-cover" /> : <FileVideo className="h-4 w-4 text-white" />}
+            <span className="absolute bottom-0 right-0 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-purple-600 ring-1 ring-black">
+              <Users className="h-2 w-2 text-white" />
+            </span>
+          </button>
+        )}
       </div>
 
-      <button
-        type="button"
-        onClick={(event) => { event.stopPropagation(); void openReposters() }}
-        aria-label="See who reposted this reel"
-        title="Who reposted this reel"
-        className="absolute bottom-5 right-3 z-20 flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-white/80 bg-black/70 shadow-lg"
-      >
-        {reelThumbnail ? <img src={reelThumbnail} alt="" className="h-full w-full object-cover" /> : <FileVideo className="h-5 w-5 text-white" />}
-        <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-purple-600 ring-1 ring-black">
-          <Users className="h-2.5 w-2.5 text-white" />
-        </span>
-      </button>
+
 
       <RepostBadge reposters={post.reposted_by ?? []} variant="overlay" />
 
