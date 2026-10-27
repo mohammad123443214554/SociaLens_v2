@@ -47,6 +47,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   const [loadingReposters, setLoadingReposters] = useState(false)
   const [repostersError, setRepostersError] = useState('')
   const [reelThumbnail, setReelThumbnail] = useState('')
+  const [hasReposts, setHasReposts] = useState((post.reposted_by?.length ?? 0) > 0)
   const thumbnailAttemptedRef = useRef(false)
   const [markedNotInterested, setMarkedNotInterested] = useState(false)
   const [progress, setProgress] = useState(0) // 0-100
@@ -63,6 +64,46 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
 
   const { data: isReposted = false } = useIsReposted(post.id, user?.id, post.is_reposted)
   const toggleRepost = useToggleRepost()
+
+  // The feed's reposted_by field can be stale or omitted for a reel that another
+  // user has reposted. Derive visibility from the canonical reposts table instead.
+  useEffect(() => {
+    let active = true
+    const refreshRepostPresence = async () => {
+      const { count, error } = await supabase
+        .from('reposts')
+        .select('post_id', { count: 'exact', head: true })
+        .eq('post_id', post.id)
+      if (!active) return
+      if (error) {
+        console.error('Unable to check reel reposts', error)
+        return
+      }
+      setHasReposts((count ?? 0) > 0)
+    }
+
+    void refreshRepostPresence()
+    const channel = supabase
+      .channel(`reel-reposts-${post.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'reposts',
+        filter: `post_id=eq.${post.id}`,
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setHasReposts(true)
+        } else {
+          void refreshRepostPresence()
+        }
+      })
+      .subscribe()
+
+    return () => {
+      active = false
+      void supabase.removeChannel(channel)
+    }
+  }, [post.id, supabase])
 
   const flushWatchTime = () => {
     if (watchIntervalRef.current) { clearInterval(watchIntervalRef.current); watchIntervalRef.current = null }
@@ -435,7 +476,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
             )}
           </div>
         )}
-        {(post.reposted_by?.length ?? 0) > 0 && (
+        {hasReposts && (
           <button
             type="button"
             onClick={(event) => { event.stopPropagation(); void openReposters() }}
