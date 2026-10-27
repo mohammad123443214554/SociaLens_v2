@@ -83,6 +83,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const [originalStoryToOpen, setOriginalStoryToOpen] = useState<StoryWithProfile | null>(null)
   const [groupIndex, setGroupIndex] = useState(startGroupIndex)
   const [storyIndex, setStoryIndex] = useState(startStoryIndex)
+  const [deletedStoryIds, setDeletedStoryIds] = useState<string[]>([])
   const [progress, setProgress] = useState(0)
   const [snapDropEditing, setSnapDropEditing] = useState(false)
   const [emojiSliderInteracting, setEmojiSliderInteracting] = useState(false)
@@ -109,7 +110,13 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const [sendError, setSendError] = useState<string | null>(null)
   const [messageSent, setMessageSent] = useState(false)
 
-  const group = groups[groupIndex]
+  // Keep a deleted story out of the viewer immediately while the query cache refetches.
+  // This prevents the old array index from jumping over the next story or pointing past the end.
+  const visibleGroups = groups.map((item) => ({
+    ...item,
+    stories: item.stories.filter((itemStory) => !deletedStoryIds.includes(itemStory.id)),
+  }))
+  const group = visibleGroups[groupIndex]
   const story = group?.stories[storyIndex]
   const isOwn = currentUserId === story?.user_id
 
@@ -130,7 +137,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
     setMessageText('')
     setSendError(null)
     setMessageSent(false)
-  }, [groupIndex, storyIndex])
+  }, [groupIndex, storyIndex, story?.id])
 
   const { data: mentionRecords = [] } = useStoryMentions(story?.id)
 
@@ -167,7 +174,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
     if (!group) return
     if (storyIndex < group.stories.length - 1) {
       setStoryIndex((i) => i + 1)
-    } else if (groupIndex < groups.length - 1) {
+    } else if (groupIndex < visibleGroups.length - 1) {
       setGroupIndex((g) => g + 1)
       setStoryIndex(0)
     } else if (onReachEnd) {
@@ -182,7 +189,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
     if (storyIndex > 0) {
       setStoryIndex((i) => i - 1)
     } else if (groupIndex > 0) {
-      const prevGroup = groups[groupIndex - 1]
+      const prevGroup = visibleGroups[groupIndex - 1]
       setGroupIndex((g) => g - 1)
       setStoryIndex(prevGroup.stories.length - 1)
     }
@@ -215,14 +222,14 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupIndex, storyIndex])
+  }, [groupIndex, storyIndex, story?.id])
 
   // Progress for video stories, driven by actual playback time. Advances
   // through each clip in a multi-scene video story before moving on to the
   // next story post.
   useEffect(() => {
     setVideoSceneIndex(0)
-  }, [groupIndex, storyIndex])
+  }, [groupIndex, storyIndex, story?.id])
 
   useEffect(() => {
     if (!story || story.story_type !== 'video') return
@@ -268,7 +275,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
       video.removeEventListener('ended', onEnded)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupIndex, storyIndex, videoSceneIndex])
+  }, [groupIndex, storyIndex, videoSceneIndex, story?.id])
 
   // Pause/resume the video element itself when a panel opens/closes or the
   // person starts typing.
@@ -409,16 +416,32 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
       if (loopCheckRef.current) clearInterval(loopCheckRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupIndex, storyIndex, activeMusicUrl])
+  }, [groupIndex, storyIndex, activeMusicUrl, story?.id])
 
   const handleDelete = async () => {
     setShowDeleteConfirm(false)
     audioRef.current?.pause()
-    await deleteStory.mutateAsync({ storyId: story.id, mediaUrl: story.media_url })
-    if (group.stories.length <= 1) {
-      onClose()
-    } else {
-      goNextStory()
+    try {
+      await deleteStory.mutateAsync({ storyId: story.id, mediaUrl: story.media_url })
+      setDeletedStoryIds((ids) => ids.includes(story.id) ? ids : [...ids, story.id])
+
+      // A middle story is replaced at the same index by the next story once
+      // the deleted item is filtered out. Only move groups when deleting the
+      // last story in this group; close if this was the group's only story.
+      if (group.stories.length <= 1) {
+        onClose()
+      } else if (storyIndex >= group.stories.length - 1) {
+        if (groupIndex < visibleGroups.length - 1) {
+          setGroupIndex((index) => index + 1)
+          setStoryIndex(0)
+        } else if (onReachEnd) {
+          onReachEnd()
+        } else {
+          onClose()
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete story:', error)
     }
   }
 
