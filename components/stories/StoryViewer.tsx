@@ -120,6 +120,17 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const story = group?.stories[storyIndex]
   const isOwn = currentUserId === story?.user_id
 
+  // The story URL tracks the currently displayed item, so refresh/reload can
+  // restore this same story instead of dropping the viewer overlay.
+  useEffect(() => {
+    if (!story?.id || typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('story') !== story.id) {
+      url.searchParams.set('story', story.id)
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    }
+  }, [story?.id])
+
   // Query refreshes and deletes can briefly leave the viewer's old index
   // outside the updated story list. Normalize it instead of leaving a blank
   // black overlay on screen.
@@ -524,7 +535,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-[100] flex items-center justify-center">
+    <div className="fixed inset-0 bg-background text-foreground z-[100] flex items-center justify-center">
       <div className="relative w-full h-full sm:max-w-sm sm:h-[90vh] sm:rounded-2xl overflow-hidden bg-black">
         {/* Progress bars */}
         <div className="absolute top-2 left-2 right-2 z-20 flex gap-1">
@@ -805,17 +816,17 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
           {isOwn ? (
             <div className="w-full flex items-center justify-between text-white/90 text-sm py-1">
               <button onClick={() => setShowViews(true)} className="flex items-center gap-1.5">
-                <Eye className="h-4 w-4" /> {views.length}
+                <Eye className="h-4 w-4" aria-hidden="true" />
               </button>
               <div className="flex items-center gap-4">
                 <button onClick={() => setShowLikers(true)} className="flex items-center gap-1.5">
-                  <Heart className="h-4 w-4" /> {likeData?.count ?? 0}
+                  <Heart className="h-4 w-4" aria-hidden="true" />
                 </button>
                 <button onClick={() => setShowReactors(true)} className="flex items-center gap-1.5">
-                  <span className="text-base leading-none">😊</span> {reactors.length}
+                  <span className="text-base leading-none" aria-hidden="true">😊</span>
                 </button>
                 <button onClick={() => setShowComments(true)} className="flex items-center gap-1.5">
-                  <MessageCircle className="h-4 w-4" /> {countThread(commentThread)}
+                  <MessageCircle className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -855,11 +866,11 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
         {/* Views panel (owner only) */}
         {showViews && (
-          <div className="absolute inset-0 z-40 flex flex-col justify-end">
+          <div className="absolute inset-0 z-40 flex flex-col justify-end sm:justify-center sm:px-4">
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowViews(false)} />
-            <div className="relative bg-card rounded-t-2xl max-h-[60%] flex flex-col text-foreground">
+            <div className="relative bg-card rounded-t-2xl sm:rounded-2xl max-h-[72%] sm:max-h-[min(76vh,680px)] sm:w-full sm:max-w-md sm:mx-auto flex flex-col text-foreground shadow-2xl">
               <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
-                <h3 className="font-bold">Viewed by {views.length}</h3>
+                <div><h3 className="font-bold text-base">Story viewers</h3><p className="text-xs text-muted-foreground mt-0.5">{views.length} {views.length === 1 ? 'view' : 'views'}</p></div>
                 <button onClick={() => setShowViews(false)} className="p-1 rounded-full hover:bg-muted">
                   <X className="h-5 w-5" />
                 </button>
@@ -895,7 +906,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowLikers(false)} />
             <div className="relative bg-card rounded-t-2xl max-h-[60%] flex flex-col text-foreground">
               <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
-                <h3 className="font-bold">Liked by {likers.length}</h3>
+                <div><h3 className="font-bold text-base">Story likes</h3><p className="text-xs text-muted-foreground mt-0.5">{likeData?.count ?? likers.length} {(likeData?.count ?? likers.length) === 1 ? 'like' : 'likes'}</p></div>
                 <button onClick={() => setShowLikers(false)} className="p-1 rounded-full hover:bg-muted">
                   <X className="h-5 w-5" />
                 </button>
@@ -931,7 +942,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowReactors(false)} />
             <div className="relative bg-card rounded-t-2xl max-h-[60%] flex flex-col text-foreground">
               <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
-                <h3 className="font-bold">Reactions ({reactors.length})</h3>
+                <div><h3 className="font-bold text-base">Story reactions</h3><p className="text-xs text-muted-foreground mt-0.5">{reactors.length} {reactors.length === 1 ? 'reaction' : 'reactions'}</p></div>
                 <button onClick={() => setShowReactors(false)} className="p-1 rounded-full hover:bg-muted">
                   <X className="h-5 w-5" />
                 </button>
@@ -965,7 +976,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowComments(false)} />
             <div className="relative bg-card rounded-t-2xl max-h-[60%] flex flex-col text-foreground">
               <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
-                <h3 className="font-bold">Comments</h3>
+                <div><h3 className="font-bold text-base">Story comments</h3><p className="text-xs text-muted-foreground mt-0.5">{countThread(commentThread)} {countThread(commentThread) === 1 ? 'comment' : 'comments'}</p></div>
                 <button onClick={() => setShowComments(false)} className="p-1 rounded-full hover:bg-muted">
                   <X className="h-5 w-5" />
                 </button>
