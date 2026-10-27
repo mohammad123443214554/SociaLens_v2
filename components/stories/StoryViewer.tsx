@@ -120,6 +120,35 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const story = group?.stories[storyIndex]
   const isOwn = currentUserId === story?.user_id
 
+  // Query refreshes and deletes can briefly leave the viewer's old index
+  // outside the updated story list. Normalize it instead of leaving a blank
+  // black overlay on screen.
+  useEffect(() => {
+    if (visibleGroups.length === 0) return
+
+    if (groupIndex >= visibleGroups.length) {
+      setGroupIndex(visibleGroups.length - 1)
+      setStoryIndex(0)
+      return
+    }
+
+    const currentGroup = visibleGroups[groupIndex]
+    if (!currentGroup || currentGroup.stories.length === 0) {
+      const nextNonEmpty = visibleGroups.findIndex((candidate, index) => index > groupIndex && candidate.stories.length > 0)
+      const previousNonEmpty = visibleGroups.findLastIndex((candidate, index) => index < groupIndex && candidate.stories.length > 0)
+      const nextIndex = nextNonEmpty >= 0 ? nextNonEmpty : previousNonEmpty
+      if (nextIndex >= 0) {
+        setGroupIndex(nextIndex)
+        setStoryIndex(nextNonEmpty >= 0 ? 0 : visibleGroups[nextIndex].stories.length - 1)
+      }
+      return
+    }
+
+    if (storyIndex >= currentGroup.stories.length) {
+      setStoryIndex(currentGroup.stories.length - 1)
+    }
+  }, [visibleGroups, groupIndex, storyIndex])
+
   // Anything that opens a panel or has the person actively typing pauses
   // the auto-advance timer/video, same as Instagram.
   const paused = snapDropEditing || emojiSliderInteracting || isAddingToMyStory || showMenu || showHideViewers || showDeleteConfirm || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0 || !!originalStoryToOpen
@@ -293,7 +322,23 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
     else audioRef.current.play().catch(() => {})
   }, [paused])
 
-  if (!group || !story) return null
+  if (!group || !story) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black text-white" role="status" aria-live="polite">
+        <div className="flex flex-col items-center gap-4 px-6 text-center">
+          <Loader2 className="h-7 w-7 animate-spin" aria-hidden="true" />
+          <p className="text-sm text-white/80">Loading stories…</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-white/30 px-4 py-2 text-sm hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            Close stories
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // For multi-scene stories, figure out which scene should be showing right
   // now, and pull that scene's own style/position/music from it. Falls
