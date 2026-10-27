@@ -1,8 +1,6 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import { Home, Search, SquarePlay, Send, Settings, PlusSquare, Archive } from 'lucide-react'
 import { cn } from '@/lib/utils/helpers'
@@ -29,7 +27,6 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname()
   const { profile } = useUser()
-  const [showCreate, setShowCreate] = useState(false)
 
   return (
     <>
@@ -43,13 +40,10 @@ export function Sidebar() {
           </Link>
         ))}
 
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-accent text-left w-full"
-        >
+        <Link href="/create" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-accent text-left w-full">
           <PlusSquare className="h-5 w-5" />
           Create
-        </button>
+        </Link>
 
         <div className="mt-auto pt-4 border-t space-y-1">
           {profile && (
@@ -81,7 +75,6 @@ export function Sidebar() {
         </div>
       </aside>
 
-      {showCreate && <CreatePostModal onClose={() => setShowCreate(false)} />}
     </>
   )
 }
