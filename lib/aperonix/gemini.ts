@@ -92,48 +92,51 @@ export function getKeysForRole(role: GeminiRole): string[] {
   return [getPrimaryKey(role), ...getBackupKeys()].filter(Boolean) as string[]
 }
 
-async function requestGemini(apiKey: string, model: string, systemPrompt: string, contents: GeminiMessage[], tools?: GeminiTool[]) {
+async function requestGemini(
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  contents: GeminiMessage[],
+  timeoutMs: number,
+  maxOutputTokens: number,
+  tools?: GeminiTool[]
+) {
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
     ...(tools ? { tools } : {}),
     generationConfig: {
-      // Gemini's own docs recommend leaving temperature/top_p/top_k at
-      // their defaults on the current model generation - its reasoning
-      // is tuned around those defaults, and overriding them tends to hurt
-      // more than it helps. maxOutputTokens is just a length cap, safe to
-      // keep custom.
-      maxOutputTokens: 8192,
+      // Create-post fields are short outputs. A large chat-sized token budget
+      // wastes latency and can keep generation running far longer than needed.
+      maxOutputTokens,
     },
   })
 
-  // Retry the same key+model a couple of times for transient 503
-  // (overloaded) / 429 (rate limited) errors before giving up and trying
-  // the next one. A 404 (wrong/deprecated model name) is NOT retried here -
-  // that's on the caller to try the next model candidate instead, since
-  // retrying the identical request would just 404 again.
-  const maxAttempts = 2
-  let lastStatus = 0
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
     const response = await fetch(`${GEMINI_BASE_URL}/${model}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
+      signal: controller.signal,
     })
 
-    if (response.ok) return response.json()
+    if (response.ok) return await response.json()
 
-    lastStatus = response.status
-    if (response.status === 404) break // wrong/deprecated model - no point retrying this same call
-    const isRetryable = response.status === 503 || response.status === 429
-    if (!isRetryable || attempt === maxAttempts) break
-    await new Promise(resolve => setTimeout(resolve, attempt * 700))
+    const err: any = new Error(`Gemini request failed (status ${response.status})`)
+    err.status = response.status
+    throw err
+  } catch (error: any) {
+    if (controller.signal.aborted || error?.name === 'AbortError' || error?.name === 'TimeoutError') {
+      const timeoutError: any = new Error('Aperonix generation timed out')
+      timeoutError.code = 'APERONIX_TIMEOUT'
+      throw timeoutError
+    }
+    throw error
+  } finally {
+    clearTimeout(timeout)
   }
-
-  const err: any = new Error(`Gemini request failed (status ${lastStatus})`)
-  err.status = lastStatus
-  throw err
 }
 
 /**
@@ -156,21 +159,44 @@ export async function callGemini(
     throw new Error('Try again later.')
   }
 
+  // Keep the whole request comfortably inside Vercel's function limit.
+  // A previous unbounded sequence of retries could run until Vercel returned 504.
+  const deadline = Date.now() + 45_000
+  const perAttemptTimeoutMs = 12_000
   let data: any = null
+  let lastError: any = null
 
   outer:
   for (const key of keysToTry) {
     for (const model of GEMINI_MODEL_CANDIDATES) {
+      const remainingMs = deadline - Date.now()
+      if (remainingMs < 1_500) break outer
       try {
-        data = await requestGemini(key, model, systemPrompt, contents, tools)
+        data = await requestGemini(
+          key,
+          model,
+          systemPrompt,
+          contents,
+          Math.min(perAttemptTimeoutMs, remainingMs),
+          role === 'generate' ? 256 : 8192,
+          tools
+        )
         break outer
-      } catch (err) {
-        console.error(`Aperonix: Gemini call failed on a "${role}"-role key with model "${model}", trying the next option if available.`, err)
+      } catch (err: any) {
+        lastError = err
+        // A timeout means this model is too slow for a responsive editor.
+        // Move to the next candidate/key rather than retrying the same request.
+        console.error(`Aperonix: Gemini request failed for role "${role}" and model "${model}" (status ${err?.status ?? err?.code ?? 'unknown'}); trying the next available candidate.`)
       }
     }
   }
 
   if (!data) {
+    if (Date.now() >= deadline || lastError?.code === 'APERONIX_TIMEOUT') {
+      const timeoutError: any = new Error('Aperonix generation timed out')
+      timeoutError.code = 'APERONIX_TIMEOUT'
+      throw timeoutError
+    }
     throw new Error('Try again later.')
   }
 
