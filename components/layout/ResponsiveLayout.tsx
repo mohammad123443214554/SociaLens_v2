@@ -18,6 +18,7 @@ export function ResponsiveLayout({ children }: { children: React.ReactNode }) {
   // the /chat/[chatId] pattern below, or the navbar disappears on mobile
   // there too and the page's own sticky header ends up overlapping its
   // first list item (there's no more navbar height for it to stick under).
+  const isFullScreenPage = pathname === '/create'
   const isImmersivePage =
     (/^\/chat\/[^/]+$/.test(pathname || '') && pathname !== '/chat/archive') ||
     pathname === '/aperonix' || pathname === '/aperonix/voice' || pathname === '/reels'
@@ -25,15 +26,15 @@ export function ResponsiveLayout({ children }: { children: React.ReactNode }) {
   return (
     <CallProvider>
       <div className="min-h-screen bg-background">
-        <Navbar className={isImmersivePage ? 'hidden lg:block' : undefined} />
-        <div className="flex">
-          <Sidebar />
-          <main className={`flex-1 min-w-0 ${isImmersivePage ? 'pb-0 lg:pb-0' : 'pb-16 lg:pb-0'}`}>
+        <Navbar className={isFullScreenPage ? 'hidden' : isImmersivePage ? 'hidden lg:block' : undefined} />
+        <div className={isFullScreenPage ? 'flex min-h-screen' : 'flex'}>
+          {!isFullScreenPage && <Sidebar />}
+          <main className={`flex-1 min-w-0 ${isFullScreenPage || isImmersivePage ? 'pb-0 lg:pb-0' : 'pb-16 lg:pb-0'}`}>
             {children}
           </main>
         </div>
-        <MobileBottomNav className={isImmersivePage ? 'hidden' : undefined} />
-        <BackButton />
+        {!isFullScreenPage && <MobileBottomNav className={isImmersivePage ? 'hidden' : undefined} />}
+        {!isFullScreenPage && <BackButton />}
         <GlobalToast />
       </div>
     </CallProvider>
