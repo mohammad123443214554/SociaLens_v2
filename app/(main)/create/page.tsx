@@ -239,9 +239,10 @@ export default function CreateEditorPage() {
     uploadingRef.current = true
     setUploading(true)
     setUploadProgress(10)
+    const localPreviewUrl = URL.createObjectURL(file)
     setPreviewUrl(current => {
       if (current?.startsWith('blob:')) URL.revokeObjectURL(current)
-      return URL.createObjectURL(file)
+      return localPreviewUrl
     })
     try {
       const currentDraftId = draftIdRef.current || crypto.randomUUID()
@@ -264,17 +265,14 @@ export default function CreateEditorPage() {
         const { error: oldMediaDeleteError } = await supabase.storage.from('create-drafts').remove([previousMediaPath])
         if (oldMediaDeleteError) console.warn('Replaced draft media cleanup failed', oldMediaDeleteError)
       }
-      const temporaryPreview = previewUrl
       const { data: signed } = await supabase.storage.from('create-drafts').createSignedUrl(path, 3600)
-      if (temporaryPreview?.startsWith('blob:')) URL.revokeObjectURL(temporaryPreview)
+      URL.revokeObjectURL(localPreviewUrl)
       if (signed?.signedUrl) setPreviewUrl(signed.signedUrl)
     } catch (err) {
       console.error('Draft media upload failed', err)
       setError('Media upload failed. Please try again. Your previous saved media is unchanged.')
-      setPreviewUrl(current => {
-        if (current?.startsWith('blob:')) URL.revokeObjectURL(current)
-        return previousPreviewUrl
-      })
+      URL.revokeObjectURL(localPreviewUrl)
+      setPreviewUrl(previousPreviewUrl)
     } finally {
       uploadingRef.current = false
       setUploading(false)
