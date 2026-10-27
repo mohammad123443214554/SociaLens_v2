@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Plus } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -24,6 +24,8 @@ const StoryViewer = dynamic(() => import('./StoryViewer').then(m => m.StoryViewe
 export function StoriesBar() {
   const { user, profile } = useUser()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { data: groups = [] } = useActiveStories(user?.id)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [viewerStoryIndex, setViewerStoryIndex] = useState(0)
@@ -34,6 +36,26 @@ export function StoriesBar() {
   // sponsored ring directly - only then does a back-tap on it make sense
   // (there's a real story to return to).
   const [adFromChain, setAdFromChain] = useState(false)
+  const lastPathnameRef = useRef(pathname)
+  const lastStoryParamRef = useRef<string | null>(null)
+
+  // Close the overlay when navigation leaves the feed, or when a Home/nav
+  // link removes ?story= while staying on the same route. Do not close on
+  // initial open: StoryViewer itself adds ?story= after mounting.
+  useEffect(() => {
+    const currentStoryParam = searchParams.get('story')
+    const routeChanged = lastPathnameRef.current !== pathname
+    const storyParamWasRemoved = lastStoryParamRef.current !== null && currentStoryParam === null
+
+    if (routeChanged || storyParamWasRemoved) {
+      setViewerIndex(null)
+      setShowAdStory(false)
+      setAdFromChain(false)
+    }
+
+    lastPathnameRef.current = pathname
+    lastStoryParamRef.current = currentStoryParam
+  }, [pathname, searchParams])
 
   // Keep a directly opened story addressable after refresh. The viewer writes
   // its current story ID to ?story=..., and this restores the matching group
