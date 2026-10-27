@@ -1,4 +1,4 @@
-const CACHE_NAME = 'geolink-v4'
+const CACHE_NAME = 'geolink-v5'
 const OFFLINE_URL = '/offline'
 
 const PRECACHE = [
