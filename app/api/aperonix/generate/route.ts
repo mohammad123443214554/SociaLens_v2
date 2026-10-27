@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { callGemini, extractText, GeminiMessage } from '@/lib/aperonix/gemini'
 import { stripMarkdown } from '@/lib/utils/helpers'
 
+export const maxDuration = 60
+
 const NO_MARKDOWN = ` Do not use any markdown or formatting symbols anywhere in the reply - no **bold**, no *italics*, no underscores, no backticks. Plain text only.`
 
 const MEDIA_PROMPTS: Record<string, string> = {
