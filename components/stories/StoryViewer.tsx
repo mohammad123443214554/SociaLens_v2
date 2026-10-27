@@ -135,7 +135,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
     const currentGroup = visibleGroups[groupIndex]
     if (!currentGroup || currentGroup.stories.length === 0) {
       const nextNonEmpty = visibleGroups.findIndex((candidate, index) => index > groupIndex && candidate.stories.length > 0)
-      const previousNonEmpty = visibleGroups.findLastIndex((candidate, index) => index < groupIndex && candidate.stories.length > 0)
+      const previousNonEmpty = visibleGroups.reduce((last, candidate, index) => index < groupIndex && candidate.stories.length > 0 ? index : last, -1)
       const nextIndex = nextNonEmpty >= 0 ? nextNonEmpty : previousNonEmpty
       if (nextIndex >= 0) {
         setGroupIndex(nextIndex)
