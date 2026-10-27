@@ -73,7 +73,7 @@ export function StoriesBar() {
   // closing the viewer - so people actually reach it in the normal
   // scroll-through-stories flow, not only by tapping the ring directly.
   const handleReachEndOfStories = () => {
-    setViewerIndex(null)
+    closeStoryViewer()
     setAdFromChain(true)
     setShowAdStory(true)
   }
