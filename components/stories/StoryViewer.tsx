@@ -428,9 +428,9 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
       // A middle story is replaced at the same index by the next story once
       // the deleted item is filtered out. Only move groups when deleting the
       // last story in this group; close if this was the group's only story.
-      if (group.stories.length <= 1) {
-        onClose()
-      } else if (storyIndex >= group.stories.length - 1) {
+      if (group.stories.length <= 1 || storyIndex >= group.stories.length - 1) {
+        // If this was the group's last story, continue to the next available
+        // group instead of leaving the viewer on an empty/black surface.
         if (groupIndex < visibleGroups.length - 1) {
           setGroupIndex((index) => index + 1)
           setStoryIndex(0)
