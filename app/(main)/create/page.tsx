@@ -471,8 +471,12 @@ export default function CreateEditorPage() {
       const currentValue = field === 'title' ? title : field === 'caption' ? caption : hashtags
       const apiField = field === 'caption' ? 'description' : field
       const res = await fetch('/api/aperonix/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mediaBase64, mimeType: mediaBase64 ? mediaFile.type : undefined, sampledImages, mediaKind: mediaType, field: apiField, regenerate: generated[field], previousResult: generated[field] ? currentValue : undefined }) })
-      const data = await res.json()
+      const responseText = await res.text()
+      let data: { result?: string; error?: string } = {}
+      try { data = JSON.parse(responseText) as { result?: string; error?: string } }
+      catch { throw new Error(res.status === 504 ? 'Aperonix took too long to respond. Please try again; your post has not been lost.' : 'Aperonix returned an invalid response. Please try again.') }
       if (!res.ok) throw new Error(data.error || 'Aperonix could not generate this right now.')
+      if (typeof data.result !== 'string' || !data.result.trim()) throw new Error('Aperonix did not return any text. Please try again.')
       if (field === 'title') setTitle(String(data.result).slice(0, 100))
       else if (field === 'caption') setCaption(String(data.result).slice(0, 2200))
       else setHashtags(String(data.result).split(/\s+/).map((tag: string) => tag.startsWith('#') ? tag : '#' + tag).join(' '))
