@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import { Home, Search, SquarePlay, Plus, Send } from 'lucide-react'
 import { cn } from '@/lib/utils/helpers'
@@ -10,10 +9,6 @@ import { useUser } from '@/lib/hooks/useUser'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { createClient } from '@/lib/supabase/client'
-
-// See Sidebar.tsx for why this is dynamically imported instead of a
-// Normal top-level import - this component renders on every page too.
-const CreatePostModal = dynamic(() => import('@/components/shared/CreatePostModal').then(m => m.CreatePostModal), { ssr: false })
 
 // Left-side nav items (before the Create button)
 const leftNavItems = [
@@ -31,7 +26,6 @@ export function MobileBottomNav({ className }: { className?: string } = {}) {
   const pathname = usePathname()
   const { profile, user } = useUser()
   const [unreadMessages, setUnreadMessages] = useState(0)
-  const [showCreate, setShowCreate] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -71,14 +65,12 @@ export function MobileBottomNav({ className }: { className?: string } = {}) {
             </Link>
           ))}
 
-          {/* Create Post */}
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex flex-col items-center gap-0.5 p-2 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-          >
+          {/* Open the dedicated Post/Reel editor */}
+          <Link href="/create"
+            className={cn('flex flex-col items-center gap-0.5 p-2 rounded-lg transition-colors', pathname.startsWith('/create') ? 'text-pink-500' : 'text-muted-foreground hover:text-foreground')}>
             <Plus className="h-5 w-5" />
             <span className="text-[10px]">Create</span>
-          </button>
+          </Link>
 
           {rightNavItems.map(({ href, icon: Icon, label }) => (
             <Link key={href} href={href}
@@ -111,7 +103,6 @@ export function MobileBottomNav({ className }: { className?: string } = {}) {
         </div>
       </nav>
 
-      {showCreate && <CreatePostModal onClose={() => setShowCreate(false)} />}
     </>
   )
 }
