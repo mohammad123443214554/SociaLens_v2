@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Heart, MessageCircle, Volume2, VolumeX, Share2, X, Repeat2, MoreVertical, Flag, EyeOff, Check } from 'lucide-react'
+import { Heart, MessageCircle, Volume2, VolumeX, Share2, X, Repeat2, MoreVertical, Flag, EyeOff, Check, FileVideo, Users } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ShareModal } from '@/components/shared/ShareModal'
 import { PostCaption } from '@/components/shared/PostCaption'
@@ -42,6 +42,12 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   const [showShare, setShowShare] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const [showReposters, setShowReposters] = useState(false)
+  const [reposters, setReposters] = useState<Array<{ id: string; username: string; avatar_url: string | null; is_verified?: boolean; verification_type?: 'blue' | 'yellow' | null; created_at?: string }>>([])
+  const [loadingReposters, setLoadingReposters] = useState(false)
+  const [repostersError, setRepostersError] = useState('')
+  const [reelThumbnail, setReelThumbnail] = useState('')
+  const thumbnailAttemptedRef = useRef(false)
   const [markedNotInterested, setMarkedNotInterested] = useState(false)
   const [progress, setProgress] = useState(0) // 0-100
   const [seeking, setSeeking] = useState(false)
@@ -233,6 +239,44 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
     toggleRepost.mutate({ postId: post.id, userId: user.id, postOwnerId: post.user_id, repost: !isReposted })
   }
 
+  const captureReelThumbnail = () => {
+    const video = videoRef.current
+    if (thumbnailAttemptedRef.current || !video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return
+    thumbnailAttemptedRef.current = true
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = 160
+      canvas.height = Math.max(1, Math.round(160 * video.videoHeight / video.videoWidth))
+      const context = canvas.getContext('2d')
+      if (!context) return
+      context.drawImage(video, 0, 0, canvas.width, canvas.height)
+      setReelThumbnail(canvas.toDataURL('image/jpeg', 0.72))
+    } catch {
+      // Cross-origin video sources may disallow snapshots; the icon fallback remains usable.
+    }
+  }
+
+  const openReposters = async () => {
+    setShowReposters(true)
+    setLoadingReposters(true)
+    setRepostersError('')
+    try {
+      const { data, error } = await supabase
+        .from('reposts')
+        .select('created_at, profiles!reposts_user_id_fkey(id,username,avatar_url,is_verified,verification_type)')
+        .eq('post_id', post.id)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      const rows = (data ?? []) as Array<{ created_at: string; profiles: { id: string; username: string; avatar_url: string | null; is_verified?: boolean; verification_type?: 'blue' | 'yellow' | null } | null }>
+      setReposters(rows.filter(row => row.profiles).map(row => ({ ...row.profiles!, created_at: row.created_at })))
+    } catch (error) {
+      console.error('Unable to load reel reposters', error)
+      setRepostersError('Could not load reposts right now. Please try again.')
+    } finally {
+      setLoadingReposters(false)
+    }
+  }
+
   const openComments = () => {
     setShowComments(true)
   }
@@ -247,7 +291,8 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
         poster={BLANK_VIDEO_POSTER}
         preload={shouldLoad ? 'auto' : 'none'}
         onClick={handleTap}
-        onTimeUpdate={handleTimeUpdate}
+        onLoadedData={captureReelThumbnail}
+         onTimeUpdate={() => { captureReelThumbnail(); handleTimeUpdate() }}
         onError={handleVideoError}
         className="absolute inset-0 w-full h-full object-contain bg-black" />
 
@@ -374,9 +419,58 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
         )}
       </div>
 
-      {/* "X reposted" badge - shows every follower who reposted this reel,
-          stacked neatly instead of collapsing down to just one name. */}
+      <button
+        type="button"
+        onClick={(event) => { event.stopPropagation(); void openReposters() }}
+        aria-label="See who reposted this reel"
+        title="Who reposted this reel"
+        className="absolute bottom-5 right-3 z-20 flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-white/80 bg-black/70 shadow-lg"
+      >
+        {reelThumbnail ? <img src={reelThumbnail} alt="" className="h-full w-full object-cover" /> : <FileVideo className="h-5 w-5 text-white" />}
+        <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-purple-600 ring-1 ring-black">
+          <Users className="h-2.5 w-2.5 text-white" />
+        </span>
+      </button>
+
       <RepostBadge reposters={post.reposted_by ?? []} variant="overlay" />
+
+      {showReposters && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setShowReposters(false)}>
+          <section role="dialog" aria-modal="true" aria-label="People who reposted this reel" className="flex max-h-[70%] w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-white/10 bg-card text-card-foreground shadow-2xl" onClick={event => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div>
+                <h2 className="font-semibold">Reposted by</h2>
+                <p className="text-xs text-muted-foreground">{loadingReposters ? 'Loading people…' : reposters.length + ' ' + (reposters.length === 1 ? 'person' : 'people')}</p>
+              </div>
+              <button type="button" onClick={() => setShowReposters(false)} aria-label="Close repost list" className="rounded-full p-2 hover:bg-accent"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="min-h-24 overflow-y-auto p-2">
+              {loadingReposters ? (
+                <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground"><span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" /> Loading reposts…</div>
+              ) : repostersError ? (
+                <div className="space-y-3 px-3 py-6 text-center text-sm">
+                  <p className="text-red-500">{repostersError}</p>
+                  <button type="button" onClick={() => void openReposters()} className="rounded-lg border border-border px-3 py-2 font-medium hover:bg-accent">Try again</button>
+                </div>
+              ) : reposters.length === 0 ? (
+                <p className="px-3 py-8 text-center text-sm text-muted-foreground">No one has reposted this reel yet.</p>
+              ) : reposters.map(reposter => (
+                <Link key={reposter.id} href={'/profile/' + reposter.username} onClick={() => setShowReposters(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-accent">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={getAvatarUrl(reposter.avatar_url)} />
+                    <AvatarFallback>{reposter.username?.[0]?.toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-1 truncate text-sm font-semibold">@{reposter.username}{reposter.is_verified && <VerifiedBadge type={reposter.verification_type} className="text-xs" />}</p>
+                    <p className="text-xs text-muted-foreground">Reposted this reel</p>
+                  </div>
+                  {reposter.created_at && <span className="shrink-0 text-[10px] text-muted-foreground">{new Date(reposter.created_at).toLocaleDateString()}</span>}
+                </Link>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* Bottom info */}
       <div className="absolute bottom-6 left-3 right-16 z-10">
@@ -402,12 +496,14 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
             buttonClassName="text-white/70 text-xs hover:underline font-medium drop-shadow"
           />
         )}
-        <div className="flex items-center gap-2 mt-2">
-          <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center">
-            <span className="text-[8px] text-white">♪</span>
+        {!post.reposted_by?.length && (
+          <div className="flex items-center gap-2 mt-2">
+            <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center">
+              <FileVideo className="h-2.5 w-2.5 text-white" />
+            </div>
+            <p className="text-white/70 text-xs">Original Content</p>
           </div>
-          <p className="text-white/70 text-xs">Original Audio</p>
-        </div>
+        )}
       </div>
 
       {/* Comments Panel */}
