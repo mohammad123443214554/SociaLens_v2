@@ -3,7 +3,6 @@ const OFFLINE_URL = '/offline'
 
 const PRECACHE = [
   '/',
-  '/feed',
   '/offline',
   '/manifest.json',
   '/icons/icon-192x192.png',
@@ -46,16 +45,47 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return
   if (url.origin !== location.origin) return
 
+  // Never cache authenticated HTML pages, API responses, or arbitrary GETs.
+  // Caching /feed can preserve a stale redirect/error page and make the app
+  // appear broken on a later visit. Pages should always try the network first.
+  if (e.request.mode === 'navigate' || e.request.destination === 'document') {
+    e.respondWith(
+      fetch(e.request, { cache: 'no-store' }).catch(async () => {
+        const offlinePage = await caches.match(OFFLINE_URL)
+        if (offlinePage) return offlinePage
+        return new Response(
+          '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SociaLens is offline</title><body style="font-family:system-ui,sans-serif;padding:2rem;max-width:34rem;margin:10vh auto;color:#222"><h1>You appear to be offline</h1><p>SociaLens could not load this page. Check your internet connection and try again.</p><button onclick="location.reload()">Try again</button></body></html>',
+          { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } }
+        )
+      })
+    )
+    return
+  }
+
+  // Only cache same-origin static assets, never API responses or dynamic data.
+  const isStaticAsset =
+    e.request.destination === 'image' ||
+    e.request.destination === 'style' ||
+    e.request.destination === 'script' ||
+    e.request.destination === 'font' ||
+    url.pathname.startsWith('/_next/static/') ||
+    url.pathname.startsWith('/icons/')
+
+  if (!isStaticAsset) return
+
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        const clone = res.clone()
-        caches.open(CACHE_NAME).then(c => c.put(e.request, clone))
+        if (res.ok && res.type === 'basic') {
+          const clone = res.clone()
+          caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone)).catch(() => {})
+        }
         return res
       })
-      .catch(() => caches.match(e.request)
-        .then(cached => cached || caches.match(OFFLINE_URL))
-      )
+      .catch(async () => {
+        const cached = await caches.match(e.request)
+        return cached || Response.error()
+      })
   )
 })
 
