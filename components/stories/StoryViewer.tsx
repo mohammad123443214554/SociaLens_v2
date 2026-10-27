@@ -902,9 +902,9 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
         {/* Likers panel (owner only) */}
         {showLikers && (
-          <div className="absolute inset-0 z-40 flex flex-col justify-end">
+          <div className="absolute inset-0 z-40 flex flex-col justify-end sm:justify-center sm:px-4">
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowLikers(false)} />
-            <div className="relative bg-card rounded-t-2xl max-h-[60%] flex flex-col text-foreground">
+            <div className="relative bg-card rounded-t-2xl sm:rounded-2xl max-h-[72%] sm:max-h-[min(76vh,680px)] sm:w-full sm:max-w-md sm:mx-auto flex flex-col text-foreground shadow-2xl">
               <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
                 <div><h3 className="font-bold text-base">Story likes</h3><p className="text-xs text-muted-foreground mt-0.5">{likeData?.count ?? likers.length} {(likeData?.count ?? likers.length) === 1 ? 'like' : 'likes'}</p></div>
                 <button onClick={() => setShowLikers(false)} className="p-1 rounded-full hover:bg-muted">
@@ -938,9 +938,9 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
         {/* Reactors panel (owner only) */}
         {showReactors && (
-          <div className="absolute inset-0 z-40 flex flex-col justify-end">
+          <div className="absolute inset-0 z-40 flex flex-col justify-end sm:justify-center sm:px-4">
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowReactors(false)} />
-            <div className="relative bg-card rounded-t-2xl max-h-[60%] flex flex-col text-foreground">
+            <div className="relative bg-card rounded-t-2xl sm:rounded-2xl max-h-[72%] sm:max-h-[min(76vh,680px)] sm:w-full sm:max-w-md sm:mx-auto flex flex-col text-foreground shadow-2xl">
               <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
                 <div><h3 className="font-bold text-base">Story reactions</h3><p className="text-xs text-muted-foreground mt-0.5">{reactors.length} {reactors.length === 1 ? 'reaction' : 'reactions'}</p></div>
                 <button onClick={() => setShowReactors(false)} className="p-1 rounded-full hover:bg-muted">
@@ -972,9 +972,9 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
         {/* Comments panel */}
         {showComments && (
-          <div className="absolute inset-0 z-40 flex flex-col justify-end">
+          <div className="absolute inset-0 z-40 flex flex-col justify-end sm:justify-center sm:px-4">
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowComments(false)} />
-            <div className="relative bg-card rounded-t-2xl max-h-[60%] flex flex-col text-foreground">
+            <div className="relative bg-card rounded-t-2xl sm:rounded-2xl max-h-[72%] sm:max-h-[min(76vh,680px)] sm:w-full sm:max-w-md sm:mx-auto flex flex-col text-foreground shadow-2xl">
               <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
                 <div><h3 className="font-bold text-base">Story comments</h3><p className="text-xs text-muted-foreground mt-0.5">{countThread(commentThread)} {countThread(commentThread) === 1 ? 'comment' : 'comments'}</p></div>
                 <button onClick={() => setShowComments(false)} className="p-1 rounded-full hover:bg-muted">
