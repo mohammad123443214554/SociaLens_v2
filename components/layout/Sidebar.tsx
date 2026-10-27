@@ -9,14 +9,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 
-// CreatePostModal pulls in image compression, video-duration checking,
-// and the Aperonix AI caption/hashtag UI - genuinely heavy, and this
-// component (the sidebar) renders on every single page. Loading it only
-// when someone actually taps "Create Post" instead of bundling it into
-// every page's initial JS is what actually shrinks Feed/Reels/Explore's
-// first load.
-const CreatePostModal = dynamic(() => import('@/components/shared/CreatePostModal').then(m => m.CreatePostModal), { ssr: false })
-
 const navItems = [
   { href: '/feed', icon: Home, label: 'Home' },
   { href: '/explore', icon: Search, label: 'Explore' },
