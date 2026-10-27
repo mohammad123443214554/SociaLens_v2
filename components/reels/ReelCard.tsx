@@ -267,8 +267,13 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
         .eq('post_id', post.id)
         .order('created_at', { ascending: false })
       if (error) throw error
-      const rows = (data ?? []) as Array<{ created_at: string; profiles: { id: string; username: string; avatar_url: string | null; is_verified?: boolean; verification_type?: 'blue' | 'yellow' | null } | null }>
-      setReposters(rows.filter(row => row.profiles).map(row => ({ ...row.profiles!, created_at: row.created_at })))
+      // Supabase can return the joined profile relation as an array for this relationship.
+      // Normalize it before building the UI list instead of asserting it is a single object.
+      const rows = (data ?? []) as Array<{
+        created_at: string
+        profiles: Array<{ id: string; username: string; avatar_url: string | null; is_verified?: boolean; verification_type?: 'blue' | 'yellow' | null }> | null
+      }>
+      setReposters(rows.flatMap(row => (row.profiles ?? []).map(profile => ({ ...profile, created_at: row.created_at }))))
     } catch (error) {
       console.error('Unable to load reel reposters', error)
       setRepostersError('Could not load reposts right now. Please try again.')
