@@ -265,9 +265,14 @@ export default function CreateEditorPage() {
         const { error: oldMediaDeleteError } = await supabase.storage.from('create-drafts').remove([previousMediaPath])
         if (oldMediaDeleteError) console.warn('Replaced draft media cleanup failed', oldMediaDeleteError)
       }
-      const { data: signed } = await supabase.storage.from('create-drafts').createSignedUrl(path, 3600)
-      URL.revokeObjectURL(localPreviewUrl)
-      if (signed?.signedUrl) setPreviewUrl(signed.signedUrl)
+      const { data: signed, error: signedError } = await supabase.storage.from('create-drafts').createSignedUrl(path, 3600)
+      if (signed?.signedUrl) {
+        URL.revokeObjectURL(localPreviewUrl)
+        setPreviewUrl(signed.signedUrl)
+      } else if (signedError) {
+        setError('Media uploaded and saved, but its preview could not be refreshed. Reopen the draft to reload it.')
+        setPreviewUrl(localPreviewUrl)
+      }
     } catch (err) {
       console.error('Draft media upload failed', err)
       setError('Media upload failed. Please try again. Your previous saved media is unchanged.')
