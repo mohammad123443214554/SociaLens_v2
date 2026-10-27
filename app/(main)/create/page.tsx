@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ImagePlus, Film, FileText, Loader2, Save, Trash2, Upload, X, Play, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, ImagePlus, Film, FileText, Loader2, Save, Trash2, Upload, X, Play, Image as ImageIcon, Sparkles, Hash } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { useQueryClient } from '@tanstack/react-query'
@@ -48,6 +48,44 @@ function buildPostContent(title: string, caption: string, hashtags: string) {
   return parts.join('\n\n')
 }
 
+const MAX_AI_MEDIA_BYTES = 3.5 * 1024 * 1024
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '')
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+async function sampleVideoFrames(file: File, maxFrames = 6): Promise<string[]> {
+  const video = document.createElement('video')
+  const objectUrl = URL.createObjectURL(file)
+  video.preload = 'metadata'; video.muted = true; video.playsInline = true; video.src = objectUrl
+  try {
+    await new Promise<void>((resolve, reject) => { video.onloadedmetadata = () => resolve(); video.onerror = () => reject(new Error('This video could not be read in your browser.')) })
+    const duration = Number.isFinite(video.duration) ? video.duration : 0
+    if (!duration) throw new Error('This video has no readable duration.')
+    const count = Math.min(maxFrames, Math.max(1, Math.ceil(duration / 8)))
+    const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Video frame extraction is not supported by this browser.')
+    const frames: string[] = []
+    for (let i = 0; i < count; i++) {
+      const time = count === 1 ? duration / 2 : duration * (0.06 + 0.88 * (i / (count - 1)))
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = () => { video.removeEventListener('seeked', onSeeked); video.removeEventListener('error', onError) }
+        const onSeeked = () => { cleanup(); resolve() }; const onError = () => { cleanup(); reject(new Error('Could not read a frame from this video.')) }
+        video.addEventListener('seeked', onSeeked, { once: true }); video.addEventListener('error', onError, { once: true })
+        video.currentTime = Math.min(time, Math.max(0, duration - 0.05))
+      })
+      const scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight))
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale)); canvas.height = Math.max(1, Math.round(video.videoHeight * scale))
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height); frames.push(canvas.toDataURL('image/jpeg', 0.58).split(',')[1])
+    }
+    return frames
+  } finally { video.pause(); video.removeAttribute('src'); video.load(); URL.revokeObjectURL(objectUrl) }
+}
 export default function CreateEditorPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -81,6 +119,8 @@ export default function CreateEditorPage() {
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
   const [showRestriction, setShowRestriction] = useState(false)
+  const [generating, setGenerating] = useState<Record<'title' | 'caption' | 'hashtags', boolean>>({ title: false, caption: false, hashtags: false })
+  const [generated, setGenerated] = useState<Record<'title' | 'caption' | 'hashtags', boolean>>({ title: false, caption: false, hashtags: false })
   const [loadingDraft, setLoadingDraft] = useState(true)
 
   useEffect(() => {
@@ -417,6 +457,29 @@ export default function CreateEditorPage() {
     }
   }
 
+  const generateField = async (field: 'title' | 'caption' | 'hashtags') => {
+    if (!mediaPath || !previewUrl || mediaType === 'none') { setError('Upload a photo or video first so Aperonix can understand your content.'); return }
+    setError(''); setGenerating(previous => ({ ...previous, [field]: true }))
+    try {
+      const response = await fetch(previewUrl)
+      if (!response.ok) throw new Error('Could not load your media for Aperonix. Please try again.')
+      const blob = await response.blob()
+      const mediaFile = new File([blob], mediaType === 'video' ? 'video.mp4' : 'photo.jpg', { type: blob.type || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg') })
+      if (mediaType === 'image' && mediaFile.size > MAX_AI_MEDIA_BYTES) throw new Error('This photo is too large for Aperonix to analyze. Please choose a smaller photo.')
+      const sampledImages = mediaType === 'video' ? await sampleVideoFrames(mediaFile, 6) : undefined
+      const mediaBase64 = mediaType === 'image' ? await fileToBase64(mediaFile) : undefined
+      const currentValue = field === 'title' ? title : field === 'caption' ? caption : hashtags
+      const apiField = field === 'caption' ? 'description' : field
+      const res = await fetch('/api/aperonix/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mediaBase64, mimeType: mediaBase64 ? mediaFile.type : undefined, sampledImages, mediaKind: mediaType, field: apiField, regenerate: generated[field], previousResult: generated[field] ? currentValue : undefined }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Aperonix could not generate this right now.')
+      if (field === 'title') setTitle(String(data.result).slice(0, 100))
+      else if (field === 'caption') setCaption(String(data.result).slice(0, 2200))
+      else setHashtags(String(data.result).split(/\s+/).map((tag: string) => tag.startsWith('#') ? tag : '#' + tag).join(' '))
+      setGenerated(previous => ({ ...previous, [field]: true }))
+    } catch (err) { console.error('Aperonix field generation failed', err); setError(err instanceof Error ? err.message : 'Aperonix could not generate this right now.') }
+    finally { setGenerating(previous => ({ ...previous, [field]: false })) }
+  }
   const saveLabel = saveState === 'loading' ? 'Loading drafts…' : saveState === 'saving' ? 'Saving…' : saveState === 'error' ? 'Save failed' : 'Saved'
   const isVideo = mediaType === 'video'
 
@@ -433,13 +496,13 @@ export default function CreateEditorPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className={`flex items-center gap-1.5 text-xs ${saveState === 'error' ? 'text-red-500' : 'text-muted-foreground'}`}><Save className="h-3.5 w-3.5" />{saveLabel}</span>
-          <button type="button" onClick={() => setShowDrafts(true)} className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent">Drafts ({drafts.length})</button>
+          <button type="button" onClick={() => setShowDrafts(true)} className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent">Drafts</button>
           <button type="button" onClick={startNewDraft} className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent">New draft</button>
           <button type="button" onClick={publish} disabled={publishing || uploading || loadingDraft} className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60">{publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}{publishing ? 'Sharing…' : contentType === 'reel' ? 'Share Reel' : 'Share Post'}</button>
         </div>
       </div>
 
-      <div className="mb-4 flex rounded-xl border border-border bg-card p-1">
+      {mediaType === 'none' && <div className="mb-4 flex rounded-xl border border-border bg-card p-1">
         <button type="button" onClick={() => { setContentType('post'); setError('') }} className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${contentType === 'post' ? 'bg-accent text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><ImageIcon className="h-4 w-4" /> Post</button>
         <button type="button" onClick={() => { setContentType('reel'); if (mediaType === 'image') void removeMedia(); setError('') }} className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${contentType === 'reel' ? 'bg-accent text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><Film className="h-4 w-4" /> Reel</button>
       </div>
@@ -447,20 +510,20 @@ export default function CreateEditorPage() {
       {loadingDraft ? <div className="flex min-h-72 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> Restoring your draft…</div> : (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
           <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="font-semibold">Media</h2><p className="text-xs text-muted-foreground">{contentType === 'reel' ? 'Choose a video for your Reel' : 'Add a photo or video to your post'}</p></div><input ref={fileRef} type="file" accept={contentType === 'reel' ? 'video/*' : 'image/*,video/*'} className="hidden" onChange={handleFile} /><button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"><ImagePlus className="h-4 w-4" />{mediaPath ? 'Replace media' : 'Choose media'}</button></div>
+            <div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="font-semibold">Media</h2><p className="text-xs text-muted-foreground">{contentType === 'reel' ? 'Choose a video for your Reel' : 'Add a photo or video to your post'}</p></div><input ref={fileRef} type="file" accept={contentType === 'reel' ? 'video/*' : 'image/*,video/*'} className="hidden" onChange={handleFile} /><button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"><ImagePlus className="h-4 w-4" />{mediaPath ? (isVideo ? 'Replace video' : 'Replace photo') : 'Choose media'}</button></div>
             <div className="flex min-h-[300px] items-center justify-center bg-muted/35 p-4 sm:min-h-[430px]">
               {previewUrl ? (isVideo ? <video key={previewUrl} src={previewUrl} controls playsInline className="max-h-[65vh] max-w-full rounded-xl object-contain" /> : <img src={previewUrl} alt="Selected media preview" className="max-h-[65vh] max-w-full rounded-xl object-contain" />) : <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full max-w-sm flex-col items-center rounded-2xl border-2 border-dashed border-border px-6 py-12 text-center hover:border-pink-500/60 hover:bg-accent/40"><div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">{contentType === 'reel' ? <Film className="h-7 w-7" /> : <ImagePlus className="h-7 w-7" />}</div><span className="font-semibold">Add media</span><span className="mt-1 text-sm text-muted-foreground">{contentType === 'reel' ? 'MP4, WebM or QuickTime video' : 'Photo or video, up to 100 MB'}</span></button>}
             </div>
-            {mediaPath && <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{mediaName || 'Uploaded media'}</p><p className="text-xs text-muted-foreground">{formatBytes(mediaSize)} · Saved privately with this draft</p></div><button type="button" onClick={removeMedia} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" />Remove</button></div>}
+            {mediaPath && <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{isVideo ? 'Video uploaded' : 'Photo uploaded'}</p><p className="text-xs text-muted-foreground">{formatBytes(mediaSize)} · Saved privately with this draft</p></div><button type="button" onClick={removeMedia} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" />Remove</button></div>}
             {uploading && <div className="border-t border-border px-4 py-3"><div className="mb-1 flex justify-between text-xs text-muted-foreground"><span>Uploading media securely…</span><span>{uploadProgress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div>}
           </section>
 
           <section className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
             <div><h2 className="font-semibold">Details</h2><p className="text-xs text-muted-foreground">Your changes save automatically.</p></div>
-            <div><label htmlFor="create-title" className="mb-1.5 block text-sm font-medium">Title <span className="text-muted-foreground">(optional)</span></label><input id="create-title" value={title} onChange={e => setTitle(e.target.value)} maxLength={100} placeholder="Add a title…" className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" /><p className="mt-1 text-right text-xs text-muted-foreground">{title.length}/100</p></div>
-            <div><label htmlFor="create-caption" className="mb-1.5 block text-sm font-medium">Caption</label><textarea id="create-caption" value={caption} onChange={e => setCaption(e.target.value)} maxLength={2200} rows={7} placeholder="Write a caption, tell your story…" className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" /><p className="mt-1 text-right text-xs text-muted-foreground">{caption.length}/2200</p></div>
-            <div><label htmlFor="create-hashtags" className="mb-1.5 block text-sm font-medium">Hashtags</label><input id="create-hashtags" value={hashtags} onChange={e => setHashtags(e.target.value)} placeholder="#socialens #photography" className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" /><p className="mt-1 text-xs text-muted-foreground">Separate hashtags with spaces. The editor adds # when missing.</p></div>
-            <div className="rounded-xl border border-border bg-muted/30 p-3"><div className="mb-2 flex items-center gap-2 text-sm font-semibold"><FileText className="h-4 w-4" /> Preview</div>{previewUrl && <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">{isVideo ? <Play className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}{mediaName || (isVideo ? 'Video preview' : 'Photo preview')}</div>}<p className="whitespace-pre-wrap break-words text-sm font-semibold">{title}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm">{caption}</p><p className="mt-2 break-words text-sm text-pink-500">{hashtags.split(/\s+/).filter(Boolean).map(tag => tag.startsWith('#') ? tag : `#${tag}`).join(' ')}</p></div>
+            <div><label htmlFor="create-title" className="mb-1.5 block text-sm font-medium">Title</label><div className="relative"><input id="create-title" value={title} onChange={e => setTitle(e.target.value)} maxLength={100} placeholder="Add a title…" className="w-full rounded-lg border border-input bg-background px-3 py-2.5 pr-36 text-sm outline-none focus:ring-2 focus:ring-ring" /><button type="button" onClick={() => void generateField('title')} disabled={!mediaPath || generating.title || uploading || publishing} className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-xs font-semibold text-pink-500 hover:text-pink-400 disabled:opacity-50">{generating.title ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}{generating.title ? 'Generating…' : generated.title ? 'Regenerate with Aperonix' : 'Generate with Aperonix'}</button></div><p className="mt-1 text-right text-xs text-muted-foreground">{title.length}/100</p></div>
+            <div><div className="mb-1.5 flex items-center justify-between gap-2"><label htmlFor="create-caption" className="block text-sm font-medium">Caption</label><button type="button" onClick={() => void generateField('caption')} disabled={!mediaPath || generating.caption || uploading || publishing} className="inline-flex items-center gap-1 text-xs font-semibold text-pink-500 hover:text-pink-400 disabled:opacity-50">{generating.caption ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}{generating.caption ? 'Generating…' : generated.caption ? 'Regenerate with Aperonix' : 'Generate with Aperonix'}</button></div><textarea id="create-caption" value={caption} onChange={e => setCaption(e.target.value)} maxLength={2200} rows={7} placeholder="Write a caption, tell your story…" className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" /><p className="mt-1 text-right text-xs text-muted-foreground">{caption.length}/2200</p></div>
+            <div><div className="mb-1.5 flex items-center justify-between gap-2"><label htmlFor="create-hashtags" className="block text-sm font-medium"><span className="inline-flex items-center gap-1"><Hash className="h-3.5 w-3.5" />Hashtags</span></label><button type="button" onClick={() => void generateField('hashtags')} disabled={!mediaPath || generating.hashtags || uploading || publishing} className="inline-flex items-center gap-1 text-xs font-semibold text-pink-500 hover:text-pink-400 disabled:opacity-50">{generating.hashtags ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}{generating.hashtags ? 'Generating…' : generated.hashtags ? 'Regenerate with Aperonix' : 'Generate with Aperonix'}</button></div><input id="create-hashtags" value={hashtags} onChange={e => setHashtags(e.target.value)} placeholder="#socialens #photography" className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" /><p className="mt-1 text-xs text-muted-foreground">Separate hashtags with spaces. The editor adds # when missing.</p></div>
+            <div className="rounded-xl border border-border bg-muted/30 p-3"><div className="mb-2 flex items-center gap-2 text-sm font-semibold"><FileText className="h-4 w-4" /> Preview</div><p className="whitespace-pre-wrap break-words text-sm font-semibold">{title}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm">{caption}</p><p className="mt-2 break-words text-sm text-pink-500">{hashtags.split(/\s+/).filter(Boolean).map(tag => tag.startsWith('#') ? tag : `#${tag}`).join(' ')}</p></div>
             {error && <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2.5 text-sm text-red-500">{error}</div>}
             {uploading || publishing ? <div className="space-y-1"><div className="flex justify-between text-xs text-muted-foreground"><span>{uploading ? 'Saving media…' : 'Publishing…'}</span><span>{uploadProgress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div> : null}
             <button type="button" onClick={publish} disabled={publishing || uploading || loadingDraft} className="w-full rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60">{publishing ? 'Publishing…' : contentType === 'reel' ? 'Share Reel' : 'Share Post'}</button>
