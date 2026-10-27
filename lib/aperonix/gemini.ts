@@ -165,6 +165,7 @@ export async function callGemini(
   const perAttemptTimeoutMs = 12_000
   let data: any = null
   let lastError: any = null
+  let sawTimeout = false
 
   outer:
   for (const key of keysToTry) {
@@ -184,6 +185,7 @@ export async function callGemini(
         break outer
       } catch (err: any) {
         lastError = err
+        if (err?.code === 'APERONIX_TIMEOUT' || err?.name === 'AbortError' || err?.name === 'TimeoutError') sawTimeout = true
         // A timeout means this model is too slow for a responsive editor.
         // Move to the next candidate/key rather than retrying the same request.
         console.error(`Aperonix: Gemini request failed for role "${role}" and model "${model}" (status ${err?.status ?? err?.code ?? 'unknown'}); trying the next available candidate.`)
@@ -192,7 +194,7 @@ export async function callGemini(
   }
 
   if (!data) {
-    if (Date.now() >= deadline || lastError?.code === 'APERONIX_TIMEOUT') {
+    if (Date.now() >= deadline || sawTimeout || lastError?.code === 'APERONIX_TIMEOUT') {
       const timeoutError: any = new Error('Aperonix generation timed out')
       timeoutError.code = 'APERONIX_TIMEOUT'
       throw timeoutError
