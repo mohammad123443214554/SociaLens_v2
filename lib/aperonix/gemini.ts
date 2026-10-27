@@ -179,7 +179,7 @@ export async function callGemini(
           systemPrompt,
           contents,
           Math.min(perAttemptTimeoutMs, remainingMs),
-          role === 'generate' ? 256 : 8192,
+          role === 'generate' ? 512 : 8192,
           tools
         )
         break outer
