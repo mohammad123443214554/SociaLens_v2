@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { X, Music, MoreVertical, Heart, MessageCircle, Send, EyeOff, Trash2, Loader2, Eye, Flag, ExternalLink } from 'lucide-react'
+import { X, Music, MoreVertical, Heart, MessageCircle, Send, EyeOff, Trash2, Loader2, Eye, Flag, ExternalLink, Pause, Play } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getAvatarUrl, formatTimeAgo, cn } from '@/lib/utils/helpers'
 import { useDeleteStory, useStoryMentions } from '@/lib/hooks/useStories'
@@ -85,6 +85,9 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   const [storyIndex, setStoryIndex] = useState(startStoryIndex)
   const [deletedStoryIds, setDeletedStoryIds] = useState<string[]>([])
   const [progress, setProgress] = useState(0)
+  const [isPlaybackPaused, setIsPlaybackPaused] = useState(false)
+  const activeProgressTrackRef = useRef<HTMLDivElement>(null)
+  const isSeekingProgressRef = useRef(false)
   const [snapDropEditing, setSnapDropEditing] = useState(false)
   const [emojiSliderInteracting, setEmojiSliderInteracting] = useState(false)
   const progressRef = useRef(0)
@@ -162,7 +165,7 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
 
   // Anything that opens a panel or has the person actively typing pauses
   // the auto-advance timer/video, same as Instagram.
-  const paused = snapDropEditing || emojiSliderInteracting || isAddingToMyStory || showMenu || showHideViewers || showDeleteConfirm || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0 || !!originalStoryToOpen
+  const paused = isPlaybackPaused || snapDropEditing || emojiSliderInteracting || isAddingToMyStory || showMenu || showHideViewers || showDeleteConfirm || showComments || showReactionBar || showViews || showLikers || showReactors || messageText.length > 0 || !!originalStoryToOpen
   const pausedRef = useRef(paused)
   useEffect(() => { pausedRef.current = paused }, [paused])
 
@@ -241,6 +244,8 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   // clock instead of the bar jumping ahead once resumed.
   useEffect(() => {
     setProgress(0)
+    progressRef.current = 0
+    setIsPlaybackPaused(false)
     if (timerRef.current) clearInterval(timerRef.current)
     if (!story || story.story_type === 'video') return
 
@@ -251,8 +256,13 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
       const now = Date.now()
       const delta = now - last
       last = now
+      if (isSeekingProgressRef.current) {
+        elapsed = (progressRef.current / 100) * durationMs
+        isSeekingProgressRef.current = false
+      }
       if (!pausedRef.current) elapsed += delta
       const pct = Math.min(100, (elapsed / durationMs) * 100)
+      progressRef.current = pct
       setProgress(pct)
       if (pct >= 100) {
         if (timerRef.current) clearInterval(timerRef.current)
@@ -300,7 +310,9 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
       }
       const elapsedInClip = Math.max(0, Math.min(scene?.duration ?? trimEnd - trimStart, video.currentTime - trimStart))
       const total = story.duration_seconds || video.duration || 1
-      setProgress(Math.min(100, ((priorDuration + elapsedInClip) / total) * 100))
+      const nextProgress = Math.min(100, ((priorDuration + elapsedInClip) / total) * 100)
+      progressRef.current = nextProgress
+      setProgress(nextProgress)
       if (video.currentTime >= trimEnd - 0.05) advance()
     }
     const onEnded = () => advance()
@@ -316,6 +328,45 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupIndex, storyIndex, videoSceneIndex, story?.id])
+
+  // Seek within the current story, including multi-scene video stories.
+  const seekStoryProgress = (clientX: number) => {
+    const track = activeProgressTrackRef.current
+    if (!track || !story) return
+    const rect = track.getBoundingClientRect()
+    if (!rect.width) return
+    const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    const nextProgress = fraction * 100
+    progressRef.current = nextProgress
+    setProgress(nextProgress)
+
+    if (story.story_type !== 'video') {
+      isSeekingProgressRef.current = true
+      return
+    }
+
+    const scenes = story.video_scenes
+    const totalDuration = story.duration_seconds || videoRef.current?.duration || 1
+    let remaining = fraction * totalDuration
+    let targetIndex = 0
+    if (scenes?.length) {
+      for (let i = 0; i < scenes.length; i += 1) {
+        if (remaining <= scenes[i].duration || i === scenes.length - 1) {
+          targetIndex = i
+          break
+        }
+        remaining -= scenes[i].duration
+      }
+      const targetScene = scenes[targetIndex]
+      const targetTime = Math.max(0, (targetScene?.trimStart ?? 0) + remaining)
+      if (targetIndex !== videoSceneIndex) setVideoSceneIndex(targetIndex)
+      requestAnimationFrame(() => {
+        if (videoRef.current) videoRef.current.currentTime = targetTime
+      })
+    } else if (videoRef.current) {
+      videoRef.current.currentTime = fraction * totalDuration
+    }
+  }
 
   // Pause/resume the video element itself when a panel opens/closes or the
   // person starts typing.
@@ -537,19 +588,52 @@ export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, curr
   return (
     <div className="fixed inset-0 bg-background text-foreground z-[100] flex items-center justify-center">
       <div className="relative w-full h-full sm:max-w-sm sm:h-[90vh] sm:rounded-2xl overflow-hidden bg-black">
-        {/* Progress bars */}
-        <div className="absolute top-2 left-2 right-2 z-20 flex gap-1">
-          {group.stories.map((_, i) => (
-            <div key={i} className="flex-1 h-1 bg-white/30 rounded-full overflow-hidden">
+        {/* Story progress, seeking and playback controls */}
+        <div className="absolute top-2 left-2 right-2 z-[95] flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 gap-1">
+            {group.stories.map((_, i) => (
               <div
-                className="h-full bg-white rounded-full"
-                style={{
-                  width: i < storyIndex ? '100%' : i === storyIndex ? `${progress}%` : '0%',
-                  transition: i === storyIndex ? 'width 50ms linear' : undefined,
-                }}
-              />
-            </div>
-          ))}
+                key={i}
+                ref={i === storyIndex ? activeProgressTrackRef : undefined}
+                className={`relative flex-1 h-1.5 rounded-full bg-white/35 ${i === storyIndex ? 'cursor-pointer touch-none' : 'overflow-hidden'}`}
+                onPointerDown={i === storyIndex ? event => {
+                  event.preventDefault()
+                  isSeekingProgressRef.current = true
+                  event.currentTarget.setPointerCapture(event.pointerId)
+                  seekStoryProgress(event.clientX)
+                } : undefined}
+                onPointerMove={i === storyIndex ? event => {
+                  if (isSeekingProgressRef.current && event.buttons === 1) seekStoryProgress(event.clientX)
+                } : undefined}
+                onPointerUp={i === storyIndex ? event => {
+                  if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+                } : undefined}
+                role={i === storyIndex ? 'slider' : undefined}
+                aria-label={i === storyIndex ? 'Seek story progress' : undefined}
+                aria-valuemin={i === storyIndex ? 0 : undefined}
+                aria-valuemax={i === storyIndex ? 100 : undefined}
+                aria-valuenow={i === storyIndex ? Math.round(progress) : undefined}
+                tabIndex={i === storyIndex ? 0 : undefined}
+              >
+                <div
+                  className="h-full rounded-full bg-white"
+                  style={{
+                    width: i < storyIndex ? '100%' : i === storyIndex ? `${progress}%` : '0%',
+                    transition: i === storyIndex ? 'width 50ms linear' : undefined,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsPlaybackPaused(value => !value)}
+            aria-label={isPlaybackPaused ? 'Play story' : 'Pause story'}
+            title={isPlaybackPaused ? 'Play story' : 'Pause story'}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/55 text-white hover:bg-black/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            {isPlaybackPaused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4" />}
+          </button>
         </div>
 
         {/* Header */}
