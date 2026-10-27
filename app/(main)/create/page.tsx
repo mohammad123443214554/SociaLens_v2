@@ -505,7 +505,7 @@ export default function CreateEditorPage() {
       {mediaType === 'none' && <div className="mb-4 flex rounded-xl border border-border bg-card p-1">
         <button type="button" onClick={() => { setContentType('post'); setError('') }} className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${contentType === 'post' ? 'bg-accent text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><ImageIcon className="h-4 w-4" /> Post</button>
         <button type="button" onClick={() => { setContentType('reel'); if (mediaType === 'image') void removeMedia(); setError('') }} className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${contentType === 'reel' ? 'bg-accent text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><Film className="h-4 w-4" /> Reel</button>
-      </div>
+      </div>}
 
       {loadingDraft ? <div className="flex min-h-72 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> Restoring your draft…</div> : (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
