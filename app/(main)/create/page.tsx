@@ -26,6 +26,8 @@ type Draft = {
   media_path: string | null
   media_name: string | null
   media_size: number | null
+  cover_time: number | null
+  cover_path: string | null
   status: 'draft' | 'publishing'
   created_at: string
   updated_at: string
@@ -94,8 +96,10 @@ export default function CreateEditorPage() {
   const db = supabase as any
   const queryClient = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
+  const coverFileRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const draftIdRef = useRef<string | null>(null)
-  const dataRef = useRef({ contentType: 'post' as ContentType, title: '', caption: '', hashtags: '', mediaType: 'none' as MediaType, mediaPath: null as string | null, mediaName: null as string | null, mediaSize: null as number | null })
+  const dataRef = useRef({ contentType: 'post' as ContentType, title: '', caption: '', hashtags: '', mediaType: 'none' as MediaType, mediaPath: null as string | null, mediaName: null as string | null, mediaSize: null as number | null, coverTime: 0, coverPath: null as string | null })
   const revisionRef = useRef(0)
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const uploadingRef = useRef(false)
@@ -109,6 +113,12 @@ export default function CreateEditorPage() {
   const [mediaPath, setMediaPath] = useState<string | null>(null)
   const [mediaName, setMediaName] = useState<string | null>(null)
   const [mediaSize, setMediaSize] = useState<number | null>(null)
+  const [videoDuration, setVideoDuration] = useState(0)
+  const [coverTime, setCoverTime] = useState(0)
+  const [coverPath, setCoverPath] = useState<string | null>(null)
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null)
+  const [pendingDeleteDraft, setPendingDeleteDraft] = useState<Draft | null>(null)
+  const [deletingDraft, setDeletingDraft] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [draftId, setDraftId] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Draft[]>([])
@@ -124,9 +134,9 @@ export default function CreateEditorPage() {
   const [loadingDraft, setLoadingDraft] = useState(true)
 
   useEffect(() => {
-    dataRef.current = { contentType, title, caption, hashtags, mediaType, mediaPath, mediaName, mediaSize }
+    dataRef.current = { contentType, title, caption, hashtags, mediaType, mediaPath, mediaName, mediaSize, coverTime, coverPath }
     revisionRef.current += 1
-  }, [contentType, title, caption, hashtags, mediaType, mediaPath, mediaName, mediaSize])
+  }, [contentType, title, caption, hashtags, mediaType, mediaPath, mediaName, mediaSize, coverTime, coverPath])
 
   const applyDraft = useCallback(async (draft: Draft) => {
     await saveQueueRef.current
@@ -140,12 +150,20 @@ export default function CreateEditorPage() {
     setMediaPath(draft.media_path || null)
     setMediaName(draft.media_name || null)
     setMediaSize(draft.media_size ?? null)
+    setCoverTime(draft.cover_time ?? 0)
+    setCoverPath(draft.cover_path || null)
+    setCoverPreviewUrl(null)
+    setVideoDuration(0)
     setPreviewUrl(null)
     setError('')
     if (draft.media_path) {
       const { data, error: signedError } = await supabase.storage.from('create-drafts').createSignedUrl(draft.media_path, 3600)
       if (signedError) setError('Draft text was restored, but its media preview could not be loaded. Please reselect the file if needed.')
       else setPreviewUrl(data.signedUrl)
+    }
+    if (draft.cover_path) {
+      const { data } = await supabase.storage.from('create-drafts').createSignedUrl(draft.cover_path, 3600)
+      if (data?.signedUrl) setCoverPreviewUrl(data.signedUrl)
     }
     setSaveState('saved')
   }, [supabase])
@@ -204,6 +222,8 @@ export default function CreateEditorPage() {
         media_path: snapshot.mediaPath,
         media_name: snapshot.mediaName,
         media_size: snapshot.mediaSize,
+        cover_time: snapshot.coverTime,
+        cover_path: snapshot.coverPath,
         status: 'draft',
         updated_at: new Date().toISOString(),
       }
@@ -235,7 +255,7 @@ export default function CreateEditorPage() {
     if (loadingDraft || !user || uploading || publishing) return
     const timer = window.setTimeout(() => persistDraft(), 900)
     return () => window.clearTimeout(timer)
-  }, [contentType, title, caption, hashtags, mediaType, mediaPath, mediaName, mediaSize, loadingDraft, user, uploading, publishing, persistDraft])
+  }, [contentType, title, caption, hashtags, mediaType, mediaPath, mediaName, mediaSize, coverTime, coverPath, loadingDraft, user, uploading, publishing, persistDraft])
 
   const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -300,6 +320,10 @@ export default function CreateEditorPage() {
       setMediaName(file.name)
       setMediaSize(file.size)
       setMediaType(isVideo ? 'video' : 'image')
+      setVideoDuration(isVideo ? duration : 0)
+      setCoverTime(isVideo ? Math.min(0.2, Math.max(0, duration - 0.05)) : 0)
+      setCoverPath(null)
+      setCoverPreviewUrl(null)
       setUploadProgress(100)
       if (previousMediaPath && previousMediaPath !== path) {
         const { error: oldMediaDeleteError } = await supabase.storage.from('create-drafts').remove([previousMediaPath])
@@ -336,6 +360,10 @@ export default function CreateEditorPage() {
     setMediaName(null)
     setMediaSize(null)
     setMediaType('none')
+    setVideoDuration(0)
+    setCoverTime(0)
+    setCoverPath(null)
+    setCoverPreviewUrl(null)
   }
 
   const startNewDraft = async () => {
@@ -350,6 +378,10 @@ export default function CreateEditorPage() {
     setMediaPath(null)
     setMediaName(null)
     setMediaSize(null)
+    setVideoDuration(0)
+    setCoverTime(0)
+    setCoverPath(null)
+    setCoverPreviewUrl(null)
     setPreviewUrl(null)
     setError('')
     setSaveState('saved')
@@ -357,18 +389,24 @@ export default function CreateEditorPage() {
   }
 
   const deleteDraft = async (draft: Draft) => {
-    if (!window.confirm('Delete this draft? Published posts and their media will not be affected.')) return
+    if (deletingDraft) return
+    setDeletingDraft(true)
     const { error: deleteError } = await db.from('create_drafts').delete().eq('id', draft.id).eq('user_id', user?.id)
     if (deleteError) {
       setError('Could not delete this draft. Please try again.')
+      setDeletingDraft(false)
+      setPendingDeleteDraft(null)
       return
     }
-    if (draft.media_path) {
-      const { error: mediaDeleteError } = await supabase.storage.from('create-drafts').remove([draft.media_path])
+    const pathsToRemove = [draft.media_path, draft.cover_path].filter((path): path is string => Boolean(path))
+    if (pathsToRemove.length) {
+      const { error: mediaDeleteError } = await supabase.storage.from('create-drafts').remove(pathsToRemove)
       if (mediaDeleteError) console.warn('Draft media cleanup failed', mediaDeleteError)
     }
     setDrafts(previous => previous.filter(item => item.id !== draft.id))
     if (draftIdRef.current === draft.id) await startNewDraft()
+    setPendingDeleteDraft(null)
+    setDeletingDraft(false)
   }
 
   const publish = async () => {
@@ -400,6 +438,7 @@ export default function CreateEditorPage() {
     try {
       await saveQueueRef.current
       let publicMediaUrl: string | null = null
+      let publicCoverUrl: string | null = null
       if (mediaPath && mediaType !== 'none') {
         setUploadProgress(15)
         const { data: blob, error: downloadError } = await supabase.storage.from('create-drafts').download(mediaPath)
@@ -419,6 +458,35 @@ export default function CreateEditorPage() {
         uploadedFinalPath = finalPath
         publicMediaUrl = supabase.storage.from('posts').getPublicUrl(finalPath).data.publicUrl
       }
+      if (mediaType === 'video' && mediaPath && previewUrl && !coverPath && videoRef.current) {
+        const video = videoRef.current
+        const previousTime = video.currentTime
+        await new Promise<void>(resolve => {
+          const onSeeked = () => { video.removeEventListener('seeked', onSeeked); resolve() }
+          video.addEventListener('seeked', onSeeked, { once: true })
+          video.currentTime = Math.min(Math.max(0, coverTime), Math.max(0, video.duration - 0.05))
+        })
+        const canvas = document.createElement('canvas')
+        const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight))
+        canvas.width = Math.max(1, Math.round(video.videoWidth * scale)); canvas.height = Math.max(1, Math.round(video.videoHeight * scale))
+        const context = canvas.getContext('2d')
+        if (!context) throw new Error('Could not create a cover image from this video.')
+        context.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const coverBlob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not export the selected cover frame.')), 'image/jpeg', 0.88))
+        const coverUploadPath = `${user.id}/${crypto.randomUUID()}-cover.jpg`
+        const { error: coverUploadError } = await supabase.storage.from('posts').upload(coverUploadPath, coverBlob, { upsert: false, contentType: 'image/jpeg', cacheControl: LONG_CACHE_CONTROL })
+        if (coverUploadError) throw coverUploadError
+        uploadedFinalPath = uploadedFinalPath || coverUploadPath
+        publicCoverUrl = supabase.storage.from('posts').getPublicUrl(coverUploadPath).data.publicUrl
+        video.currentTime = previousTime
+      } else if (coverPath) {
+        const { data: coverBlob, error: coverDownloadError } = await supabase.storage.from('create-drafts').download(coverPath)
+        if (coverDownloadError || !coverBlob) throw coverDownloadError || new Error('Could not load your uploaded cover image.')
+        const coverUploadPath = `${user.id}/${crypto.randomUUID()}-cover.jpg`
+        const { error: coverUploadError } = await supabase.storage.from('posts').upload(coverUploadPath, coverBlob, { upsert: false, contentType: coverBlob.type || 'image/jpeg', cacheControl: LONG_CACHE_CONTROL })
+        if (coverUploadError) throw coverUploadError
+        publicCoverUrl = supabase.storage.from('posts').getPublicUrl(coverUploadPath).data.publicUrl
+      }
 
       setUploadProgress(75)
       const { data: createdPost, error: postError } = await supabase.from('posts').insert({
@@ -426,6 +494,7 @@ export default function CreateEditorPage() {
         content: postContent || null,
         media_url: publicMediaUrl,
         media_type: mediaType,
+        cover_url: publicCoverUrl,
       }).select('id').single()
       if (postError || !createdPost) throw postError || new Error('Publishing was not confirmed by the server.')
       postCreated = true
@@ -440,7 +509,8 @@ export default function CreateEditorPage() {
       if (draftIdRef.current) {
         await db.from('create_drafts').delete().eq('id', draftIdRef.current).eq('user_id', user.id)
       }
-      if (mediaPath) await supabase.storage.from('create-drafts').remove([mediaPath])
+      const draftFiles = [mediaPath, coverPath].filter((path): path is string => Boolean(path))
+      if (draftFiles.length) await supabase.storage.from('create-drafts').remove(draftFiles)
       router.push('/feed')
     } catch (err) {
       console.error('Post/Reel publishing failed', err)
@@ -509,10 +579,11 @@ export default function CreateEditorPage() {
       {loadingDraft ? <div className="flex min-h-72 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> Restoring your draft…</div> : (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
           <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="font-semibold">Media</h2><p className="text-xs text-muted-foreground">{contentType === 'reel' ? 'Choose a video for your Reel' : <><span className="sm:hidden">Add a photo or video</span><span className="hidden sm:inline">Add a photo or video to your post</span></>}</p></div><input ref={fileRef} type="file" accept={contentType === 'reel' ? 'video/*' : 'image/*,video/*'} className="hidden" onChange={handleFile} /><button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-2 text-xs font-medium hover:bg-accent disabled:opacity-50 sm:gap-2 sm:px-3 sm:text-sm"><ImagePlus className="h-4 w-4" />{mediaPath ? (isVideo ? 'Replace video' : 'Replace photo') : 'Choose media'}</button></div>
+            <div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="font-semibold">Media</h2><p className="text-xs text-muted-foreground">{contentType === 'reel' ? 'Choose a video for your Reel' : <><span className="sm:hidden">Add a photo or video</span><span className="hidden sm:inline">Add a photo or video to your post</span></>}</p></div><input ref={fileRef} type="file" accept={contentType === 'reel' ? 'video/*' : 'image/*,video/*'} className="hidden" onChange={handleFile} /><input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={async e => { const file = e.target.files?.[0]; e.target.value = ''; if (!file || !user || !file.type.startsWith('image/')) return; if (file.size > 15 * 1024 * 1024) { setError('Cover images must be 15 MB or smaller.'); return } try { setError(''); const path = `${user.id}/${draftIdRef.current || crypto.randomUUID()}/cover-${crypto.randomUUID()}.${file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg'}`; const { error: uploadError } = await supabase.storage.from('create-drafts').upload(path, file, { upsert: false, contentType: file.type, cacheControl: '3600' }); if (uploadError) throw uploadError; const oldPath = coverPath; setCoverPath(path); setCoverPreviewUrl(URL.createObjectURL(file)); if (oldPath) await supabase.storage.from('create-drafts').remove([oldPath]); } catch (err) { console.error('Cover upload failed', err); setError('Could not upload that cover image. Please try again.'); } }} /><button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-2 text-xs font-medium hover:bg-accent disabled:opacity-50 sm:gap-2 sm:px-3 sm:text-sm"><ImagePlus className="h-4 w-4" />{mediaPath ? (isVideo ? 'Replace video' : 'Replace photo') : 'Choose media'}</button></div>
             <div className="flex min-h-[300px] items-center justify-center bg-muted/35 p-4 sm:min-h-[430px]">
-              {previewUrl ? (isVideo ? <video key={previewUrl} src={previewUrl} controls playsInline className="max-h-[65vh] max-w-full rounded-xl object-contain" /> : <img src={previewUrl} alt="Selected media preview" className="max-h-[65vh] max-w-full rounded-xl object-contain" />) : <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full max-w-sm flex-col items-center rounded-2xl border-2 border-dashed border-border px-6 py-12 text-center hover:border-pink-500/60 hover:bg-accent/40"><div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">{contentType === 'reel' ? <Film className="h-7 w-7" /> : <ImagePlus className="h-7 w-7" />}</div><span className="font-semibold">Add media</span><span className="mt-1 text-sm text-muted-foreground">{contentType === 'reel' ? 'MP4, WebM or QuickTime video' : 'Photo or video, up to 100 MB'}</span></button>}
+              {previewUrl ? (isVideo ? <video ref={videoRef} key={previewUrl} src={previewUrl} controls playsInline onLoadedMetadata={e => setVideoDuration(Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0)} onSeeked={e => { if (!coverPath && e.currentTarget.videoWidth) { try { const v = e.currentTarget; const canvas = document.createElement('canvas'); const scale = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight)); canvas.width = Math.max(1, Math.round(v.videoWidth * scale)); canvas.height = Math.max(1, Math.round(v.videoHeight * scale)); canvas.getContext('2d')?.drawImage(v, 0, 0, canvas.width, canvas.height); setCoverPreviewUrl(canvas.toDataURL('image/jpeg', 0.75)) } catch { /* Browser may temporarily be unable to sample a frame. */ } } }} className="max-h-[65vh] max-w-full rounded-xl object-contain" /> : <img src={previewUrl} alt="Selected media preview" className="max-h-[65vh] max-w-full rounded-xl object-contain" />) : <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full max-w-sm flex-col items-center rounded-2xl border-2 border-dashed border-border px-6 py-12 text-center hover:border-pink-500/60 hover:bg-accent/40"><div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">{contentType === 'reel' ? <Film className="h-7 w-7" /> : <ImagePlus className="h-7 w-7" />}</div><span className="font-semibold">Add media</span><span className="mt-1 text-sm text-muted-foreground">{contentType === 'reel' ? 'MP4, WebM or QuickTime video' : 'Photo or video, up to 100 MB'}</span></button>}
             </div>
+            {mediaType === 'video' && previewUrl && <div className="space-y-3 border-t border-border px-4 py-4"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold">Choose video cover</p><p className="text-xs text-muted-foreground">Move along the timeline to choose a frame for Home and Explore.</p></div><button type="button" onClick={() => coverFileRef.current?.click()} disabled={uploading || publishing} className="shrink-0 rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-accent disabled:opacity-50"><Upload className="mr-1 inline h-3.5 w-3.5" />Upload cover</button></div><div className="grid grid-cols-[minmax(0,1fr)_96px] gap-3"><div className="min-w-0"><div className="relative h-12 overflow-hidden rounded-lg border border-border bg-muted"><div className="absolute inset-0 flex opacity-50">{Array.from({length: 12}, (_, i) => <div key={i} className="flex-1 border-r border-background/50 bg-gradient-to-b from-muted-foreground/25 to-muted-foreground/5" />)}</div><input aria-label="Select video cover frame" type="range" min={0} max={Math.max(0, videoDuration - 0.05)} step={0.1} value={Math.min(coverTime, Math.max(0, videoDuration - 0.05))} onChange={e => { const next = Number(e.target.value); setCoverTime(next); setCoverPath(null); const v = videoRef.current; if (v) v.currentTime = next }} className="absolute inset-0 h-full w-full cursor-pointer accent-pink-500" /></div><div className="mt-1 flex justify-between text-[10px] text-muted-foreground"><span>0:00</span><span>{Math.floor(coverTime / 60)}:{String(Math.floor(coverTime % 60)).padStart(2, '0')} selected</span><span>{Math.floor(videoDuration / 60)}:{String(Math.floor(videoDuration % 60)).padStart(2, '0')}</span></div></div><div className="flex h-[72px] items-center justify-center overflow-hidden rounded-lg border border-border bg-muted">{coverPreviewUrl ? <img src={coverPreviewUrl} alt="Selected video cover preview" className="h-full w-full object-cover" /> : <span className="px-2 text-center text-[10px] text-muted-foreground">Select a frame</span>}</div></div>{coverPath && <button type="button" onClick={async () => { if (coverPath) await supabase.storage.from('create-drafts').remove([coverPath]); setCoverPath(null); setCoverPreviewUrl(null) }} className="text-xs font-medium text-pink-500 hover:underline">Use a frame from video instead</button>}<p className="text-[11px] text-muted-foreground">The selected cover is saved with your draft and published with the video.</p></div>}
             {mediaPath && <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{isVideo ? 'Video uploaded' : 'Photo uploaded'}</p><p className="text-xs text-muted-foreground">{formatBytes(mediaSize)} · Saved privately with this draft</p></div><button type="button" onClick={removeMedia} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" />Remove</button></div>}
             {uploading && <div className="border-t border-border px-4 py-3"><div className="mb-1 flex justify-between text-xs text-muted-foreground"><span>Uploading media securely…</span><span>{uploadProgress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div>}
           </section>
@@ -531,7 +602,8 @@ export default function CreateEditorPage() {
         </div>
       )}
 
-      {showDrafts && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-3" onClick={() => setShowDrafts(false)}><div className="max-h-[85vh] w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl" onClick={e => e.stopPropagation()}><div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="font-bold">Your drafts</h2><p className="text-xs text-muted-foreground">Only you can access your unfinished work.</p></div><button type="button" onClick={() => setShowDrafts(false)} aria-label="Close drafts" className="rounded-full p-2 hover:bg-accent"><X className="h-4 w-4" /></button></div><div className="max-h-[65vh] space-y-2 overflow-y-auto p-3">{drafts.length ? drafts.map(draft => <div key={draft.id} className="flex items-center gap-3 rounded-xl border border-border p-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">{draft.content_type === 'reel' ? <Film className="h-5 w-5" /> : <ImageIcon className="h-5 w-5" />}</div><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{draft.content_type === 'reel' ? 'Reel draft' : 'Post draft'}</p><p className="truncate text-xs text-muted-foreground">{draft.title || draft.caption || draft.media_name || 'Untitled draft'}</p><p className="text-[11px] text-muted-foreground">Updated {new Date(draft.updated_at).toLocaleString()}</p></div><button type="button" onClick={async () => { await applyDraft(draft); setShowDrafts(false); router.replace(`/create?draft=${draft.id}`) }} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-accent">Continue</button><button type="button" onClick={() => void deleteDraft(draft)} aria-label="Delete draft" className="rounded-lg p-2 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"><Trash2 className="h-4 w-4" /></button></div>) : <p className="px-4 py-10 text-center text-sm text-muted-foreground">No saved drafts yet. Start writing and they’ll appear here.</p>}</div></div></div>}
+      {pendingDeleteDraft && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4" role="presentation" onClick={() => !deletingDraft && setPendingDeleteDraft(null)}><div role="alertdialog" aria-modal="true" aria-labelledby="delete-draft-title" aria-describedby="delete-draft-description" className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl" onClick={e => e.stopPropagation()}><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-red-500/10 text-red-500"><Trash2 className="h-5 w-5" /></div><h2 id="delete-draft-title" className="text-lg font-bold">Delete this draft?</h2><p id="delete-draft-description" className="mt-2 text-sm leading-relaxed text-muted-foreground">This will permanently delete this unfinished draft and its saved media. Published posts and their media will not be affected.</p><div className="mt-5 flex justify-end gap-2"><button type="button" disabled={deletingDraft} onClick={() => setPendingDeleteDraft(null)} className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold hover:bg-accent disabled:opacity-50">Cancel</button><button type="button" disabled={deletingDraft} onClick={() => void deleteDraft(pendingDeleteDraft)} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">{deletingDraft ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}{deletingDraft ? 'Deleting…' : 'Delete draft'}</button></div></div></div>}
+      {showDrafts && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-3" onClick={() => setShowDrafts(false)}><div className="max-h-[85vh] w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl" onClick={e => e.stopPropagation()}><div className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="font-bold">Your drafts</h2><p className="text-xs text-muted-foreground">Only you can access your unfinished work.</p></div><button type="button" onClick={() => setShowDrafts(false)} aria-label="Close drafts" className="rounded-full p-2 hover:bg-accent"><X className="h-4 w-4" /></button></div><div className="max-h-[65vh] space-y-2 overflow-y-auto p-3">{drafts.length ? drafts.map(draft => <div key={draft.id} className="flex items-center gap-3 rounded-xl border border-border p-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">{draft.content_type === 'reel' ? <Film className="h-5 w-5" /> : <ImageIcon className="h-5 w-5" />}</div><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{draft.content_type === 'reel' ? 'Reel draft' : 'Post draft'}</p><p className="truncate text-xs text-muted-foreground">{draft.title || draft.caption || draft.media_name || 'Untitled draft'}</p><p className="text-[11px] text-muted-foreground">Updated {new Date(draft.updated_at).toLocaleString()}</p></div><button type="button" onClick={async () => { await applyDraft(draft); setShowDrafts(false); router.replace(`/create?draft=${draft.id}`) }} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-accent">Continue</button><button type="button" onClick={() => setPendingDeleteDraft(draft)} aria-label="Delete draft" className="rounded-lg p-2 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"><Trash2 className="h-4 w-4" /></button></div>) : <p className="px-4 py-10 text-center text-sm text-muted-foreground">No saved drafts yet. Start writing and they’ll appear here.</p>}</div></div></div>}
     </div>
   )
 }
