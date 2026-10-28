@@ -64,11 +64,16 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
   const deleteForMe = async (story: StoryWithProfile) => {
     setActionError('')
     setNotice('')
-    const createdAt = mentionCreatedAt.get(story.id)
-    if (!createdAt) { setActionError('Could not find this story mention. Please refresh and try again.'); return }
-    const { error: deleteError } = await supabase.from('story_mentions').delete()
-      .eq('story_id', story.id).eq('creator_id', otherUserId).eq('mentioned_user_id', userId).eq('created_at', createdAt)
-    if (deleteError) { setActionError('Could not delete this mention for you. Please try again.'); return }
+    const { data: deleted, error: deleteError } = await supabase.rpc('delete_story_mention_for_me', {
+      p_story_id: story.id,
+      p_creator_id: otherUserId,
+    })
+    if (deleteError || deleted !== true) {
+      setActionError(deleteError?.message
+        ? 'Could not delete this mention for you. Please try again.'
+        : 'This story mention was not found or was already removed.')
+      return
+    }
     setStories(previous => previous.filter(item => item.id !== story.id))
     setOpenMenuStoryId(null)
     setNotice('Story mention deleted for you.')
