@@ -425,19 +425,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
     )
   }
 
-  if ((message as any).is_aperonix_reply) {
-    return (
-      <div className={cn('flex gap-2 mb-3', isOwn && 'flex-row-reverse')}>
-        <div>
-          <AperonixReplyMessage content={message.content} isOwn={isOwn} />
-          <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-muted-foreground' : 'text-muted-foreground')}>
-            {formatTimeAgo(message.created_at)}
-            {isOwn && (message.is_read ? ' · Seen' : ' · Sent')}
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const isAperonixReply = Boolean((message as any).is_aperonix_reply)
 
   return (
     <div className={cn('flex gap-1 mb-2 group items-center', isOwn && 'flex-row-reverse')}>
@@ -468,6 +456,14 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
               <button onClick={() => setEditing(false)} className="text-xs px-2.5 py-1 rounded-full text-muted-foreground hover:bg-muted">Cancel</button>
               <button onClick={handleSaveEdit} className="text-xs px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white font-medium">Save</button>
             </div>
+          </div>
+        ) : isAperonixReply ? (
+          <div>
+            <AperonixReplyMessage content={message.content} isOwn={isOwn} />
+            <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-muted-foreground' : 'text-muted-foreground')}>
+              {formatTimeAgo(message.created_at)}
+              {isOwn && (message.is_read ? ' · Seen' : ' · Sent')}
+            </p>
           </div>
         ) : (message as any).post_id ? (
           <div className="max-w-[240px]">
@@ -593,7 +589,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
             className="fixed z-40 bg-card border rounded-xl shadow-xl overflow-hidden"
             style={{ top: menuPos.top, left: menuPos.left, width: MENU_WIDTH }}
           >
-            {isOwn && !mediaType && !((message as any).sticker) && !((message as any).post_id) && !((message as any).story_id) && (
+            {isOwn && !isAperonixReply && !mediaType && !((message as any).sticker) && !((message as any).post_id) && !((message as any).story_id) && (
               <button onClick={() => { setShowMenu(false); setEditing(true) }} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </button>
@@ -687,6 +683,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
             sticker: (message as any).sticker ?? null,
             post_id: (message as any).post_id ?? null,
             story_id: (message as any).story_id ?? null,
+            is_aperonix_reply: isAperonixReply,
           }}
           onClose={() => setShowForward(false)}
         />
