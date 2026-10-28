@@ -279,7 +279,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
       }
 
       return (
-        <div className={cn('flex gap-1 mb-2 group items-center', isOwn && 'flex-row-reverse')}>
+        <div className={cn('flex w-full gap-1 mb-2 group items-center', isOwn && 'flex-row-reverse')}>
           <div className="flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
             <div className={cn(
               'flex items-center gap-2 px-3 py-2 rounded-2xl text-sm',
@@ -415,7 +415,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
 
   return (
     <div className={cn('flex gap-1 mb-2 group items-center', isOwn && 'flex-row-reverse')}>
-      <div className="max-w-[70%] flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
+      <div className="w-fit min-w-0 max-w-[70%] flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
         {replyPreview && (
           <div className="flex flex-col mb-1.5" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
             <p className="text-[11px] text-muted-foreground px-1 mb-1">
