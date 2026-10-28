@@ -316,7 +316,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b bg-muted/40">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold text-pink-500">Replying to</p>
-            <p className="text-xs text-muted-foreground truncate">{replyingTo.content || 'Attachment'}</p>
+            <p className="text-xs text-muted-foreground truncate">{(() => { try { const p = JSON.parse(replyingTo.content); if (p?.__sociaLensShare === 1) { const first = Array.isArray(p.messages) ? p.messages.find((m: { role?: string; content?: string }) => m.role === 'user' && m.content?.trim()) : null; return p.type === 'chat' ? [p.title || 'Aperonix chat', first?.content].filter(Boolean).join(' · ') : p.type === 'prompt' ? (p.prompt || 'Shared Aperonix prompt') : p.type === 'voice' ? (p.title || 'Aperonix voice conversation') : 'Shared Aperonix content'; } } catch {} return replyingTo.content || 'Attachment'; })()}</p>
           </div>
           <button onClick={onCancelReply} className="shrink-0 text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
