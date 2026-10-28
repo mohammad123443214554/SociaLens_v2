@@ -139,6 +139,7 @@ export interface ForwardableMessage {
   sticker?: string | null
   post_id?: string | null
   story_id?: string | null
+  is_aperonix_reply?: boolean
 }
 
 export function useForwardMessage() {
@@ -167,6 +168,7 @@ export function useForwardMessage() {
         sticker: message.sticker ?? null,
         post_id: message.post_id ?? null,
         story_id: message.story_id ?? null,
+        is_aperonix_reply: message.is_aperonix_reply ?? false,
         is_forwarded: true,
       }
 
