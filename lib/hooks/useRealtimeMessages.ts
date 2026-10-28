@@ -30,6 +30,10 @@ export function useRealtimeMessages(chatId: string, currentUserId: string) {
   const oldestLoadedAtRef = useRef<string | null>(null)
   const hasMoreOlderRef = useRef(false)
   const loadingOlderRef = useRef(false)
+  // A request already in flight can return a stale snapshot after a message
+  // was removed. Keep a session-level tombstone so polling/older-page results
+  // cannot accidentally put a locally removed message back into the timeline.
+  const hiddenMessageIdsRef = useRef(new Set<string>())
 
   useEffect(() => {
     if (!chatId) return
@@ -43,7 +47,7 @@ export function useRealtimeMessages(chatId: string, currentUserId: string) {
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE)
       if (!data) return
-      const ordered = [...data].reverse()
+      const ordered = [...data].reverse().filter((m) => !hiddenMessageIdsRef.current.has(m.id))
       setMessages(ordered)
       oldestLoadedAtRef.current = ordered[0]?.created_at ?? null
       hasMoreOlderRef.current = data.length === PAGE_SIZE
@@ -71,7 +75,9 @@ export function useRealtimeMessages(chatId: string, currentUserId: string) {
       if (!data) return
       setMessages((prev) => {
         const byId = new Map(prev.map((m) => [m.id, m]))
-        for (const m of data) byId.set(m.id, m as Message)
+        for (const m of data) {
+          if (!hiddenMessageIdsRef.current.has(m.id)) byId.set(m.id, m as Message)
+        }
         return Array.from(byId.values()).sort(
           (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         )
@@ -94,6 +100,7 @@ export function useRealtimeMessages(chatId: string, currentUserId: string) {
         },
         (payload) => {
           const incoming = payload.new as Message
+          if (hiddenMessageIdsRef.current.has(incoming.id)) return
           // Guards against showing the sender's own message twice - once
           // from the optimistic insert below, once from this realtime echo.
           setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]))
@@ -114,6 +121,7 @@ export function useRealtimeMessages(chatId: string, currentUserId: string) {
           // the SELECT policy enforces server-side.
           const iAmSender = updated.sender_id === currentUserId
           if ((updated.deleted_for_sender && iAmSender) || (updated.deleted_for_recipient && !iAmSender)) {
+            hiddenMessageIdsRef.current.add(updated.id)
             setMessages((prev) => prev.filter((m) => m.id !== updated.id))
             return
           }
@@ -189,7 +197,7 @@ export function useRealtimeMessages(chatId: string, currentUserId: string) {
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE)
       if (data && data.length > 0) {
-        const ordered = [...data].reverse()
+        const ordered = [...data].reverse().filter((m) => !hiddenMessageIdsRef.current.has(m.id))
         setMessages((prev) => {
           const existingIds = new Set(prev.map((m) => m.id))
           return [...ordered.filter((m) => !existingIds.has(m.id)), ...prev]
@@ -278,6 +286,7 @@ export function useRealtimeMessages(chatId: string, currentUserId: string) {
   // round-trip - the other participant still gets it live via the
   // subscription above.
   const removeMessageLocally = useCallback((messageId: string) => {
+    hiddenMessageIdsRef.current.add(messageId)
     setMessages((prev) => prev.filter((m) => m.id !== messageId))
   }, [])
 
