@@ -111,7 +111,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
     const parsed = JSON.parse(message.content)
     if (parsed?.__sociaLensShare === 1 && parsed.type === 'voice') sharedVoicePayload = parsed
   } catch {}
-  const isSharedVoiceMessage = Boolean(sharedVoicePayload?.audioUrl)
+  const isSharedVoiceMessage = Boolean(sharedVoicePayload)
   const sharedVoiceAudioUrl = sharedVoicePayload?.audioUrl || null
   const actionText = getMessageActionText(message.content)
   const myReaction = reactions.find(r => r.user_id === currentUserId)
