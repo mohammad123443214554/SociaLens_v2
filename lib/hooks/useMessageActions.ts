@@ -27,10 +27,15 @@ export function useDeleteMessageForMe() {
   const supabase = createClient()
 
   return useMutation({
-    mutationFn: async ({ messageId, isSender }: { messageId: string; chatId: string; isSender: boolean }) => {
+    mutationFn: async ({ messageId, chatId, isSender }: { messageId: string; chatId: string; isSender: boolean }) => {
       const column = isSender ? 'deleted_for_sender' : 'deleted_for_recipient'
-      const { error } = await supabase.from('messages').update({ [column]: true }).eq('id', messageId)
+      const { error, count } = await supabase
+        .from('messages')
+        .update({ [column]: true }, { count: 'exact' })
+        .eq('id', messageId)
+        .eq('chat_id', chatId)
       if (error) throw error
+      if (count === 0) throw new Error('Message was not updated. Please refresh the chat and try again.')
     },
   })
 }
