@@ -22,7 +22,7 @@ type SharedPayload = {
   durationMs?: number
 }
 
-export function SharedAperonixContentMessage({ content, isOwn }: { content: string; isOwn: boolean }) {
+export function SharedAperonixContentMessage({ content, isOwn, messageId }: { content: string; isOwn: boolean; messageId?: string }) {
   const [showFull, setShowFull] = useState(false)
   let payload: SharedPayload
   try {
@@ -63,7 +63,7 @@ export function SharedAperonixContentMessage({ content, isOwn }: { content: stri
         {isVoice ? (
           <div className="space-y-1.5">
             <p className="truncate text-sm font-semibold">{payload.title || 'Voice conversation'}</p>
-            {payload.audioUrl ? <audio controls preload="metadata" src={payload.audioUrl} className="w-full" /> : <p className="text-xs text-muted-foreground">Recording is unavailable.</p>}
+            {payload.audioUrl ? <audio controls preload="metadata" src={payload.audioUrl} data-shared-voice-message-id={messageId} className="w-full" /> : <p className="text-xs text-muted-foreground">Recording is unavailable.</p>}
             {payload.durationMs ? <p className="text-xs text-muted-foreground">{Math.floor(payload.durationMs / 60000)}:{String(Math.floor(payload.durationMs / 1000) % 60).padStart(2, '0')} · Tap play to listen</p> : <p className="text-xs text-muted-foreground">Tap play to listen to the conversation</p>}
           </div>
         ) : <p className="whitespace-pre-wrap break-words text-sm leading-5 line-clamp-4">{transcript}</p>}
