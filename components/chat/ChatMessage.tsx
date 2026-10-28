@@ -33,6 +33,8 @@ interface ChatMessageProps {
   isOwn: boolean
   currentUserId: string
   otherUsername?: string
+  currentUserAvatarUrl?: string | null
+  otherAvatarUrl?: string | null
   onReply?: (message: Message) => void
   onRemoveMessage?: (messageId: string) => void
   onPatchMessage?: (messageId: string, patch: Partial<Message>) => void
@@ -75,7 +77,7 @@ function formatCallDuration(sec: number) {
   return `${m}:${s}`
 }
 
-export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onReply, onRemoveMessage, onPatchMessage, onCallAgain, unavailable }: ChatMessageProps) {
+export function ChatMessage({ message, isOwn, currentUserId, otherUsername, currentUserAvatarUrl, otherAvatarUrl, onReply, onRemoveMessage, onPatchMessage, onCallAgain, unavailable }: ChatMessageProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showCallMenu, setShowCallMenu] = useState(false)
   const [callMenuPos, setCallMenuPos] = useState<{ top: number; left: number } | null>(null)
@@ -475,8 +477,12 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
   const isAperonixReply = Boolean((message as any).is_aperonix_reply)
 
   return (
-    <div className={cn('flex w-full gap-1 mb-2 group items-center', isOwn && 'flex-row-reverse')}>
-      <div className="w-fit min-w-0 max-w-[70%] flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
+    <div className={cn('flex w-full gap-2 mb-2 group items-end', isOwn && 'flex-row-reverse')}>
+      <Avatar className="h-6 w-6 shrink-0 mb-4">
+        <AvatarImage src={getAvatarUrl(isOwn ? currentUserAvatarUrl : otherAvatarUrl) || undefined} />
+        <AvatarFallback className="text-[9px]">{(isOwn ? 'You' : otherUsername || 'U').slice(0, 1).toUpperCase()}</AvatarFallback>
+      </Avatar>
+      <div className="w-fit min-w-0 max-w-[78%] flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
         {replyPreview && (
           <div className="flex flex-col mb-1.5" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
             <p className="text-[11px] text-muted-foreground px-1 mb-1">
