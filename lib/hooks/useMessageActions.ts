@@ -29,13 +29,17 @@ export function useDeleteMessageForMe() {
   return useMutation({
     mutationFn: async ({ messageId, chatId, isSender }: { messageId: string; chatId: string; isSender: boolean }) => {
       const column = isSender ? 'deleted_for_sender' : 'deleted_for_recipient'
-      const { error, count } = await supabase
+      // Do not request an exact count/RETURNING from PostgREST here.
+      // The SELECT RLS policy intentionally hides this row immediately after
+      // the user's deleted_* flag becomes true; asking PostgREST to return a
+      // count can therefore make PostgreSQL reject the UPDATE under RLS even
+      // though the user is allowed to update the row.
+      const { error } = await supabase
         .from('messages')
-        .update({ [column]: true }, { count: 'exact' })
+        .update({ [column]: true })
         .eq('id', messageId)
         .eq('chat_id', chatId)
       if (error) throw error
-      if (count === 0) throw new Error('Message was not updated. Please refresh the chat and try again.')
     },
   })
 }
