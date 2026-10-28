@@ -478,11 +478,13 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
 
   return (
     <div className={cn('flex w-full gap-2 mb-2 group items-end', isOwn && 'flex-row-reverse')}>
-      <Avatar className="h-6 w-6 shrink-0 mb-4">
-        <AvatarImage src={getAvatarUrl(isOwn ? currentUserAvatarUrl : otherAvatarUrl) || undefined} />
-        <AvatarFallback className="text-[9px]">{(isOwn ? 'You' : otherUsername || 'U').slice(0, 1).toUpperCase()}</AvatarFallback>
-      </Avatar>
-      <div className="w-fit min-w-0 max-w-[78%] flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
+      {!isOwn && (
+        <Avatar className="h-5 w-5 sm:h-6 sm:w-6 shrink-0 mb-4">
+          <AvatarImage src={getAvatarUrl(otherAvatarUrl) || undefined} />
+          <AvatarFallback className="text-[9px]">{(otherUsername || 'U').slice(0, 1).toUpperCase()}</AvatarFallback>
+        </Avatar>
+      )}
+      <div className="w-fit min-w-0 max-w-[84%] sm:max-w-[78%] flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
         {replyPreview && (
           <div className="flex flex-col mb-1.5" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
             <p className="text-[11px] text-muted-foreground px-1 mb-1">
