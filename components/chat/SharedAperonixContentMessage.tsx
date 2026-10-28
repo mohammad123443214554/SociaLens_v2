@@ -47,7 +47,7 @@ export function SharedAperonixContentMessage({ content, isOwn }: { content: stri
   const heading = isVoice ? 'Aperonix Voice Conversation' : isPrompt ? `${username} Prompt` : 'Aperonix Chat'
 
   return (
-    <div className={`w-full max-w-[560px] ${isOwn ? 'ml-auto' : 'mr-auto'} overflow-hidden rounded-2xl border ${isOwn ? 'border-white/20 bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'border-border bg-muted'}`}>
+    <div className={`w-full max-w-[560px] overflow-hidden rounded-2xl border ${isOwn ? 'border-white/20 bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'border-border bg-muted'}`}>
       <div className={`flex items-center gap-1.5 px-3 pt-2.5 ${isOwn ? 'text-white/80' : 'text-muted-foreground'}`}>
         {isPrompt ? (
           <Avatar className="h-4 w-4 shrink-0">
