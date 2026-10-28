@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, Play, Video, MoreHorizontal, Trash2, Plus, X } from 'lucide-react'
+import { Loader2, Play, Video, MoreHorizontal, Trash2, Plus } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { createClient } from '@/lib/supabase/client'
 import { getAvatarUrl } from '@/lib/utils/helpers'
