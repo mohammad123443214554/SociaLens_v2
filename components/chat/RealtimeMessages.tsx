@@ -66,6 +66,16 @@ export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsern
     })
   }, [localMessages])
 
+  // Mention cards load asynchronously after their database query. Keep the
+  // newest story mention visible when it arrives, instead of leaving it above
+  // the viewport after the initial chat scroll has already completed.
+  useEffect(() => {
+    if (!mentionedStories || !hasDoneInitialScrollRef.current) return
+    if (isNearBottom()) {
+      requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }))
+    }
+  }, [mentionedStories])
+
   // Only jumps to the bottom when there's an actual new message (or the
   // Typing dots appear) AND the person is already near the bottom - not on
   // Every re-render, which used to yank them back down while they were
@@ -116,7 +126,6 @@ export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsern
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         </div>
       )}
-      {mentionedStories}
       {localMessages.map((msg) => (
         <ChatMessage
           key={msg.id}
@@ -133,6 +142,7 @@ export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsern
           unavailable={isMessageUnavailable?.(msg.sender_id)}
         />
       ))}
+      {mentionedStories}
       {isTyping && (
         <div className="flex gap-1 items-center px-3 py-2 bg-muted rounded-2xl rounded-bl-sm w-fit mb-2">
           <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.3s]" />
