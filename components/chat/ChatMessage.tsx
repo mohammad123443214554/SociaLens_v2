@@ -411,20 +411,6 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
       (sharedPayload.type === 'prompt' || sharedPayload.type === 'chat' || sharedPayload.type === 'voice')
   } catch {}
 
-  if (isSharedAperonixContent) {
-    return (
-      <div className={cn('flex gap-2 mb-3', isOwn && 'flex-row-reverse')}>
-        <div className="min-w-0">
-          <SharedAperonixContentMessage content={message.content} isOwn={isOwn} />
-          <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-muted-foreground' : 'text-muted-foreground')}>
-            {formatTimeAgo(message.created_at)}
-            {isOwn && (message.is_read ? ' · Seen' : ' · Sent')}
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   const isAperonixReply = Boolean((message as any).is_aperonix_reply)
 
   return (
@@ -456,6 +442,14 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
               <button onClick={() => setEditing(false)} className="text-xs px-2.5 py-1 rounded-full text-muted-foreground hover:bg-muted">Cancel</button>
               <button onClick={handleSaveEdit} className="text-xs px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white font-medium">Save</button>
             </div>
+          </div>
+        ) : isSharedAperonixContent ? (
+          <div className={cn('min-w-0', isOwn ? 'w-full max-w-[560px]' : 'w-full max-w-[560px]')}>
+            <SharedAperonixContentMessage content={message.content} isOwn={isOwn} />
+            <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-muted-foreground' : 'text-muted-foreground')}>
+              {formatTimeAgo(message.created_at)}
+              {isOwn && (message.is_read ? ' · Seen' : ' · Sent')}
+            </p>
           </div>
         ) : isAperonixReply ? (
           <div>
