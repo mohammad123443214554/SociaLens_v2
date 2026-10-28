@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { MoreVertical, Reply as ReplyIcon, Smile, Pencil, Trash2, EyeOff, Copy, Volume2, Square, Forward, Check, Download, Gauge, Phone, Video, Flag, Loader2 } from 'lucide-react'
+import { MoreVertical, Reply as ReplyIcon, Smile, Pencil, Trash2, EyeOff, Copy, Volume2, Square, Forward, Check, Download, Gauge, Phone, Video, Flag, Loader2, Play } from 'lucide-react'
 import { SharedPostMessage } from './SharedPostMessage'
 import { SharedStoryMessage } from './SharedStoryMessage'
 import { AperonixReplyMessage } from './AperonixReplyMessage'
@@ -41,7 +41,7 @@ interface ChatMessageProps {
 }
 
 const MENU_WIDTH = 208
-const MENU_HEIGHT = 320
+const MENU_HEIGHT = 280
 const EMOJI_WIDTH = 288
 const EMOJI_HEIGHT = 288
 const SPEEDS = [1, 1.5, 2, 0.5]
@@ -106,6 +106,13 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
 
   const mediaType = (message as any).media_type as 'image' | 'video' | 'audio' | 'call' | null
   const mediaUrl = (message as any).media_url as string | null
+  let sharedVoicePayload: { __sociaLensShare?: number; type?: string; audioUrl?: string; mimeType?: string; title?: string } | null = null
+  try {
+    const parsed = JSON.parse(message.content)
+    if (parsed?.__sociaLensShare === 1 && parsed.type === 'voice') sharedVoicePayload = parsed
+  } catch {}
+  const isSharedVoiceMessage = Boolean(sharedVoicePayload?.audioUrl)
+  const sharedVoiceAudioUrl = sharedVoicePayload?.audioUrl || null
   const actionText = getMessageActionText(message.content)
   const myReaction = reactions.find(r => r.user_id === currentUserId)
 
@@ -145,27 +152,51 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
   }
 
   const handleDownload = async () => {
-    if (!mediaUrl) return
+    const downloadUrl = isSharedVoiceMessage ? sharedVoiceAudioUrl : mediaUrl
+    if (!downloadUrl) {
+      window.alert('The shared voice recording is unavailable.')
+      setShowMenu(false)
+      return
+    }
     setDownloading(true)
     try {
-      const res = await fetch(mediaUrl)
+      const res = await fetch(downloadUrl)
+      if (!res.ok) throw new Error('Download request failed')
       const blob = await res.blob()
       const blobUrl = URL.createObjectURL(blob)
-      const ext = mediaType === 'video' ? 'mp4' : 'jpg'
+      const mime = sharedVoicePayload?.mimeType || blob.type
+      const ext = isSharedVoiceMessage
+        ? (mime.includes('wav') ? 'wav' : mime.includes('mpeg') || mime.includes('mp3') ? 'mp3' : mime.includes('ogg') ? 'ogg' : mime.includes('mp4') ? 'm4a' : 'webm')
+        : mediaType === 'video' ? 'mp4' : 'jpg'
       const a = document.createElement('a')
       a.href = blobUrl
-      a.download = `socialens-${mediaType}-${message.id}.${ext}`
+      a.download = `socialens-${isSharedVoiceMessage ? 'aperonix-voice' : mediaType}-${message.id}.${ext}`
       document.body.appendChild(a)
       a.click()
       a.remove()
-      URL.revokeObjectURL(blobUrl)
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
     } catch {
-      // If the download fetch fails (e.g. blocked by CORS on a custom CDN),
-      // falling back to opening it in a new tab still lets them save it manually.
-      window.open(mediaUrl, '_blank')
+      // Cross-origin storage can block fetch; opening the original recording still
+      // gives the recipient a browser-native way to play/save it.
+      window.open(downloadUrl, '_blank', 'noopener,noreferrer')
     } finally {
       setDownloading(false)
       setShowMenu(false)
+    }
+  }
+
+  const handlePlaySharedVoice = async () => {
+    setShowMenu(false)
+    const audio = document.querySelector<HTMLAudioElement>(`audio[data-shared-voice-message-id="${message.id}"]`)
+    if (!audio) {
+      window.alert('The shared voice player is unavailable. Please reload the chat and try again.')
+      return
+    }
+    try {
+      if (audio.ended) audio.currentTime = 0
+      await audio.play()
+    } catch {
+      window.alert('Could not play this recording. Check the audio URL and try again.')
     }
   }
 
@@ -618,22 +649,32 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </button>
             )}
-            {message.content && (
+            {!isSharedVoiceMessage && message.content && (
               <button onClick={handleCopy} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
                 {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />} Copy
               </button>
             )}
-            {message.content && (
+            {!isSharedVoiceMessage && message.content && (
               <button onClick={handleRead} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
                 {speaking ? <Square className="h-3.5 w-3.5 fill-current text-pink-500" /> : <Volume2 className="h-3.5 w-3.5" />} {speaking ? 'Stop' : 'Read aloud'}
               </button>
             )}
-            {(mediaType === 'image' || mediaType === 'video') && (
+            {isSharedVoiceMessage && (
+              <>
+                <button onClick={handleDownload} disabled={downloading} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted disabled:opacity-50">
+                  <Download className="h-3.5 w-3.5" /> {downloading ? 'Downloading...' : 'Download'}
+                </button>
+                <button onClick={handlePlaySharedVoice} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
+                  <Play className="h-3.5 w-3.5" /> Play
+                </button>
+              </>
+            )}
+            {!isSharedVoiceMessage && (mediaType === 'image' || mediaType === 'video') && (
               <button onClick={handleDownload} disabled={downloading} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted disabled:opacity-50">
                 <Download className="h-3.5 w-3.5" /> {downloading ? 'Downloading...' : mediaType === 'image' ? 'Download Photo' : 'Download Video'}
               </button>
             )}
-            {mediaType === 'audio' && (
+            {!isSharedVoiceMessage && mediaType === 'audio' && (
               <button onClick={cyclePlaybackSpeed} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
                 <Gauge className="h-3.5 w-3.5" /> Playback speed ({playbackRate}x)
               </button>
