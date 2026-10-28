@@ -275,6 +275,7 @@ export default function CreateEditorPage() {
       setError('Reels require a video. Please choose a video file.')
       return
     }
+    let selectedVideoDuration = 0
     if (isVideo) {
       const objectUrl = URL.createObjectURL(file)
       const duration = await new Promise<number>(resolve => {
@@ -292,6 +293,7 @@ export default function CreateEditorPage() {
         setError('Videos for Posts/Reels must be 20 minutes or shorter.')
         return
       }
+      selectedVideoDuration = duration
     }
 
     const previousMediaPath = mediaPath
@@ -320,8 +322,8 @@ export default function CreateEditorPage() {
       setMediaName(file.name)
       setMediaSize(file.size)
       setMediaType(isVideo ? 'video' : 'image')
-      setVideoDuration(isVideo ? duration : 0)
-      setCoverTime(isVideo ? Math.min(0.2, Math.max(0, duration - 0.05)) : 0)
+      setVideoDuration(selectedVideoDuration)
+      setCoverTime(isVideo ? Math.min(0.2, Math.max(0, selectedVideoDuration - 0.05)) : 0)
       setCoverPath(null)
       setCoverPreviewUrl(null)
       setUploadProgress(100)
