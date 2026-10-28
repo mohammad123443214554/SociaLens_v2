@@ -347,7 +347,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
           `poster` stops Android WebView from painting its own stretched grey
           placeholder over the reel before the first frame arrives. */}
       <video ref={videoRef} loop playsInline muted={isMuted}
-        poster={BLANK_VIDEO_POSTER}
+        poster={post.cover_url || BLANK_VIDEO_POSTER}
         preload={shouldLoad ? 'auto' : 'none'}
         onClick={handleTap}
         onLoadedData={captureReelThumbnail}
