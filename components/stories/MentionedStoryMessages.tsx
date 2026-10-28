@@ -107,7 +107,8 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
           const isVideo = story.story_type === 'video'
           return (
             <div key={story.id} className="w-full max-w-[min(240px,72%)] sm:max-w-[min(260px,72%)]">
-              <button type="button" onClick={() => { setActionError(''); setNotice(''); setSelectedStory(story) }}
+              <div role="button" tabIndex={0} onClick={() => { setActionError(''); setNotice(''); setSelectedStory(story) }}
+                onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setActionError(''); setNotice(''); setSelectedStory(story) } }}
                 className="group relative block aspect-[9/12] w-full overflow-hidden rounded-2xl border border-border bg-muted text-left shadow-sm transition hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 aria-label={`Open story shared by @${story.profiles?.username || 'user'}`}>
                 {preview ? (isVideo
@@ -143,7 +144,7 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
                 </div>
                 <span className="absolute inset-0 flex items-center justify-center text-white"><span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-black/40 shadow-lg backdrop-blur-sm transition group-hover:scale-105">{isVideo ? <Play className="ml-1 h-5 w-5 fill-current" /> : <Video className="h-5 w-5" />}</span></span>
                 <span className="absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-[9px] font-semibold text-white backdrop-blur-sm">Tap to view story</span>
-              </button>
+              </div>
             </div>
           )
         })}
