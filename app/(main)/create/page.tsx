@@ -461,11 +461,26 @@ export default function CreateEditorPage() {
       if (mediaType === 'video' && mediaPath && previewUrl && !coverPath && videoRef.current) {
         const video = videoRef.current
         const previousTime = video.currentTime
-        await new Promise<void>(resolve => {
-          const onSeeked = () => { video.removeEventListener('seeked', onSeeked); resolve() }
-          video.addEventListener('seeked', onSeeked, { once: true })
-          video.currentTime = Math.min(Math.max(0, coverTime), Math.max(0, video.duration - 0.05))
-        })
+        const targetTime = Math.min(Math.max(0, coverTime), Math.max(0, video.duration - 0.05))
+        if (video.readyState < 2) {
+          await new Promise<void>((resolve, reject) => {
+            const onReady = () => { cleanup(); resolve() }
+            const onError = () => { cleanup(); reject(new Error('Could not read the selected video frame.')) }
+            const cleanup = () => { video.removeEventListener('loadeddata', onReady); video.removeEventListener('error', onError) }
+            video.addEventListener('loadeddata', onReady, { once: true })
+            video.addEventListener('error', onError, { once: true })
+          })
+        }
+        if (Math.abs(video.currentTime - targetTime) > 0.02) {
+          await new Promise<void>((resolve, reject) => {
+            const onSeeked = () => { cleanup(); resolve() }
+            const onError = () => { cleanup(); reject(new Error('Could not seek to the selected cover frame.')) }
+            const cleanup = () => { video.removeEventListener('seeked', onSeeked); video.removeEventListener('error', onError) }
+            video.addEventListener('seeked', onSeeked, { once: true })
+            video.addEventListener('error', onError, { once: true })
+            video.currentTime = targetTime
+          })
+        }
         const canvas = document.createElement('canvas')
         const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight))
         canvas.width = Math.max(1, Math.round(video.videoWidth * scale)); canvas.height = Math.max(1, Math.round(video.videoHeight * scale))
