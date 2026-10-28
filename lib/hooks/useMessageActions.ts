@@ -172,15 +172,17 @@ export function useForwardMessage() {
         is_forwarded: true,
       }
 
-      const lastMessageType: 'text' | 'post' | 'reel' | 'image' | 'video' | 'audio' | 'sticker' =
-        message.post_id || message.story_id ? 'post'
+      const lastMessageType: 'text' | 'post' | 'reel' | 'image' | 'video' | 'audio' | 'sticker' | 'aperonix' =
+        message.is_aperonix_reply ? 'aperonix'
+        : message.post_id || message.story_id ? 'post'
         : message.sticker ? 'sticker'
         : message.media_type === 'image' ? 'image'
         : message.media_type === 'video' ? 'video'
         : message.media_type === 'audio' ? 'audio'
         : 'text'
       const lastMessagePreview =
-        message.sticker ? `${message.sticker} Sticker`
+        message.is_aperonix_reply ? '✨ Aperonix reply'
+        : message.sticker ? `${message.sticker} Sticker`
         : message.media_type === 'image' ? '📷 Photo'
         : message.media_type === 'video' ? '🎥 Video'
         : message.media_type === 'audio' ? '🎤 Voice message'
