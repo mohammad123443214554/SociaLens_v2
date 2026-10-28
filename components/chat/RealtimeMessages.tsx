@@ -116,6 +116,7 @@ export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsern
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         </div>
       )}
+      {mentionedStories}
       {localMessages.map((msg) => (
         <ChatMessage
           key={msg.id}
@@ -132,7 +133,6 @@ export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsern
           unavailable={isMessageUnavailable?.(msg.sender_id)}
         />
       ))}
-      {mentionedStories}
       {isTyping && (
         <div className="flex gap-1 items-center px-3 py-2 bg-muted rounded-2xl rounded-bl-sm w-fit mb-2">
           <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.3s]" />
