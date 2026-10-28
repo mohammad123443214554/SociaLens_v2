@@ -408,10 +408,20 @@ export default function ChatRoomPage() {
         </button>
       </div>
 
-      {/* Messages */}
+      {/* Conversation timeline and composer share one wallpaper surface, down to the bottom edge. */}
+      <div
+        className="flex-1 min-h-0 flex flex-col overflow-hidden bg-no-repeat"
+        style={wallpaper?.wallpaper_url ? {
+          backgroundImage: `url(${wallpaper.wallpaper_url})`,
+          backgroundSize: 'cover',
+          backgroundPosition: `${wallpaper.position_x ?? 50}% ${wallpaper.position_y ?? 50}%`,
+        } : undefined}
+      >
       <RealtimeMessages
         messages={messages}
         currentUserId={user.id}
+        currentUserAvatarUrl={profile?.avatar_url}
+        otherAvatarUrl={other.avatar_url}
         isTyping={isTyping}
         otherUsername={other.username}
         onReply={setReplyingTo}
@@ -440,12 +450,13 @@ export default function ChatRoomPage() {
           onCancelReply={() => setReplyingTo(null)}
         />
       ) : (
-        <div className="px-4 py-4 border-t text-center">
+        <div className="px-4 py-4 border-t bg-background/80 backdrop-blur text-center">
           <p className="text-sm text-muted-foreground">
             {theyBlockedMe ? 'Message is not available.' : iBlockedThem ? "You've blocked this user." : restrictionMessage}
           </p>
         </div>
       )}
+      </div>
       {showStory && hasStory && (
         <StoryViewer
           groups={storyGroups}
