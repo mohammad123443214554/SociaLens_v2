@@ -444,7 +444,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
             </div>
           </div>
         ) : isSharedAperonixContent ? (
-          <div className={cn('min-w-0', isOwn ? 'w-full max-w-[560px]' : 'w-full max-w-[560px]')}>
+          <div className="w-full min-w-0">
             <SharedAperonixContentMessage content={message.content} isOwn={isOwn} />
             <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-muted-foreground' : 'text-muted-foreground')}>
               {formatTimeAgo(message.created_at)}
