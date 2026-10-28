@@ -158,10 +158,15 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
     unsendMessage.mutate({ messageId: message.id, chatId: message.chat_id })
   }
 
-  const handleDeleteForMe = () => {
+  const handleDeleteForMe = async () => {
     setShowMenu(false)
-    onRemoveMessage?.(message.id)
-    deleteForMe.mutate({ messageId: message.id, chatId: message.chat_id, isSender: isOwn })
+    try {
+      await deleteForMe.mutateAsync({ messageId: message.id, chatId: message.chat_id, isSender: isOwn })
+      onRemoveMessage?.(message.id)
+    } catch (error) {
+      console.error('[chat] Delete for me failed:', error)
+      window.alert(error instanceof Error ? error.message : 'Could not delete this message for you. Please try again.')
+    }
   }
 
   const handleSaveEdit = () => {
