@@ -45,6 +45,29 @@ const EMOJI_WIDTH = 288
 const EMOJI_HEIGHT = 288
 const SPEEDS = [1, 1.5, 2, 0.5]
 
+/** Return human-readable text for message actions without exposing share-payload JSON. */
+function getMessageActionText(content: string): string {
+  try {
+    const payload = JSON.parse(content)
+    if (payload?.__sociaLensShare === 1) {
+      if (payload.type === 'prompt') return String(payload.prompt || '')
+      if (payload.type === 'voice') return String(payload.title || 'Aperonix voice conversation')
+      if (payload.type === 'chat' && Array.isArray(payload.messages)) {
+        const username = String(payload.owner?.username || 'User')
+        return payload.messages.map((item: { role?: string; content?: string; attachments?: { name?: string }[] }) => {
+          const speaker = item.role === 'user' ? username : 'Aperonix'
+          const body = String(item.content || '')
+          const attachments = item.attachments?.length
+            ? `\\nAttachments: ${item.attachments.map(file => file.name || 'file').join(', ')}`
+            : ''
+          return `${speaker}:\\n${body}${attachments}`
+        }).join('\\n\\n')
+      }
+    }
+  } catch {}
+  return content
+}
+
 function formatCallDuration(sec: number) {
   const m = Math.floor(sec / 60).toString().padStart(2, '0')
   const s = Math.floor(sec % 60).toString().padStart(2, '0')
@@ -82,6 +105,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
 
   const mediaType = (message as any).media_type as 'image' | 'video' | 'audio' | 'call' | null
   const mediaUrl = (message as any).media_url as string | null
+  const actionText = getMessageActionText(message.content)
   const myReaction = reactions.find(r => r.user_id === currentUserId)
 
   // Both popups are viewport-clamped (never spill off the edge of the
@@ -101,7 +125,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(message.content)
+      await navigator.clipboard.writeText(actionText)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {}
@@ -116,7 +140,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
     }
     setShowMenu(false)
     setSpeaking(true)
-    await speakText(message.content, () => setSpeaking(false))
+    await speakText(actionText, () => setSpeaking(false))
   }
 
   const handleDownload = async () => {
@@ -449,7 +473,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
             </div>
           </div>
         ) : isSharedAperonixContent ? (
-          <div className="w-full min-w-0">
+          <div className="w-full min-w-0 max-w-[560px]">
             <SharedAperonixContentMessage content={message.content} isOwn={isOwn} />
             <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-muted-foreground' : 'text-muted-foreground')}>
               {formatTimeAgo(message.created_at)}
@@ -588,7 +612,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
             className="fixed z-40 bg-card border rounded-xl shadow-xl overflow-hidden"
             style={{ top: menuPos.top, left: menuPos.left, width: MENU_WIDTH }}
           >
-            {isOwn && !isAperonixReply && !mediaType && !((message as any).sticker) && !((message as any).post_id) && !((message as any).story_id) && (
+            {isOwn && !isAperonixReply && !isSharedAperonixContent && !mediaType && !((message as any).sticker) && !((message as any).post_id) && !((message as any).story_id) && (
               <button onClick={() => { setShowMenu(false); setEditing(true) }} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </button>
