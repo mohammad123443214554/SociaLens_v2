@@ -27,7 +27,7 @@ export function useDeleteMessageForMe() {
   const supabase = createClient()
 
   return useMutation({
-    mutationFn: async ({ messageId, chatId, isSender }: { messageId: string; chatId: string; isSender: boolean }) => {
+    mutationFn: async ({ messageId, chatId }: { messageId: string; chatId: string }) => {
       // Use the narrowly scoped RPC because the messages RLS UPDATE policy
       // rejects this flag transition on the live database (HTTP 403 / SQLSTATE
       // 42501). The RPC independently verifies chat membership and only sets
