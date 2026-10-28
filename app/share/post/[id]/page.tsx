@@ -27,7 +27,7 @@ export default function PublicPostPage() {
     ;(async () => {
       const { data } = await supabase
         .from('posts')
-        .select('id, content, media_url, media_type, likes_count, comments_count, created_at, profiles(username, avatar_url, is_verified, verification_type)')
+        .select('id, content, media_url, media_type, cover_url, likes_count, comments_count, created_at, profiles(username, avatar_url, is_verified, verification_type)')
         .eq('id', params.id)
         .maybeSingle()
       if (cancelled) return
@@ -88,7 +88,7 @@ export default function PublicPostPage() {
         {post.media_url && (
           isVideo ? (
             // eslint-disable-next-line jsx-a11y/media-has-caption
-            <video src={post.media_url} controls playsInline className="w-full rounded-xl bg-black max-h-[75vh] object-contain" />
+            <video src={post.media_url} poster={post.cover_url || undefined} controls playsInline className="w-full rounded-xl bg-black max-h-[75vh] object-contain" />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={post.media_url} alt="Post" className="w-full rounded-xl object-contain max-h-[75vh] bg-muted" />
