@@ -26,6 +26,7 @@ import {
 } from '@/lib/hooks/useMessageActions'
 import { speakText, stopSpeaking } from '@/lib/utils/voice'
 import { ReportModal } from '@/components/shared/ReportModal'
+import { getSharedAperonixReplyLabel } from '@/lib/utils/sharedAperonix'
 
 interface ChatMessageProps {
   message: Message
@@ -272,7 +273,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, onRe
     }
     return (
       <div className="bg-muted rounded-2xl px-3 py-2 text-sm text-muted-foreground max-w-[220px] truncate">
-        {(() => { try { const p = JSON.parse(replyPreview.content); if (p?.__sociaLensShare === 1) { const first = Array.isArray(p.messages) ? p.messages.find((m: { role?: string; content?: string }) => m.role === 'user' && m.content?.trim()) : null; return p.type === 'chat' ? [p.title || 'Aperonix chat', first?.content].filter(Boolean).join(' · ') : p.type === 'prompt' ? (p.prompt || 'Shared Aperonix prompt') : p.type === 'voice' ? (p.title || 'Aperonix voice conversation') : 'Shared Aperonix content'; } } catch {} return replyPreview.content || 'Attachment'; })()}
+        {getSharedAperonixReplyLabel(replyPreview.content)}
       </div>
     )
   }
