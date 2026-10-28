@@ -28,17 +28,14 @@ export function useDeleteMessageForMe() {
 
   return useMutation({
     mutationFn: async ({ messageId, chatId, isSender }: { messageId: string; chatId: string; isSender: boolean }) => {
-      const column = isSender ? 'deleted_for_sender' : 'deleted_for_recipient'
-      // Do not request an exact count/RETURNING from PostgREST here.
-      // The SELECT RLS policy intentionally hides this row immediately after
-      // the user's deleted_* flag becomes true; asking PostgREST to return a
-      // count can therefore make PostgreSQL reject the UPDATE under RLS even
-      // though the user is allowed to update the row.
-      const { error } = await supabase
-        .from('messages')
-        .update({ [column]: true })
-        .eq('id', messageId)
-        .eq('chat_id', chatId)
+      // Use the narrowly scoped RPC because the messages RLS UPDATE policy
+      // rejects this flag transition on the live database (HTTP 403 / SQLSTATE
+      // 42501). The RPC independently verifies chat membership and only sets
+      // the caller's own deleted flag.
+      const { error } = await supabase.rpc('delete_message_for_me', {
+        p_message_id: messageId,
+        p_chat_id: chatId,
+      })
       if (error) throw error
     },
   })
