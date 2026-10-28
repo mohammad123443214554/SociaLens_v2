@@ -112,6 +112,7 @@ export type Post = {
   user_id: string
   content: string | null
   media_url: string | null
+  cover_url: string | null
   media_type: 'image' | 'video' | 'none' | null
   likes_count: number
   comments_count: number
