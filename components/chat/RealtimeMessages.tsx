@@ -10,6 +10,8 @@ interface RealtimeMessagesProps {
   currentUserId: string
   isTyping: boolean
   otherUsername?: string
+  currentUserAvatarUrl?: string | null
+  otherAvatarUrl?: string | null
   onReply?: (message: Message) => void
   onRemoveMessage?: (messageId: string) => void
   onPatchMessage?: (messageId: string, patch: Partial<Message>) => void
@@ -24,7 +26,7 @@ interface RealtimeMessagesProps {
   mentionedStories?: ReactNode
 }
 
-export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsername, onReply, onRemoveMessage, onPatchMessage, onCallAgain, isMessageUnavailable, wallpaperUrl, wallpaperPosition, onLoadOlder, hasMoreOlder, isLoadingOlder, mentionedStories }: RealtimeMessagesProps) {
+export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsername, currentUserAvatarUrl, otherAvatarUrl, onReply, onRemoveMessage, onPatchMessage, onCallAgain, isMessageUnavailable, wallpaperUrl, wallpaperPosition, onLoadOlder, hasMoreOlder, isLoadingOlder, mentionedStories }: RealtimeMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const lastMessageIdRef = useRef<string | null>(null)
@@ -107,16 +109,7 @@ export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsern
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto p-4 bg-no-repeat"
-      style={
-        wallpaperUrl
-          ? {
-              backgroundImage: `url(${wallpaperUrl})`,
-              backgroundSize: 'cover',
-              backgroundPosition: `${wallpaperPosition?.x ?? 50}% ${wallpaperPosition?.y ?? 50}%`,
-            }
-          : undefined
-      }
+      className="flex-1 min-h-0 overflow-y-auto p-4 bg-transparent"
     >
       {isLoadingOlder && (
         <div className="flex justify-center py-2">
@@ -130,6 +123,8 @@ export function RealtimeMessages({ messages, currentUserId, isTyping, otherUsern
           isOwn={msg.sender_id === currentUserId}
           currentUserId={currentUserId}
           otherUsername={otherUsername}
+          currentUserAvatarUrl={currentUserAvatarUrl}
+          otherAvatarUrl={otherAvatarUrl}
           onReply={onReply}
           onRemoveMessage={onRemoveMessage}
           onPatchMessage={onPatchMessage}
