@@ -58,10 +58,10 @@ function getMessageActionText(content: string): string {
           const speaker = item.role === 'user' ? username : 'Aperonix'
           const body = String(item.content || '')
           const attachments = item.attachments?.length
-            ? `\\nAttachments: ${item.attachments.map(file => file.name || 'file').join(', ')}`
+            ? `\nAttachments: ${item.attachments.map(file => file.name || 'file').join(', ')}`
             : ''
-          return `${speaker}:\\n${body}${attachments}`
-        }).join('\\n\\n')
+          return `${speaker}:\n${body}${attachments}`
+        }).join('\n\n')
       }
     }
   } catch {}
