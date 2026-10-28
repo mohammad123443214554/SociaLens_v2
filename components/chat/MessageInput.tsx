@@ -379,7 +379,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
           </button>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="flex items-end gap-2 p-3 sm:px-4">
+        <form onSubmit={handleSubmit} className="p-3 sm:px-4"><div className="flex w-full items-end gap-1.5 rounded-2xl border border-border/60 bg-muted/70 px-2 py-1.5 focus-within:border-pink-500">
           <div className="relative shrink-0">
             <button ref={emojiBtnRef} type="button" onClick={openEmoji} className="p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
               <Smile className="h-5 w-5" />
@@ -396,7 +396,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
             placeholder="Message..."
             rows={1}
             disabled={disabled}
-            className="flex-1 min-h-[44px] max-h-36 bg-muted/90 rounded-2xl px-4 py-3 text-sm outline-none border border-border/50 focus:border-pink-500 resize-none overflow-y-auto leading-relaxed disabled:opacity-60 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="flex-1 min-w-0 min-h-[44px] max-h-36 bg-transparent rounded-xl px-2 py-2.5 text-sm outline-none border-0 focus:ring-0 resize-none overflow-y-auto leading-relaxed disabled:opacity-60 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           />
 
           {hasContent ? (
@@ -440,7 +440,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
               </button>
             </div>
           )}
-        </form>
+        </div></form>
       )}
 
       {showEmoji && emojiPos && (
