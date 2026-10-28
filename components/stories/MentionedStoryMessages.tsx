@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, Play, Video } from 'lucide-react'
+import { Loader2, Play, Video, MoreHorizontal, Trash2, Plus, X } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { createClient } from '@/lib/supabase/client'
 import { getAvatarUrl } from '@/lib/utils/helpers'
@@ -19,6 +19,8 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [actionError, setActionError] = useState('')
+  const [openMenuStoryId, setOpenMenuStoryId] = useState<string | null>(null)
+  const [mentionCreatedAt, setMentionCreatedAt] = useState<Map<string, string>>(() => new Map())
   const reshare = useReshareMentionedStory()
 
   useEffect(() => {
@@ -33,7 +35,9 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
         if (active) { setStories([]); setError('Mentioned media is unavailable right now.'); setLoading(false) }
         return
       }
-      const ids = Array.from(new Set((mentionRows || []).map(row => row.story_id)))
+      const rows = mentionRows || []
+      const ids = Array.from(new Set(rows.map(row => row.story_id)))
+      if (active) setMentionCreatedAt(new Map(rows.map(row => [row.story_id, row.created_at])))
       if (!ids.length) {
         if (active) { setStories([]); setLoading(false) }
         return
@@ -56,6 +60,19 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
     })()
     return () => { active = false }
   }, [userId, otherUserId])
+
+  const deleteForMe = async (story: StoryWithProfile) => {
+    setActionError('')
+    setNotice('')
+    const createdAt = mentionCreatedAt.get(story.id)
+    if (!createdAt) { setActionError('Could not find this story mention. Please refresh and try again.'); return }
+    const { error: deleteError } = await supabase.from('story_mentions').delete()
+      .eq('story_id', story.id).eq('creator_id', otherUserId).eq('mentioned_user_id', userId).eq('created_at', createdAt)
+    if (deleteError) { setActionError('Could not delete this mention for you. Please try again.'); return }
+    setStories(previous => previous.filter(item => item.id !== story.id))
+    setOpenMenuStoryId(null)
+    setNotice('Story mention deleted for you.')
+  }
 
   const addToMyStory = async (story: StoryWithProfile) => {
     setActionError('')
@@ -80,7 +97,7 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
 
   return (
     <>
-      <div className="mb-4 flex flex-col items-start gap-2" aria-label="Stories you were mentioned in">
+      <div className="mb-3 flex flex-col items-start gap-2" aria-label="Stories you were mentioned in">
         {loading && <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading shared story…</div>}
         {error && <p className="max-w-[85%] rounded-2xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground">{error}</p>}
         {stories.map(story => {
@@ -89,7 +106,7 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
             : story.story_type === 'photo' ? (story.photo_scenes?.[0]?.imageUrl || story.media_url) : null
           const isVideo = story.story_type === 'video'
           return (
-            <div key={story.id} className="w-full max-w-[min(320px,85%)]">
+            <div key={story.id} className="w-full max-w-[min(240px,72%)] sm:max-w-[min(260px,72%)]">
               <button type="button" onClick={() => { setActionError(''); setNotice(''); setSelectedStory(story) }}
                 className="group relative block aspect-[9/12] w-full overflow-hidden rounded-2xl border border-border bg-muted text-left shadow-sm transition hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 aria-label={`Open story shared by @${story.profiles?.username || 'user'}`}>
@@ -98,12 +115,34 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
                   : <img src={preview} alt="" className="absolute inset-0 h-full w-full object-cover" />)
                   : <div className="absolute inset-0 flex items-center justify-center p-5" style={{ background: story.background_color || '#25213d' }}><p className="line-clamp-7 text-center text-lg font-semibold text-white">{story.text_content || 'Story'}</p></div>}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
-                <div className="absolute left-3 right-3 top-3 flex items-center gap-2 text-white">
-                  <Avatar className="h-8 w-8 border border-white/70"><AvatarImage src={getAvatarUrl(story.profiles?.avatar_url)} /><AvatarFallback>{story.profiles?.username?.[0]?.toUpperCase() || '?'}</AvatarFallback></Avatar>
-                  <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">@{story.profiles?.username || 'user'}</p><p className="text-[10px] text-white/75">Mentioned you in a story</p></div>
+                <div className="absolute right-2 top-2 z-10">
+                  <button type="button" onClick={(event) => { event.stopPropagation(); setOpenMenuStoryId(openMenuStoryId === story.id ? null : story.id) }}
+                    aria-label="Story mention options" className="flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-black/75">
+                    <MoreHorizontal className="h-5 w-5" />
+                  </button>
+                  {openMenuStoryId === story.id && (
+                    <>
+                      <button type="button" aria-label="Close story menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setOpenMenuStoryId(null)} />
+                      <div className="absolute right-0 top-9 z-30 w-44 overflow-hidden rounded-xl border border-white/10 bg-[#171923] p-1 text-white shadow-xl">
+                        <button type="button" onClick={() => { setOpenMenuStoryId(null); if (!alreadyAddedStoryIds.has(story.id)) void addToMyStory(story) }}
+                          disabled={alreadyAddedStoryIds.has(story.id) || reshare.isPending}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs hover:bg-white/10 disabled:opacity-50">
+                          <Plus className="h-4 w-4" /> {alreadyAddedStoryIds.has(story.id) ? 'Already added' : 'Add to my story'}
+                        </button>
+                        <button type="button" onClick={() => void deleteForMe(story)}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs text-red-300 hover:bg-white/10">
+                          <Trash2 className="h-4 w-4" /> Delete for me
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <span className="absolute inset-0 flex items-center justify-center text-white"><span className="flex h-14 w-14 items-center justify-center rounded-full border border-white/60 bg-black/40 shadow-lg backdrop-blur-sm transition group-hover:scale-105">{isVideo ? <Play className="ml-1 h-6 w-6 fill-current" /> : <Video className="h-6 w-6" />}</span></span>
-                <span className="absolute bottom-3 left-3 rounded-full bg-black/55 px-3 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">Tap to view story</span>
+                <div className="absolute left-3 right-12 top-3 flex items-center gap-2 text-white">
+                  <Avatar className="h-7 w-7 border border-white/70"><AvatarImage src={getAvatarUrl(story.profiles?.avatar_url)} /><AvatarFallback>{story.profiles?.username?.[0]?.toUpperCase() || '?'}</AvatarFallback></Avatar>
+                  <div className="min-w-0 flex-1"><p className="truncate text-[11px] font-semibold">@{story.profiles?.username || 'user'}</p><p className="text-[9px] text-white/75">Mentioned you in a story</p></div>
+                </div>
+                <span className="absolute inset-0 flex items-center justify-center text-white"><span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-black/40 shadow-lg backdrop-blur-sm transition group-hover:scale-105">{isVideo ? <Play className="ml-1 h-5 w-5 fill-current" /> : <Video className="h-5 w-5" />}</span></span>
+                <span className="absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-[9px] font-semibold text-white backdrop-blur-sm">Tap to view story</span>
               </button>
             </div>
           )
