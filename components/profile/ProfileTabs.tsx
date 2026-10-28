@@ -287,7 +287,7 @@ export function ProfileTabs({ profileId, isPrivate, isFollowing, isOwn }: Profil
               {videoPosts.map(post => (
                 <button key={post.id} onClick={() => openPost(post)}
                   className="relative aspect-[9/16] bg-muted overflow-hidden group">
-                  <video src={post.media_url ?? ''} className="w-full h-full object-cover" preload="metadata" muted />
+                  {post.cover_url ? <img src={post.cover_url} alt="Reel cover" className="w-full h-full object-cover" /> : <video src={post.media_url ?? ''} className="w-full h-full object-cover" preload="metadata" muted />}
                   {post.reposted_by && post.reposted_by.length > 0 && (
                     <div className="absolute top-1.5 left-1.5 z-10 bg-black/50 rounded-full p-1">
                       <Repeat2 className="h-3 w-3 text-white" />
