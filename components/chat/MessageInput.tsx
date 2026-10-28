@@ -312,7 +312,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
   const hasContent = !!message.trim() || !!attachedFile
 
   return (
-    <div className="shrink-0 border-t border-border/60 bg-background/75 backdrop-blur-md">
+    <div className="shrink-0 border-t border-white/10 bg-black/10 backdrop-blur-sm">
       {replyingTo && (
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b bg-muted/40">
           <div className="min-w-0">
@@ -379,10 +379,10 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
           </button>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="p-3 sm:px-4"><div className="flex w-full items-end gap-1.5 rounded-2xl border border-border/60 bg-muted/70 px-2 py-1.5 focus-within:border-pink-500">
+        <form onSubmit={handleSubmit} className="px-3 py-2 sm:px-4 sm:py-3"><div className="flex w-full items-center gap-1 rounded-full border border-white/15 bg-background/85 px-1.5 py-1 sm:gap-1.5 sm:px-2 sm:py-1.5 shadow-sm focus-within:border-white/30">
           <div className="relative shrink-0">
-            <button ref={emojiBtnRef} type="button" onClick={openEmoji} className="p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
-              <Smile className="h-5 w-5" />
+            <button ref={emojiBtnRef} type="button" onClick={openEmoji} className="p-1.5 sm:p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
+              <Smile className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
           </div>
 
@@ -396,7 +396,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
             placeholder="Message..."
             rows={1}
             disabled={disabled}
-            className="flex-1 min-w-0 min-h-[44px] max-h-36 bg-transparent rounded-xl px-2 py-2.5 text-sm outline-none border-0 focus:ring-0 resize-none overflow-y-auto leading-relaxed disabled:opacity-60 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="flex-1 min-w-0 min-h-[36px] sm:min-h-[44px] max-h-36 bg-transparent rounded-xl px-1.5 py-2 text-sm sm:px-2 sm:py-2.5 outline-none border-0 focus:ring-0 resize-none overflow-y-auto leading-relaxed disabled:opacity-60 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           />
 
           {hasContent ? (
@@ -410,7 +410,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
           ) : (
             <div className="flex items-center gap-0.5 shrink-0">
               <button type="button" onClick={startRecording} disabled={disabled} className="p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
-                <Mic className="h-5 w-5" />
+                <Mic className="h-5 w-5 sm:h-6 sm:w-6" />
               </button>
               <div className="relative">
                 <button
@@ -419,7 +419,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
                   disabled={disabled}
                   className="p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
-                  <ImageIcon className="h-5 w-5" />
+                  <ImageIcon className="h-5 w-5 sm:h-6 sm:w-6" />
                 </button>
                 {showAttachMenu && (
                   <>
@@ -436,7 +436,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
                 )}
               </div>
               <button ref={stickerBtnRef} type="button" onClick={openStickers} disabled={disabled} className="p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
-                <StickerIcon className="h-5 w-5" />
+                <StickerIcon className="h-5 w-5 sm:h-6 sm:w-6" />
               </button>
             </div>
           )}
