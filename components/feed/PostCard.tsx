@@ -243,7 +243,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
             controls
             playsInline
             preload="metadata"
-            poster={BLANK_VIDEO_POSTER}
+            poster={post.cover_url || BLANK_VIDEO_POSTER}
             onLoadedMetadata={handleVideoMetadata}
             onError={handleVideoError}
             className="w-full"
