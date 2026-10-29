@@ -6,12 +6,14 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import {
   useBlockStatus, useToggleBlock, useNickname, useSetNickname, useDeleteNickname,
-  useChatWallpaper, useDeleteChatWallpaper, useDeleteChatForMe,
+  useChatWallpaper, useDeleteChatWallpaper, useDeleteChatForMe, useArchiveLockStatus,
 } from '@/lib/hooks/useChatSettings'
 import { ChatSettingsPage } from '@/components/chat/ChatSettingsPage'
 import { NicknameModal } from '@/components/chat/NicknameModal'
 import { CallSettingsPage } from '@/components/chat/CallSettingsPage'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
+import { ArchiveUnlockScreen } from '@/components/chat/ArchiveUnlockScreen'
+import { ArchivePasswordWizard } from '@/components/chat/ArchivePasswordWizard'
 
 export default function ChatSettingsRoutePage() {
   const params = useParams()
@@ -23,6 +25,7 @@ export default function ChatSettingsRoutePage() {
   const [showNickname, setShowNickname] = useState(false)
   const [showCallSettings, setShowCallSettings] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [archiveUnlocked, setArchiveUnlocked] = useState(false)
   const { data: wallpaper } = useChatWallpaper(chatId, user?.id)
   const { data: nickname } = useNickname(chatId, user?.id)
   const { data: blockStatus } = useBlockStatus(user?.id, chat?.other?.id)
@@ -31,6 +34,7 @@ export default function ChatSettingsRoutePage() {
   const toggleBlock = useToggleBlock()
   const deleteChat = useDeleteChatForMe()
   const deleteWallpaper = useDeleteChatWallpaper()
+  const { data: archiveLock } = useArchiveLockStatus(user?.id)
 
   useEffect(() => {
     if (!chatId || !user?.id) return
@@ -53,6 +57,20 @@ export default function ChatSettingsRoutePage() {
   }, [chatId, user?.id, router, supabase])
 
   if (loading || !user || !chat) return <PageLoader />
+
+  // Preserve the same archive-password gate as the conversation route. A
+  // dedicated settings URL must not become a way to bypass an archived chat's
+  // lock after a refresh or by pasting the settings URL directly.
+  const isArchivedByMe = Array.isArray(chat.archived_by) && chat.archived_by.includes(user.id)
+  if (isArchivedByMe && !archiveUnlocked) {
+    if (archiveLock && !archiveLock.hasPassword) {
+      return <ArchivePasswordWizard onClose={() => router.push('/chat')} onDone={() => setArchiveUnlocked(true)} />
+    }
+    if (archiveLock) {
+      return <ArchiveUnlockScreen hint={archiveLock.hint} onUnlock={() => setArchiveUnlocked(true)} title="Chat is locked" />
+    }
+    return <PageLoader />
+  }
 
   const other = chat.other
   const iBlockedThem = !!blockStatus?.iBlockedThem
