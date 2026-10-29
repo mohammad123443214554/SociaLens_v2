@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { WallpaperModal } from '@/components/chat/WallpaperModal'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { useUser } from '@/lib/hooks/useUser'
-import { useSetChatWallpaper, useArchiveLockStatus } from '@/lib/hooks/useChatSettings'
+import { useSetChatWallpaper, useArchiveLockStatus, useChatWallpaper } from '@/lib/hooks/useChatSettings'
 import { createClient } from '@/lib/supabase/client'
 import { ArchiveUnlockScreen } from '@/components/chat/ArchiveUnlockScreen'
 import { ArchivePasswordWizard } from '@/components/chat/ArchivePasswordWizard'
@@ -21,6 +21,8 @@ export default function ChatWallpaperRoutePage() {
   const [chat, setChat] = useState<any>(null)
   const [archiveUnlocked, setArchiveUnlocked] = useState(false)
   const { data: archiveLock } = useArchiveLockStatus(user?.id)
+  const { data: currentWallpaper } = useChatWallpaper(chatId, user?.id)
+  const editExisting = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('edit') === '1'
 
   useEffect(() => {
     if (!chatId || !user?.id) return
@@ -69,7 +71,7 @@ export default function ChatWallpaperRoutePage() {
     }
   }
 
-  if (loading || !user || !chat) return <PageLoader />
+  if (loading || !user || !chat || (editExisting && currentWallpaper === undefined)) return <PageLoader />
 
   // Keep the archive lock effective even when the wallpaper URL is opened
   // directly or refreshed instead of coming from the conversation page.
@@ -88,6 +90,9 @@ export default function ChatWallpaperRoutePage() {
     <div className="fixed inset-0 z-[140] bg-background">
       <WallpaperModal
         onDone={handleSave}
+        initialImageUrl={editExisting ? currentWallpaper?.wallpaper_url : undefined}
+        initialPosition={editExisting ? { x: currentWallpaper?.position_x ?? 50, y: currentWallpaper?.position_y ?? 50 } : undefined}
+        saveLabel={editExisting ? 'Save changes' : 'Apply wallpaper'}
         onClose={() => router.replace(`/chat/${chatId}/settings`)}
         saving={saving}
       />
