@@ -479,6 +479,7 @@ export default function ChatRoomPage() {
           onBack={() => router.push(`/chat/${chatId}`)}
           onSetNickname={() => setShowNicknameModal(true)}
           onSetWallpaper={() => router.push(`/chat/${chatId}/settings/wallpaper`)}
+          onEditWallpaper={() => router.push(`/chat/${chatId}/settings/wallpaper?edit=1`)}
           onRemoveWallpaper={handleRemoveWallpaper}
           onToggleBlock={handleToggleBlock}
           onDeleteChat={handleDeleteChat}
