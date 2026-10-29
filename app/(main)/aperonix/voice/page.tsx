@@ -73,7 +73,7 @@ async function loadVoiceWallpaper(conversationId: string): Promise<ChatWallpaper
     if (original.error || processed.error || !original.data?.signedUrl || !processed.data?.signedUrl) throw new Error('Could not load this voice wallpaper.')
     const loaded: ChatWallpaper = { originalDataUrl: original.data.signedUrl, dataUrl: processed.data.signedUrl,
       originalStoragePath: data.original_storage_path, processedStoragePath: data.processed_storage_path,
-      filterIndex: data.filter_index, zoom: data.zoom, positionX: data.position_x, positionY: data.position_y }
+      filterIndex: data.filter_index, zoom: data.zoom, positionX: data.position_x, positionY: data.position_y, rotationDegrees: 0 }
     if (typeof window !== 'undefined') {
       const image = new window.Image(); image.src = loaded.dataUrl
       if (typeof image.decode === 'function') await image.decode().catch(() => undefined)
