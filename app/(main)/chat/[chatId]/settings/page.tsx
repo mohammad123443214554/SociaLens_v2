@@ -10,7 +10,6 @@ import {
 } from '@/lib/hooks/useChatSettings'
 import { ChatSettingsPage } from '@/components/chat/ChatSettingsPage'
 import { NicknameModal } from '@/components/chat/NicknameModal'
-import { CallSettingsPage } from '@/components/chat/CallSettingsPage'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { ArchiveUnlockScreen } from '@/components/chat/ArchiveUnlockScreen'
 import { ArchivePasswordWizard } from '@/components/chat/ArchivePasswordWizard'
@@ -23,7 +22,6 @@ export default function ChatSettingsRoutePage() {
   const supabase = useMemo(() => createClient(), [])
   const [chat, setChat] = useState<any>(null)
   const [showNickname, setShowNickname] = useState(false)
-  const [showCallSettings, setShowCallSettings] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmRemoveWallpaper, setConfirmRemoveWallpaper] = useState(false)
   const [removingWallpaper, setRemovingWallpaper] = useState(false)
@@ -136,7 +134,7 @@ export default function ChatSettingsRoutePage() {
         onRemoveWallpaper={() => setConfirmRemoveWallpaper(true)}
         onToggleBlock={handleToggleBlock}
         onDeleteChat={handleDeleteChat}
-        onOpenCallSettings={() => setShowCallSettings(true)}
+        onOpenCallSettings={() => router.push(`/chat/${chatId}/settings/call`)}
       />
       {confirmRemoveWallpaper && (
         <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/60 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !removingWallpaper) setConfirmRemoveWallpaper(false) }}>
@@ -150,9 +148,6 @@ export default function ChatSettingsRoutePage() {
             </div>
           </section>
         </div>
-      )}
-      {showCallSettings && (
-        <CallSettingsPage userId={user.id} onBack={() => setShowCallSettings(false)} />
       )}
       {showNickname && (
         <NicknameModal
