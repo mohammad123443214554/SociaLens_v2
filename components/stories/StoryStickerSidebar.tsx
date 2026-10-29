@@ -22,17 +22,17 @@ export function StoryStickerSidebar({ onClose, onMention, onLink, onCountdown, o
   const [searchQuery, setSearchQuery] = useState('')
 
   const stickers = [
-    { id: 'emoji', title: 'Emojis', description: 'Add searchable emoji stickers', onSelect: onEmoji, icon: <Smile className="h-5 w-5" />, iconStyle: 'bg-amber-500/10 text-amber-500' },
-    { id: 'gif', title: 'GIF', description: 'Search animated GIF stickers', onSelect: onGIF, icon: <Image className="h-5 w-5" />, iconStyle: 'bg-fuchsia-500/10 text-fuchsia-500' },
-    { id: 'mention', title: 'Mention', description: 'Tag someone in your story', onSelect: onMention, icon: <AtSign className="h-5 w-5" />, iconStyle: 'bg-pink-500/10 text-pink-500' },
-    { id: 'poll', title: 'Poll', description: 'Ask a question and collect votes', onSelect: onPoll, icon: <BarChart3 className="h-5 w-5" />, iconStyle: 'bg-pink-500/10 text-pink-500' },
-    { id: 'photo-collage', title: 'Photo Collage', description: 'Combine 2–6 photos in one sticker', onSelect: onPhotoCollage, icon: <Images className="h-5 w-5" />, iconStyle: 'bg-indigo-500/10 text-indigo-500' },
-    { id: 'emoji-slider', title: 'Emoji Slider', description: 'Collect emoji reactions from viewers', onSelect: onEmojiSlider, icon: <SlidersHorizontal className="h-5 w-5" />, iconStyle: 'bg-orange-500/10 text-orange-500' },
-    { id: 'quiz', title: 'Quiz', description: 'Ask a question with one correct answer', onSelect: onQuiz, icon: <Brain className="h-5 w-5" />, iconStyle: 'bg-violet-500/10 text-violet-500' },
-    { id: 'countdown', title: 'Countdown', description: 'Add a live countdown to your story', onSelect: onCountdown, icon: <Timer className="h-5 w-5" />, iconStyle: 'bg-violet-500/10 text-violet-500' },
-    { id: 'link', title: 'Link', description: 'Add a clickable website sticker', onSelect: onLink, icon: <Link2 className="h-5 w-5" />, iconStyle: 'bg-blue-500/10 text-blue-500' },
-    { id: 'snapdrop', title: 'SnapDrop', description: 'Invite people to add a photo', onSelect: onSnapDrop, icon: <Camera className="h-5 w-5" />, iconStyle: 'bg-violet-500/10 text-violet-500' },
-    { id: 'shapecut', title: 'ShapeCut', description: 'Clip a photo into one of 120 shapes', onSelect: onShapeCut, icon: <Shapes className="h-5 w-5" />, iconStyle: 'bg-cyan-500/10 text-cyan-500' },
+    { id: 'emoji', title: 'Emojis', description: 'Add searchable emoji stickers', onSelect: onEmoji, icon: <Smile className="h-5 w-5" />, iconStyle: 'bg-muted text-muted-foreground' },
+    { id: 'gif', title: 'GIF', description: 'Search animated GIF stickers', onSelect: onGIF, icon: <Image className="h-5 w-5" />, iconStyle: 'bg-muted text-muted-foreground' },
+    { id: 'mention', title: 'Mention', description: 'Tag someone in your story', onSelect: onMention, icon: <AtSign className="h-5 w-5" />, iconStyle: 'bg-muted text-muted-foreground' },
+    { id: 'poll', title: 'Poll', description: 'Ask a question and collect votes', onSelect: onPoll, icon: <BarChart3 className="h-5 w-5" />, iconStyle: 'bg-muted text-muted-foreground' },
+    { id: 'photo-collage', title: 'Photo Collage', description: 'Combine 2–6 photos in one sticker', onSelect: onPhotoCollage, icon: <Images className="h-5 w-5" />, iconStyle: 'bg-muted text-muted-foreground' },
+    { id: 'emoji-slider', title: 'Emoji Slider', description: 'Collect emoji reactions from viewers', onSelect: onEmojiSlider, icon: <SlidersHorizontal className="h-5 w-5" />, iconStyle: 'bg-muted text-muted-foreground' },
+    { id: 'quiz', title: 'Quiz', description: 'Ask a question with one correct answer', onSelect: onQuiz, icon: <Brain className="h-5 w-5" />, iconStyle: 'bg-muted text-muted-foreground' },
+    { id: 'countdown', title: 'Countdown', description: 'Add a live countdown to your story', onSelect: onCountdown, icon: <Timer className="h-5 w-5" />, iconStyle: 'bg-muted text-muted-foreground' },
+    { id: 'link', title: 'Link', description: 'Add a clickable website sticker', onSelect: onLink, icon: <Link2 className="h-5 w-5" />, iconStyle: 'bg-muted text-muted-foreground' },
+    { id: 'snapdrop', title: 'SnapDrop', description: 'Invite people to add a photo', onSelect: onSnapDrop, icon: <Camera className="h-5 w-5" />, iconStyle: 'bg-muted text-muted-foreground' },
+    { id: 'shapecut', title: 'ShapeCut', description: 'Clip a photo into one of 120 shapes', onSelect: onShapeCut, icon: <Shapes className="h-5 w-5" />, iconStyle: 'bg-muted text-muted-foreground' },
   ]
 
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
@@ -64,6 +64,7 @@ export function StoryStickerSidebar({ onClose, onMention, onLink, onCountdown, o
             <button
               type="button"
               onClick={() => setSearchQuery('')}
+              aria-label="Clear sticker search"
               className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               Clear
