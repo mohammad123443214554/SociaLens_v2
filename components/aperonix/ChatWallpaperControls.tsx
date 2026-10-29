@@ -400,14 +400,24 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
                 )}
               </div>
 
-              <div className="relative mx-auto mb-5 h-[min(58dvh,620px)] min-h-[260px] w-full max-w-2xl overflow-hidden rounded-2xl border border-pink-500/30 bg-slate-950/70 shadow-inner sm:h-[min(62dvh,680px)]">
-                {draft ? (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={draft.originalDataUrl} alt="Wallpaper preview" className="absolute inset-0 h-full w-full object-cover transition-[transform,object-position,filter] duration-150" style={{ filter: FILTERS[draft.filterIndex]?.css || 'none', objectPosition: draft.positionX + '% ' + draft.positionY + '%', transform: 'scale(' + draft.zoom / 100 + ') rotate(' + draft.rotationDegrees + 'deg)' }} />
-                    <div className="absolute bottom-3 left-3 rounded-lg border border-white/20 bg-slate-950/55 px-3 py-2 text-xs text-white backdrop-blur-sm">{wallpaperLabel === 'chat' ? 'Chat wallpaper preview' : 'Voice wallpaper preview'}</div>
-                  </>
-                ) : <button type="button" onClick={() => fileRef.current?.click()} className="flex h-full w-full flex-col items-center justify-center gap-2 p-6"><ImagePlus className="h-8 w-8 text-pink-500" /><span className="text-sm">Choose a photo to start</span></button>}
+              <div className="mx-auto mb-5 w-full max-w-3xl">
+                <div className="mb-2 flex items-center justify-between gap-3 px-1">
+                  <div><h3 className="text-sm font-semibold">Live chat-area preview</h3><p className="text-xs text-muted-foreground">This canvas matches the wallpaper region between the chat header and message composer.</p></div>
+                  {draft && <span className="shrink-0 rounded-full border border-border bg-background/70 px-2.5 py-1 text-xs tabular-nums text-muted-foreground">{draft.zoom}% · {draft.rotationDegrees}°</span>}
+                </div>
+                <div className="relative isolate aspect-[1.08/1] max-h-[min(55dvh,560px)] min-h-[250px] w-full overflow-hidden rounded-2xl border border-border bg-slate-950 shadow-[0_18px_60px_-24px_rgba(168,85,247,0.45)] sm:aspect-[1.15/1]">
+                  {draft ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={draft.originalDataUrl} alt="Wallpaper crop preview" className="absolute inset-0 h-full w-full object-cover transition-[transform,object-position,filter] duration-150" style={{ filter: FILTERS[draft.filterIndex]?.css || 'none', objectPosition: draft.positionX + '% ' + draft.positionY + '%', transform: 'scale(' + draft.zoom / 100 + ') rotate(' + draft.rotationDegrees + 'deg)' }} />
+                      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/25 via-transparent to-slate-950/35" />
+                      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-pink-500 via-violet-500 to-sky-500" />
+                      <div className="absolute left-3 top-4 max-w-[78%] rounded-2xl rounded-tl-md border border-white/15 bg-slate-950/55 px-3 py-2 text-xs text-white shadow-lg backdrop-blur-md sm:left-5 sm:top-6 sm:px-4 sm:py-3 sm:text-sm">Hey! This is how your wallpaper looks behind incoming messages.</div>
+                      <div className="absolute right-3 top-[30%] max-w-[76%] rounded-2xl rounded-tr-md border border-white/15 bg-gradient-to-br from-pink-500/90 to-violet-600/90 px-3 py-2 text-xs text-white shadow-lg backdrop-blur-md sm:right-5 sm:px-4 sm:py-3 sm:text-sm">And your sent messages stay clear and readable.</div>
+                      <div className="absolute bottom-4 left-3 flex items-center gap-2 rounded-full border border-white/15 bg-slate-950/55 px-3 py-1.5 text-[10px] text-white/90 backdrop-blur-md sm:bottom-5 sm:left-5 sm:text-xs"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> {wallpaperLabel === 'chat' ? 'Chat wallpaper' : 'Voice wallpaper'} preview</div>
+                    </>
+                  ) : <button type="button" onClick={() => fileRef.current?.click()} className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center text-white"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 to-violet-600 shadow-lg"><ImagePlus className="h-7 w-7" /></span><span className="text-sm font-semibold">Choose a photo to start</span><span className="text-xs text-white/60">JPG, PNG or WebP · up to 15 MB</span></button>}
+                </div>
               </div>
               {error && <p role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">{error}</p>}
               <div className="mb-3 flex items-center justify-between gap-3"><div><h3 className="text-sm font-semibold">Filters</h3><p className="text-xs text-muted-foreground">120 presets · previews use your selected photo</p></div><span className="rounded-full border border-pink-500/30 px-2.5 py-1 text-xs text-pink-500">{draft ? FILTERS[draft.filterIndex]?.name : 'Choose a photo'}</span></div>
