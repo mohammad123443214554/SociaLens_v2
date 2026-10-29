@@ -67,6 +67,67 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
   const [rotation, setRotation] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [targetRatio, setTargetRatio] = useState(9 / 16)
+  const [draftDataUrl, setDraftDataUrl] = useState<string | null>(null)
+  const [draftRestored, setDraftRestored] = useState(false)
+  const draftKeyRef = useRef<string | null>(null)
+
+  // Keep an in-progress wallpaper edit across refreshes of this exact chat
+  // route. sessionStorage is tab-scoped; the image is restored as a File so
+  // the same editor controls and export path continue to work.
+  useEffect(() => {
+    const key = `socia-lens-wallpaper-draft:${window.location.pathname}`
+    draftKeyRef.current = key
+    try {
+      const raw = window.sessionStorage.getItem(key)
+      if (raw) {
+        const draft = JSON.parse(raw) as {
+          dataUrl?: string
+          name?: string
+          type?: string
+          position?: { x: number; y: number }
+          zoom?: number
+          rotation?: number
+        }
+        if (draft.dataUrl?.startsWith('data:')) {
+          const [header, encoded] = draft.dataUrl.split(',')
+          const mime = draft.type || header.match(/data:([^;]+)/)?.[1] || 'image/jpeg'
+          const binary = window.atob(encoded || '')
+          const bytes = new Uint8Array(binary.length)
+          for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+          const restoredFile = new File([bytes], draft.name || 'chat-wallpaper.jpg', { type: mime })
+          setFile(restoredFile)
+          setPreviewUrl(URL.createObjectURL(restoredFile))
+          setDraftDataUrl(draft.dataUrl)
+          setPosition(draft.position || { x: 50, y: 50 })
+          setZoom(typeof draft.zoom === 'number' ? draft.zoom : 100)
+          setRotation(typeof draft.rotation === 'number' ? draft.rotation : 0)
+        }
+      }
+    } catch (cause) {
+      console.error('Could not restore wallpaper editor draft', cause)
+      window.sessionStorage.removeItem(key)
+    } finally {
+      setDraftRestored(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!draftRestored || !draftDataUrl || !file || !draftKeyRef.current) return
+    try {
+      window.sessionStorage.setItem(draftKeyRef.current, JSON.stringify({
+        dataUrl: draftDataUrl,
+        name: file.name,
+        type: file.type,
+        position,
+        zoom,
+        rotation,
+      }))
+    } catch (cause) {
+      // Storage can be unavailable or full for unusually large images; the
+      // editor remains usable in memory and still reports upload errors.
+      console.warn('Wallpaper draft could not be persisted for refresh', cause)
+    }
+  }, [draftRestored, draftDataUrl, file, position, zoom, rotation])
 
   // Match the real chat wallpaper surface: the chat column's width divided
   // by its actual height. Recalculate on resize/orientation changes.
@@ -81,13 +142,13 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
     return () => window.removeEventListener('resize', updateRatio)
   }, [])
 
-  // Try opening the native picker on entry, but keep a visible fallback button.
-  // Do not close on window focus: browsers can fire focus before input.onChange,
-  // which used to close the modal before the selected photo was processed.
+  // Open the native picker only for a fresh editor. If this route is refreshed
+  // with a saved draft, restore the editor instead of interrupting it with a picker.
   useEffect(() => {
+    if (!draftRestored || draftDataUrl) return
     const id = window.requestAnimationFrame(() => fileInputRef.current?.click())
     return () => window.cancelAnimationFrame(id)
-  }, [])
+  }, [draftRestored, draftDataUrl])
 
   useEffect(() => {
     return () => {
@@ -129,12 +190,19 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
     setPosition({ x: 50, y: 50 })
     setZoom(100)
     setRotation(0)
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setDraftDataUrl(reader.result)
+    }
+    reader.readAsDataURL(picked)
   }
 
   const handleCancel = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setFile(null)
     setPreviewUrl(null)
+    setDraftDataUrl(null)
+    if (draftKeyRef.current) window.sessionStorage.removeItem(draftKeyRef.current)
     onClose()
   }
 
