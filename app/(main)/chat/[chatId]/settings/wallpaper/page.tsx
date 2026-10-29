@@ -1,12 +1,14 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { WallpaperModal } from '@/components/chat/WallpaperModal'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { useUser } from '@/lib/hooks/useUser'
-import { useSetChatWallpaper } from '@/lib/hooks/useChatSettings'
+import { useSetChatWallpaper, useArchiveLockStatus } from '@/lib/hooks/useChatSettings'
 import { createClient } from '@/lib/supabase/client'
+import { ArchiveUnlockScreen } from '@/components/chat/ArchiveUnlockScreen'
+import { ArchivePasswordWizard } from '@/components/chat/ArchivePasswordWizard'
 
 export default function ChatWallpaperRoutePage() {
   const params = useParams()
@@ -16,6 +18,28 @@ export default function ChatWallpaperRoutePage() {
   const supabase = useMemo(() => createClient(), [])
   const setChatWallpaper = useSetChatWallpaper()
   const [saving, setSaving] = useState(false)
+  const [chat, setChat] = useState<any>(null)
+  const [archiveUnlocked, setArchiveUnlocked] = useState(false)
+  const { data: archiveLock } = useArchiveLockStatus(user?.id)
+
+  useEffect(() => {
+    if (!chatId || !user?.id) return
+    let cancelled = false
+    void supabase
+      .from('chats')
+      .select('id, archived_by')
+      .eq('id', chatId)
+      .single()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error || !data) {
+          router.replace('/chat')
+          return
+        }
+        setChat(data)
+      })
+    return () => { cancelled = true }
+  }, [chatId, user?.id, router, supabase])
 
   const handleSave = async (file: File, position: { x: number; y: number }) => {
     if (!user?.id || saving) return
@@ -45,7 +69,20 @@ export default function ChatWallpaperRoutePage() {
     }
   }
 
-  if (loading || !user) return <PageLoader />
+  if (loading || !user || !chat) return <PageLoader />
+
+  // Keep the archive lock effective even when the wallpaper URL is opened
+  // directly or refreshed instead of coming from the conversation page.
+  const isArchivedByMe = Array.isArray(chat.archived_by) && chat.archived_by.includes(user.id)
+  if (isArchivedByMe && !archiveUnlocked) {
+    if (archiveLock && !archiveLock.hasPassword) {
+      return <ArchivePasswordWizard onClose={() => router.push('/chat')} onDone={() => setArchiveUnlocked(true)} />
+    }
+    if (archiveLock) {
+      return <ArchiveUnlockScreen hint={archiveLock.hint} onUnlock={() => setArchiveUnlocked(true)} title="Chat is locked" />
+    }
+    return <PageLoader />
+  }
 
   return (
     <div className="fixed inset-0 z-[140] bg-background">
