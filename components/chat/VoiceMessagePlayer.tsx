@@ -89,7 +89,7 @@ export function VoiceMessagePlayer({ url, durationSeconds, isOwn, playbackRate =
   const currentDuration = Number.isFinite(duration) && duration ? duration : 0
 
   return (
-    <div className={`w-[min(300px,calc(78vw))] min-w-[210px] ${isOwn ? 'text-white' : 'text-foreground'}`}>
+    <div className={`w-[min(260px,calc(100vw-170px))] min-w-0 ${isOwn ? 'text-white' : 'text-foreground'}`}>
       <div className="flex items-center gap-3">
         <button
           type="button"
