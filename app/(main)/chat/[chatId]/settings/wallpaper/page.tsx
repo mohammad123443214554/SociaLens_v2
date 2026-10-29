@@ -23,6 +23,7 @@ export default function ChatWallpaperRoutePage() {
   const setChatWallpaper = useSetChatWallpaper()
   const deleteChatWallpaper = useDeleteChatWallpaper()
   const [saving, setSaving] = useState(false)
+  const [confirmRemove, setConfirmRemove] = useState(false)
   const [chat, setChat] = useState<any>(null)
   const [archiveUnlocked, setArchiveUnlocked] = useState(false)
   const { data: archiveLock } = useArchiveLockStatus(user?.id)
@@ -118,9 +119,22 @@ export default function ChatWallpaperRoutePage() {
               <span className="flex items-center gap-3"><ImageIcon className="h-5 w-5 text-muted-foreground" /><span><span className="block font-medium">{currentWallpaper?.wallpaper_url ? 'Change Wallpaper' : 'Set Wallpaper'}</span><span className="text-sm text-muted-foreground">Choose a new photo from your device</span></span></span><ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
             {currentWallpaper?.wallpaper_url && <button type="button" onClick={() => router.push(`/chat/${chatId}/settings/wallpaper?mode=edit`)} className="flex w-full items-center justify-between px-4 py-4 text-left hover:bg-muted/60"><span className="flex items-center gap-3"><PencilLine className="h-5 w-5 text-muted-foreground" /><span><span className="block font-medium">Edit Wallpaper</span><span className="text-sm text-muted-foreground">Adjust the current wallpaper</span></span></span><ChevronRight className="h-4 w-4 text-muted-foreground" /></button>}
-            {currentWallpaper?.wallpaper_url && <button type="button" disabled={saving} onClick={() => { if (window.confirm('Remove this chat wallpaper? You can set another one anytime.')) void handleRemoveWallpaper() }} className="flex w-full items-center justify-between px-4 py-4 text-left text-destructive hover:bg-destructive/5 disabled:opacity-50"><span className="flex items-center gap-3"><ImageOff className="h-5 w-5" /><span><span className="block font-medium">{saving ? 'Removing…' : 'Remove Wallpaper'}</span><span className="text-sm opacity-80">Return to the default chat background</span></span></span><ChevronRight className="h-4 w-4" /></button>}
+            {currentWallpaper?.wallpaper_url && <button type="button" disabled={saving} onClick={() => setConfirmRemove(true)} className="flex w-full items-center justify-between px-4 py-4 text-left text-destructive hover:bg-destructive/5 disabled:opacity-50"><span className="flex items-center gap-3"><ImageOff className="h-5 w-5" /><span><span className="block font-medium">{saving ? 'Removing…' : 'Remove Wallpaper'}</span><span className="text-sm opacity-80">Return to the default chat background</span></span></span><ChevronRight className="h-4 w-4" /></button>}
           </div>
         </main>
+        {confirmRemove && (
+          <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/60 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setConfirmRemove(false) }}>
+            <section role="alertdialog" aria-modal="true" aria-labelledby="remove-wallpaper-title" aria-describedby="remove-wallpaper-description" className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive"><ImageOff className="h-6 w-6" /></div>
+              <h2 id="remove-wallpaper-title" className="text-center text-lg font-semibold">Remove wallpaper?</h2>
+              <p id="remove-wallpaper-description" className="mt-2 text-center text-sm text-muted-foreground">Your chat will return to its default background. You can set a new wallpaper anytime.</p>
+              <div className="mt-5 flex gap-3">
+                <button type="button" disabled={saving} onClick={() => setConfirmRemove(false)} className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted disabled:opacity-50">Cancel</button>
+                <button type="button" disabled={saving} onClick={() => void handleRemoveWallpaper()} className="flex-1 rounded-xl bg-destructive px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? 'Removing…' : 'Remove wallpaper'}</button>
+              </div>
+            </section>
+          </div>
+        )}
       </div>
     )
   }
