@@ -25,6 +25,7 @@ export function VoiceMessagePlayer({ url, durationSeconds, isOwn, playbackRate =
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
   const [waveform, setWaveform] = useState<number[]>(FALLBACK_WAVEFORM)
+  const [playbackError, setPlaybackError] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -64,13 +65,22 @@ export function VoiceMessagePlayer({ url, durationSeconds, isOwn, playbackRate =
     if (audioRef.current) audioRef.current.playbackRate = playbackRate
   }, [playbackRate])
 
-  const toggle = () => {
+  const toggle = async () => {
     const audio = audioRef.current
-    if (!audio) return
-    if (playing) audio.pause()
-    else {
+    if (!audio || !url) return
+    setPlaybackError(false)
+    if (playing) {
+      audio.pause()
+      return
+    }
+    try {
       audio.playbackRate = playbackRate
-      void audio.play().catch(() => setPlaying(false))
+      if (audio.networkState === HTMLMediaElement.NETWORK_EMPTY) audio.load()
+      await audio.play()
+    } catch (error) {
+      console.error('[chat] Voice message playback failed:', error)
+      setPlaying(false)
+      setPlaybackError(true)
     }
   }
 
@@ -82,7 +92,8 @@ export function VoiceMessagePlayer({ url, durationSeconds, isOwn, playbackRate =
     <div className={`w-[min(300px,calc(78vw))] min-w-[210px] ${isOwn ? 'text-white' : 'text-foreground'}`}>
       <div className="flex items-center gap-3">
         <button
-          onClick={toggle}
+          type="button"
+          onClick={() => { void toggle() }}}
           aria-label={playing ? 'Pause voice message' : 'Play voice message'}
           className="h-11 w-11 rounded-full shrink-0 flex items-center justify-center bg-gradient-to-br from-violet-500 via-purple-600 to-blue-600 text-white shadow-[0_0_14px_rgba(139,92,246,0.35)] ring-1 ring-white/15"
         >
@@ -99,7 +110,7 @@ export function VoiceMessagePlayer({ url, durationSeconds, isOwn, playbackRate =
       </div>
       <div className="flex items-center justify-between gap-3 pl-[56px] mt-0.5 min-h-[18px]">
         <span className={`text-xs tabular-nums ${isOwn ? 'text-white/80' : 'text-muted-foreground'}`}>{currentDuration ? formatTime(currentDuration) : '0:00'}</span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           {timestamp && <span className={`text-xs whitespace-nowrap ${isOwn ? 'text-white/70' : 'text-muted-foreground'}`}>{timestamp}</span>}
           {isOwn && (
             isRead && seenAvatarUrl ? (
@@ -109,7 +120,7 @@ export function VoiceMessagePlayer({ url, durationSeconds, isOwn, playbackRate =
               </Avatar>
             ) : (
               <span className={`inline-flex items-center -space-x-1 ${isRead ? 'text-violet-400' : isOwn ? 'text-white/65' : 'text-muted-foreground'}`} aria-label={isRead ? 'Read' : 'Sent'}>
-                <svg width="17" height="13" viewBox="0 0 17 13" fill="none" aria-hidden="true"><path d="M1 6.5 4.4 10 11.2 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 6.5 9.4 10 16.2 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5 4.7 9 10 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </span>
             )
           )}
@@ -123,11 +134,13 @@ export function VoiceMessagePlayer({ url, durationSeconds, isOwn, playbackRate =
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => { setPlaying(false); setProgress(0) }}
+        onError={() => { setPlaying(false); setPlaybackError(true) }}
         onTimeUpdate={(e) => {
           const audio = e.currentTarget
           if (audio.duration) setProgress((audio.currentTime / audio.duration) * 100)
         }}
       />
+      {playbackError && <p role="status" className="mt-1 pl-[56px] text-[10px] text-red-300">Could not play this voice message. Please try again.</p>}
     </div>
   )
 }
