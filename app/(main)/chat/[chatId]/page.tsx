@@ -343,12 +343,18 @@ export default function ChatRoomPage() {
   }
 
   return (
-    <div className="relative flex flex-col h-[100dvh] lg:h-[calc(100vh-3.5rem)] max-w-xl mx-auto">
+    <div
+      className="relative flex flex-col h-[100dvh] lg:h-[calc(100vh-3.5rem)] max-w-xl mx-auto bg-no-repeat bg-cover"
+      style={wallpaper?.wallpaper_url ? {
+        backgroundImage: `url(${wallpaper.wallpaper_url})`,
+        backgroundPosition: `${wallpaper.position_x ?? 50}% ${wallpaper.position_y ?? 50}%`,
+      } : undefined}
+    >
       {showRestrictionPopup && (
         <RestrictionPopup feature="messaging" until={profile?.restrict_message_until} onClose={() => setShowRestrictionPopup(false)} />
       )}
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b bg-background sticky top-0 lg:top-14 z-10">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-background/10 backdrop-blur-sm sticky top-0 lg:top-14 z-10">
         <button onClick={() => router.back()} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -409,14 +415,7 @@ export default function ChatRoomPage() {
       </div>
 
       {/* Conversation timeline and composer share one wallpaper surface, down to the bottom edge. */}
-      <div
-        className="flex-1 min-h-0 flex flex-col overflow-hidden bg-no-repeat"
-        style={wallpaper?.wallpaper_url ? {
-          backgroundImage: `url(${wallpaper.wallpaper_url})`,
-          backgroundSize: 'cover',
-          backgroundPosition: `${wallpaper.position_x ?? 50}% ${wallpaper.position_y ?? 50}%`,
-        } : undefined}
-      >
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-transparent">
       <RealtimeMessages
         messages={messages}
         currentUserId={user.id}
