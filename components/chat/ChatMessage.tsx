@@ -77,6 +77,25 @@ function formatCallDuration(sec: number) {
   return `${m}:${s}`
 }
 
+function MessageReadReceipt({ isRead, avatarUrl }: { isRead: boolean; avatarUrl?: string | null }) {
+  if (isRead && avatarUrl) {
+    return (
+      <Avatar className="inline-flex h-[15px] w-[15px] shrink-0 align-middle ring-1 ring-violet-400/70" title="Seen">
+        <AvatarImage src={getAvatarUrl(avatarUrl) || undefined} />
+        <AvatarFallback className="text-[7px] bg-violet-600 text-white">✓</AvatarFallback>
+      </Avatar>
+    )
+  }
+  return (
+    <span className={cn('inline-flex items-center shrink-0 align-middle', isRead ? 'text-violet-400' : 'text-muted-foreground/70')} title={isRead ? 'Seen' : 'Sent'} aria-label={isRead ? 'Seen' : 'Sent'}>
+      <svg width="17" height="13" viewBox="0 0 17 13" fill="none" aria-hidden="true">
+        <path d="M1 6.5 4.4 10 11.2 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6 6.5 9.4 10 16.2 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
+  )
+}
+
 export function ChatMessage({ message, isOwn, currentUserId, otherUsername, currentUserAvatarUrl, otherAvatarUrl, onReply, onRemoveMessage, onPatchMessage, onCallAgain, unavailable }: ChatMessageProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showCallMenu, setShowCallMenu] = useState(false)
@@ -517,7 +536,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
             <SharedAperonixContentMessage content={message.content} isOwn={isOwn} messageId={message.id} />
             <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-muted-foreground' : 'text-muted-foreground')}>
               {formatTimeAgo(message.created_at)}
-              {isOwn && (message.is_read ? ' · Seen' : ' · Sent')}
+              {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
             </p>
           </div>
         ) : isAperonixReply ? (
@@ -525,7 +544,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
             <AperonixReplyMessage content={message.content} isOwn={isOwn} />
             <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-muted-foreground' : 'text-muted-foreground')}>
               {formatTimeAgo(message.created_at)}
-              {isOwn && (message.is_read ? ' · Seen' : ' · Sent')}
+              {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
             </p>
           </div>
         ) : (message as any).post_id ? (
@@ -533,7 +552,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
             <SharedPostMessage postId={(message as any).post_id} />
             <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-white/70' : 'text-muted-foreground')}>
               {formatTimeAgo(message.created_at)}
-              {isOwn && (message.is_read ? ' · Seen' : ' · Sent')}
+              {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
             </p>
           </div>
         ) : (message as any).story_id ? (
@@ -541,24 +560,28 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
             <SharedStoryMessage storyId={(message as any).story_id} content={message.content} isOwn={isOwn} />
             <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-white/70' : 'text-muted-foreground')}>
               {formatTimeAgo(message.created_at)}
-              {isOwn && (message.is_read ? ' · Seen' : ' · Sent')}
+              {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
             </p>
           </div>
         ) : (message as any).sticker ? (
           <div className="text-6xl leading-none px-1">{(message as any).sticker}</div>
         ) : mediaType === 'audio' ? (
           <div className={cn(
-            'px-3 py-2',
+            'px-3 py-2.5',
             isOwn
-              ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl rounded-br-sm'
-              : 'bg-muted rounded-2xl rounded-bl-sm'
+              ? 'bg-gradient-to-r from-pink-500/95 to-purple-600/95 text-white rounded-2xl rounded-br-sm'
+              : 'bg-background/85 backdrop-blur-sm border border-violet-400/15 rounded-2xl rounded-bl-sm'
           )}>
-            <VoiceMessagePlayer url={mediaUrl!} durationSeconds={(message as any).media_duration_seconds} isOwn={isOwn} playbackRate={playbackRate} />
-            <p className={cn('text-[10px] mt-1 flex items-center gap-1.5', isOwn ? 'text-white/70' : 'text-muted-foreground')}>
-              {playbackRate !== 1 && <span className="font-semibold">{playbackRate}x ·</span>}
-              {formatTimeAgo(message.created_at)}
-              {isOwn && (message.is_read ? ' · Seen' : ' · Sent')}
-            </p>
+            <VoiceMessagePlayer
+              url={mediaUrl!}
+              durationSeconds={(message as any).media_duration_seconds}
+              isOwn={isOwn}
+              playbackRate={playbackRate}
+              timestamp={formatTimeAgo(message.created_at)}
+              isRead={message.is_read}
+              seenAvatarUrl={otherAvatarUrl}
+            />
+            {playbackRate !== 1 && <p className="text-[10px] mt-1 text-right opacity-75">{playbackRate}x speed</p>}
           </div>
         ) : (mediaType === 'image' || mediaType === 'video') ? (
           <div className={cn('rounded-2xl overflow-hidden max-w-[240px] relative', isOwn ? 'rounded-br-sm' : 'rounded-bl-sm')}>
@@ -597,7 +620,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
               isOwn ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white/70' : 'bg-muted text-muted-foreground'
             )}>
               {formatTimeAgo(message.created_at)}
-              {isOwn && (message.is_read ? ' · Seen' : ' · Sent')}
+              {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
             </p>
           </div>
         ) : (
@@ -611,7 +634,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
             <p className={cn('text-[10px] mt-0.5 flex items-center gap-1', isOwn ? 'text-white/70' : 'text-muted-foreground')}>
               {(message as any).is_edited && <span className="italic">Edited ·</span>}
               {formatTimeAgo(message.created_at)}
-              {isOwn && (message.is_read ? ' · Seen' : ' · Sent')}
+              {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
             </p>
           </div>
         )}
