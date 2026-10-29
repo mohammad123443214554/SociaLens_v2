@@ -88,9 +88,8 @@ function MessageReadReceipt({ isRead, avatarUrl }: { isRead: boolean; avatarUrl?
   }
   return (
     <span className={cn('inline-flex items-center shrink-0 align-middle', isRead ? 'text-violet-400' : 'text-muted-foreground/70')} title={isRead ? 'Seen' : 'Sent'} aria-label={isRead ? 'Seen' : 'Sent'}>
-      <svg width="17" height="13" viewBox="0 0 17 13" fill="none" aria-hidden="true">
-        <path d="M1 6.5 4.4 10 11.2 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M6 6.5 9.4 10 16.2 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <path d="M2 6.5 4.7 9 10 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </span>
   )
@@ -534,7 +533,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
         ) : isSharedAperonixContent ? (
           <div className="w-full min-w-0 max-w-[560px]">
             <SharedAperonixContentMessage content={message.content} isOwn={isOwn} messageId={message.id} />
-            <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-muted-foreground' : 'text-muted-foreground')}>
+            <p className={cn('text-[10px] mt-1 flex items-center gap-1.5', isOwn ? 'justify-end text-muted-foreground' : 'text-muted-foreground')}>
               {formatTimeAgo(message.created_at)}
               {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
             </p>
@@ -542,7 +541,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
         ) : isAperonixReply ? (
           <div>
             <AperonixReplyMessage content={message.content} isOwn={isOwn} />
-            <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-muted-foreground' : 'text-muted-foreground')}>
+            <p className={cn('text-[10px] mt-1 flex items-center gap-1.5', isOwn ? 'justify-end text-muted-foreground' : 'text-muted-foreground')}>
               {formatTimeAgo(message.created_at)}
               {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
             </p>
@@ -550,7 +549,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
         ) : (message as any).post_id ? (
           <div className="max-w-[240px]">
             <SharedPostMessage postId={(message as any).post_id} />
-            <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-white/70' : 'text-muted-foreground')}>
+            <p className={cn('text-[10px] mt-1 flex items-center gap-1.5', isOwn ? 'justify-end text-white/70' : 'text-muted-foreground')}>
               {formatTimeAgo(message.created_at)}
               {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
             </p>
@@ -558,7 +557,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
         ) : (message as any).story_id ? (
           <div>
             <SharedStoryMessage storyId={(message as any).story_id} content={message.content} isOwn={isOwn} />
-            <p className={cn('text-[10px] mt-1', isOwn ? 'text-right text-white/70' : 'text-muted-foreground')}>
+            <p className={cn('text-[10px] mt-1 flex items-center gap-1.5', isOwn ? 'justify-end text-white/70' : 'text-muted-foreground')}>
               {formatTimeAgo(message.created_at)}
               {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
             </p>
@@ -622,7 +621,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
               </div>
             )}
             <p className={cn(
-              'text-[10px] px-3 py-1',
+              'text-[10px] px-3 py-1 flex items-center gap-1.5',
               isOwn ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white/70' : 'bg-muted text-muted-foreground'
             )}>
               {formatTimeAgo(message.created_at)}
@@ -637,7 +636,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
               : 'bg-muted rounded-2xl rounded-bl-sm'
           )}>
             <p className="whitespace-pre-wrap break-words">{message.content}</p>
-            <p className={cn('text-[10px] mt-0.5 flex items-center gap-1', isOwn ? 'text-white/70' : 'text-muted-foreground')}>
+            <p className={cn('text-[10px] mt-0.5 flex items-center gap-1.5', isOwn ? 'text-white/70 justify-end' : 'text-muted-foreground')}>
               {(message as any).is_edited && <span className="italic">Edited ·</span>}
               {formatTimeAgo(message.created_at)}
               {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
