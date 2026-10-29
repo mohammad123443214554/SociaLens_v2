@@ -502,7 +502,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
           <AvatarFallback className="text-[9px]">{(otherUsername || 'U').slice(0, 1).toUpperCase()}</AvatarFallback>
         </Avatar>
       )}
-      <div className="w-fit min-w-0 max-w-[84%] sm:max-w-[78%] flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
+      <div className="min-w-0 flex-1 max-w-[84%] sm:max-w-[78%] flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
         {replyPreview && (
           <div className="flex flex-col mb-1.5" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
             <p className="text-[11px] text-muted-foreground px-1 mb-1">
