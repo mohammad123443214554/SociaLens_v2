@@ -113,7 +113,7 @@ export default function ChatSettingsRoutePage() {
   }
 
   return (
-    <div className="relative min-h-[calc(100dvh-4rem)] bg-background">
+    <div className="relative min-h-[100dvh] bg-background">
       <ChatSettingsPage
         otherUsername={other.username}
         myNicknameForThem={nickname || null}
