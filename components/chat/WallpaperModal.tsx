@@ -8,6 +8,9 @@ interface WallpaperModalProps {
   onDone: (file: File, position: { x: number; y: number }) => void
   onClose: () => void
   saving?: boolean
+  initialImageUrl?: string
+  initialPosition?: { x: number; y: number }
+  saveLabel?: string
 }
 
 /**
@@ -57,24 +60,47 @@ function drawWallpaper(
   context.restore()
 }
 
-export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps) {
+export function WallpaperModal({ onDone, onClose, saving, initialImageUrl, initialPosition, saveLabel = 'Apply wallpaper' }: WallpaperModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const previewCanvasRef = useRef<HTMLCanvasElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [position, setPosition] = useState({ x: 50, y: 50 })
+  const [position, setPosition] = useState(initialPosition || { x: 50, y: 50 })
   const [zoom, setZoom] = useState(100)
   const [rotation, setRotation] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [targetRatio, setTargetRatio] = useState(9 / 16)
   const [draftDataUrl, setDraftDataUrl] = useState<string | null>(null)
   const [draftRestored, setDraftRestored] = useState(false)
+  const [initialImageLoading, setInitialImageLoading] = useState(!!initialImageUrl)
   const draftKeyRef = useRef<string | null>(null)
 
   // Keep an in-progress wallpaper edit across refreshes of this exact chat
   // route. sessionStorage is tab-scoped; the image is restored as a File so
   // the same editor controls and export path continue to work.
   useEffect(() => {
+    if (initialImageUrl) {
+      let cancelled = false
+      void (async () => {
+        try {
+          const response = await fetch(initialImageUrl)
+          if (!response.ok) throw new Error('Could not load the current wallpaper.')
+          const blob = await response.blob()
+          const restoredFile = new File([blob], 'chat-wallpaper.jpg', { type: blob.type || 'image/jpeg' })
+          if (cancelled) return
+          setFile(restoredFile)
+          setPreviewUrl(URL.createObjectURL(restoredFile))
+          setPosition(initialPosition || { x: 50, y: 50 })
+          setDraftRestored(true)
+        } catch (cause) {
+          if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load the current wallpaper.')
+          if (!cancelled) setDraftRestored(true)
+        } finally {
+          if (!cancelled) setInitialImageLoading(false)
+        }
+      })()
+      return () => { cancelled = true }
+    }
     const key = `socia-lens-wallpaper-draft:${window.location.pathname}`
     draftKeyRef.current = key
     try {
@@ -109,10 +135,10 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
     } finally {
       setDraftRestored(true)
     }
-  }, [])
+  }, [initialImageUrl, initialPosition])
 
   useEffect(() => {
-    if (!draftRestored || !draftDataUrl || !file || !draftKeyRef.current) return
+    if (initialImageUrl || !draftRestored || !draftDataUrl || !file || !draftKeyRef.current) return
     try {
       window.sessionStorage.setItem(draftKeyRef.current, JSON.stringify({
         dataUrl: draftDataUrl,
@@ -127,7 +153,7 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
       // editor remains usable in memory and still reports upload errors.
       console.warn('Wallpaper draft could not be persisted for refresh', cause)
     }
-  }, [draftRestored, draftDataUrl, file, position, zoom, rotation])
+  }, [initialImageUrl, draftRestored, draftDataUrl, file, position, zoom, rotation])
 
   // Match the real chat wallpaper surface: the chat column's width divided
   // by its actual height. Recalculate on resize/orientation changes.
@@ -145,10 +171,10 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
   // Open the native picker only for a fresh editor. If this route is refreshed
   // with a saved draft, restore the editor instead of interrupting it with a picker.
   useEffect(() => {
-    if (!draftRestored || draftDataUrl) return
+    if (!draftRestored || draftDataUrl || initialImageUrl) return
     const id = window.requestAnimationFrame(() => fileInputRef.current?.click())
     return () => window.cancelAnimationFrame(id)
-  }, [draftRestored, draftDataUrl])
+  }, [draftRestored, draftDataUrl, initialImageUrl])
 
   useEffect(() => {
     return () => {
@@ -251,8 +277,8 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
       {!previewUrl ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
           <div className="rounded-2xl border border-border bg-muted/50 p-5"><ZoomIn className="h-8 w-8 text-muted-foreground" /></div>
-          <div><p className="font-semibold">Choose a wallpaper photo</p><p className="mt-1 text-sm text-muted-foreground">Select a photo to open the wallpaper editor.</p></div>
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-6 py-3 font-medium text-white">Choose photo</button>
+          <div><p className="font-semibold">{initialImageLoading ? 'Loading current wallpaper…' : 'Choose a wallpaper photo'}</p><p className="mt-1 text-sm text-muted-foreground">Select a photo to open the wallpaper editor.</p></div>
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={initialImageLoading} className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-6 py-3 font-medium text-white disabled:opacity-50">Choose photo</button>
           <button type="button" onClick={onClose} className="rounded-xl px-6 py-2 text-sm text-muted-foreground hover:bg-muted">Cancel</button>
         </div>
       ) : (
@@ -261,7 +287,7 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
             <button onClick={handleCancel} className="text-muted-foreground hover:text-foreground p-1">
               <X className="h-6 w-6" />
             </button>
-            <p className="text-foreground text-sm font-medium">Set wallpaper</p>
+            <p className="text-foreground text-sm font-medium">{initialImageUrl ? 'Edit wallpaper' : 'Set wallpaper'}</p>
             <div className="w-8" />
           </div>
 
@@ -301,7 +327,7 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
               className="flex-1 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-medium disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              {saving ? 'Saving...' : 'Apply wallpaper'}
+              {saving ? 'Saving...' : saveLabel}
             </button>
           </div>
         </>
