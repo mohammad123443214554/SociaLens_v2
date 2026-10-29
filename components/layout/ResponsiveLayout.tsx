@@ -20,7 +20,7 @@ export function ResponsiveLayout({ children }: { children: React.ReactNode }) {
   // first list item (there's no more navbar height for it to stick under).
   const isFullScreenPage = pathname === '/create'
   const isImmersivePage =
-    (/^\/chat\/[^/]+$/.test(pathname || '') && pathname !== '/chat/archive') ||
+    (/^\/chat\/[^/]+(?:\/settings(?:\/wallpaper)?)?$/.test(pathname || '') && pathname !== '/chat/archive') ||
     pathname === '/aperonix' || pathname === '/aperonix/voice' || pathname === '/reels'
 
   return (
