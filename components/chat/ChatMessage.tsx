@@ -564,7 +564,13 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
             </p>
           </div>
         ) : (message as any).sticker ? (
-          <div className="text-6xl leading-none px-1">{(message as any).sticker}</div>
+          <div className="flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
+            <div className="text-6xl leading-none px-1">{(message as any).sticker}</div>
+            <p className={cn('text-[10px] mt-1 flex items-center gap-1.5', isOwn ? 'text-muted-foreground' : 'text-muted-foreground')}>
+              {formatTimeAgo(message.created_at)}
+              {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
+            </p>
+          </div>
         ) : mediaType === 'audio' ? (
           <div className={cn(
             'px-3 py-2.5',
