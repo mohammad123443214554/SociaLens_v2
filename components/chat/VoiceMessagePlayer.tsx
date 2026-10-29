@@ -93,7 +93,7 @@ export function VoiceMessagePlayer({ url, durationSeconds, isOwn, playbackRate =
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => { void toggle() }}}
+          onClick={() => { void toggle() }}
           aria-label={playing ? 'Pause voice message' : 'Play voice message'}
           className="h-11 w-11 rounded-full shrink-0 flex items-center justify-center bg-gradient-to-br from-violet-500 via-purple-600 to-blue-600 text-white shadow-[0_0_14px_rgba(139,92,246,0.35)] ring-1 ring-white/15"
         >
