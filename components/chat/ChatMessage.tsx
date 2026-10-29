@@ -386,7 +386,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
             )}
           </div>
 
-          <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
+          <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0 self-center">
             <button ref={callMenuBtnRef} onClick={openCallMenu} className="p-1.5 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
               <MoreVertical className="h-4 w-4" />
             </button>
@@ -495,14 +495,14 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
   const isAperonixReply = Boolean((message as any).is_aperonix_reply)
 
   return (
-    <div className={cn('flex w-full gap-2 mb-2 group items-end', isOwn && 'flex-row-reverse')}>
+    <div className={cn('flex w-full min-w-0 gap-2 mb-2 group items-end', isOwn && 'flex-row-reverse')}>
       {!isOwn && (
         <Avatar className="h-5 w-5 sm:h-6 sm:w-6 shrink-0 mb-4">
           <AvatarImage src={getAvatarUrl(otherAvatarUrl) || undefined} />
           <AvatarFallback className="text-[9px]">{(otherUsername || 'U').slice(0, 1).toUpperCase()}</AvatarFallback>
         </Avatar>
       )}
-      <div className="min-w-0 flex-1 max-w-[84%] sm:max-w-[78%] flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
+      <div className={cn('min-w-0 w-fit flex-none max-w-[calc(100%-6rem)] sm:max-w-[78%] flex flex-col', !isOwn && 'max-w-[calc(100%-7.5rem)]')} style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
         {replyPreview && (
           <div className="flex flex-col mb-1.5" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
             <p className="text-[11px] text-muted-foreground px-1 mb-1">
@@ -572,7 +572,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
           </div>
         ) : mediaType === 'audio' ? (
           <div className={cn(
-            'px-3 py-2.5',
+            'w-fit max-w-full px-3 py-2.5',
             isOwn
               ? 'bg-gradient-to-r from-pink-500/95 to-purple-600/95 text-white rounded-2xl rounded-br-sm'
               : 'bg-background/85 backdrop-blur-sm border border-violet-400/15 rounded-2xl rounded-bl-sm'
@@ -658,7 +658,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
       </div>
 
       {!editing && (
-        <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
+        <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0 self-center">
           <button ref={menuBtnRef} onClick={openMenu} className="p-1.5 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
             <MoreVertical className="h-4 w-4" />
           </button>
