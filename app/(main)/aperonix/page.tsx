@@ -57,6 +57,7 @@ async function loadConversationWallpaper(conversationId: string): Promise<ChatWa
       zoom: data.zoom,
       positionX: data.position_x,
       positionY: data.position_y,
+      rotationDegrees: 0,
     }
     if (typeof window !== 'undefined') {
       const image = new window.Image()
