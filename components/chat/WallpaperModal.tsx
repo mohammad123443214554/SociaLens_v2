@@ -179,14 +179,18 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
     return () => { cancelled = true }
   }, [previewUrl, position, zoom, rotation, targetRatio])
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = e.target.files?.[0]
     // Reset the input so the same photo can be selected again.
     e.target.value = ''
     if (!picked) return
-    setFile(picked)
+    // The editor exports at a fixed display resolution, so preparing a
+    // lightweight working copy also keeps the refresh-safe session draft
+    // comfortably within browser storage quotas for typical phone photos.
+    const prepared = await compressImageIfNeeded(picked)
+    setFile(prepared)
     setError(null)
-    setPreviewUrl(URL.createObjectURL(picked))
+    setPreviewUrl(URL.createObjectURL(prepared))
     setPosition({ x: 50, y: 50 })
     setZoom(100)
     setRotation(0)
@@ -194,7 +198,7 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
     reader.onload = () => {
       if (typeof reader.result === 'string') setDraftDataUrl(reader.result)
     }
-    reader.readAsDataURL(picked)
+    reader.readAsDataURL(prepared)
   }
 
   const handleCancel = () => {
