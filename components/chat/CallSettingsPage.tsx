@@ -52,9 +52,9 @@ export function CallSettingsPage({ userId, onBack }: CallSettingsPageProps) {
   const VolumeIcon = volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2
 
   return (
-    <div className="absolute inset-0 bg-background z-30 flex flex-col">
+    <div className="min-h-[100dvh] w-full bg-background flex flex-col">
       <div className="flex items-center gap-3 px-4 py-3 border-b sticky top-0 bg-background z-10">
-        <button onClick={() => { stopRingtone(); onBack() }} className="text-muted-foreground hover:text-foreground p-1 -ml-1">
+        <button onClick={() => { stopRingtone(); onBack() }} aria-label="Back to chat settings" className="text-muted-foreground hover:text-foreground p-1 -ml-1">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h1 className="font-bold text-base">Call settings</h1>
