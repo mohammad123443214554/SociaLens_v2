@@ -108,7 +108,7 @@ export default function ChatWallpaperRoutePage() {
   const showEditor = mode === 'set' || mode === 'change' || mode === 'edit'
   if (!showEditor) {
     return (
-      <div className="fixed inset-0 z-[140] flex flex-col bg-background">
+      <div className="min-h-[100dvh] w-full flex flex-col bg-background">
         <header className="flex items-center gap-3 border-b border-border px-4 py-4">
           <button type="button" onClick={() => router.push(`/chat/${chatId}/settings`)} aria-label="Back to chat settings" className="rounded-full p-2 hover:bg-muted"><ArrowLeft className="h-5 w-5" /></button>
           <div><h1 className="text-lg font-semibold">Wallpaper settings</h1><p className="text-sm text-muted-foreground">Personalize this conversation</p></div>
