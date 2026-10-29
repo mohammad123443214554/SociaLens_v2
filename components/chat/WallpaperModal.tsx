@@ -168,14 +168,6 @@ export function WallpaperModal({ onDone, onClose, saving, initialImageUrl, initi
     return () => window.removeEventListener('resize', updateRatio)
   }, [])
 
-  // Open the native picker only for a fresh editor. If this route is refreshed
-  // with a saved draft, restore the editor instead of interrupting it with a picker.
-  useEffect(() => {
-    if (!draftRestored || draftDataUrl || initialImageUrl) return
-    const id = window.requestAnimationFrame(() => fileInputRef.current?.click())
-    return () => window.cancelAnimationFrame(id)
-  }, [draftRestored, draftDataUrl, initialImageUrl])
-
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl)
