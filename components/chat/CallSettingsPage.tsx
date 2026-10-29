@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Check, Play, Volume2, Volume1, VolumeX } from 'lucide-react'
-import { RINGTONES, previewRingtone, stopRingtone } from '@/lib/utils/ringtone'
+import { RINGTONES, previewRingtone } from '@/lib/utils/ringtone'
 import { useCallSettings, useUpdateCallSettings } from '@/lib/hooks/useChatSettings'
 
 interface CallSettingsPageProps {
@@ -15,7 +15,7 @@ interface CallSettingsPageProps {
  * setting, not per-conversation) - opened from "Call settings" inside any
  * chat's settings page.
  */
-export function CallSettingsPage({ userId, onBack }: CallSettingsPageProps) {
+export function CallSettingsPage({ userId }: CallSettingsPageProps) {
   const { data: settings } = useCallSettings(userId)
   const updateSettings = useUpdateCallSettings()
   const [previewing, setPreviewing] = useState<string | null>(null)
