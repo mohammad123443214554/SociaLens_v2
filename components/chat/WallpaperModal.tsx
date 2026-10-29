@@ -56,8 +56,10 @@ function drawWallpaper(
   context.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2)
   context.restore()
 }
-\nexport function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)\n  const previewCanvasRef = useRef<HTMLCanvasElement>(null)
+
+export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [position, setPosition] = useState({ x: 50, y: 50 })
