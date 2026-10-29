@@ -35,6 +35,7 @@ export default function ChatWallpaperRoutePage() {
         positionX: Math.round(position.x),
         positionY: Math.round(position.y),
       })
+      window.sessionStorage.removeItem(`socia-lens-wallpaper-draft:${window.location.pathname}`)
       router.replace(`/chat/${chatId}/settings`)
     } catch (error) {
       console.error(error)
