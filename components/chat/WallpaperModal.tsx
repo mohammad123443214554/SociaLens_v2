@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { X, Loader2, ZoomIn, RotateCw, ArrowUp, ArrowDown, ImagePlus, Check } from 'lucide-react'
+import { X, Loader2, ZoomIn, RotateCw, ArrowUp, ArrowDown, Check } from 'lucide-react'
 import { compressImageIfNeeded } from '@/lib/utils/imageCompression'
 
 interface WallpaperModalProps {
