@@ -142,7 +142,7 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
               className="absolute inset-0 bg-no-repeat transition-[background-size,background-position,transform] duration-150"
               style={{
                 backgroundImage: `url(${previewUrl})`,
-                backgroundSize: `${zoom}% auto`,
+                backgroundSize: 'cover',
                 backgroundPosition: `${position.x}% ${position.y}%`,
                 transform: `rotate(${rotation}deg) scale(${zoom / 100})`,
               }}
