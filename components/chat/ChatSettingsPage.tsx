@@ -31,7 +31,6 @@ export function ChatSettingsPage({
   iBlockedThem,
   deleting,
   showNicknameOption,
-  onBack,
   onSetNickname,
   onSetWallpaper,
   onEditWallpaper,
