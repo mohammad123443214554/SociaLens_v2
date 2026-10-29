@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeft, PencilLine, Image as ImageIcon, ImageOff, Ban, Trash2, ChevronRight, Phone } from 'lucide-react'
+import { PencilLine, Image as ImageIcon, Ban, Trash2, ChevronRight, Phone } from 'lucide-react'
 
 interface ChatSettingsPageProps {
   otherUsername: string
@@ -44,9 +44,6 @@ export function ChatSettingsPage({
     <div className="absolute inset-0 bg-background z-20 flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b sticky top-0 bg-background z-10">
-        <button onClick={onBack} className="text-muted-foreground hover:text-foreground p-1 -ml-1">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
         <div>
           <h1 className="font-bold text-base leading-tight">Chat Setting</h1>
           <p className="text-xs text-muted-foreground">{otherUsername}</p>
@@ -77,6 +74,16 @@ export function ChatSettingsPage({
           )}
 
           <button
+            onClick={onToggleBlock}
+            className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-accent transition-colors"
+          >
+            <Ban className="h-5 w-5 text-muted-foreground" />
+            <span className="text-sm font-medium">{iBlockedThem ? 'Unblock' : 'Block'}</span>
+          </button>
+        </div>
+
+        <div className="rounded-2xl border bg-card divide-y overflow-hidden">
+          <button
             onClick={onSetWallpaper}
             className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-accent transition-colors"
           >
@@ -85,14 +92,6 @@ export function ChatSettingsPage({
               <span className="text-sm font-medium">Wallpaper settings</span>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-          </button>
-
-          <button
-            onClick={onToggleBlock}
-            className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-accent transition-colors"
-          >
-            <Ban className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium">{iBlockedThem ? 'Unblock' : 'Block'}</span>
           </button>
         </div>
 
