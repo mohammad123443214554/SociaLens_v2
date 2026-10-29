@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Check, Play, Volume2, Volume1, VolumeX } from 'lucide-react'
+import { Check, Play, Volume2, Volume1, VolumeX } from 'lucide-react'
 import { RINGTONES, previewRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import { useCallSettings, useUpdateCallSettings } from '@/lib/hooks/useChatSettings'
 
@@ -54,9 +54,6 @@ export function CallSettingsPage({ userId, onBack }: CallSettingsPageProps) {
   return (
     <div className="min-h-[100dvh] w-full bg-background flex flex-col">
       <div className="flex items-center gap-3 px-4 py-3 border-b sticky top-0 bg-background z-10">
-        <button onClick={() => { stopRingtone(); onBack() }} aria-label="Back to chat settings" className="text-muted-foreground hover:text-foreground p-1 -ml-1">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
         <h1 className="font-bold text-base">Call settings</h1>
       </div>
 
