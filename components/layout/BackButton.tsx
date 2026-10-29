@@ -39,7 +39,8 @@ export function BackButton() {
   const isChatThread = CHAT_THREAD.test(pathname) && pathname !== '/chat/archive'
   const isProfilePage = PROFILE_PAGE.test(pathname)
   const isSettingsPage = SETTINGS_PAGE.test(pathname)
-  if (EXACT_EXCLUDE.has(pathname) || isChatThread || isProfilePage || isSettingsPage) return null
+  const isChatSettingsPage = /^\\/chat\\/[^/]+\\/settings(?:\\/.*)?$/.test(pathname)
+  if (EXACT_EXCLUDE.has(pathname) || isChatThread || isChatSettingsPage || isProfilePage || isSettingsPage) return null
 
   const isReels = pathname === '/reels'
 
