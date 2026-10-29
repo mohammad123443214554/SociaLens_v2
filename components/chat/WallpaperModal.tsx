@@ -21,8 +21,43 @@ interface WallpaperModalProps {
  * detect that via the window regaining focus with no file selected, and
  * just close the modal - nothing changes.
  */
-export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
+
+function drawWallpaper(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  width: number,
+  height: number,
+  position: { x: number; y: number },
+  zoom: number,
+  rotation: number,
+) {
+  context.clearRect(0, 0, width, height)
+  context.save()
+  context.beginPath()
+  context.rect(0, 0, width, height)
+  context.clip()
+
+  const radians = rotation * Math.PI / 180
+  const cos = Math.abs(Math.cos(radians))
+  const sin = Math.abs(Math.sin(radians))
+  const rotatedWidth = image.naturalWidth * cos + image.naturalHeight * sin
+  const rotatedHeight = image.naturalWidth * sin + image.naturalHeight * cos
+  const scale = Math.max(width / rotatedWidth, height / rotatedHeight) * zoom / 100
+  const renderedWidth = rotatedWidth * scale
+  const renderedHeight = rotatedHeight * scale
+  const maxX = Math.max(0, (renderedWidth - width) / 2)
+  const maxY = Math.max(0, (renderedHeight - height) / 2)
+  const offsetX = ((50 - position.x) / 50) * maxX
+  const offsetY = ((50 - position.y) / 50) * maxY
+
+  context.translate(width / 2 + offsetX, height / 2 + offsetY)
+  context.rotate(radians)
+  context.scale(scale, scale)
+  context.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2)
+  context.restore()
+}
+\nexport function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)\n  const previewCanvasRef = useRef<HTMLCanvasElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [position, setPosition] = useState({ x: 50, y: 50 })
@@ -58,6 +93,29 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
     }
   }, [previewUrl])
 
+  // The preview and saved image are rendered by the exact same canvas
+  // renderer. This prevents CSS background-cover/transform differences from
+  // making the applied wallpaper shift compared with what the user approved.
+  useEffect(() => {
+    if (!previewUrl || !previewCanvasRef.current) return
+    let cancelled = false
+    const canvas = previewCanvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    const ratio = window.devicePixelRatio || 1
+    const width = Math.max(1, Math.round(rect.width * ratio))
+    const height = Math.max(1, Math.round(rect.height * ratio))
+    canvas.width = width
+    canvas.height = height
+    const image = new Image()
+    image.onload = () => {
+      if (cancelled) return
+      const context = canvas.getContext('2d')
+      if (context) drawWallpaper(context, image, width, height, position, zoom, rotation)
+    }
+    image.src = previewUrl
+    return () => { cancelled = true }
+  }, [previewUrl, position, zoom, rotation, targetRatio])
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = e.target.files?.[0]
     // Reset the input so the same photo can be selected again.
@@ -87,8 +145,7 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
         image.onload = () => resolve()
         image.onerror = () => reject(new Error('Could not read this photo.'))
       })
-      // Export using the actual chat wallpaper surface's aspect ratio, not
-      // the smaller editor preview frame.
+      // Export using the same renderer and crop geometry as the on-screen preview.
       const width = 1400
       const height = Math.max(1, Math.round(width / targetRatio))
       const canvas = document.createElement('canvas')
@@ -96,26 +153,7 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
       canvas.height = height
       const context = canvas.getContext('2d')
       if (!context) throw new Error('Photo editor is unavailable.')
-      const rotated = Math.abs(rotation % 180) === 90
-      const imageWidth = rotated ? image.naturalHeight : image.naturalWidth
-      const imageHeight = rotated ? image.naturalWidth : image.naturalHeight
-      // Scale to cover the entire output before applying zoom. Clamp the
-      // vertical adjustment to the available overflow so the crop can never
-      // expose an empty/transparent band at the top or bottom.
-      const scale = Math.max(width / imageWidth, height / imageHeight) * zoom / 100
-      const renderedHeight = imageHeight * scale
-      const maxVerticalOffset = Math.max(0, (renderedHeight - height) / 2)
-      const requestedVerticalOffset = ((50 - position.y) / 100) * height * 0.7
-      const verticalOffset = Math.max(-maxVerticalOffset, Math.min(maxVerticalOffset, requestedVerticalOffset))
-      context.save()
-      context.beginPath()
-      context.rect(0, 0, width, height)
-      context.clip()
-      context.translate(width / 2, height / 2 + verticalOffset)
-      context.rotate(rotation * Math.PI / 180)
-      context.scale(scale, scale)
-      context.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2)
-      context.restore()
+      drawWallpaper(context, image, width, height, position, zoom, rotation)
       const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Could not prepare wallpaper.')), 'image/jpeg', 0.94))
       const cropped = new File([blob], 'chat-wallpaper.jpg', { type: 'image/jpeg' })
       const compressed = await compressImageIfNeeded(cropped)
@@ -155,14 +193,10 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
 
           <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden px-3 py-2 bg-muted/20">
             <div data-wallpaper-preview className="relative max-h-[54dvh] w-full max-w-xl overflow-hidden bg-slate-950" style={{ aspectRatio: targetRatio, maxWidth: `min(100%, ${Math.max(1, targetRatio * 54)}dvh)` }}>
-              <div
-                className="absolute inset-0 bg-no-repeat transition-[background-size,background-position,transform] duration-150"
-                style={{
-                  backgroundImage: `url(${previewUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: `${position.x}% ${position.y}%`,
-                  transform: `rotate(${rotation}deg) scale(${zoom / 100})`,
-                }}
+              <canvas
+                ref={previewCanvasRef}
+                aria-label="Wallpaper preview"
+                className="absolute inset-0 h-full w-full"
               />
             </div>
           </div>
