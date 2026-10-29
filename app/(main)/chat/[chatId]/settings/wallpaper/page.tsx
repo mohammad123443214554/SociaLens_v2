@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { WallpaperModal } from '@/components/chat/WallpaperModal'
+import { Image as ImageIcon, PencilLine, ImageOff, ChevronRight, ArrowLeft } from 'lucide-react'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { useUser } from '@/lib/hooks/useUser'
 import { useSetChatWallpaper, useArchiveLockStatus, useChatWallpaper } from '@/lib/hooks/useChatSettings'
@@ -14,6 +15,9 @@ export default function ChatWallpaperRoutePage() {
   const params = useParams()
   const chatId = params.chatId as string
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const mode = searchParams.get('mode')
+  const editExisting = mode === 'edit'
   const { user, loading } = useUser()
   const supabase = useMemo(() => createClient(), [])
   const setChatWallpaper = useSetChatWallpaper()
@@ -22,7 +26,6 @@ export default function ChatWallpaperRoutePage() {
   const [archiveUnlocked, setArchiveUnlocked] = useState(false)
   const { data: archiveLock } = useArchiveLockStatus(user?.id)
   const { data: currentWallpaper } = useChatWallpaper(chatId, user?.id)
-  const editExisting = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('edit') === '1'
 
   useEffect(() => {
     if (!chatId || !user?.id) return
@@ -62,7 +65,7 @@ export default function ChatWallpaperRoutePage() {
         positionY: Math.round(position.y),
       })
       window.sessionStorage.removeItem(`socia-lens-wallpaper-draft:${window.location.pathname}`)
-      router.replace(`/chat/${chatId}/settings`)
+      router.replace(`/chat/${chatId}`)
     } catch (error) {
       console.error(error)
       window.alert('Could not set wallpaper. Please try again.')
@@ -86,6 +89,41 @@ export default function ChatWallpaperRoutePage() {
     return <PageLoader />
   }
 
+  const handleRemoveWallpaper = async () => {
+    if (!user?.id || saving) return
+    setSaving(true)
+    try {
+      await setChatWallpaper.mutateAsync({ chatId, userId: user.id, wallpaperUrl: '', positionX: 50, positionY: 50 })
+      router.replace(`/chat/${chatId}`)
+    } catch (error) {
+      console.error(error)
+      window.alert('Could not remove wallpaper. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const showEditor = mode === 'set' || mode === 'change' || mode === 'edit'
+  if (!showEditor) {
+    return (
+      <div className="fixed inset-0 z-[140] flex flex-col bg-background">
+        <header className="flex items-center gap-3 border-b border-border px-4 py-4">
+          <button type="button" onClick={() => router.push(`/chat/${chatId}`)} aria-label="Back to chat" className="rounded-full p-2 hover:bg-muted"><ArrowLeft className="h-5 w-5" /></button>
+          <div><h1 className="text-lg font-semibold">Wallpaper settings</h1><p className="text-sm text-muted-foreground">Personalize this conversation</p></div>
+        </header>
+        <main className="mx-auto w-full max-w-xl flex-1 space-y-3 p-4">
+          <div className="overflow-hidden rounded-2xl border border-border bg-card divide-y divide-border">
+            <button type="button" onClick={() => router.push(`/chat/${chatId}/settings/wallpaper?mode=${currentWallpaper?.wallpaper_url ? 'change' : 'set'}`)} className="flex w-full items-center justify-between px-4 py-4 text-left hover:bg-muted/60">
+              <span className="flex items-center gap-3"><ImageIcon className="h-5 w-5 text-muted-foreground" /><span><span className="block font-medium">{currentWallpaper?.wallpaper_url ? 'Change Wallpaper' : 'Set Wallpaper'}</span><span className="text-sm text-muted-foreground">Choose a new photo from your device</span></span></span><ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+            {currentWallpaper?.wallpaper_url && <button type="button" onClick={() => router.push(`/chat/${chatId}/settings/wallpaper?mode=edit`)} className="flex w-full items-center justify-between px-4 py-4 text-left hover:bg-muted/60"><span className="flex items-center gap-3"><PencilLine className="h-5 w-5 text-muted-foreground" /><span><span className="block font-medium">Edit Wallpaper</span><span className="text-sm text-muted-foreground">Adjust the current wallpaper</span></span></span><ChevronRight className="h-4 w-4 text-muted-foreground" /></button>}
+            {currentWallpaper?.wallpaper_url && <button type="button" disabled={saving} onClick={() => { if (window.confirm('Remove this chat wallpaper? You can set another one anytime.')) void handleRemoveWallpaper() }} className="flex w-full items-center justify-between px-4 py-4 text-left text-destructive hover:bg-destructive/5 disabled:opacity-50"><span className="flex items-center gap-3"><ImageOff className="h-5 w-5" /><span><span className="block font-medium">{saving ? 'Removing…' : 'Remove Wallpaper'}</span><span className="text-sm opacity-80">Return to the default chat background</span></span></span><ChevronRight className="h-4 w-4" /></button>}
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-[140] bg-background">
       <WallpaperModal
@@ -93,7 +131,7 @@ export default function ChatWallpaperRoutePage() {
         initialImageUrl={editExisting ? currentWallpaper?.wallpaper_url : undefined}
         initialPosition={editExisting ? { x: currentWallpaper?.position_x ?? 50, y: currentWallpaper?.position_y ?? 50 } : undefined}
         saveLabel={editExisting ? 'Save changes' : 'Apply wallpaper'}
-        onClose={() => router.replace(`/chat/${chatId}/settings`)}
+        onClose={() => router.replace(`/chat/${chatId}/settings/wallpaper`)}
         saving={saving}
       />
     </div>
