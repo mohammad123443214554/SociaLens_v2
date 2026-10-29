@@ -28,6 +28,7 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
   const [position, setPosition] = useState({ x: 50, y: 50 })
   const [zoom, setZoom] = useState(100)
   const [rotation, setRotation] = useState(0)
+  const [error, setError] = useState<string | null>(null)
 
   // Kick the OS file picker open as soon as this modal mounts.
   useEffect(() => {
@@ -57,6 +58,7 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
     const picked = e.target.files?.[0]
     if (!picked) return
     setFile(picked)
+    setError(null)
     setPreviewUrl(URL.createObjectURL(picked))
     setPosition({ x: 50, y: 50 })
     setZoom(100)
@@ -152,6 +154,7 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
             <div className="pointer-events-none absolute right-3 top-[32%] max-w-[78%] rounded-2xl rounded-tr-md bg-gradient-to-br from-pink-500 to-violet-600 px-3 py-2 text-xs text-white shadow-lg">Sent message preview</div>
           </div>
           <div className="grid grid-cols-2 gap-3 border-t border-border bg-background p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+            {error && <p role="alert" className="col-span-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600">{error}</p>}
             <label className="col-span-2 text-xs text-muted-foreground sm:col-span-1">
               <span className="mb-2 flex items-center justify-between"><span className="flex items-center gap-2"><ZoomIn className="h-4 w-4 text-pink-500" /> Zoom</span><span>{zoom}%</span></span>
               <input type="range" min="100" max="250" value={zoom} onChange={event => setZoom(Number(event.target.value))} className="w-full accent-pink-500" aria-label="Wallpaper zoom" />
