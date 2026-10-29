@@ -6,7 +6,7 @@ import { WallpaperModal } from '@/components/chat/WallpaperModal'
 import { Image as ImageIcon, PencilLine, ImageOff, ChevronRight, ArrowLeft } from 'lucide-react'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { useUser } from '@/lib/hooks/useUser'
-import { useSetChatWallpaper, useArchiveLockStatus, useChatWallpaper } from '@/lib/hooks/useChatSettings'
+import { useSetChatWallpaper, useDeleteChatWallpaper, useArchiveLockStatus, useChatWallpaper } from '@/lib/hooks/useChatSettings'
 import { createClient } from '@/lib/supabase/client'
 import { ArchiveUnlockScreen } from '@/components/chat/ArchiveUnlockScreen'
 import { ArchivePasswordWizard } from '@/components/chat/ArchivePasswordWizard'
@@ -21,6 +21,7 @@ export default function ChatWallpaperRoutePage() {
   const { user, loading } = useUser()
   const supabase = useMemo(() => createClient(), [])
   const setChatWallpaper = useSetChatWallpaper()
+  const deleteChatWallpaper = useDeleteChatWallpaper()
   const [saving, setSaving] = useState(false)
   const [chat, setChat] = useState<any>(null)
   const [archiveUnlocked, setArchiveUnlocked] = useState(false)
@@ -93,7 +94,7 @@ export default function ChatWallpaperRoutePage() {
     if (!user?.id || saving) return
     setSaving(true)
     try {
-      await setChatWallpaper.mutateAsync({ chatId, userId: user.id, wallpaperUrl: '', positionX: 50, positionY: 50 })
+      await deleteChatWallpaper.mutateAsync({ chatId, userId: user.id })
       router.replace(`/chat/${chatId}`)
     } catch (error) {
       console.error(error)
