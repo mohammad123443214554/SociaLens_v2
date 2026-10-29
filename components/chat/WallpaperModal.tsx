@@ -29,23 +29,27 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
   const [zoom, setZoom] = useState(100)
   const [rotation, setRotation] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [targetRatio, setTargetRatio] = useState(9 / 16)
 
-  // Kick the OS file picker open as soon as this modal mounts.
+  // Match the real chat wallpaper surface: the chat column's width divided
+  // by its actual height. Recalculate on resize/orientation changes.
   useEffect(() => {
-    fileInputRef.current?.click()
-
-    const handleWindowFocus = () => {
-      // Give the browser a moment to actually populate input.files after
-      // the picker closes before we check it.
-      setTimeout(() => {
-        if (!fileInputRef.current?.files?.length && !file) {
-          onClose()
-        }
-      }, 300)
+    const updateRatio = () => {
+      const width = window.innerWidth >= 1024 ? Math.min(window.innerWidth, 576) : window.innerWidth
+      const height = window.innerWidth >= 1024 ? Math.max(1, window.innerHeight - 56) : window.innerHeight
+      setTargetRatio(width / height)
     }
-    window.addEventListener('focus', handleWindowFocus)
-    return () => window.removeEventListener('focus', handleWindowFocus)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    updateRatio()
+    window.addEventListener('resize', updateRatio)
+    return () => window.removeEventListener('resize', updateRatio)
+  }, [])
+
+  // Try opening the native picker on entry, but keep a visible fallback button.
+  // Do not close on window focus: browsers can fire focus before input.onChange,
+  // which used to close the modal before the selected photo was processed.
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => fileInputRef.current?.click())
+    return () => window.cancelAnimationFrame(id)
   }, [])
 
   useEffect(() => {
@@ -56,6 +60,8 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = e.target.files?.[0]
+    // Reset the input so the same photo can be selected again.
+    e.target.value = ''
     if (!picked) return
     setFile(picked)
     setError(null)
@@ -81,11 +87,10 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
         image.onload = () => resolve()
         image.onerror = () => reject(new Error('Could not read this photo.'))
       })
-      const area = document.querySelector('[data-wallpaper-preview]')
-      const rect = area?.getBoundingClientRect()
-      const ratio = rect && rect.width > 0 && rect.height > 0 ? rect.width / rect.height : 1
+      // Export using the actual chat wallpaper surface's aspect ratio, not
+      // the smaller editor preview frame.
       const width = 1400
-      const height = Math.max(900, Math.round(width / ratio))
+      const height = Math.max(1, Math.round(width / targetRatio))
       const canvas = document.createElement('canvas')
       canvas.width = width
       canvas.height = height
@@ -125,9 +130,11 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
       />
 
       {!previewUrl ? (
-        // Waiting on the OS picker - nothing to show, it's a native popup.
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+          <div className="rounded-2xl border border-border bg-muted/50 p-5"><ZoomIn className="h-8 w-8 text-muted-foreground" /></div>
+          <div><p className="font-semibold">Choose a wallpaper photo</p><p className="mt-1 text-sm text-muted-foreground">Select a photo to open the wallpaper editor.</p></div>
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-6 py-3 font-medium text-white">Choose photo</button>
+          <button type="button" onClick={onClose} className="rounded-xl px-6 py-2 text-sm text-muted-foreground hover:bg-muted">Cancel</button>
         </div>
       ) : (
         <>
@@ -139,19 +146,18 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
             <div className="w-8" />
           </div>
 
-          <div data-wallpaper-preview className="relative flex-1 min-h-[260px] overflow-hidden touch-pan-y bg-slate-950 sm:min-h-[320px]">
-            <div
-              className="absolute inset-0 bg-no-repeat transition-[background-size,background-position,transform] duration-150"
-              style={{
-                backgroundImage: `url(${previewUrl})`,
-                backgroundSize: 'cover',
-                backgroundPosition: `${position.x}% ${position.y}%`,
-                transform: `rotate(${rotation}deg) scale(${zoom / 100})`,
-              }}
-            />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/20 via-transparent to-slate-950/35" />
-            <div className="pointer-events-none absolute left-3 top-4 max-w-[78%] rounded-2xl rounded-tl-md border border-white/15 bg-slate-950/60 px-3 py-2 text-xs text-white shadow-lg backdrop-blur-md">Incoming message preview</div>
-            <div className="pointer-events-none absolute right-3 top-[32%] max-w-[78%] rounded-2xl rounded-tr-md bg-gradient-to-br from-pink-500 to-violet-600 px-3 py-2 text-xs text-white shadow-lg">Sent message preview</div>
+          <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden px-3 py-2 bg-muted/20">
+            <div data-wallpaper-preview className="relative max-h-[54dvh] w-full max-w-xl overflow-hidden bg-slate-950" style={{ aspectRatio: targetRatio, maxWidth: `min(100%, ${Math.max(1, targetRatio * 54)}dvh)` }}>
+              <div
+                className="absolute inset-0 bg-no-repeat transition-[background-size,background-position,transform] duration-150"
+                style={{
+                  backgroundImage: `url(${previewUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: `${position.x}% ${position.y}%`,
+                  transform: `rotate(${rotation}deg) scale(${zoom / 100})`,
+                }}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3 border-t border-border bg-background p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
             {error && <p role="alert" className="col-span-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600">{error}</p>}
