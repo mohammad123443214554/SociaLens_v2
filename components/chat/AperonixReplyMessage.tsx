@@ -16,7 +16,7 @@ export function AperonixReplyMessage({ content, isOwn }: AperonixReplyMessagePro
   const [showFull, setShowFull] = useState(false)
 
   return (
-    <div className={`max-w-[80%] rounded-2xl overflow-hidden border ${isOwn ? 'border-white/20' : 'border-border'} ${isOwn ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
+    <div className={`w-full max-w-full rounded-2xl overflow-hidden border ${isOwn ? 'border-white/20' : 'border-border'} ${isOwn ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted'}`}>
       <div className={`flex items-center gap-1.5 px-3 pt-2.5 ${isOwn ? 'text-white/80' : 'text-muted-foreground'}`}>
         <Image src="/images/aperonix-logo.png" alt="Aperonix" width={16} height={16} className="rounded-full" />
         <span className="text-[11px] font-semibold">Aperonix reply</span>
