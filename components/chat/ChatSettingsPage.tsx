@@ -12,6 +12,7 @@ interface ChatSettingsPageProps {
   onBack: () => void
   onSetNickname: () => void
   onSetWallpaper: () => void
+  onEditWallpaper: () => void
   onRemoveWallpaper: () => void
   onToggleBlock: () => void
   onDeleteChat: () => void
@@ -33,6 +34,7 @@ export function ChatSettingsPage({
   onBack,
   onSetNickname,
   onSetWallpaper,
+  onEditWallpaper,
   onRemoveWallpaper,
   onToggleBlock,
   onDeleteChat,
@@ -80,14 +82,27 @@ export function ChatSettingsPage({
           >
             <div className="flex items-center gap-3">
               <ImageIcon className="h-5 w-5 text-muted-foreground" />
-              <span className="text-sm font-medium">{hasWallpaper ? 'Edit Wallpaper' : 'Set Wallpaper'}</span>
+              <span className="text-sm font-medium">{hasWallpaper ? 'Change Wallpaper' : 'Set Wallpaper'}</span>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
           </button>
 
           {hasWallpaper && (
             <button
-              onClick={onRemoveWallpaper}
+              onClick={onEditWallpaper}
+              className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-accent transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <PencilLine className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm font-medium">Edit Wallpaper</span>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            </button>
+          )}
+
+          {hasWallpaper && (
+            <button
+              onClick={onRemoveWallpaper
               className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-accent transition-colors"
             >
               <ImageOff className="h-5 w-5 text-muted-foreground" />
