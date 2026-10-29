@@ -110,7 +110,7 @@ export default function ChatWallpaperRoutePage() {
     return (
       <div className="fixed inset-0 z-[140] flex flex-col bg-background">
         <header className="flex items-center gap-3 border-b border-border px-4 py-4">
-          <button type="button" onClick={() => router.push(`/chat/${chatId}`)} aria-label="Back to chat" className="rounded-full p-2 hover:bg-muted"><ArrowLeft className="h-5 w-5" /></button>
+          <button type="button" onClick={() => router.push(`/chat/${chatId}/settings`)} aria-label="Back to chat settings" className="rounded-full p-2 hover:bg-muted"><ArrowLeft className="h-5 w-5" /></button>
           <div><h1 className="text-lg font-semibold">Wallpaper settings</h1><p className="text-sm text-muted-foreground">Personalize this conversation</p></div>
         </header>
         <main className="mx-auto w-full max-w-xl flex-1 space-y-3 p-4">
@@ -146,7 +146,7 @@ export default function ChatWallpaperRoutePage() {
         initialImageUrl={editExisting ? currentWallpaper?.wallpaper_url : undefined}
         initialPosition={editExisting ? { x: currentWallpaper?.position_x ?? 50, y: currentWallpaper?.position_y ?? 50 } : undefined}
         saveLabel={editExisting ? 'Save changes' : 'Apply wallpaper'}
-        onClose={() => router.replace(`/chat/${chatId}/settings/wallpaper`)}
+        onClose={() => router.replace(`/chat/${chatId}/settings`)}
         saving={saving}
       />
     </div>
