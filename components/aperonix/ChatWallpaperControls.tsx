@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ImagePlus, SlidersHorizontal, X, Trash2, ZoomIn, MoveHorizontal, MoveVertical, UploadCloud } from 'lucide-react'
+import { ImagePlus, SlidersHorizontal, X, Trash2, ZoomIn, RotateCw, ArrowUp, ArrowDown, UploadCloud } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export type ChatWallpaper = {
@@ -14,6 +14,7 @@ export type ChatWallpaper = {
   zoom: number
   positionX: number
   positionY: number
+  rotationDegrees: number
 }
 
 const BUCKET = 'aperonix-wallpapers'
@@ -111,6 +112,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
           zoom: data.zoom,
           positionX: data.position_x,
           positionY: data.position_y,
+          rotationDegrees: 0,
         }
         if (!cancelled) setCurrentWallpaper(loaded)
       } catch (cause) {
@@ -143,7 +145,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
       }
       setDraft({
         dataUrl, originalDataUrl: dataUrl, originalStoragePath: '', processedStoragePath: '',
-        filterIndex: 0, zoom: 100, positionX: 50, positionY: 50,
+        filterIndex: 0, zoom: 100, positionX: 50, positionY: 50, rotationDegrees: 0,
       })
       setError(null)
       setUploadOpen(false)
@@ -176,14 +178,21 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
       })
       // Keep the source image at its native resolution. Downscaling wallpapers
       // to 1800px made high-resolution photos visibly soft on large displays.
-      const width = image.naturalWidth
-      const height = image.naturalHeight
+      const sourceWidth = image.naturalWidth
+      const sourceHeight = image.naturalHeight
+      const rotated = Math.abs(draft.rotationDegrees % 180) === 90
+      const width = rotated ? sourceHeight : sourceWidth
+      const height = rotated ? sourceWidth : sourceHeight
       const baseCanvas = document.createElement('canvas')
       baseCanvas.width = width
       baseCanvas.height = height
       const baseContext = baseCanvas.getContext('2d')
       if (!baseContext) throw new Error('Image editor is unavailable in this browser.')
-      baseContext.drawImage(image, 0, 0, width, height)
+      baseContext.save()
+      baseContext.translate(width / 2, height / 2)
+      baseContext.rotate((draft.rotationDegrees * Math.PI) / 180)
+      baseContext.drawImage(image, -sourceWidth / 2, -sourceHeight / 2, sourceWidth, sourceHeight)
+      baseContext.restore()
       const originalBlob = await new Promise<Blob>((resolve, reject) => baseCanvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not prepare this photo.')), 'image/jpeg', 0.98))
 
       const filteredCanvas = document.createElement('canvas')
@@ -242,6 +251,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
         zoom: draft.zoom,
         positionX: draft.positionX,
         positionY: draft.positionY,
+        rotationDegrees: 0,
       }
       setCurrentWallpaper(saved)
       if (isActive) onWallpaperChange(saved)
@@ -371,22 +381,30 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border p-3">
-                <div className="flex items-center gap-2 text-sm font-medium"><SlidersHorizontal className="h-4 w-4 text-pink-500" /> Photo positioning</div>
-                <button type="button" onClick={() => fileRef.current?.click()} className="rounded-full border border-pink-500/30 px-3 py-1.5 text-xs text-pink-500 hover:bg-pink-500/10">Change photo</button>
+                <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm font-medium"><SlidersHorizontal className="h-4 w-4 text-pink-500" /> Adjust your wallpaper</div>
+                  <button type="button" onClick={() => fileRef.current?.click()} className="rounded-full border border-pink-500/30 px-3 py-1.5 text-xs text-pink-500 transition hover:bg-pink-500/10">Change photo</button>
+                </div>
                 {draft && (
-                  <div className="grid w-full gap-3 sm:grid-cols-3">
-                    <label className="text-xs text-muted-foreground"><span className="flex items-center gap-1"><ZoomIn className="h-3.5 w-3.5" /> Zoom <span className="ml-auto text-foreground">{draft.zoom}%</span></span><input type="range" min="80" max="160" value={draft.zoom} onChange={event => setDraft(previous => previous ? { ...previous, zoom: Number(event.target.value) } : previous)} className="mt-2 block w-full accent-pink-500" /></label>
-                    <label className="text-xs text-muted-foreground"><span className="flex items-center gap-1"><MoveHorizontal className="h-3.5 w-3.5" /> Horizontal <span className="ml-auto text-foreground">{draft.positionX}%</span></span><input type="range" min="0" max="100" value={draft.positionX} onChange={event => setDraft(previous => previous ? { ...previous, positionX: Number(event.target.value) } : previous)} className="mt-2 block w-full accent-pink-500" /></label>
-                    <label className="text-xs text-muted-foreground"><span className="flex items-center gap-1"><MoveVertical className="h-3.5 w-3.5" /> Vertical <span className="ml-auto text-foreground">{draft.positionY}%</span></span><input type="range" min="0" max="100" value={draft.positionY} onChange={event => setDraft(previous => previous ? { ...previous, positionY: Number(event.target.value) } : previous)} className="mt-2 block w-full accent-pink-500" /></label>
+                  <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                    <label className="col-span-2 text-xs text-muted-foreground sm:col-span-1">
+                      <span className="flex items-center gap-1.5"><ZoomIn className="h-4 w-4 text-pink-500" /> Zoom <span className="ml-auto font-medium text-foreground">{draft.zoom}%</span></span>
+                      <input aria-label="Wallpaper zoom" type="range" min="80" max="160" step="1" value={draft.zoom} onChange={event => setDraft(previous => previous ? { ...previous, zoom: Number(event.target.value) } : previous)} className="mt-2 block w-full accent-pink-500" />
+                    </label>
+                    <div className="col-span-2 grid grid-cols-3 gap-2 sm:col-span-1 sm:min-w-[270px]">
+                      <button type="button" onClick={() => setDraft(previous => previous ? { ...previous, rotationDegrees: (previous.rotationDegrees + 90) % 360 } : previous)} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-background/70 px-2 text-xs font-medium transition hover:border-pink-500/60 hover:bg-pink-500/10"><RotateCw className="h-4 w-4 text-pink-500" /> Rotate</button>
+                      <button type="button" onClick={() => setDraft(previous => previous ? { ...previous, positionY: Math.max(0, previous.positionY - 5) } : previous)} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-background/70 px-2 text-xs font-medium transition hover:border-pink-500/60 hover:bg-pink-500/10"><ArrowUp className="h-4 w-4 text-pink-500" /> Move up</button>
+                      <button type="button" onClick={() => setDraft(previous => previous ? { ...previous, positionY: Math.min(100, previous.positionY + 5) } : previous)} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-background/70 px-2 text-xs font-medium transition hover:border-pink-500/60 hover:bg-pink-500/10"><ArrowDown className="h-4 w-4 text-pink-500" /> Move down</button>
+                    </div>
                   </div>
                 )}
               </div>
 
-              <div onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); pickFile(event.dataTransfer.files?.[0]) }} className="relative mb-5 aspect-[4/5] w-full overflow-hidden rounded-2xl border border-pink-500/30 bg-muted/50 sm:aspect-video">
+              <div className="relative mx-auto mb-5 h-[min(58dvh,620px)] min-h-[260px] w-full max-w-2xl overflow-hidden rounded-2xl border border-pink-500/30 bg-slate-950/70 shadow-inner sm:h-[min(62dvh,680px)]">
                 {draft ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={draft.originalDataUrl} alt="Wallpaper preview" className="absolute inset-0 h-full w-full object-cover" style={{ filter: FILTERS[draft.filterIndex]?.css || 'none', objectPosition: draft.positionX + '% ' + draft.positionY + '%', transform: 'scale(' + draft.zoom / 100 + ')' }} />
+                    <img src={draft.originalDataUrl} alt="Wallpaper preview" className="absolute inset-0 h-full w-full object-cover transition-[transform,object-position,filter] duration-150" style={{ filter: FILTERS[draft.filterIndex]?.css || 'none', objectPosition: draft.positionX + '% ' + draft.positionY + '%', transform: 'scale(' + draft.zoom / 100 + ') rotate(' + draft.rotationDegrees + 'deg)' }} />
                     <div className="absolute bottom-3 left-3 rounded-lg border border-white/20 bg-slate-950/55 px-3 py-2 text-xs text-white backdrop-blur-sm">{wallpaperLabel === 'chat' ? 'Chat wallpaper preview' : 'Voice wallpaper preview'}</div>
                   </>
                 ) : <button type="button" onClick={() => fileRef.current?.click()} className="flex h-full w-full flex-col items-center justify-center gap-2 p-6"><ImagePlus className="h-8 w-8 text-pink-500" /><span className="text-sm">Choose a photo to start</span></button>}
@@ -398,7 +416,7 @@ export function ChatWallpaperControls({ conversationId, wallpaper, onWallpaperCh
                   <button key={filter.name} type="button" disabled={!draft} onClick={() => setDraft(previous => previous ? { ...previous, filterIndex: index } : previous)} className={'group overflow-hidden rounded-xl border text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ' + (draft?.filterIndex === index ? 'border-pink-500 ring-2 ring-pink-500/30' : 'border-border hover:border-pink-500/60')} title={filter.name}>
                     {draft ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={draft.originalDataUrl} alt="" className="block h-12 w-full object-cover" style={{ filter: filter.css, objectPosition: draft.positionX + '% ' + draft.positionY + '%', transform: 'scale(' + draft.zoom / 100 + ')' }} />
+                      <img src={draft.originalDataUrl} alt="" className="block h-12 w-full object-cover" style={{ filter: filter.css, objectPosition: '50% 50%' }} />
                     ) : <span className="block h-12 bg-muted" />}
                     <span className="block truncate px-2 py-1.5 text-[10px] sm:text-xs">{filter.name}</span>
                   </button>
