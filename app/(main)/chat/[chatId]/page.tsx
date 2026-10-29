@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, usePathname } from 'next/navigation'
 import { ArrowLeft, Circle, Settings, Phone, Loader2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { StatusDot } from '@/components/shared/StatusDot'
@@ -47,6 +47,9 @@ export default function ChatRoomPage() {
   const [savingWallpaper, setSavingWallpaper] = useState(false)
   const [showRestrictionPopup, setShowRestrictionPopup] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
+  const isSettingsRoute = pathname.endsWith('/settings')
+  const isWallpaperRoute = pathname.endsWith('/settings/wallpaper')
   const supabase = createClient()
 
   const { messages, isTyping, onlineUsers, sendMessage, sendTypingIndicator, removeMessageLocally, patchMessageLocally, addPendingMessage, resolvePendingMessage, failPendingMessage, loadOlderMessages, hasMoreOlder, isLoadingOlder } =
@@ -284,6 +287,7 @@ export default function ChatRoomPage() {
         positionY: Math.round(position.y),
       })
       setShowWallpaperModal(false)
+      router.replace(`/chat/${chatId}/settings`)
     } catch (err) {
       console.error(err)
       alert('Could not set wallpaper. Please try again.')
@@ -407,7 +411,7 @@ export default function ChatRoomPage() {
 
         {/* Chat settings */}
         <button
-          onClick={() => setShowSettingsPage(true)}
+          onClick={() => router.push(`/chat/${chatId}/settings`)}
           className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-accent transition-colors"
         >
           <Settings className="h-5 w-5" />
@@ -464,7 +468,7 @@ export default function ChatRoomPage() {
           onClose={() => setShowStory(false)}
         />
       )}
-      {showSettingsPage && (
+      {(showSettingsPage || isSettingsRoute) && (
         <ChatSettingsPage
           otherUsername={displayName}
           myNicknameForThem={myNicknameForThem || null}
@@ -472,9 +476,9 @@ export default function ChatRoomPage() {
           iBlockedThem={iBlockedThem}
           deleting={deleting}
           showNicknameOption={!theyBlockedMe}
-          onBack={() => setShowSettingsPage(false)}
+          onBack={() => router.push(`/chat/${chatId}`)}
           onSetNickname={() => setShowNicknameModal(true)}
-          onSetWallpaper={() => setShowWallpaperModal(true)}
+          onSetWallpaper={() => router.push(`/chat/${chatId}/settings/wallpaper`)}
           onRemoveWallpaper={handleRemoveWallpaper}
           onToggleBlock={handleToggleBlock}
           onDeleteChat={handleDeleteChat}
@@ -487,10 +491,10 @@ export default function ChatRoomPage() {
           onBack={() => setShowCallSettings(false)}
         />
       )}
-      {showWallpaperModal && (
+      {(showWallpaperModal || isWallpaperRoute) && (
         <WallpaperModal
           onDone={handleSaveWallpaper}
-          onClose={() => setShowWallpaperModal(false)}
+          onClose={() => router.replace(`/chat/${chatId}/settings`)}
           saving={savingWallpaper}
         />
       )}
