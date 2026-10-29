@@ -99,12 +99,19 @@ export function WallpaperModal({ onDone, onClose, saving }: WallpaperModalProps)
       const rotated = Math.abs(rotation % 180) === 90
       const imageWidth = rotated ? image.naturalHeight : image.naturalWidth
       const imageHeight = rotated ? image.naturalWidth : image.naturalHeight
+      // Scale to cover the entire output before applying zoom. Clamp the
+      // vertical adjustment to the available overflow so the crop can never
+      // expose an empty/transparent band at the top or bottom.
       const scale = Math.max(width / imageWidth, height / imageHeight) * zoom / 100
+      const renderedHeight = imageHeight * scale
+      const maxVerticalOffset = Math.max(0, (renderedHeight - height) / 2)
+      const requestedVerticalOffset = ((50 - position.y) / 100) * height * 0.7
+      const verticalOffset = Math.max(-maxVerticalOffset, Math.min(maxVerticalOffset, requestedVerticalOffset))
       context.save()
       context.beginPath()
       context.rect(0, 0, width, height)
       context.clip()
-      context.translate(width / 2, height / 2 + ((50 - position.y) / 100) * height * 0.7)
+      context.translate(width / 2, height / 2 + verticalOffset)
       context.rotate(rotation * Math.PI / 180)
       context.scale(scale, scale)
       context.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2)
