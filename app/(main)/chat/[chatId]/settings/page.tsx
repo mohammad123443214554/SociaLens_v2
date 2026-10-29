@@ -25,6 +25,8 @@ export default function ChatSettingsRoutePage() {
   const [showNickname, setShowNickname] = useState(false)
   const [showCallSettings, setShowCallSettings] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [confirmRemoveWallpaper, setConfirmRemoveWallpaper] = useState(false)
+  const [removingWallpaper, setRemovingWallpaper] = useState(false)
   const [archiveUnlocked, setArchiveUnlocked] = useState(false)
   const { data: wallpaper } = useChatWallpaper(chatId, user?.id)
   const { data: nickname } = useNickname(chatId, user?.id)
@@ -37,11 +39,11 @@ export default function ChatSettingsRoutePage() {
   const { data: archiveLock } = useArchiveLockStatus(user?.id)
 
   useEffect(() => {
-    if (!chatId || !user?.id) return
+    if (!chatId) return
     let cancelled = false
     void supabase
       .from('chats')
-      .select('*, participant1:profiles!chats_participant1_id_fkey(*), participant2:profiles!chats_participant2_id_fkey(*)')
+      .select('id, participant1_id, participant2_id, archived_by, participant1:profiles!chats_participant1_id_fkey(id, username), participant2:profiles!chats_participant2_id_fkey(id, username)')
       .eq('id', chatId)
       .single()
       .then(({ data, error }) => {
@@ -50,13 +52,15 @@ export default function ChatSettingsRoutePage() {
           router.replace('/chat')
           return
         }
-        const other = data.participant1_id === user.id ? data.participant2 : data.participant1
-        setChat({ ...data, other })
+        setChat(data)
       })
     return () => { cancelled = true }
-  }, [chatId, user?.id, router, supabase])
+  }, [chatId, router, supabase])
 
   if (loading || !user || !chat) return <PageLoader />
+
+  const other = chat.participant1_id === user.id ? chat.participant2 : chat.participant1
+  if (!other?.id) return <PageLoader />
 
   // Preserve the same archive-password gate as the conversation route. A
   // dedicated settings URL must not become a way to bypass an archived chat's
@@ -72,7 +76,6 @@ export default function ChatSettingsRoutePage() {
     return <PageLoader />
   }
 
-  const other = chat.other
   const iBlockedThem = !!blockStatus?.iBlockedThem
   const theyBlockedMe = !!blockStatus?.theyBlockedMe
 
@@ -95,11 +98,16 @@ export default function ChatSettingsRoutePage() {
   }
 
   const handleRemoveWallpaper = async () => {
+    if (removingWallpaper) return
+    setRemovingWallpaper(true)
     try {
       await deleteWallpaper.mutateAsync({ chatId, userId: user.id })
+      setConfirmRemoveWallpaper(false)
     } catch (error) {
       console.error(error)
       window.alert('Could not remove wallpaper. Please try again.')
+    } finally {
+      setRemovingWallpaper(false)
     }
   }
 
@@ -124,11 +132,25 @@ export default function ChatSettingsRoutePage() {
         onBack={() => router.push(`/chat/${chatId}`)}
         onSetNickname={() => setShowNickname(true)}
         onSetWallpaper={() => router.push(`/chat/${chatId}/settings/wallpaper`)}
-        onRemoveWallpaper={handleRemoveWallpaper}
+        onEditWallpaper={() => router.push(`/chat/${chatId}/settings/wallpaper?edit=1`)}
+        onRemoveWallpaper={() => setConfirmRemoveWallpaper(true)}
         onToggleBlock={handleToggleBlock}
         onDeleteChat={handleDeleteChat}
         onOpenCallSettings={() => setShowCallSettings(true)}
       />
+      {confirmRemoveWallpaper && (
+        <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/60 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !removingWallpaper) setConfirmRemoveWallpaper(false) }}>
+          <section role="alertdialog" aria-modal="true" aria-labelledby="remove-wallpaper-title" aria-describedby="remove-wallpaper-description" className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive"><span className="text-xl">⌫</span></div>
+            <h2 id="remove-wallpaper-title" className="text-center text-lg font-semibold">Remove wallpaper?</h2>
+            <p id="remove-wallpaper-description" className="mt-2 text-center text-sm text-muted-foreground">This will remove your custom wallpaper from this conversation. You can set another one anytime.</p>
+            <div className="mt-5 flex gap-3">
+              <button type="button" disabled={removingWallpaper} onClick={() => setConfirmRemoveWallpaper(false)} className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted disabled:opacity-50">Cancel</button>
+              <button type="button" disabled={removingWallpaper} onClick={handleRemoveWallpaper} className="flex-1 rounded-xl bg-destructive px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{removingWallpaper ? 'Removing…' : 'Remove wallpaper'}</button>
+            </div>
+          </section>
+        </div>
+      )}
       {showCallSettings && (
         <CallSettingsPage userId={user.id} onBack={() => setShowCallSettings(false)} />
       )}
