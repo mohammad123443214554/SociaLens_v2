@@ -286,22 +286,17 @@ export function useCallEngine(currentUserId?: string) {
       if (info.provider === 'agora') {
         const { default: AgoraRTC } = await import('agora-rtc-sdk-ng')
 
-        // ---- 1. Media first. This is the step that throws NotAllowedError
-        // when the WebView denies the permission, and it must happen while
-        // we are still holding nothing. ----
-        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack()
-        let videoTrack: any = null
-        if (activeCall.type === 'video') {
-          try {
-            videoTrack = await AgoraRTC.createCameraVideoTrack()
-          } catch (camErr) {
-            // No usable camera on this device - don't fail the whole call
-            // over it, just continue as audio-only and let them know why.
-            console.warn('[Agora] camera unavailable, continuing audio-only', camErr)
-            videoTrack = null
-            setError('No camera found on this device - continuing with audio only.')
-          }
-        }
+        // Acquire microphone and camera concurrently to reduce call setup
+        // time. A camera failure is non-fatal: keep audio running and leave
+        // the video surface blank instead of showing a red error banner.
+        const audioPromise = AgoraRTC.createMicrophoneAudioTrack()
+        const videoPromise = activeCall.type === 'video'
+          ? AgoraRTC.createCameraVideoTrack().catch((camErr: any) => {
+              console.warn('[Agora] camera unavailable; keeping video surface blank', camErr)
+              return null
+            })
+          : Promise.resolve(null)
+        const [audioTrack, videoTrack] = await Promise.all([audioPromise, videoPromise])
         const closeTracks = () => {
           try { audioTrack?.close() } catch {}
           try { videoTrack?.close() } catch {}
