@@ -21,6 +21,6 @@ export async function POST(request: NextRequest) {
   }
   if (call.status !== 'ringing') return NextResponse.json({ ok: true })
 
-  await supabase.from('calls').update({ status: 'rejected', ended_at: new Date().toISOString() }).eq('id', callId)
+  await supabase.from('calls').update({ status: 'rejected', ended_at: new Date().toISOString(), ended_by: user.id }).eq('id', callId)
   return NextResponse.json({ ok: true })
 }
