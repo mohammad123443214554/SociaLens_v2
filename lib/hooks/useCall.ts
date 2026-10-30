@@ -680,7 +680,7 @@ export function useCallEngine(currentUserId?: string) {
       await updateCallStatus(callId, { status: 'rejected', ended_at: new Date().toISOString() })
     }
     if (callRef.current?.id === callId) cleanup()
-  }, [cleanup, updateCallStatus])
+  }, [cleanup, updateCallStatus, currentUserId])
 
   const acceptIncoming = useCallback(async () => {
     const current = callRef.current
@@ -700,7 +700,7 @@ export function useCallEngine(currentUserId?: string) {
       await updateCallStatus(current.id, { status: finalStatus, ended_at: new Date().toISOString(), ended_by: currentUserId ?? null })
     }
     cleanup(finalStatus)
-  }, [cleanup])
+  }, [cleanup, currentUserId])
 
   const toggleMute = useCallback(() => {
     const next = !isMuted
