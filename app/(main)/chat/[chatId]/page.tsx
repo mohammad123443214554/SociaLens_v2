@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter, usePathname } from 'next/navigation'
-import { ArrowLeft, Circle, Settings, Phone, Loader2 } from 'lucide-react'
+import { ArrowLeft, Circle, Settings, Phone, Video, Loader2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { StatusDot } from '@/components/shared/StatusDot'
 import { RealtimeMessages } from '@/components/chat/RealtimeMessages'
@@ -408,15 +408,24 @@ export default function ChatRoomPage() {
           )}
         </div>
 
-        {/* Voice call only - video calling was removed since the video
-            transport wasn't reliable enough and hurt the calling experience. */}
+        {/* Audio and video calls share the same secure 1-to-1 call engine. */}
         <button
           onClick={() => handleStartCall('audio')}
           disabled={callStarting}
           className={`p-1 rounded-lg hover:bg-accent transition-colors ${canCall && !theyBlockedMe && !iBlockedThem ? 'text-muted-foreground hover:text-foreground' : 'text-muted-foreground/40'}`}
           title="Voice call"
+          aria-label="Start voice call"
         >
           {callStarting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Phone className="h-5 w-5" />}
+        </button>
+        <button
+          onClick={() => handleStartCall('video')}
+          disabled={callStarting}
+          className={`p-1 rounded-lg hover:bg-accent transition-colors ${canCall && !theyBlockedMe && !iBlockedThem ? 'text-muted-foreground hover:text-foreground' : 'text-muted-foreground/40'}`}
+          title="Video call"
+          aria-label="Start video call"
+        >
+          {callStarting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Video className="h-5 w-5" />}
         </button>
 
         {/* Chat settings */}
