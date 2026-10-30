@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { WallpaperModal } from '@/components/chat/WallpaperModal'
-import { Image as ImageIcon, PencilLine, ImageOff, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Image as ImageIcon, PencilLine, ImageOff, ChevronRight } from 'lucide-react'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { useUser } from '@/lib/hooks/useUser'
 import { useSetChatWallpaper, useDeleteChatWallpaper, useArchiveLockStatus, useChatWallpaper } from '@/lib/hooks/useChatSettings'
@@ -109,16 +109,17 @@ export default function ChatWallpaperRoutePage() {
   if (!showEditor) {
     return (
       <div className="min-h-[100dvh] w-full flex flex-col bg-background">
-        <header className="flex items-center gap-3 border-b border-border px-4 py-4">
-          <div><h1 className="text-lg font-semibold">Wallpaper settings</h1><p className="text-sm text-muted-foreground">Personalize this conversation</p></div>
+        <header className="flex items-center gap-3 border-b border-border px-4 py-3">
+          <button type="button" onClick={() => router.push("/chat/" + chatId + "/settings")} className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/70 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-pink-500/40 hover:text-pink-400 sm:px-3 sm:py-2 sm:text-sm"><ArrowLeft className="h-3.5 w-3.5" /> Back</button>
+          <h1 className="text-base font-bold">Wallpaper settings</h1>
         </header>
         <main className="mx-auto w-full max-w-xl flex-1 space-y-3 p-4">
           <div className="overflow-hidden rounded-2xl border border-border bg-card divide-y divide-border">
             <button type="button" onClick={() => router.push(`/chat/${chatId}/settings/wallpaper?mode=${currentWallpaper?.wallpaper_url ? 'change' : 'set'}`)} className="flex w-full items-center justify-between px-4 py-3.5 text-left hover:bg-muted/60">
-              <span className="flex items-center gap-3"><ImageIcon className="h-5 w-5 text-muted-foreground" /><span><span className="block font-medium">{currentWallpaper?.wallpaper_url ? 'Change Wallpaper' : 'Set Wallpaper'}</span><span className="text-sm text-muted-foreground">Choose a new photo from your device</span></span></span><ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <span className="flex items-center gap-3"><ImageIcon className="h-5 w-5 text-muted-foreground" /><span className="text-sm font-medium">{currentWallpaper?.wallpaper_url ? "Change Wallpaper" : "Set Wallpaper"}</span></span><ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
-            {currentWallpaper?.wallpaper_url && <button type="button" onClick={() => router.push(`/chat/${chatId}/settings/wallpaper?mode=edit`)} className="flex w-full items-center justify-between px-4 py-3.5 text-left hover:bg-muted/60"><span className="flex items-center gap-3"><PencilLine className="h-5 w-5 text-muted-foreground" /><span><span className="block font-medium">Edit Wallpaper</span><span className="text-sm text-muted-foreground">Adjust the current wallpaper</span></span></span><ChevronRight className="h-4 w-4 text-muted-foreground" /></button>}
-            {currentWallpaper?.wallpaper_url && <button type="button" disabled={saving} onClick={() => setConfirmRemove(true)} className="flex w-full items-center justify-between px-4 py-3.5 text-left text-destructive hover:bg-destructive/5 disabled:opacity-50"><span className="flex items-center gap-3"><ImageOff className="h-5 w-5" /><span><span className="block font-medium">{saving ? 'Removing…' : 'Remove Wallpaper'}</span><span className="text-sm opacity-80">Return to the default chat background</span></span></span><ChevronRight className="h-4 w-4" /></button>}
+            {currentWallpaper?.wallpaper_url && <button type="button" onClick={() => router.push(`/chat/${chatId}/settings/wallpaper?mode=edit`)} className="flex w-full items-center justify-between px-4 py-3.5 text-left hover:bg-muted/60"><span className="flex items-center gap-3"><PencilLine className="h-5 w-5 text-muted-foreground" /><span className="text-sm font-medium">Edit Wallpaper</span></span><ChevronRight className="h-4 w-4 text-muted-foreground" /></button>}
+            {currentWallpaper?.wallpaper_url && <button type="button" disabled={saving} onClick={() => setConfirmRemove(true)} className="flex w-full items-center justify-between px-4 py-3.5 text-left hover:bg-muted/60 disabled:opacity-50"><span className="flex items-center gap-3"><ImageOff className="h-4 w-4 text-muted-foreground" /><span className="text-sm font-medium">{saving ? "Removing…" : "Remove Wallpaper"}</span></span><ChevronRight className="h-4 w-4" /></button>}
           </div>
         </main>
         {confirmRemove && (
