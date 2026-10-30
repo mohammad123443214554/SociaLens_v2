@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight, PauseCircle, PlayCircle } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
@@ -15,6 +15,7 @@ interface CallScreenProps {
   remoteStream: MediaStream | null
   isMuted: boolean
   isCameraOff: boolean
+  isOnHold: boolean
   callDurationSec: number
   error: string | null
   ringtoneId?: string
@@ -22,6 +23,7 @@ interface CallScreenProps {
   onEnd: () => void
   onToggleMute: () => void
   onToggleCamera: () => void
+  onToggleHold: () => void
 }
 
 function formatDuration(sec: number) {
@@ -32,8 +34,8 @@ function formatDuration(sec: number) {
 
 export function CallScreen({
   phase, type, peerName, peerAvatar, localStream, remoteStream,
-  isMuted, isCameraOff, callDurationSec, error, ringtoneId, ringtoneVolume,
-  onEnd, onToggleMute, onToggleCamera,
+  isMuted, isCameraOff, isOnHold, callDurationSec, error, ringtoneId, ringtoneVolume,
+  onEnd, onToggleMute, onToggleCamera, onToggleHold,
 }: CallScreenProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -68,7 +70,7 @@ export function CallScreen({
     error ? error :
     phase === 'outgoing-ringing' ? 'Ringing...' :
     phase === 'connecting' ? 'Connecting...' :
-    phase === 'in-call' ? formatDuration(callDurationSec) : ''
+    phase === 'in-call' ? (isOnHold ? `On hold · ${formatDuration(callDurationSec)}` : formatDuration(callDurationSec)) : ''
 
   const isVideoCall = type === 'video'
   const showRemoteVideo = isVideoCall && remoteStream && phase === 'in-call'
@@ -82,13 +84,13 @@ export function CallScreen({
           autoPlay
           playsInline
           muted
-          className={`absolute inset-0 w-full h-full object-cover ${showRemoteVideo && !localVideoIsMain ? 'opacity-100' : 'opacity-0'}`}
+          style={{ objectFit: "cover", objectPosition: "center center", backgroundColor: "#000" }}
+          className={`absolute inset-0 block w-full h-full object-cover object-center bg-black ${showRemoteVideo && !localVideoIsMain ? 'opacity-100' : 'opacity-0'}`}
         />
       )}
       <audio ref={remoteAudioRef} autoPlay className="hidden" />
 
-      {/* Dim overlay so controls/text stay readable over video */}
-      {isVideoCall && <div className="absolute inset-0 bg-black/30" />}
+      {/* Keep remote camera image unfiltered; controls have their own contrast. */}
 
       {/* Top bar - SociaLens branded, mirrors a normal call app's header */}
       <div className="relative z-10 flex items-center justify-center px-5 pt-5">
@@ -125,7 +127,8 @@ export function CallScreen({
             autoPlay
             playsInline
             muted
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-150 ${localVideoIsMain && !isCameraOff ? 'opacity-100 scale-x-[-1]' : 'opacity-0 pointer-events-none'}`}
+            style={{ objectFit: "cover", objectPosition: "center center", backgroundColor: "#000" }}
+            className={`absolute inset-0 block w-full h-full object-cover object-center bg-black transition-opacity duration-150 ${localVideoIsMain && !isCameraOff ? 'opacity-100 scale-x-[-1]' : 'opacity-0 pointer-events-none'}`}
           />
           <div className="absolute bottom-28 left-4 w-24 h-32 sm:w-28 sm:h-36 rounded-xl overflow-hidden ring-2 ring-white/25 bg-neutral-900 z-20 shadow-lg">
             <button
@@ -142,14 +145,15 @@ export function CallScreen({
               autoPlay
               playsInline
               muted
-              className={`w-full h-full object-cover ${localVideoIsMain ? '' : 'scale-x-[-1]'}`}
+              style={{ objectFit: "cover", objectPosition: "center center", backgroundColor: "#000" }}
+              className={`block w-full h-full object-cover object-center bg-black ${localVideoIsMain ? '' : 'scale-x-[-1]'}`}
             />
           </div>
         </>
       )}
 
       {/* Controls */}
-      <div className="relative z-10 flex items-center justify-center gap-6 pb-12 pt-6 bg-gradient-to-t from-black/40 to-transparent">
+      <div className="relative z-10 flex items-center justify-center gap-4 px-4 pb-12 pt-6 bg-gradient-to-t from-black/50 to-transparent">
         <button
           onClick={onToggleMute}
           className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
@@ -171,7 +175,18 @@ export function CallScreen({
         )}
 
         <button
+          onClick={onToggleHold}
+          aria-label={isOnHold ? 'Resume call' : 'Hold call'}
+          title={isOnHold ? 'Resume call' : 'Hold call'}
+          className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${isOnHold ? 'bg-amber-400 text-black' : 'bg-white/15 hover:bg-white/25'}`}
+        >
+          {isOnHold ? <PlayCircle className="h-6 w-6" /> : <PauseCircle className="h-6 w-6" />}
+        </button>
+
+        <button
           onClick={onEnd}
+          aria-label="End call"
+          title="End call"
           className="h-16 w-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors shadow-lg shadow-red-500/30"
         >
           <PhoneOff className="h-7 w-7" />
