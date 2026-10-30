@@ -23,6 +23,7 @@ export default function ChatSettingsRoutePage() {
   const [chat, setChat] = useState<any>(null)
   const [showNickname, setShowNickname] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [confirmDeleteChat, setConfirmDeleteChat] = useState(false)
   const [confirmRemoveWallpaper, setConfirmRemoveWallpaper] = useState(false)
   const [removingWallpaper, setRemovingWallpaper] = useState(false)
   const [archiveUnlocked, setArchiveUnlocked] = useState(false)
@@ -83,8 +84,12 @@ export default function ChatSettingsRoutePage() {
     toggleBlock.mutate({ blockerId: user.id, blockedId: other.id, block })
   }
 
-  const handleDeleteChat = async () => {
-    if (!window.confirm('Delete this conversation? It will be removed from your inbox.')) return
+  const handleDeleteChat = () => {
+    if (!deleting) setConfirmDeleteChat(true)
+  }
+
+  const confirmDeleteAllChat = async () => {
+    if (deleting) return
     setDeleting(true)
     try {
       await deleteChat.mutateAsync({ chatId, userId: user.id })
@@ -136,6 +141,49 @@ export default function ChatSettingsRoutePage() {
         onDeleteChat={handleDeleteChat}
         onOpenCallSettings={() => router.push(`/chat/${chatId}/settings/call`)}
       />
+      {confirmDeleteChat && (
+        <div
+          className="fixed inset-0 z-[190] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !deleting) setConfirmDeleteChat(false)
+          }}
+        >
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-chat-title"
+            aria-describedby="delete-chat-description"
+            className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl"
+          >
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <span className="text-xl">!</span>
+            </div>
+            <h2 id="delete-chat-title" className="text-center text-lg font-semibold">Delete all chat?</h2>
+            <p id="delete-chat-description" className="mt-2 text-center text-sm text-muted-foreground">
+              This conversation will be removed from your inbox. The other participant's chat will not be deleted.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setConfirmDeleteChat(false)}
+                className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={confirmDeleteAllChat}
+                className="flex-1 rounded-xl bg-destructive px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting…' : 'Delete all chat'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       {confirmRemoveWallpaper && (
         <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/60 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !removingWallpaper) setConfirmRemoveWallpaper(false) }}>
           <section role="alertdialog" aria-modal="true" aria-labelledby="remove-wallpaper-title" aria-describedby="remove-wallpaper-description" className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl">
