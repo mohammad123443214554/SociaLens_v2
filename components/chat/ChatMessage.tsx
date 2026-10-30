@@ -77,6 +77,29 @@ function formatCallDuration(sec: number) {
   return `${m}:${s}`
 }
 
+type CallLogInfo = {
+  callType: 'audio' | 'video'
+  outcome: string
+  durationSec: number
+  callerId?: string | null
+  calleeId?: string | null
+  endedBy?: string | null
+}
+
+function getCallLogLabel(info: CallLogInfo, viewerId: string) {
+  const kind = info.callType === 'video' ? 'video call' : 'voice call'
+  const outgoing = info.callerId ? info.callerId === viewerId : true
+  if (info.outcome === 'completed') return `${info.callType === 'video' ? 'Video' : 'Voice'} call · ${formatCallDuration(info.durationSec)}`
+  if (info.outcome === 'missed') return outgoing ? `They didn't answer your ${kind}` : `You didn't answer the incoming ${kind}`
+  if (info.outcome === 'rejected') return outgoing ? `They declined your ${kind}` : `You declined the incoming ${kind}`
+  if (info.outcome === 'cancelled') return outgoing ? `You cancelled the ${kind}` : `They cancelled the ${kind}`
+  if (info.outcome === 'ended' && info.endedBy) {
+    if (info.endedBy === viewerId) return outgoing ? `You ended the ${kind}` : `You ended the incoming ${kind}`
+    return outgoing ? `They ended your ${kind}` : `They ended the ${kind}`
+  }
+  return info.callType === 'video' ? 'Video call' : 'Voice call'
+}
+
 function MessageReadReceipt({ isRead, avatarUrl }: { isRead: boolean; avatarUrl?: string | null }) {
   if (isRead && avatarUrl) {
     return (
@@ -278,16 +301,10 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
     // call bubble itself) - show the same friendly "Voice call · 00:14"
     // label here instead of dumping that raw JSON into the reply preview.
     if (replyPreview.media_type === 'call') {
-      let callInfo: { callType: 'audio' | 'video'; outcome: string; durationSec: number } | null = null
+      let callInfo: CallLogInfo | null = null
       try { callInfo = JSON.parse(replyPreview.content) } catch {}
       if (callInfo) {
-        const label =
-          callInfo.outcome === 'completed'
-            ? `${callInfo.callType === 'video' ? 'Video' : 'Voice'} call · ${formatCallDuration(callInfo.durationSec)}`
-            : callInfo.outcome === 'missed' ? 'Missed call'
-            : callInfo.outcome === 'rejected' ? 'Call declined'
-            : callInfo.outcome === 'cancelled' ? 'Cancelled call'
-            : `${callInfo.callType === 'video' ? 'Video' : 'Voice'} call`
+        const label = getCallLogLabel(callInfo, currentUserId)
         const Icon = callInfo.callType === 'video' ? Video : Phone
         return (
           <div className="bg-muted rounded-2xl px-3 py-2 text-sm text-muted-foreground flex items-center gap-1.5">
@@ -343,13 +360,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
     let callInfo: { callType: 'audio' | 'video'; outcome: string; durationSec: number } | null = null
     try { callInfo = JSON.parse(message.content) } catch {}
     if (callInfo) {
-      const label =
-        callInfo.outcome === 'completed'
-          ? `${callInfo.callType === 'video' ? 'Video' : 'Voice'} call · ${formatCallDuration(callInfo.durationSec)}`
-          : callInfo.outcome === 'missed' ? 'Missed call'
-          : callInfo.outcome === 'rejected' ? 'Call declined'
-          : callInfo.outcome === 'cancelled' ? 'Cancelled call'
-          : `${callInfo.callType === 'video' ? 'Video' : 'Voice'} call`
+      const label = getCallLogLabel(callInfo, currentUserId)
       const Icon = callInfo.callType === 'video' ? Video : Phone
       const isMissedOrDeclined = callInfo.outcome === 'missed' || callInfo.outcome === 'rejected'
 
