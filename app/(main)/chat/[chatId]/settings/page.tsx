@@ -132,7 +132,7 @@ export default function ChatSettingsRoutePage() {
         iBlockedThem={iBlockedThem}
         deleting={deleting}
         showNicknameOption={!theyBlockedMe}
-        onBack={() => router.push(`/chat/${chatId}`)}
+        onBack={() => router.replace(`/chat/${chatId}`)}
         onSetNickname={() => setShowNickname(true)}
         onSetWallpaper={() => router.push(`/chat/${chatId}/settings/wallpaper`)}
         onEditWallpaper={() => router.push(`/chat/${chatId}/settings/wallpaper?edit=1`)}
