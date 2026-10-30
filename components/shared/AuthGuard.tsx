@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PageLoader } from './LoadingSpinner'
@@ -11,6 +11,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [suspension, setSuspension] = useState<{ reason: string | null; deadline: string | null } | null>(null)
   const router = useRouter()
   const pathname = usePathname()
+  const checkedUserIdRef = useRef<string | null>(null)
   const checkSuspension = async (supabase: ReturnType<typeof createClient>, userId: string) => {
     const { data } = await supabase
       .from('profiles')
@@ -29,24 +30,43 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       return
     }
     const supabase = createClient()
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    let active = true
+
+    const verifySession = async (session: { user: { id: string } } | null) => {
+      if (!active) return
       if (!session) {
         router.replace('/login')
         return
       }
+
+      // getSession() and Supabase's INITIAL_SESSION event can arrive together.
+      // Check suspension once per signed-in user, not again on every token
+      // refresh or duplicate initial auth notification.
+      if (checkedUserIdRef.current === session.user.id) {
+        setReady(true)
+        return
+      }
+
+      checkedUserIdRef.current = session.user.id
       await checkSuspension(supabase, session.user.id)
-      setReady(true)
-    })
+      if (active) setReady(true)
+    }
+
+    void supabase.auth.getSession().then(({ data: { session } }) => verifySession(session))
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
+        checkedUserIdRef.current = null
         router.replace('/login')
-      } else if (session) {
-        checkSuspension(supabase, session.user.id).then(() => setReady(true))
+      } else if (session && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+        void verifySession(session)
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   if (!ready) return <PageLoader />
