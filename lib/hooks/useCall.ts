@@ -20,6 +20,7 @@ export interface CallRow {
   created_at: string
   started_at: string | null
   ended_at: string | null
+  ended_by?: string | null
 }
 
 interface PeerProfile {
@@ -116,6 +117,7 @@ export function useCallEngine(currentUserId?: string) {
   const remoteLeftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const connectingCallIdRef = useRef<string | null>(null)
   const roleRef = useRef<'caller' | 'callee' | null>(null)
+  const loggedCallIdsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => { callRef.current = call }, [call])
   useEffect(() => { console.log('[SociaLens Call] phase changed ->', phase) }, [phase])
@@ -184,14 +186,15 @@ export function useCallEngine(currentUserId?: string) {
   // hangs up, the caller's own listener always eventually notices the
   // final status and logs it exactly once.
   const logCallToChat = async (call: CallRow, status: CallStatus) => {
-    if (!call.chat_id) return
+    if (!call.chat_id || loggedCallIdsRef.current.has(call.id)) return
+    loggedCallIdsRef.current.add(call.id)
     const durationSec = startedAtMsRef.current ? Math.round((Date.now() - startedAtMsRef.current) / 1000) : 0
     const outcome = durationSec > 0 ? 'completed' : status
     try {
       await supabase.from('messages').insert({
         chat_id: call.chat_id,
         sender_id: call.caller_id,
-        content: JSON.stringify({ callType: call.type, outcome, durationSec }),
+        content: JSON.stringify({ callType: call.type, outcome, durationSec, callerId: call.caller_id, calleeId: call.callee_id, endedBy: call.ended_by ?? null }),
         media_type: 'call',
       })
       // Also update the chat list preview - without this a call never
@@ -249,7 +252,7 @@ export function useCallEngine(currentUserId?: string) {
     setCallDurationSec(0)
   }, [reportUsageAndCleanupTransport])
 
-  const updateCallStatus = useCallback(async (callId: string, patch: Partial<Pick<CallRow, 'status' | 'started_at' | 'ended_at'>>) => {
+  const updateCallStatus = useCallback(async (callId: string, patch: Partial<Pick<CallRow, 'status' | 'started_at' | 'ended_at' | 'ended_by'>>) => {
     await supabase.from('calls').update(patch).eq('id', callId)
   }, [])
 
@@ -304,7 +307,7 @@ export function useCallEngine(currentUserId?: string) {
           AGC: true,
         })
         const videoPromise = activeCall.type === 'video'
-          ? AgoraRTC.createCameraVideoTrack({ encoderConfig: '720p_2' }).catch((camErr: any) => {
+          ? AgoraRTC.createCameraVideoTrack({ encoderConfig: '720p_1' }).catch((camErr: any) => {
               console.warn('[Agora] camera unavailable; keeping video surface blank', camErr)
               return null
             })
@@ -582,7 +585,7 @@ export function useCallEngine(currentUserId?: string) {
 
   const cancelOutgoing = useCallback(async () => {
     if (!call) return
-    await updateCallStatus(call.id, { status: 'cancelled' })
+    await updateCallStatus(call.id, { status: 'cancelled', ended_at: new Date().toISOString(), ended_by: currentUserId ?? null })
     cleanup('cancelled')
   }, [call, cleanup])
 
@@ -652,7 +655,7 @@ export function useCallEngine(currentUserId?: string) {
     } catch (err: any) {
       console.error('acceptIncoming failed', err)
       setError(describeCallError(err, 'media'))
-      await updateCallStatus(row.id, { status: 'rejected' })
+      await updateCallStatus(row.id, { status: 'rejected', ended_at: new Date().toISOString(), ended_by: currentUserId ?? null })
       cleanup()
       return false
     }
@@ -694,7 +697,7 @@ export function useCallEngine(currentUserId?: string) {
   const endCall = useCallback(async (finalStatus: CallStatus = 'ended') => {
     const current = callRef.current
     if (current) {
-      await updateCallStatus(current.id, { status: finalStatus, ended_at: new Date().toISOString() })
+      await updateCallStatus(current.id, { status: finalStatus, ended_at: new Date().toISOString(), ended_by: currentUserId ?? null })
     }
     cleanup(finalStatus)
   }, [cleanup])
