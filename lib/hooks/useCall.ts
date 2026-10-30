@@ -195,12 +195,14 @@ export function useCallEngine(currentUserId?: string) {
       })
       // Also update the chat list preview - without this a call never
       // shows up there at all, only inside the conversation itself.
+      const callLabel = call.type === 'video' ? '📹 Video call' : '📞 Voice call'
+      const callKind = call.type === 'video' ? 'video' : 'voice'
       const preview =
-        outcome === 'completed' ? '📞 Voice call'
-        : outcome === 'missed' ? '📞 Missed call'
-        : outcome === 'rejected' ? '📞 Call declined'
-        : outcome === 'cancelled' ? '📞 Cancelled call'
-        : '📞 Voice call'
+        outcome === 'completed' ? callLabel
+        : outcome === 'missed' ? `📞 Missed ${callKind} call`
+        : outcome === 'rejected' ? `${call.type === 'video' ? 'Video' : 'Voice'} call declined`
+        : outcome === 'cancelled' ? `${call.type === 'video' ? 'Video' : 'Voice'} call cancelled`
+        : callLabel
       await supabase
         .from('chats')
         .update({
