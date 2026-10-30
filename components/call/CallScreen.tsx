@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
@@ -38,6 +38,7 @@ export function CallScreen({
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
+  const [localVideoIsMain, setLocalVideoIsMain] = useState(false)
 
   useEffect(() => {
     if (localVideoRef.current) localVideoRef.current.srcObject = localStream
@@ -73,7 +74,7 @@ export function CallScreen({
           ref={remoteVideoRef}
           autoPlay
           playsInline
-          className={`absolute inset-0 w-full h-full object-cover ${showRemoteVideo ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 w-full h-full object-cover ${showRemoteVideo && !localVideoIsMain ? 'opacity-100' : 'opacity-0'}`}
         />
       )}
       {!isVideoCall && <audio ref={remoteAudioRef} autoPlay />}
@@ -107,17 +108,54 @@ export function CallScreen({
 
       {!showRemoteVideo && <div className="flex-1" />}
 
-      {/* Local self-view (video calls only) */}
-      {isVideoCall && localStream && (
-        <div className="absolute top-20 right-4 w-24 h-32 sm:w-28 sm:h-36 rounded-xl overflow-hidden ring-2 ring-pink-500/40 bg-neutral-800 z-20 shadow-lg">
-          {isCameraOff ? (
-            <div className="w-full h-full flex items-center justify-center">
-              <VideoOff className="h-6 w-6 text-white/40" />
-            </div>
-          ) : (
-            <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
-          )}
-        </div>
+      {/* Main video and movable picture-in-picture preview. A missing camera
+          intentionally stays blank; it must never turn into a call error. */}
+      {isVideoCall && (
+        <>
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-150 ${localVideoIsMain && !isCameraOff ? 'opacity-100 scale-x-[-1]' : 'opacity-0 pointer-events-none'}`}
+          />
+          <div className="absolute bottom-28 left-4 w-24 h-32 sm:w-28 sm:h-36 rounded-xl overflow-hidden ring-2 ring-white/25 bg-neutral-900 z-20 shadow-lg">
+            <video
+              ref={undefined}
+              autoPlay
+              playsInline
+              muted
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => setLocalVideoIsMain((current) => !current)}
+              aria-label="Swap video positions"
+              title="Swap video positions"
+              className="absolute top-1.5 right-1.5 z-30 h-8 w-8 rounded-full bg-black/65 hover:bg-black/85 text-white flex items-center justify-center"
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+            </button>
+            {localVideoIsMain ? (
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <video
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover scale-x-[-1]"
+                ref={(node) => {
+                  if (node && node.srcObject !== localStream) node.srcObject = localStream
+                }}
+              />
+            )}
+          </div>
+        </>
       )}
 
       {/* Controls */}
