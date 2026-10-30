@@ -273,18 +273,24 @@ export function useCallEngine(currentUserId?: string) {
     // Acquiring media first means a permission failure happens before
     // anything has joined, so there is never a ghost to collide with.
     const attemptConnect = async (attempt: number): Promise<void> => {
-      const res = await fetch('/api/calls/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ callId: activeCall.id, attempt }),
-      })
+      // Fetch secure join credentials while the Agora SDK chunk loads. These
+      // independent setup steps used to happen one after another, adding
+      // avoidable delay before the microphone could even start.
+      const [res, agoraModule] = await Promise.all([
+        fetch('/api/calls/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callId: activeCall.id, attempt }),
+        }),
+        import('agora-rtc-sdk-ng'),
+      ])
       const info = await res.json()
       if (!res.ok) throw new Error(info?.error || 'Could not connect the call.')
 
       providerRef.current = info.provider
 
       if (info.provider === 'agora') {
-        const { default: AgoraRTC } = await import('agora-rtc-sdk-ng')
+        const AgoraRTC = agoraModule.default
 
         // Acquire microphone and camera concurrently to reduce call setup
         // time. A camera failure is non-fatal: keep audio running and leave
