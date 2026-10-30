@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, Search, SquarePlay, Plus, Send } from 'lucide-react'
@@ -26,31 +26,46 @@ export function MobileBottomNav({ className }: { className?: string } = {}) {
   const pathname = usePathname()
   const { profile, user } = useUser()
   const [unreadMessages, setUnreadMessages] = useState(0)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
+  const previousPathRef = useRef(pathname)
 
+  const fetchUnread = useCallback(async () => {
+    if (!user?.id) return
+    const { data } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('is_read', false)
+      .neq('sender_id', user.id)
+    setUnreadMessages(data?.length || 0)
+  }, [supabase, user?.id])
+
+  // Keep one realtime subscription for the signed-in user. Previously this
+  // effect depended on pathname, so every navigation tore the channel down,
+  // recreated it, and queried the unread-message table again.
   useEffect(() => {
-    if (!user) return
-    const fetchUnread = async () => {
-      const { data } = await supabase
-        .from('messages')
-        .select('id')
-        .eq('is_read', false)
-        .neq('sender_id', user.id)
-      setUnreadMessages(data?.length || 0)
-    }
-    fetchUnread()
-
-    // Clear when on chat page
-    if (pathname.startsWith('/chat')) {
+    if (!user?.id) {
       setUnreadMessages(0)
+      return
     }
 
-    const channel = supabase.channel('mobile-nav-unread')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, fetchUnread)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, fetchUnread)
+    void fetchUnread()
+    const channel = supabase.channel(`mobile-nav-unread:${user.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => { void fetchUnread() })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => { void fetchUnread() })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [user, pathname])
+
+    return () => { void supabase.removeChannel(channel) }
+  }, [fetchUnread, supabase, user?.id])
+
+  // Chat screens intentionally hide the unread badge. Only refresh the count
+  // when returning from a chat area, not on every unrelated route change.
+  useEffect(() => {
+    const wasInChat = previousPathRef.current.startsWith('/chat')
+    const isInChat = pathname.startsWith('/chat')
+    if (isInChat) setUnreadMessages(0)
+    else if (wasInChat) void fetchUnread()
+    previousPathRef.current = pathname
+  }, [fetchUnread, pathname])
 
   return (
     <>
