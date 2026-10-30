@@ -9,7 +9,10 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 60 * 1000,
+            // Keep recently visited screens warm so Back/Forward navigation
+            // can paint cached data immediately instead of showing a loader.
+            staleTime: 2 * 60 * 1000,
+            gcTime: 10 * 60 * 1000,
           },
         },
       })
