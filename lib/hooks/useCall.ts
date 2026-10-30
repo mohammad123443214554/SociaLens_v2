@@ -895,7 +895,7 @@ export function useCallEngine(currentUserId?: string) {
       }
     }
 
-    const intervalId = setInterval(poll, 4000)
+    const intervalId = setInterval(poll, phase === 'in-call' ? 1500 : 4000)
     return () => clearInterval(intervalId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId, phase])
