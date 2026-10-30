@@ -346,11 +346,29 @@ export function useCallEngine(currentUserId?: string) {
         // Agora temporarily remove a peer. Keep the call session alive and
         // let Agora reconnect; only the explicit Supabase call status (when
         // a participant presses End) is allowed to finish the call.
-        client.on('user-left', (remoteUser: any) => {
-          console.warn('[Agora] remote participant temporarily left; keeping call alive', remoteUser?.uid)
+        client.on('user-left', async (remoteUser: any) => {
+          console.warn('[Agora] remote participant left; verifying call-session status', remoteUser?.uid)
           removeTracksOfKind(remoteStreamObjRef.current, 'video')
           removeTracksOfKind(remoteStreamObjRef.current, 'audio')
           setRemoteStream(remoteStreamObjRef.current)
+
+          // Agora can report a temporary mobile-network handoff as user-left.
+          // A deliberate hangup updates the call row before leaving; a
+          // transient transport drop leaves the row in accepted state.
+          try {
+            const { data: latest } = await supabase
+              .from('calls')
+              .select('*')
+              .eq('id', activeCall.id)
+              .maybeSingle()
+            if (latest && ['rejected', 'missed', 'cancelled', 'busy', 'ended'].includes(latest.status)) {
+              callRef.current = { ...activeCall, ...latest } as CallRow
+              setCall(callRef.current)
+              cleanup(latest.status as CallStatus)
+            }
+          } catch (statusError) {
+            console.warn('[Agora] could not verify remote leave; keeping call session active', statusError)
+          }
         })
         client.on('connection-state-change', (curState: string, _prevState: string, reason: string) => {
           console.log('[Agora] connection state ->', curState, reason)
@@ -660,7 +678,7 @@ export function useCallEngine(currentUserId?: string) {
       cleanup()
       return false
     }
-  }, [hydrateIncomingCall, updateCallStatus, connectMedia, cleanup])
+  }, [hydrateIncomingCall, updateCallStatus, connectMedia, cleanup, currentUserId])
 
   /**
    * Rejects one specific existing call. Goes through /api/calls/decline
