@@ -57,7 +57,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const nextUser = session?.user ?? null
-      const nextUserId = nextUser?.id ?? null
 
       if (!nextUser) {
         activeUserId = null
@@ -67,6 +66,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
+      const nextUserId = nextUser.id
       setUser(nextUser)
 
       // Token refreshes happen routinely and do not mean profile data changed.
