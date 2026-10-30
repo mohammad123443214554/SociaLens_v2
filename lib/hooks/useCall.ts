@@ -588,7 +588,7 @@ export function useCallEngine(currentUserId?: string) {
     await updateCallStatus(call.id, { status: 'cancelled', ended_at: new Date().toISOString(), ended_by: currentUserId ?? null })
     callRef.current = { ...call, status: 'cancelled', ended_at: new Date().toISOString(), ended_by: currentUserId ?? null }
     cleanup('cancelled')
-  }, [call, cleanup])
+  }, [call, cleanup, updateCallStatus, currentUserId])
 
   // ------------------------------------------------------------------
   // Incoming call
@@ -678,7 +678,7 @@ export function useCallEngine(currentUserId?: string) {
       })
       if (!res.ok) throw new Error('decline endpoint returned ' + res.status)
     } catch {
-      await updateCallStatus(callId, { status: 'rejected', ended_at: new Date().toISOString() })
+      await updateCallStatus(callId, { status: 'rejected', ended_at: new Date().toISOString(), ended_by: currentUserId ?? null })
     }
     if (callRef.current?.id === callId) {
       callRef.current = { ...callRef.current, status: 'rejected', ended_at: new Date().toISOString(), ended_by: currentUserId ?? null }
