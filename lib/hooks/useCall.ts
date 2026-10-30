@@ -98,6 +98,7 @@ export function useCallEngine(currentUserId?: string) {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
   const [isMuted, setIsMuted] = useState(false)
   const [isCameraOff, setIsCameraOff] = useState(false)
+  const [isOnHold, setIsOnHold] = useState(false)
   const [callDurationSec, setCallDurationSec] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
@@ -244,6 +245,7 @@ export function useCallEngine(currentUserId?: string) {
     setPhase('idle')
     setIsMuted(false)
     setIsCameraOff(false)
+    setIsOnHold(false)
     setCallDurationSec(0)
   }, [reportUsageAndCleanupTransport])
 
@@ -295,9 +297,14 @@ export function useCallEngine(currentUserId?: string) {
         // Acquire microphone and camera concurrently to reduce call setup
         // time. A camera failure is non-fatal: keep audio running and leave
         // the video surface blank instead of showing a red error banner.
-        const audioPromise = AgoraRTC.createMicrophoneAudioTrack()
+        const audioPromise = AgoraRTC.createMicrophoneAudioTrack({
+          encoderConfig: 'high_quality',
+          AEC: true,
+          ANS: true,
+          AGC: true,
+        })
         const videoPromise = activeCall.type === 'video'
-          ? AgoraRTC.createCameraVideoTrack().catch((camErr: any) => {
+          ? AgoraRTC.createCameraVideoTrack({ encoderConfig: '720p_2' }).catch((camErr: any) => {
               console.warn('[Agora] camera unavailable; keeping video surface blank', camErr)
               return null
             })
@@ -331,17 +338,16 @@ export function useCallEngine(currentUserId?: string) {
         client.on('user-unpublished', (_remoteUser: any, mediaType: 'audio' | 'video') => {
           removeTracksOfKind(remoteStreamObjRef.current, mediaType === 'audio' ? 'audio' : 'video')
         })
-        // A brief network blip can make Agora report the other person as
-        // having "left" even though they're still on the call and about
-        // to reconnect - so this doesn't end the call immediately. It
-        // waits a few seconds for them to reappear (user-published above)
-        // before actually treating it as a real hangup.
-        client.on('user-left', () => {
-          if (remoteLeftTimeoutRef.current) clearTimeout(remoteLeftTimeoutRef.current)
-          remoteLeftTimeoutRef.current = setTimeout(() => {
-            remoteLeftTimeoutRef.current = null
-            cleanup('ended')
-          }, 8000)
+        // A transport-level user-left event is NOT a hangup. Mobile networks,
+        // browser tab suspension and brief Wi-Fi/cellular handoffs can make
+        // Agora temporarily remove a peer. Keep the call session alive and
+        // let Agora reconnect; only the explicit Supabase call status (when
+        // a participant presses End) is allowed to finish the call.
+        client.on('user-left', (remoteUser: any) => {
+          console.warn('[Agora] remote participant temporarily left; keeping call alive', remoteUser?.uid)
+          removeTracksOfKind(remoteStreamObjRef.current, 'video')
+          removeTracksOfKind(remoteStreamObjRef.current, 'audio')
+          setRemoteStream(remoteStreamObjRef.current)
         })
         client.on('connection-state-change', (curState: string, _prevState: string, reason: string) => {
           console.log('[Agora] connection state ->', curState, reason)
@@ -696,16 +702,34 @@ export function useCallEngine(currentUserId?: string) {
   const toggleMute = useCallback(() => {
     const next = !isMuted
     setIsMuted(next)
-    if (agoraRef.current?.audioTrack) agoraRef.current.audioTrack.setEnabled(!next)
-    if (dailyRef.current) dailyRef.current.setLocalAudio(!next)
-  }, [isMuted])
+    const enabled = !next && !isOnHold
+    if (agoraRef.current?.audioTrack) void agoraRef.current.audioTrack.setEnabled(enabled)
+    if (dailyRef.current) void dailyRef.current.setLocalAudio(enabled)
+  }, [isMuted, isOnHold])
 
   const toggleCamera = useCallback(() => {
     const next = !isCameraOff
     setIsCameraOff(next)
-    if (agoraRef.current?.videoTrack) agoraRef.current.videoTrack.setEnabled(!next)
-    if (dailyRef.current) dailyRef.current.setLocalVideo(!next)
-  }, [isCameraOff])
+    const enabled = !next && !isOnHold
+    if (agoraRef.current?.videoTrack) void agoraRef.current.videoTrack.setEnabled(enabled)
+    if (dailyRef.current) void dailyRef.current.setLocalVideo(enabled)
+  }, [isCameraOff, isOnHold])
+
+  // Hold suspends this participant's outgoing media without leaving the
+  // RTC room. The remote peer and call session stay connected; Resume
+  // restores only the devices that were not already muted/disabled.
+  const toggleHold = useCallback(() => {
+    const next = !isOnHold
+    setIsOnHold(next)
+    const audioEnabled = !next && !isMuted
+    const videoEnabled = !next && !isCameraOff
+    if (agoraRef.current?.audioTrack) void agoraRef.current.audioTrack.setEnabled(audioEnabled)
+    if (agoraRef.current?.videoTrack) void agoraRef.current.videoTrack.setEnabled(videoEnabled)
+    if (dailyRef.current) {
+      void dailyRef.current.setLocalAudio(audioEnabled)
+      void dailyRef.current.setLocalVideo(videoEnabled)
+    }
+  }, [isOnHold, isMuted, isCameraOff])
 
   // Call duration timer, running once the transport is actually live.
   useEffect(() => {
@@ -853,6 +877,7 @@ export function useCallEngine(currentUserId?: string) {
     remoteStream,
     isMuted,
     isCameraOff,
+    isOnHold,
     callDurationSec,
     error,
     startCall,
@@ -864,6 +889,7 @@ export function useCallEngine(currentUserId?: string) {
     hangup: () => endCall('ended'),
     toggleMute,
     toggleCamera,
+    toggleHold,
     confirmPermissionAndConnect,
     recheckPermission,
   }
