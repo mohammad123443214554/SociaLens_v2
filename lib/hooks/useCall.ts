@@ -586,6 +586,7 @@ export function useCallEngine(currentUserId?: string) {
   const cancelOutgoing = useCallback(async () => {
     if (!call) return
     await updateCallStatus(call.id, { status: 'cancelled', ended_at: new Date().toISOString(), ended_by: currentUserId ?? null })
+    callRef.current = { ...call, status: 'cancelled', ended_at: new Date().toISOString(), ended_by: currentUserId ?? null }
     cleanup('cancelled')
   }, [call, cleanup])
 
@@ -679,7 +680,10 @@ export function useCallEngine(currentUserId?: string) {
     } catch {
       await updateCallStatus(callId, { status: 'rejected', ended_at: new Date().toISOString() })
     }
-    if (callRef.current?.id === callId) cleanup()
+    if (callRef.current?.id === callId) {
+      callRef.current = { ...callRef.current, status: 'rejected', ended_at: new Date().toISOString(), ended_by: currentUserId ?? null }
+      cleanup('rejected')
+    }
   }, [cleanup, updateCallStatus, currentUserId])
 
   const acceptIncoming = useCallback(async () => {
@@ -697,7 +701,9 @@ export function useCallEngine(currentUserId?: string) {
   const endCall = useCallback(async (finalStatus: CallStatus = 'ended') => {
     const current = callRef.current
     if (current) {
-      await updateCallStatus(current.id, { status: finalStatus, ended_at: new Date().toISOString(), ended_by: currentUserId ?? null })
+      const endedAt = new Date().toISOString()
+      await updateCallStatus(current.id, { status: finalStatus, ended_at: endedAt, ended_by: currentUserId ?? null })
+      callRef.current = { ...current, status: finalStatus, ended_at: endedAt, ended_by: currentUserId ?? null }
     }
     cleanup(finalStatus)
   }, [cleanup, currentUserId])
@@ -789,6 +795,8 @@ export function useCallEngine(currentUserId?: string) {
 
     function handleStatusUpdate(row: CallRow) {
       if (!callRef.current || row.id !== callRef.current.id) return
+      callRef.current = { ...callRef.current, ...row }
+      setCall((current) => current?.id === row.id ? { ...current, ...row } : current)
 
       if (row.status === 'accepted' && roleRef.current === 'caller') {
         const acceptedCall = { ...callRef.current, status: 'accepted' as CallStatus }
@@ -854,13 +862,15 @@ export function useCallEngine(currentUserId?: string) {
       // for it happens to get lost.
       const current = callRef.current
       if (current) {
-        const { data: fresh } = await supabase.from('calls').select('status').eq('id', current.id).single()
+        const { data: fresh } = await supabase.from('calls').select('status, ended_by, ended_at').eq('id', current.id).single()
         if (fresh && fresh.status !== current.status) {
           if (fresh.status === 'accepted' && roleRef.current === 'caller') {
             const acceptedCall = { ...current, status: 'accepted' as CallStatus }
             setCall(acceptedCall)
             connectMedia(acceptedCall)
           } else if (['rejected', 'missed', 'cancelled', 'busy', 'ended'].includes(fresh.status)) {
+            callRef.current = { ...current, ...fresh }
+            setCall((existing) => existing?.id === current.id ? { ...existing, ...fresh } : existing)
             cleanup(fresh.status)
           }
         }
