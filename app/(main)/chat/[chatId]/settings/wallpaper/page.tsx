@@ -110,7 +110,7 @@ export default function ChatWallpaperRoutePage() {
     return (
       <div className="min-h-[100dvh] w-full flex flex-col bg-background">
         <header className="flex items-center gap-3 border-b border-border px-4 py-3">
-          <button type="button" onClick={() => router.push("/chat/" + chatId + "/settings")} className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/70 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-pink-500/40 hover:text-pink-400 sm:px-3 sm:py-2 sm:text-sm"><ArrowLeft className="h-3.5 w-3.5" /> Back</button>
+          <button type="button" onClick={() => router.replace("/chat/" + chatId + "/settings")} className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/70 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-pink-500/40 hover:text-pink-400 sm:px-3 sm:py-2 sm:text-sm"><ArrowLeft className="h-3.5 w-3.5" /> Back</button>
           <h1 className="text-base font-bold">Wallpaper settings</h1>
         </header>
         <main className="mx-auto w-full max-w-xl flex-1 space-y-3 p-4">
