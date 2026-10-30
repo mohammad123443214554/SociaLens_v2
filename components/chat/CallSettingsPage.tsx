@@ -15,7 +15,7 @@ interface CallSettingsPageProps {
  * setting, not per-conversation) - opened from "Call settings" inside any
  * chat's settings page.
  */
-export function CallSettingsPage({ userId }: CallSettingsPageProps) {
+export function CallSettingsPage({ userId, onBack }: CallSettingsPageProps) {
   const { data: settings } = useCallSettings(userId)
   const updateSettings = useUpdateCallSettings()
   const [previewing, setPreviewing] = useState<string | null>(null)
