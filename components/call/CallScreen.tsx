@@ -38,6 +38,7 @@ export function CallScreen({
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
+  const pipVideoRef = useRef<HTMLVideoElement>(null)
   const [localVideoIsMain, setLocalVideoIsMain] = useState(false)
 
   useEffect(() => {
@@ -48,6 +49,12 @@ export function CallScreen({
     if (type === 'video' && remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream
     if (type === 'audio' && remoteAudioRef.current) remoteAudioRef.current.srcObject = remoteStream
   }, [remoteStream, type])
+
+  useEffect(() => {
+    if (type === 'video' && pipVideoRef.current) {
+      pipVideoRef.current.srcObject = localVideoIsMain ? remoteStream : localStream
+    }
+  }, [localStream, remoteStream, localVideoIsMain, type])
 
   // Ringback tone while we're the caller waiting for pickup.
   useEffect(() => {
@@ -136,24 +143,13 @@ export function CallScreen({
             >
               <ArrowLeftRight className="h-4 w-4" />
             </button>
-            {localVideoIsMain ? (
-              <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <video
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover scale-x-[-1]"
-                ref={(node) => {
-                  if (node && node.srcObject !== localStream) node.srcObject = localStream
-                }}
-              />
-            )}
+            <video
+              ref={pipVideoRef}
+              autoPlay
+              playsInline
+              muted={!localVideoIsMain}
+              className={`w-full h-full object-cover ${localVideoIsMain ? '' : 'scale-x-[-1]'}`}
+            />
           </div>
         </>
       )}
