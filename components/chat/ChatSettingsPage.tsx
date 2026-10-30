@@ -1,6 +1,6 @@
 'use client'
 
-import { PencilLine, Image as ImageIcon, Ban, Trash2, ChevronRight, Phone } from 'lucide-react'
+import { ArrowLeft, PencilLine, Image as ImageIcon, Ban, Trash2, ChevronRight, Phone } from 'lucide-react'
 
 interface ChatSettingsPageProps {
   otherUsername: string
@@ -40,6 +40,7 @@ export function ChatSettingsPage({
     <div className="absolute inset-0 bg-background z-20 flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b sticky top-0 bg-background z-10">
+        <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/70 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-pink-500/40 hover:text-pink-400 sm:px-3 sm:py-2 sm:text-sm"><ArrowLeft className="h-3.5 w-3.5" /> Back</button>
         <div>
           <h1 className="font-bold text-base leading-tight">Chat Setting</h1>
           <p className="text-xs text-muted-foreground">{otherUsername}</p>
