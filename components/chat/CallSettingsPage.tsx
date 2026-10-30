@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, Play, Volume2, Volume1, VolumeX } from 'lucide-react'
+import { ArrowLeft, Check, Play, Volume2, Volume1, VolumeX } from 'lucide-react'
 import { RINGTONES, previewRingtone } from '@/lib/utils/ringtone'
 import { useCallSettings, useUpdateCallSettings } from '@/lib/hooks/useChatSettings'
 
@@ -54,6 +54,7 @@ export function CallSettingsPage({ userId }: CallSettingsPageProps) {
   return (
     <div className="min-h-[100dvh] w-full bg-background flex flex-col">
       <div className="flex items-center gap-3 px-4 py-3 border-b sticky top-0 bg-background z-10">
+        <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/70 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-pink-500/40 hover:text-pink-400 sm:px-3 sm:py-2 sm:text-sm"><ArrowLeft className="h-3.5 w-3.5" /> Back</button>
         <h1 className="font-bold text-base">Call settings</h1>
       </div>
 
