@@ -52,6 +52,16 @@ export default function ChatRoomPage() {
   const isWallpaperRoute = pathname.endsWith('/settings/wallpaper')
   const supabase = createClient()
 
+  // Warm the dedicated settings routes while the conversation is already
+  // open. The click then switches to an already-prefetched route instead of
+  // waiting for Next.js to fetch its route bundle after the tap.
+  useEffect(() => {
+    if (!chatId) return
+    router.prefetch(`/chat/${chatId}/settings`)
+    router.prefetch(`/chat/${chatId}/settings/call`)
+    router.prefetch(`/chat/${chatId}/settings/wallpaper`)
+  }, [chatId, router])
+
   const { messages, isTyping, onlineUsers, sendMessage, sendTypingIndicator, removeMessageLocally, patchMessageLocally, addPendingMessage, resolvePendingMessage, failPendingMessage, loadOlderMessages, hasMoreOlder, isLoadingOlder } =
     useRealtimeMessages(chatId, user?.id ?? '')
   const { data: storyGroups = [] } = useActiveStories(user?.id)
