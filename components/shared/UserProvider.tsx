@@ -31,12 +31,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const existing = profileRequestsRef.current.get(userId)
     if (existing) return existing
 
-    const request = supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-      .then(({ data }) => {
+    // Supabase query builders are PromiseLike (not full Promises), so
+    // normalize the thenable before attaching catch/finally handlers.
+    const request = Promise.resolve(
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+    ).then(({ data }) => {
         const nextProfile = data as Profile | null
         if (mountedRef.current && nextProfile) setProfile(nextProfile)
         return nextProfile
