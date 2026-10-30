@@ -47,7 +47,7 @@ export function CallScreen({
 
   useEffect(() => {
     if (type === 'video' && remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream
-    if (type === 'audio' && remoteAudioRef.current) remoteAudioRef.current.srcObject = remoteStream
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = remoteStream
   }, [remoteStream, type])
 
   useEffect(() => {
@@ -81,10 +81,11 @@ export function CallScreen({
           ref={remoteVideoRef}
           autoPlay
           playsInline
+          muted
           className={`absolute inset-0 w-full h-full object-cover ${showRemoteVideo && !localVideoIsMain ? 'opacity-100' : 'opacity-0'}`}
         />
       )}
-      {!isVideoCall && <audio ref={remoteAudioRef} autoPlay />}
+      <audio ref={remoteAudioRef} autoPlay className="hidden" />
 
       {/* Dim overlay so controls/text stay readable over video */}
       {isVideoCall && <div className="absolute inset-0 bg-black/30" />}
@@ -127,13 +128,6 @@ export function CallScreen({
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-150 ${localVideoIsMain && !isCameraOff ? 'opacity-100 scale-x-[-1]' : 'opacity-0 pointer-events-none'}`}
           />
           <div className="absolute bottom-28 left-4 w-24 h-32 sm:w-28 sm:h-36 rounded-xl overflow-hidden ring-2 ring-white/25 bg-neutral-900 z-20 shadow-lg">
-            <video
-              ref={undefined}
-              autoPlay
-              playsInline
-              muted
-              className="hidden"
-            />
             <button
               type="button"
               onClick={() => setLocalVideoIsMain((current) => !current)}
@@ -147,7 +141,7 @@ export function CallScreen({
               ref={pipVideoRef}
               autoPlay
               playsInline
-              muted={!localVideoIsMain}
+              muted
               className={`w-full h-full object-cover ${localVideoIsMain ? '' : 'scale-x-[-1]'}`}
             />
           </div>
