@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import { QueryProvider } from '@/components/shared/QueryProvider'
+import { UserProvider } from '@/components/shared/UserProvider'
 import { NativeAuthBridge } from '@/components/auth/NativeAuthBridge'
 import './globals.css'
 
@@ -110,7 +111,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <QueryProvider>{children}</QueryProvider>
+          <QueryProvider><UserProvider>{children}</UserProvider></QueryProvider>
           <NativeAuthBridge />
         </ThemeProvider>
 
