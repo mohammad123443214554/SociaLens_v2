@@ -941,7 +941,13 @@ export function useCallEngine(currentUserId?: string) {
       if (videoTrack) {
         const activeId = videoTrack.getMediaStreamTrack()?.getSettings?.().deviceId
         const currentIndex = cameras.findIndex((camera) => camera.deviceId === activeId)
-        const nextCamera = cameras[(currentIndex + 1 + cameras.length) % cameras.length]
+        const wantsBack = cameraFacing !== 'environment'
+        const facingMatch = cameras.find((camera) => wantsBack
+          ? /back|rear|environment/i.test(camera.label || '')
+          : /front|user|facetime/i.test(camera.label || ''))
+        const nextCamera = facingMatch && facingMatch.deviceId !== activeId
+          ? facingMatch
+          : cameras[(currentIndex + 1 + cameras.length) % cameras.length]
         await videoTrack.setDevice(nextCamera.deviceId)
         upsertTrack(localStreamObjRef.current, videoTrack.getMediaStreamTrack())
         setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
@@ -952,7 +958,13 @@ export function useCallEngine(currentUserId?: string) {
         const activeTrack = localStreamObjRef.current.getVideoTracks()[0]
         const activeId = activeTrack?.getSettings?.().deviceId
         const currentIndex = cameras.findIndex((camera) => camera.deviceId === activeId)
-        const nextCamera = cameras[(currentIndex + 1 + cameras.length) % cameras.length]
+        const wantsBack = cameraFacing !== 'environment'
+        const facingMatch = cameras.find((camera) => wantsBack
+          ? /back|rear|environment/i.test(camera.label || '')
+          : /front|user|facetime/i.test(camera.label || ''))
+        const nextCamera = facingMatch && facingMatch.deviceId !== activeId
+          ? facingMatch
+          : cameras[(currentIndex + 1 + cameras.length) % cameras.length]
         await dailyRef.current.setInputDevicesAsync({ videoDeviceId: nextCamera.deviceId })
         setCameraFacing(/back|rear|environment/i.test(nextCamera.label || '') ? 'environment' : 'user')
       }
@@ -960,7 +972,7 @@ export function useCallEngine(currentUserId?: string) {
       console.error('[Call] camera switch failed', cameraError)
       setError('Could not switch camera. Please try again.')
     }
-  }, [canSwitchCamera, isCameraOff, isOnHold])
+  }, [canSwitchCamera, isCameraOff, isOnHold, cameraFacing])
 
   // Call duration timer, running once the transport is actually live.
   useEffect(() => {
