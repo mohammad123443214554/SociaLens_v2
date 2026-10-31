@@ -140,6 +140,8 @@ export function useCallEngine(currentUserId?: string) {
   const [isMuted, setIsMuted] = useState(false)
   const [isCameraOff, setIsCameraOff] = useState(false)
   const [isOnHold, setIsOnHold] = useState(false)
+  const [canSwitchCamera, setCanSwitchCamera] = useState(false)
+  const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user')
   const [callDurationSec, setCallDurationSec] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
@@ -307,6 +309,8 @@ export function useCallEngine(currentUserId?: string) {
     setIsMuted(false)
     setIsCameraOff(false)
     setIsOnHold(false)
+    setCanSwitchCamera(false)
+    setCameraFacing('user')
     setCallDurationSec(0)
   }, [reportUsageAndCleanupTransport])
 
@@ -387,6 +391,15 @@ export function useCallEngine(currentUserId?: string) {
             })
           : Promise.resolve(null)
         const [audioTrack, videoTrack] = await Promise.all([audioPromise, videoPromise])
+        if (videoTrack) {
+          try {
+            const cameras = await AgoraRTC.getCameras()
+            setCanSwitchCamera(cameras.length > 1)
+            const activeId = videoTrack.getMediaStreamTrack()?.getSettings?.().deviceId
+            const activeCamera = cameras.find((camera: MediaDeviceInfo) => camera.deviceId === activeId)
+            setCameraFacing(/back|rear|environment/i.test(activeCamera?.label || '') ? 'environment' : 'user')
+          } catch { setCanSwitchCamera(false) }
+        }
         const closeTracks = () => {
           try { audioTrack?.close() } catch {}
           try { videoTrack?.close() } catch {}
@@ -538,6 +551,15 @@ export function useCallEngine(currentUserId?: string) {
 
         await call.join({ url: info.roomUrl, token: info.token })
         if (activeCall.type === 'audio') await call.setLocalVideo(false)
+        else {
+          try {
+            const cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput')
+            setCanSwitchCamera(cameras.length > 1)
+            const activeId = cameras[0]?.deviceId
+            const activeCamera = cameras.find((camera) => camera.deviceId === activeId)
+            setCameraFacing(/back|rear|environment/i.test(activeCamera?.label || '') ? 'environment' : 'user')
+          } catch { setCanSwitchCamera(false) }
+        }
       }
     }
 
@@ -863,12 +885,26 @@ export function useCallEngine(currentUserId?: string) {
     if (dailyRef.current) void dailyRef.current.setLocalAudio(enabled)
   }, [isMuted, isOnHold])
 
-  const toggleCamera = useCallback(() => {
+  const toggleCamera = useCallback(async () => {
     const next = !isCameraOff
     setIsCameraOff(next)
     const enabled = !next && !isOnHold
-    if (agoraRef.current?.videoTrack) void agoraRef.current.videoTrack.setEnabled(enabled)
-    if (dailyRef.current) void dailyRef.current.setLocalVideo(enabled)
+    const videoTrack = agoraRef.current?.videoTrack
+    if (videoTrack) {
+      try {
+        await videoTrack.setEnabled(enabled)
+        if (enabled) upsertTrack(localStreamObjRef.current, videoTrack.getMediaStreamTrack())
+        else removeTracksOfKind(localStreamObjRef.current, 'video')
+        setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
+      } catch (cameraError) {
+        console.error('[Agora] camera toggle failed', cameraError)
+        setIsCameraOff(!enabled)
+      }
+    }
+    if (dailyRef.current) {
+      try { await dailyRef.current.setLocalVideo(enabled) }
+      catch (cameraError) { console.error('[Daily] camera toggle failed', cameraError); setIsCameraOff(!enabled) }
+    }
   }, [isCameraOff, isOnHold])
 
   // Hold suspends this participant's outgoing media without leaving the
@@ -882,12 +918,49 @@ export function useCallEngine(currentUserId?: string) {
     const audioEnabled = !next && !isMuted
     const videoEnabled = !next && !isCameraOff
     if (agoraRef.current?.audioTrack) void agoraRef.current.audioTrack.setEnabled(audioEnabled)
-    if (agoraRef.current?.videoTrack) void agoraRef.current.videoTrack.setEnabled(videoEnabled)
+    const videoTrack = agoraRef.current?.videoTrack
+    if (videoTrack) {
+      void videoTrack.setEnabled(videoEnabled).then(() => {
+        if (videoEnabled) upsertTrack(localStreamObjRef.current, videoTrack.getMediaStreamTrack())
+        else removeTracksOfKind(localStreamObjRef.current, 'video')
+        setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
+      }).catch((cameraError: any) => console.error('[Agora] hold camera transition failed', cameraError))
+    }
     if (dailyRef.current) {
       void dailyRef.current.setLocalAudio(audioEnabled)
       void dailyRef.current.setLocalVideo(videoEnabled)
     }
   }, [isOnHold, isMuted, isCameraOff, updateCallStatus])
+
+  const switchCamera = useCallback(async () => {
+    if (!canSwitchCamera || isCameraOff || isOnHold) return
+    try {
+      const cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput')
+      if (cameras.length < 2) { setCanSwitchCamera(false); return }
+      const videoTrack = agoraRef.current?.videoTrack
+      if (videoTrack) {
+        const activeId = videoTrack.getMediaStreamTrack()?.getSettings?.().deviceId
+        const currentIndex = cameras.findIndex((camera) => camera.deviceId === activeId)
+        const nextCamera = cameras[(currentIndex + 1 + cameras.length) % cameras.length]
+        await videoTrack.setDevice(nextCamera.deviceId)
+        upsertTrack(localStreamObjRef.current, videoTrack.getMediaStreamTrack())
+        setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
+        setCameraFacing(/back|rear|environment/i.test(nextCamera.label || '') ? 'environment' : 'user')
+        return
+      }
+      if (dailyRef.current) {
+        const activeTrack = localStreamObjRef.current.getVideoTracks()[0]
+        const activeId = activeTrack?.getSettings?.().deviceId
+        const currentIndex = cameras.findIndex((camera) => camera.deviceId === activeId)
+        const nextCamera = cameras[(currentIndex + 1 + cameras.length) % cameras.length]
+        await dailyRef.current.setInputDevicesAsync({ videoDeviceId: nextCamera.deviceId })
+        setCameraFacing(/back|rear|environment/i.test(nextCamera.label || '') ? 'environment' : 'user')
+      }
+    } catch (cameraError) {
+      console.error('[Call] camera switch failed', cameraError)
+      setError('Could not switch camera. Please try again.')
+    }
+  }, [canSwitchCamera, isCameraOff, isOnHold])
 
   // Call duration timer, running once the transport is actually live.
   useEffect(() => {
@@ -1089,6 +1162,8 @@ export function useCallEngine(currentUserId?: string) {
     isMuted,
     isCameraOff,
     isOnHold,
+    canSwitchCamera,
+    cameraFacing,
     callDurationSec,
     error,
     startCall,
@@ -1100,6 +1175,7 @@ export function useCallEngine(currentUserId?: string) {
     hangup: () => endCall('ended'),
     toggleMute,
     toggleCamera,
+    switchCamera,
     toggleHold,
     confirmPermissionAndConnect,
     recheckPermission,
