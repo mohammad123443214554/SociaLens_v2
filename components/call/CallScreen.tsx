@@ -383,7 +383,43 @@ export function CallScreen({
         >
           {isOnHold ? <PlayCircle className="h-6 w-6" /> : <PauseCircle className="h-6 w-6" />}
         </button>
+
+        <button
+          type="button"
+          onClick={() => setIsScreenLocked(true)}
+          aria-label="Lock call screen"
+          title="Lock screen · prevent accidental touches"
+          className="h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25"
+        >
+          <Lock className="h-6 w-6" />
+        </button>
+
+        <button
+          onClick={onEnd}
+          aria-label="End call"
+          title="End call"
+          className="h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors shadow-lg shadow-red-500/30"
+        >
+          <PhoneOff className="h-7 w-7" />
+        </button>
       </div>
+
+      {isScreenLocked && (
+        <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-black/75 backdrop-blur-sm text-white" role="dialog" aria-modal="true" aria-label="Call screen locked">
+          <Lock className="h-9 w-9 text-white/90" />
+          <p className="text-sm font-medium">Screen locked</p>
+          <p className="text-xs text-white/65">Your call continues normally</p>
+          <button
+            type="button"
+            onClick={() => setIsScreenLocked(false)}
+            className="mt-2 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-neutral-900 shadow-lg active:scale-95"
+            aria-label="Unlock call screen"
+          >
+            <Unlock className="h-4 w-4" />
+            Unlock
+          </button>
+        </div>
+      )}
     </div>
   )
 }
