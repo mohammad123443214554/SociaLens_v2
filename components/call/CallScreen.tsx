@@ -81,6 +81,17 @@ export function CallScreen({
         if (disposed) return
         if (context.state === 'running' && remoteAudioRef.current) {
           remoteAudioRef.current.muted = true
+        } else {
+          // Do not leave a dormant duplicate audio route behind.
+          try { source.disconnect() } catch {}
+          audioContextRef.current = null
+          audioGainRef.current = null
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.muted = false
+            remoteAudioRef.current.volume = 1
+          }
+          await context.close().catch(() => {})
+          context = null
         }
       } catch (audioError) {
         console.warn('[Call] speaker boost unavailable; using normal playback', audioError)
