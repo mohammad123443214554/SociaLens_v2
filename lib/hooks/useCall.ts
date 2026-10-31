@@ -165,6 +165,9 @@ export function useCallEngine(currentUserId?: string) {
   const connectionSetupRef = useRef<Map<string, Promise<{ info: any; agoraModule: any; dailyModule?: any }>>>(new Map())
   const transportCleanupRef = useRef(false)
   const announcedCallEventsRef = useRef<Map<string, Promise<void>>>(new Map())
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectAttemptsRef = useRef(0)
+  const reconnectActiveCallRef = useRef<((activeCall: CallRow) => void) | null>(null)
 
   useEffect(() => { callRef.current = call }, [call])
   useEffect(() => { console.log('[SociaLens Call] phase changed ->', phase) }, [phase])
@@ -295,6 +298,8 @@ export function useCallEngine(currentUserId?: string) {
     clearRingTimeout()
     clearDurationTimer()
     clearRemoteLeftTimeout()
+    if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null }
+    reconnectAttemptsRef.current = 0
     void reportUsageAndCleanupTransport()
 
     localStreamObjRef.current.getTracks().forEach((t) => { t.stop(); localStreamObjRef.current.removeTrack(t) })
@@ -474,7 +479,20 @@ export function useCallEngine(currentUserId?: string) {
         })
         client.on('connection-state-change', (curState: string, _prevState: string, reason: string) => {
           console.log('[Agora] connection state ->', curState, reason)
+          if (curState === 'CONNECTED') { reconnectAttemptsRef.current = 0; setNetworkQuality('unknown') }
           if (curState === 'DISCONNECTED' || curState === 'CONNECTING' || curState === 'RECONNECTING') setNetworkQuality('unknown')
+          if (curState === 'DISCONNECTED' && !transportCleanupRef.current) {
+            const active = callRef.current
+            if (active?.status === 'accepted' && reconnectActiveCallRef.current && !reconnectTimerRef.current) {
+              setPhase('connecting')
+              const delay = Math.min(12000, 1500 * (2 ** reconnectAttemptsRef.current))
+              reconnectTimerRef.current = setTimeout(() => {
+                reconnectTimerRef.current = null
+                reconnectAttemptsRef.current += 1
+                reconnectActiveCallRef.current?.(active)
+              }, delay)
+            }
+          }
         })
 
         // ---- 3. Join. uid + token both come from the server response and
@@ -697,6 +715,33 @@ export function useCallEngine(currentUserId?: string) {
     }
     await doConnectMedia(activeCall)
   }, [doConnectMedia])
+
+  // A transport reconnect uses the existing call row and provider routing. It
+  // never creates a new call or changes the accepted call status.
+  reconnectActiveCallRef.current = (activeCall: CallRow) => {
+    if (transportCleanupRef.current || callRef.current?.id !== activeCall.id || activeCall.status !== 'accepted') return
+    if (connectingCallIdRef.current === activeCall.id && phase === 'in-call') connectingCallIdRef.current = null
+    void (async () => {
+      await teardownTransportSilently()
+      if (callRef.current?.id !== activeCall.id || callRef.current.status !== 'accepted') return
+      connectingCallIdRef.current = null
+      await connectMedia(activeCall)
+    })()
+  }
+
+  // Retry a dropped transport when the browser reports that connectivity has
+  // returned. Offline itself never ends the database call session.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !call || phase === 'idle') return
+    const retry = () => {
+      if (!navigator.onLine) { setNetworkQuality('unknown'); setPhase('connecting'); return }
+      const active = callRef.current
+      if (active?.status === 'accepted' && phase !== 'in-call') reconnectActiveCallRef.current?.(active)
+    }
+    window.addEventListener('online', retry)
+    window.addEventListener('offline', () => { setNetworkQuality('unknown'); setPhase('connecting') })
+    return () => window.removeEventListener('online', retry)
+  }, [call?.id, call?.status, phase])
 
   // Called when the person taps "Allow camera & microphone" on our
   // explainer screen - this click IS the user gesture the browser needs
@@ -935,6 +980,20 @@ export function useCallEngine(currentUserId?: string) {
       catch (cameraError) { console.error('[Daily] camera toggle failed', cameraError); setIsCameraOff(!next) }
     }
   }, [isCameraOff, isOnHold])
+
+  const switchToAudioOnly = useCallback(async () => {
+    if (isCameraOff) return
+    setIsCameraOff(true)
+    const videoTrack = agoraRef.current?.videoTrack
+    if (videoTrack) {
+      try { await videoTrack.setEnabled(false) } catch (cameraError) { console.warn('[Call] could not disable video track', cameraError) }
+      removeTracksOfKind(localStreamObjRef.current, 'video')
+      setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
+    }
+    if (dailyRef.current) {
+      try { await dailyRef.current.setLocalVideo(false) } catch (cameraError) { console.warn('[Call] could not disable Daily video', cameraError) }
+    }
+  }, [isCameraOff])
 
   // Hold suspends this participant's outgoing media without leaving the
   // RTC room. The remote peer and call session stay connected; Resume
@@ -1262,6 +1321,7 @@ export function useCallEngine(currentUserId?: string) {
     callDurationSec,
     error,
     networkQuality,
+    switchToAudioOnly,
     startCall,
     cancelOutgoing,
     acceptIncoming,
