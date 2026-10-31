@@ -920,7 +920,7 @@ export function useCallEngine(currentUserId?: string) {
     const next = !isOnHold
     setIsOnHold(next)
     const activeCall = callRef.current
-    if (activeCall) void updateCallStatus(activeCall.id, { is_on_hold: next, hold_initiated_by: next ? currentUserId : null })
+    if (activeCall) void updateCallStatus(activeCall.id, { is_on_hold: next, hold_initiated_by: currentUserId })
     const audioEnabled = !next && !isMuted
     const videoEnabled = !next && !isCameraOff
     if (agoraRef.current?.audioTrack) void agoraRef.current.audioTrack.setEnabled(audioEnabled)
