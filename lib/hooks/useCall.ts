@@ -145,6 +145,7 @@ export function useCallEngine(currentUserId?: string) {
   const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user')
   const [callDurationSec, setCallDurationSec] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [networkQuality, setNetworkQuality] = useState<'excellent' | 'good' | 'weak' | 'unknown'>('unknown')
 
   const localStreamObjRef = useRef<MediaStream>(new MediaStream())
   const remoteStreamObjRef = useRef<MediaStream>(new MediaStream())
@@ -307,6 +308,10 @@ export function useCallEngine(currentUserId?: string) {
     setCall(null)
     setPeer(null)
     setPhase('idle')
+    setNetworkQuality('unknown')
+    if (typeof window !== 'undefined') {
+      try { window.sessionStorage.removeItem('socialens-active-call') } catch {}
+    }
     setIsMuted(false)
     setIsCameraOff(false)
     setIsOnHold(false)
@@ -461,8 +466,15 @@ export function useCallEngine(currentUserId?: string) {
             console.warn('[Agora] could not verify remote leave; keeping call session active', statusError)
           }
         })
+        client.on('network-quality', (stats: { uplinkNetworkQuality?: number; downlinkNetworkQuality?: number }) => {
+          const values = [stats?.uplinkNetworkQuality, stats?.downlinkNetworkQuality].filter((value): value is number => typeof value === 'number' && value > 0)
+          if (!values.length) { setNetworkQuality('unknown'); return }
+          const worst = Math.max(...values)
+          setNetworkQuality(worst <= 1 ? 'excellent' : worst <= 2 ? 'good' : 'weak')
+        })
         client.on('connection-state-change', (curState: string, _prevState: string, reason: string) => {
           console.log('[Agora] connection state ->', curState, reason)
+          if (curState === 'DISCONNECTED' || curState === 'CONNECTING' || curState === 'RECONNECTING') setNetworkQuality('unknown')
         })
 
         // ---- 3. Join. uid + token both come from the server response and
@@ -552,6 +564,17 @@ export function useCallEngine(currentUserId?: string) {
           } catch (statusError) {
             console.warn('[Daily] could not verify room exit; keeping call active', statusError)
           }
+        })
+        call.on('network-stats-updated', (ev: any) => {
+          // Daily exposes a rolling stats snapshot. Read only numeric network metrics;
+          // if the SDK omits them, keep the UI honest and show Checking connection.
+          const stats = ev?.stats?.latest ?? ev?.stats ?? ev
+          const candidates = [stats?.inbound?.rtt, stats?.outbound?.rtt, stats?.inbound?.packetLoss, stats?.outbound?.packetLoss]
+            .filter((value: unknown): value is number => typeof value === 'number' && Number.isFinite(value))
+          if (!candidates.length) { setNetworkQuality('unknown'); return }
+          const rtt = Math.max(Number(stats?.inbound?.rtt ?? 0), Number(stats?.outbound?.rtt ?? 0))
+          const loss = Math.max(Number(stats?.inbound?.packetLoss ?? 0), Number(stats?.outbound?.packetLoss ?? 0))
+          setNetworkQuality(rtt <= 150 && loss <= 2 ? 'excellent' : rtt <= 300 && loss <= 5 ? 'good' : 'weak')
         })
         call.on('error', (ev: any) => { console.error('[Daily] error', ev); setError(describeCallError(ev, 'connect')) })
 
@@ -980,6 +1003,60 @@ export function useCallEngine(currentUserId?: string) {
     }
   }, [canSwitchCamera, isCameraOff, isOnHold, cameraFacing])
 
+  // Persist only the call id while an accepted call is active. The database remains
+  // the source of truth; this marker merely lets a refreshed tab find the same session.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !call) return
+    try {
+      if (call.status === 'accepted') window.sessionStorage.setItem('socialens-active-call', call.id)
+      else if (call.status !== 'ringing') window.sessionStorage.removeItem('socialens-active-call')
+    } catch {}
+  }, [call?.id, call?.status])
+
+  // On a browser refresh the media tracks are necessarily lost. Rehydrate the
+  // authenticated participant's still-accepted call from Supabase and rejoin
+  // the same provider room; never trust sessionStorage without checking the row.
+  const recoveredCallRef = useRef(false)
+  useEffect(() => {
+    if (!currentUserId || recoveredCallRef.current || phase !== 'idle' || typeof window === 'undefined') return
+    let cancelled = false
+    const recover = async () => {
+      let callId: string | null = null
+      try { callId = window.sessionStorage.getItem('socialens-active-call') } catch {}
+      if (!callId) return
+      recoveredCallRef.current = true
+      try {
+        const { data: rowData, error: rowError } = await supabase.from('calls').select('*').eq('id', callId).maybeSingle()
+        if (rowError || !rowData || cancelled) throw rowError || new Error('Call session not found')
+        const row = rowData as CallRow
+        if (row.status !== 'accepted' || ![row.caller_id, row.callee_id].includes(currentUserId)) {
+          window.sessionStorage.removeItem('socialens-active-call')
+          return
+        }
+        const peerId = row.caller_id === currentUserId ? row.callee_id : row.caller_id
+        const { data: profile, error: profileError } = await supabase.from('profiles')
+          .select('id, username, avatar_url, is_verified, verification_type').eq('id', peerId).single()
+        if (profileError || !profile || cancelled) throw profileError || new Error('Call participant not found')
+        roleRef.current = row.caller_id === currentUserId ? 'caller' : 'callee'
+        callRef.current = row
+        pendingCallRef.current = row
+        setCall(row)
+        setPeer(profile as PeerProfile)
+        setIsOnHold(Boolean(row.is_on_hold))
+        setCallDurationSec(row.started_at ? Math.max(0, Math.floor((Date.now() - new Date(row.started_at).getTime()) / 1000)) : 0)
+        console.info('[SociaLens Call] recovering accepted call after page refresh', row.id)
+        await connectMedia(row)
+      } catch (recoveryError) {
+        console.warn('[SociaLens Call] active call recovery failed', recoveryError)
+        if (!cancelled) setError('Could not reconnect to your active call. Please try again or end the call.')
+      }
+    }
+    void recover()
+    return () => { cancelled = true }
+    // Recovery intentionally runs once per mounted call engine after auth is ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId, phase])
+
   // Call duration timer, running once the transport is actually live.
   useEffect(() => {
     if (phase === 'in-call') {
@@ -1184,6 +1261,7 @@ export function useCallEngine(currentUserId?: string) {
     cameraFacing,
     callDurationSec,
     error,
+    networkQuality,
     startCall,
     cancelOutgoing,
     acceptIncoming,
