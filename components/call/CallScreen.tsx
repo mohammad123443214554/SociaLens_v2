@@ -51,27 +51,46 @@ export function CallScreen({
   const [isMini, setIsMini] = useState(false)
   const [miniSize, setMiniSize] = useState(300)
   const [miniPosition, setMiniPosition] = useState<{ x: number; y: number } | null>(null)
-  const dragOffsetRef = useRef<{ x: number; y: number } | null>(null)
+  const gestureRef = useRef<{ kind: 'drag' | 'resize'; pointerId: number; startX: number; startY: number; startLeft: number; startTop: number; startWidth: number } | null>(null)
 
-  const handleMiniPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+  const startMiniGesture = (event: React.PointerEvent<HTMLElement>, kind: 'drag' | 'resize') => {
     if (!isMini || (event.target as HTMLElement).closest('button')) return
-    const rect = event.currentTarget.parentElement?.getBoundingClientRect()
-    if (!rect) return
-    dragOffsetRef.current = { x: event.clientX - rect.left, y: event.clientY - rect.top }
+    if (kind === 'drag' && (event.target as HTMLElement).closest('[data-mini-resize]')) return
+    const rect = event.currentTarget.parentElement?.getBoundingClientRect() ?? event.currentTarget.getBoundingClientRect()
+    event.preventDefault()
+    gestureRef.current = {
+      kind, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY,
+      startLeft: miniPosition?.x ?? Math.max(8, window.innerWidth - miniSize - 12),
+      startTop: miniPosition?.y ?? Math.max(8, window.innerHeight - Math.round(miniSize * 1.33) - 80),
+      startWidth: miniSize,
+    }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
-  const handleMiniPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isMini || !dragOffsetRef.current) return
-    const height = Math.round(miniSize * 1.33)
-    setMiniPosition({
-      x: Math.max(8, Math.min(window.innerWidth - miniSize - 8, event.clientX - dragOffsetRef.current.x)),
-      y: Math.max(8, Math.min(window.innerHeight - height - 8, event.clientY - dragOffsetRef.current.y)),
-    })
+  const moveMiniGesture = (event: React.PointerEvent<HTMLElement>) => {
+    const gesture = gestureRef.current
+    if (!isMini || !gesture || gesture.pointerId !== event.pointerId) return
+    const dx = event.clientX - gesture.startX
+    const dy = event.clientY - gesture.startY
+    if (gesture.kind === 'drag') {
+      const height = Math.round(miniSize * 1.33)
+      setMiniPosition({
+        x: Math.max(8, Math.min(window.innerWidth - miniSize - 8, gesture.startLeft + dx)),
+        y: Math.max(8, Math.min(window.innerHeight - height - 8, gesture.startTop + dy)),
+      })
+    } else {
+      const nextWidth = Math.max(220, Math.min(480, gesture.startWidth + dx + dy * 0.35))
+      setMiniSize(nextWidth)
+      setMiniPosition({
+        x: Math.max(8, Math.min(window.innerWidth - nextWidth - 8, gesture.startLeft)),
+        y: Math.max(8, Math.min(window.innerHeight - Math.round(nextWidth * 1.33) - 8, gesture.startTop)),
+      })
+    }
   }
-  const handleMiniPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
-    dragOffsetRef.current = null
+  const endMiniGesture = (event: React.PointerEvent<HTMLElement>) => {
+    if (gestureRef.current?.pointerId === event.pointerId) gestureRef.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
+  const cycleMiniSize = () => setMiniSize((size) => size < 280 ? 320 : size < 380 ? 420 : 240)
 
   const localVideoAvailable = Boolean(!isCameraOff && !isOnHold && localStream?.getVideoTracks().some((track) => track.readyState === 'live'))
   const remoteVideoAvailable = Boolean(remoteStream?.getVideoTracks().some((track) => track.readyState === 'live'))
@@ -197,8 +216,12 @@ export function CallScreen({
 
   return (
     <div
-      className={isMini ? "fixed z-[250] flex flex-col text-white overflow-hidden rounded-2xl border border-white/20 bg-neutral-950 shadow-2xl" : "fixed inset-0 bg-neutral-950 z-[200] flex flex-col text-white overflow-hidden"}
-      style={isMini ? { width: miniSize, height: Math.round(miniSize * 1.33), left: miniPosition?.x, top: miniPosition?.y, right: miniPosition ? undefined : 12, bottom: miniPosition ? undefined : 80 } : undefined}
+      className={isMini ? "fixed z-[250] flex flex-col text-white overflow-hidden rounded-2xl border border-white/20 bg-neutral-950 shadow-2xl select-none" : "fixed inset-0 bg-neutral-950 z-[200] flex flex-col text-white overflow-hidden"}
+      style={isMini ? { width: miniSize, height: Math.round(miniSize * 1.33), left: miniPosition?.x, top: miniPosition?.y, right: miniPosition ? undefined : 12, bottom: miniPosition ? undefined : 80, touchAction: 'none' } : undefined}
+      onPointerDown={(event) => { if (isMini) startMiniGesture(event, 'drag') }}
+      onPointerMove={moveMiniGesture}
+      onPointerUp={endMiniGesture}
+      onPointerCancel={endMiniGesture}
     >
       {/* Remote video fills the background for video calls */}
       {isVideoCall && (
@@ -216,23 +239,22 @@ export function CallScreen({
       {/* Keep remote camera image unfiltered; controls have their own contrast. */}
 
       {/* Top bar - SociaLens branded, mirrors a normal call app's header */}
-      <div className={isMini ? "relative z-30 flex items-center justify-between px-2 pt-2 cursor-move touch-none" : "relative z-10 flex items-center justify-center px-5 pt-5"}
-        onPointerDown={handleMiniPointerDown} onPointerMove={handleMiniPointerMove} onPointerUp={handleMiniPointerEnd} onPointerCancel={handleMiniPointerEnd}>
+      <div className={isMini ? "relative z-30 flex items-center justify-start px-2 pt-2 pointer-events-none" : "relative z-30 flex items-center justify-center px-5 pt-5"}>
         <div className="flex items-center gap-1.5 text-xs text-white/70">
           {isMini ? <Move className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
           <span>{isMini ? peerName : "SociaLens secure call"}</span>
           {isMini && <span className="text-white/50">{statusText}</span>}
         </div>
-        <div className="flex items-center gap-1">
-          {isMini && <>
-            <button type="button" onClick={() => setMiniSize((s) => s === 240 ? 300 : s === 300 ? 360 : 240)} className="h-7 w-7 rounded-full bg-white/15" aria-label="Resize mini call larger">+</button>
-            <button type="button" onClick={() => setMiniSize((s) => s === 360 ? 300 : s === 300 ? 240 : 360)} className="h-7 w-7 rounded-full bg-white/15" aria-label="Resize mini call smaller">−</button>
-          </>}
-          <button type="button" onClick={() => { setIsMini((v) => !v); setMiniPosition(null) }} className="h-7 w-7 rounded-full bg-white/15 flex items-center justify-center" aria-label={isMini ? "Expand call screen" : "Minimize call screen"}>
-            {isMini ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
-          </button>
-        </div>
       </div>
+      <button type="button" onClick={() => { setIsMini((v) => !v); setMiniPosition(null) }} className="absolute top-3 right-3 z-[80] h-9 w-9 rounded-full bg-black/55 hover:bg-black/75 border border-white/20 flex items-center justify-center" aria-label={isMini ? "Expand call screen" : "Minimize call screen"} title={isMini ? "Expand call screen" : "Minimize call screen"}>
+        {isMini ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+      </button>
+      {isMini && <>
+        <div data-mini-resize className="absolute z-[70] top-0 right-0 h-8 w-8 cursor-nesw-resize touch-none" onPointerDown={(event) => { event.stopPropagation(); startMiniGesture(event, 'resize') }} onDoubleClick={cycleMiniSize} onContextMenu={(event) => { event.preventDefault(); cycleMiniSize() }} />
+        <div data-mini-resize className="absolute z-[70] right-0 bottom-0 h-10 w-10 cursor-nwse-resize touch-none" onPointerDown={(event) => { event.stopPropagation(); startMiniGesture(event, 'resize') }} onDoubleClick={cycleMiniSize} onContextMenu={(event) => { event.preventDefault(); cycleMiniSize() }} />
+        <div data-mini-resize className="absolute z-[70] right-0 top-8 bottom-10 w-2 cursor-ew-resize touch-none" onPointerDown={(event) => { event.stopPropagation(); startMiniGesture(event, 'resize') }} />
+        <div data-mini-resize className="absolute z-[70] left-0 right-10 bottom-0 h-2 cursor-ns-resize touch-none" onPointerDown={(event) => { event.stopPropagation(); startMiniGesture(event, 'resize') }} />
+      </>
 
       {/* Peer info - Centered when no remote video yet, top-aligned once video is live */}
       <div
