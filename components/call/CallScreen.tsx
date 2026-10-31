@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
@@ -47,6 +47,7 @@ export function CallScreen({
   const pipVideoRef = useRef<HTMLVideoElement>(null)
   const [localVideoIsMain, setLocalVideoIsMain] = useState(false)
   const [isSpeakerOn, setIsSpeakerOn] = useState(false)
+  const [isScreenLocked, setIsScreenLocked] = useState(false)
 
   const [isMini, setIsMini] = useState(false)
   const [miniSize, setMiniSize] = useState(300)
@@ -216,7 +217,7 @@ export function CallScreen({
 
   return (
     <div
-      className={isMini ? "fixed z-[250] flex flex-col text-white overflow-hidden rounded-2xl border border-white/20 bg-neutral-950 shadow-2xl select-none" : "fixed inset-0 bg-neutral-950 z-[200] flex flex-col text-white overflow-hidden"}
+      className={isMini ? "fixed z-[250] relative flex flex-col text-white overflow-hidden rounded-2xl border border-white/20 bg-neutral-950 shadow-2xl select-none" : "fixed inset-0 relative bg-neutral-950 z-[200] flex flex-col text-white overflow-hidden"}
       style={isMini ? { width: miniSize, height: Math.round(miniSize * 1.33), left: miniPosition?.x, top: miniPosition?.y, right: miniPosition ? undefined : 12, bottom: miniPosition ? undefined : 80, touchAction: 'none' } : undefined}
       onPointerDown={(event) => { if (isMini) startMiniGesture(event, 'drag') }}
       onPointerMove={moveMiniGesture}
@@ -364,6 +365,16 @@ export function CallScreen({
         </button>
 
         <button
+          type="button"
+          onClick={() => setIsScreenLocked(true)}
+          aria-label="Lock call screen"
+          title="Lock screen · prevent accidental touches"
+          className="h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25"
+        >
+          <Lock className="h-6 w-6" />
+        </button>
+
+        <button
           onClick={onEnd}
           aria-label="End call"
           title="End call"
@@ -372,6 +383,23 @@ export function CallScreen({
           <PhoneOff className="h-7 w-7" />
         </button>
       </div>
+
+      {isScreenLocked && (
+        <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-black/75 backdrop-blur-sm text-white" role="dialog" aria-modal="true" aria-label="Call screen locked">
+          <Lock className="h-9 w-9 text-white/90" />
+          <p className="text-sm font-medium">Screen locked</p>
+          <p className="text-xs text-white/65">Your call continues normally</p>
+          <button
+            type="button"
+            onClick={() => setIsScreenLocked(false)}
+            className="mt-2 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-neutral-900 shadow-lg active:scale-95"
+            aria-label="Unlock call screen"
+          >
+            <Unlock className="h-4 w-4" />
+            Unlock
+          </button>
+        </div>
+      )}
     </div>
   )
 }
