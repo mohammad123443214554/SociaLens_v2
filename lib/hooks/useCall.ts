@@ -118,6 +118,8 @@ export function useCallEngine(currentUserId?: string) {
   const connectingCallIdRef = useRef<string | null>(null)
   const roleRef = useRef<'caller' | 'callee' | null>(null)
   const loggedCallIdsRef = useRef<Set<string>>(new Set())
+  const connectionSetupRef = useRef<Map<string, Promise<{ info: any; agoraModule: any; dailyModule?: any }>>>(new Map())
+  const transportCleanupRef = useRef(false)
 
   useEffect(() => { callRef.current = call }, [call])
   useEffect(() => { console.log('[SociaLens Call] phase changed ->', phase) }, [phase])
@@ -225,7 +227,13 @@ export function useCallEngine(currentUserId?: string) {
   // and resets every piece of state back to idle. Used whenever a call
   // ends for ANY reason (hangup, reject, cancel, timeout, error).
   const cleanup = useCallback((logStatus?: CallStatus) => {
+    transportCleanupRef.current = true
     const callToLog = callRef.current
+    if (callToLog) {
+      for (const key of connectionSetupRef.current.keys()) {
+        if (key.startsWith(`${callToLog.id}:`)) connectionSetupRef.current.delete(key)
+      }
+    }
     if (callToLog && logStatus && roleRef.current === 'caller') {
       void logCallToChat(callToLog, logStatus)
     }
@@ -256,6 +264,34 @@ export function useCallEngine(currentUserId?: string) {
     await supabase.from('calls').update(patch).eq('id', callId)
   }, [])
 
+  // Warm signed provider credentials and SDK while the call is ringing.
+  // No microphone or camera is opened until the user accepts.
+  const prepareConnection = useCallback((activeCall: CallRow, attempt = 0) => {
+    const key = `${activeCall.id}:${attempt}`
+    const cached = connectionSetupRef.current.get(key)
+    if (cached) return cached
+
+    const setup = (async () => {
+      const [res, agoraModule] = await Promise.all([
+        fetch('/api/calls/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callId: activeCall.id, attempt }),
+        }),
+        import('agora-rtc-sdk-ng'),
+      ])
+      const info = await res.json()
+      if (!res.ok) throw new Error(info?.error || 'Could not prepare the call.')
+      const dailyModule = info.provider === 'daily' ? await import('@daily-co/daily-js') : undefined
+      return { info, agoraModule, dailyModule }
+    })().catch((err) => {
+      connectionSetupRef.current.delete(key)
+      throw err
+    })
+    connectionSetupRef.current.set(key, setup)
+    return setup
+  }, [])
+
   // ------------------------------------------------------------------
   // Joins the actual audio/video transport (Agora or Daily, whichever
   // /api/calls/connect decides) once both sides have accepted the call.
@@ -278,21 +314,9 @@ export function useCallEngine(currentUserId?: string) {
     // Acquiring media first means a permission failure happens before
     // anything has joined, so there is never a ghost to collide with.
     const attemptConnect = async (attempt: number): Promise<void> => {
-      // Fetch secure join credentials while the Agora SDK chunk loads. These
-      // independent setup steps used to happen one after another, adding
-      // avoidable delay before the microphone could even start.
-      const [res, agoraModule] = await Promise.all([
-        fetch('/api/calls/connect', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ callId: activeCall.id, attempt }),
-        }),
-        import('agora-rtc-sdk-ng'),
-      ])
-      const info = await res.json()
-      if (!res.ok) throw new Error(info?.error || 'Could not connect the call.')
-
+      const { info, agoraModule, dailyModule } = await prepareConnection(activeCall, attempt)
       providerRef.current = info.provider
+      transportCleanupRef.current = false
 
       if (info.provider === 'agora') {
         const AgoraRTC = agoraModule.default
@@ -409,7 +433,8 @@ export function useCallEngine(currentUserId?: string) {
         setLocalStream(localStreamObjRef.current)
         await client.publish([audioTrack, videoTrack].filter(Boolean))
       } else {
-        const { default: Daily } = await import('@daily-co/daily-js')
+        const Daily = dailyModule?.default
+        if (!Daily) throw new Error('Daily calling SDK could not be loaded.')
         const call = Daily.createCallObject({ subscribeToTracksAutomatically: true })
         dailyRef.current = call
 
@@ -429,7 +454,33 @@ export function useCallEngine(currentUserId?: string) {
           const targetStream = ev.participant?.local ? localStreamObjRef.current : remoteStreamObjRef.current
           targetStream.removeTrack(ev.track)
         })
-        call.on('left-meeting', () => cleanup('ended'))
+        call.on('left-meeting', async () => {
+          if (transportCleanupRef.current || dailyRef.current !== call) return
+          try {
+            const { data: latest } = await supabase
+              .from('calls')
+              .select('status, ended_by, ended_at')
+              .eq('id', activeCall.id)
+              .maybeSingle()
+            if (latest && ['rejected', 'missed', 'cancelled', 'busy', 'ended'].includes(latest.status)) {
+              callRef.current = { ...activeCall, ...latest } as CallRow
+              cleanup(latest.status as CallStatus)
+              return
+            }
+            if (latest?.status === 'accepted' && dailyRef.current === call) {
+              console.warn('[Daily] unexpected room exit; attempting to rejoin active call')
+              setPhase('connecting')
+              try {
+                await call.join({ url: info.roomUrl, token: info.token })
+              } catch (rejoinError) {
+                console.error('[Daily] automatic rejoin failed', rejoinError)
+                setError('Call connection interrupted. Please check your internet and try again.')
+              }
+            }
+          } catch (statusError) {
+            console.warn('[Daily] could not verify room exit; keeping call active', statusError)
+          }
+        })
         call.on('error', (ev: any) => { console.error('[Daily] error', ev); setError(describeCallError(ev, 'connect')) })
 
         await call.join({ url: info.roomUrl, token: info.token })
@@ -581,6 +632,11 @@ export function useCallEngine(currentUserId?: string) {
       setPhase('outgoing-ringing')
       console.log('[SociaLens Call] phase -> outgoing-ringing, call row:', newCall)
 
+      // Prepare credentials and SDK while the callee is being notified.
+      void prepareConnection(newCall as CallRow, 0).catch((prewarmError) => {
+        console.warn('[SociaLens Call] connection pre-warm failed; will retry on accept', prewarmError)
+      })
+
       // Fire-and-forget - notifies the callee with a system notification
       // even if they don't have SociaLens open right now.
       fetch('/api/push/notify-call', {
@@ -599,7 +655,7 @@ export function useCallEngine(currentUserId?: string) {
       setError(message)
       cleanup()
     }
-  }, [currentUserId, cleanup, updateCallStatus])
+  }, [currentUserId, cleanup, updateCallStatus, prepareConnection])
 
   const cancelOutgoing = useCallback(async () => {
     if (!call) return
@@ -795,6 +851,9 @@ export function useCallEngine(currentUserId?: string) {
           setCall(row)
           setPeer(callerProfile as PeerProfile)
           setPhase('incoming-ringing')
+          void prepareConnection(row, 0).catch((prewarmError) => {
+            console.warn('[SociaLens Call] incoming connection pre-warm failed; will retry on accept', prewarmError)
+          })
 
           ringTimeoutRef.current = setTimeout(() => cleanup(), RING_TIMEOUT_MS)
         }
@@ -867,6 +926,9 @@ export function useCallEngine(currentUserId?: string) {
           setCall(incoming as CallRow)
           setPeer(callerProfile as PeerProfile)
           setPhase('incoming-ringing')
+          void prepareConnection(incoming as CallRow, 0).catch((prewarmError) => {
+            console.warn('[SociaLens Call] polled incoming connection pre-warm failed', prewarmError)
+          })
           ringTimeoutRef.current = setTimeout(() => cleanup(), RING_TIMEOUT_MS - (Date.now() - new Date(incoming.created_at).getTime()))
         }
         return
