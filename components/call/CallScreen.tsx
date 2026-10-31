@@ -383,9 +383,6 @@ export function CallScreen({
         >
           {isOnHold ? <PlayCircle className="h-6 w-6" /> : <PauseCircle className="h-6 w-6" />}
         </button>
-
-
-      )}
     </div>
   )
 }
