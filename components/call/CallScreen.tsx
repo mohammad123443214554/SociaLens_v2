@@ -58,9 +58,16 @@ export function CallScreen({
       remoteAudioRef.current.muted = false
     }
 
-    // Route the remote stream through Web Audio so Speaker ON can boost
-    // above the browser's 100% element-volume ceiling. If Web Audio is
-    // unavailable or blocked, keep normal playback working as a fallback.
+    // "play-and-record" asks supported mobile browsers to use a phone-call
+    // audio route (often the earpiece). Speaker mode switches to playback.
+    // This API is not available in every browser, so keep a safe fallback.
+    const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
+    const applyAudioRoute = () => {
+      if (!audioSession) return
+      try { audioSession.type = isSpeakerOn ? 'playback' : 'play-and-record' } catch {}
+    }
+    applyAudioRoute()
+
     let disposed = false
     let source: MediaStreamAudioSourceNode | null = null
     let context: AudioContext | null = null
@@ -72,7 +79,7 @@ export function CallScreen({
         context = new AudioContextClass()
         source = context.createMediaStreamSource(remoteStream)
         const gain = context.createGain()
-        gain.gain.value = 1
+        gain.gain.value = isSpeakerOn ? 2.2 : 0.55
         source.connect(gain)
         gain.connect(context.destination)
         audioContextRef.current = context
@@ -82,22 +89,21 @@ export function CallScreen({
         if (context.state === 'running' && remoteAudioRef.current) {
           remoteAudioRef.current.muted = true
         } else {
-          // Do not leave a dormant duplicate audio route behind.
           try { source.disconnect() } catch {}
           audioContextRef.current = null
           audioGainRef.current = null
           if (remoteAudioRef.current) {
             remoteAudioRef.current.muted = false
-            remoteAudioRef.current.volume = 1
+            remoteAudioRef.current.volume = isSpeakerOn ? 1 : 0.55
           }
           await context.close().catch(() => {})
           context = null
         }
       } catch (audioError) {
-        console.warn('[Call] speaker boost unavailable; using normal playback', audioError)
+        console.warn('[Call] Web Audio routing unavailable; using native audio playback', audioError)
         if (remoteAudioRef.current) {
           remoteAudioRef.current.muted = false
-          remoteAudioRef.current.volume = 1
+          remoteAudioRef.current.volume = isSpeakerOn ? 1 : 0.55
         }
       }
     }
@@ -110,12 +116,15 @@ export function CallScreen({
       if (context && context.state !== 'closed') void context.close().catch(() => {})
       if (remoteAudioRef.current) remoteAudioRef.current.muted = false
     }
-  }, [remoteStream, type])
+  }, [remoteStream, type, isSpeakerOn])
 
   useEffect(() => {
-    if (audioGainRef.current) audioGainRef.current.gain.setTargetAtTime(isSpeakerOn ? 2.2 : 1, audioContextRef.current?.currentTime ?? 0, 0.08)
-    // Browsers without Web Audio support retain their normal 100% playback.
-    if (!audioGainRef.current && remoteAudioRef.current) remoteAudioRef.current.volume = 1
+    if (audioGainRef.current) audioGainRef.current.gain.setTargetAtTime(isSpeakerOn ? 2.2 : 0.55, audioContextRef.current?.currentTime ?? 0, 0.08)
+    if (!audioGainRef.current && remoteAudioRef.current) remoteAudioRef.current.volume = isSpeakerOn ? 1 : 0.55
+    const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
+    if (audioSession) {
+      try { audioSession.type = isSpeakerOn ? 'playback' : 'play-and-record' } catch {}
+    }
   }, [isSpeakerOn, remoteStream])
 
   useEffect(() => {
