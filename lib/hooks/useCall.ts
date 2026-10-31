@@ -1024,6 +1024,8 @@ export function useCallEngine(currentUserId?: string) {
             else if (fresh.status === 'missed') announceCallEvent(current.id, 'unanswered')
             else if (fresh.status === 'busy') announceCallEvent(current.id, 'busy')
           }
+          callRef.current = { ...current, ...fresh }
+          setCall((existing) => existing?.id === current.id ? { ...existing, ...fresh } : existing)
           if (fresh.status === 'accepted' && roleRef.current === 'caller') {
             const acceptedCall = { ...current, status: 'accepted' as CallStatus }
             setCall(acceptedCall)
