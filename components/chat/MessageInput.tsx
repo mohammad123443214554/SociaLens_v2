@@ -85,6 +85,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
   const [limitPopup, setLimitPopup] = useState<{ title: string; description: string } | null>(null)
   const [checkingVideo, setCheckingVideo] = useState(false)
   const [sending, setSending] = useState(false)
+  const [isComposerExpanded, setIsComposerExpanded] = useState(false)
 
   const [isRecording, setIsRecording] = useState(false)
   const [recordSeconds, setRecordSeconds] = useState(0)
@@ -102,7 +103,9 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 300)}px`
+    const nextHeight = Math.min(el.scrollHeight, 300)
+    el.style.height = `${nextHeight}px`
+    setIsComposerExpanded(nextHeight > (window.innerWidth >= 640 ? 44 : 36) + 2)
   }
   useEffect(() => { resizeTextarea() }, [message])
 
@@ -379,7 +382,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
           </button>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="px-3 py-2 sm:px-4 sm:py-3"><div className="flex w-full items-center gap-1 rounded-full border border-white/15 bg-background/85 px-1.5 py-1 sm:gap-1.5 sm:px-2 sm:py-1.5 shadow-sm focus-within:border-white/30">
+        <form onSubmit={handleSubmit} className="px-3 py-2 sm:px-4 sm:py-3"><div className={`flex w-full ${isComposerExpanded ? "items-end rounded-[26px] sm:rounded-[28px]" : "items-center rounded-full"} gap-1 border border-white/15 bg-background/85 px-1.5 py-1 sm:gap-1.5 sm:px-2 sm:py-1.5 shadow-sm focus-within:border-white/30 transition-[border-radius] duration-150`}>
           <div className="relative shrink-0">
             <button ref={emojiBtnRef} type="button" onClick={openEmoji} className="p-1.5 sm:p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
               <Smile className="h-5 w-5 sm:h-6 sm:w-6" />
