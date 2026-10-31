@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
@@ -48,12 +48,26 @@ export function CallScreen({
   const [localVideoIsMain, setLocalVideoIsMain] = useState(false)
   const [isSpeakerOn, setIsSpeakerOn] = useState(false)
 
-  useEffect(() => {
-    if (localVideoRef.current) localVideoRef.current.srcObject = localStream
-  }, [localStream])
+  const localVideoAvailable = Boolean(!isCameraOff && !isOnHold && localStream?.getVideoTracks().some((track) => track.readyState === 'live'))
+  const remoteVideoAvailable = Boolean(remoteStream?.getVideoTracks().some((track) => track.readyState === 'live'))
+
+  // Detach the preview stream immediately when camera is disabled/held. This
+  // prevents the last captured frame from remaining visible in either view.
+  useLayoutEffect(() => {
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = localVideoAvailable ? localStream : null
+      if (localVideoAvailable) void localVideoRef.current.play().catch(() => {})
+    }
+  }, [localStream, localVideoAvailable])
+
+  useLayoutEffect(() => {
+    if (type === 'video' && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteVideoAvailable ? remoteStream : null
+      if (remoteVideoAvailable) void remoteVideoRef.current.play().catch(() => {})
+    }
+  }, [remoteStream, remoteVideoAvailable, type])
 
   useEffect(() => {
-    if (type === 'video' && remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = remoteStream
       remoteAudioRef.current.volume = 1
@@ -129,11 +143,15 @@ export function CallScreen({
     }
   }, [isSpeakerOn, remoteStream])
 
-  useEffect(() => {
-    if (type === 'video' && pipVideoRef.current) {
-      pipVideoRef.current.srcObject = localVideoIsMain ? remoteStream : localStream
-    }
-  }, [localStream, remoteStream, localVideoIsMain, type])
+  useLayoutEffect(() => {
+    if (type !== 'video' || !pipVideoRef.current) return
+    const pipShowsRemote = localVideoIsMain
+    const pipStream = pipShowsRemote
+      ? (remoteVideoAvailable ? remoteStream : null)
+      : (localVideoAvailable ? localStream : null)
+    pipVideoRef.current.srcObject = pipStream
+    if (pipStream) void pipVideoRef.current.play().catch(() => {})
+  }, [localStream, remoteStream, localVideoIsMain, localVideoAvailable, remoteVideoAvailable, type])
 
   // Ringback tone while we're the caller waiting for pickup.
   useEffect(() => {
@@ -150,7 +168,7 @@ export function CallScreen({
     phase === 'in-call' ? (isOnHold ? `On hold · ${formatDuration(callDurationSec)}` : formatDuration(callDurationSec)) : ''
 
   const isVideoCall = type === 'video'
-  const showRemoteVideo = isVideoCall && remoteStream && phase === 'in-call'
+  const showRemoteVideo = isVideoCall && remoteVideoAvailable && phase === 'in-call'
 
   return (
     <div className="fixed inset-0 bg-neutral-950 z-[200] flex flex-col text-white overflow-hidden">
@@ -205,7 +223,7 @@ export function CallScreen({
             playsInline
             muted
             style={{ objectFit: "cover", objectPosition: "center center", backgroundColor: "#000" }}
-            className={`absolute inset-0 block w-full h-full object-cover object-center bg-black transition-opacity duration-150 ${localVideoIsMain && !isCameraOff ? 'opacity-100 scale-x-[-1]' : 'opacity-0 pointer-events-none'}`}
+            className={`absolute inset-0 block w-full h-full object-cover object-center bg-black transition-opacity duration-150 ${localVideoIsMain && localVideoAvailable ? 'opacity-100 scale-x-[-1]' : 'opacity-0 pointer-events-none'}`}
           />
           <div className="absolute bottom-28 left-4 w-24 h-32 sm:w-28 sm:h-36 rounded-xl overflow-hidden ring-2 ring-white/25 bg-neutral-900 z-20 shadow-lg">
             {canSwitchCamera && (
