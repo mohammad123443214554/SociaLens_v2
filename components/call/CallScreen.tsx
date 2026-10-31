@@ -25,6 +25,7 @@ interface CallScreenProps {
   onEnd: () => void
   onToggleMute: () => void
   onToggleCamera: () => void
+  onSwitchToAudioOnly: () => void
   onSwitchCamera: () => void
   onToggleHold: () => void
 }
@@ -38,7 +39,7 @@ function formatDuration(sec: number) {
 export function CallScreen({
   phase, type, peerName, peerAvatar, localStream, remoteStream,
   isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume,
-  onEnd, onToggleMute, onToggleCamera, onSwitchCamera, onToggleHold,
+  onEnd, onToggleMute, onToggleCamera, onSwitchToAudioOnly, onSwitchCamera, onToggleHold,
 }: CallScreenProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -286,6 +287,13 @@ export function CallScreen({
       </div>
 
       {!showRemoteVideo && <div className="flex-1" />}
+
+      {isVideoCall && networkQuality === 'weak' && !isCameraOff && phase === 'in-call' && (
+        <div className="absolute top-16 left-1/2 z-40 -translate-x-1/2 flex max-w-[92%] items-center gap-3 rounded-xl border border-amber-300/30 bg-neutral-950/90 px-3 py-2 text-white shadow-xl backdrop-blur">
+          <span className="text-xs leading-4">Network is weak. Turn off video to keep audio stable.</span>
+          <button type="button" onClick={onSwitchToAudioOnly} className="shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-neutral-900 hover:bg-neutral-200">Switch to audio</button>
+        </div>
+      )}
 
       {/* Main video and movable picture-in-picture preview. A missing camera
           intentionally stays blank; it must never turn into a call error. */}
