@@ -21,6 +21,7 @@ export interface CallRow {
   started_at: string | null
   ended_at: string | null
   ended_by?: string | null
+  is_on_hold?: boolean | null
 }
 
 interface PeerProfile {
@@ -77,6 +78,25 @@ function removeTracksOfKind(stream: MediaStream, kind: string) {
   stream.getTracks().filter((t) => t.kind === kind).forEach((t) => stream.removeTrack(t))
 }
 
+type CallAnnouncement = 'unanswered' | 'rejected' | 'busy' | 'on-hold'
+
+const CALL_ANNOUNCEMENT_FILES: Record<CallAnnouncement, string> = {
+  unanswered: 'call-unanswered.mp3',
+  rejected: 'call-rejected.mp3',
+  busy: 'call-user-busy.mp3',
+  'on-hold': 'call-on-hold.mp3',
+}
+
+function playCallAnnouncement(fileName: string) {
+  if (typeof window === 'undefined') return
+  const audio = new Audio(`/audio/calls/${fileName}`)
+  audio.preload = 'auto'
+  audio.volume = 1
+  void audio.play().catch((error) => {
+    console.warn('[SociaLens Call] voice announcement playback was blocked or unavailable', error)
+  })
+}
+
 /**
  * Drives one call end-to-end:
  *  - Global listener for incoming calls (works from any page, not just chat)
@@ -120,6 +140,7 @@ export function useCallEngine(currentUserId?: string) {
   const loggedCallIdsRef = useRef<Set<string>>(new Set())
   const connectionSetupRef = useRef<Map<string, Promise<{ info: any; agoraModule: any; dailyModule?: any }>>>(new Map())
   const transportCleanupRef = useRef(false)
+  const announcedCallEventsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => { callRef.current = call }, [call])
   useEffect(() => { console.log('[SociaLens Call] phase changed ->', phase) }, [phase])
@@ -127,6 +148,13 @@ export function useCallEngine(currentUserId?: string) {
   const clearRingTimeout = () => { if (ringTimeoutRef.current) { clearTimeout(ringTimeoutRef.current); ringTimeoutRef.current = null } }
   const clearDurationTimer = () => { if (durationIntervalRef.current) { clearInterval(durationIntervalRef.current); durationIntervalRef.current = null } }
   const clearRemoteLeftTimeout = () => { if (remoteLeftTimeoutRef.current) { clearTimeout(remoteLeftTimeoutRef.current); remoteLeftTimeoutRef.current = null } }
+
+  const announceCallEvent = useCallback((callId: string, event: CallAnnouncement) => {
+    const key = `${callId}:${event}`
+    if (announcedCallEventsRef.current.has(key)) return
+    announcedCallEventsRef.current.add(key)
+    playCallAnnouncement(CALL_ANNOUNCEMENT_FILES[event])
+  }, [])
 
   const reportUsageAndCleanupTransport = useCallback(async () => {
     const activeCall = callRef.current
@@ -260,7 +288,7 @@ export function useCallEngine(currentUserId?: string) {
     setCallDurationSec(0)
   }, [reportUsageAndCleanupTransport])
 
-  const updateCallStatus = useCallback(async (callId: string, patch: Partial<Pick<CallRow, 'status' | 'started_at' | 'ended_at' | 'ended_by'>>) => {
+  const updateCallStatus = useCallback(async (callId: string, patch: Partial<Pick<CallRow, 'status' | 'started_at' | 'ended_at' | 'ended_by' | 'is_on_hold'>>) => {
     await supabase.from('calls').update(patch).eq('id', callId)
   }, [])
 
@@ -668,6 +696,7 @@ export function useCallEngine(currentUserId?: string) {
       }).catch(() => {})
 
       ringTimeoutRef.current = setTimeout(async () => {
+        announceCallEvent(newCall.id, 'unanswered')
         await updateCallStatus(newCall.id, { status: 'missed' })
         cleanup('missed')
       }, RING_TIMEOUT_MS)
@@ -677,7 +706,7 @@ export function useCallEngine(currentUserId?: string) {
       setError(message)
       cleanup()
     }
-  }, [currentUserId, cleanup, updateCallStatus, prepareConnection])
+  }, [currentUserId, cleanup, updateCallStatus, prepareConnection, announceCallEvent])
 
   const cancelOutgoing = useCallback(async () => {
     if (!call) return
@@ -826,6 +855,8 @@ export function useCallEngine(currentUserId?: string) {
   const toggleHold = useCallback(() => {
     const next = !isOnHold
     setIsOnHold(next)
+    const activeCall = callRef.current
+    if (activeCall) void updateCallStatus(activeCall.id, { is_on_hold: next })
     const audioEnabled = !next && !isMuted
     const videoEnabled = !next && !isCameraOff
     if (agoraRef.current?.audioTrack) void agoraRef.current.audioTrack.setEnabled(audioEnabled)
@@ -834,7 +865,7 @@ export function useCallEngine(currentUserId?: string) {
       void dailyRef.current.setLocalAudio(audioEnabled)
       void dailyRef.current.setLocalVideo(videoEnabled)
     }
-  }, [isOnHold, isMuted, isCameraOff])
+  }, [isOnHold, isMuted, isCameraOff, updateCallStatus])
 
   // Call duration timer, running once the transport is actually live.
   useEffect(() => {
@@ -894,7 +925,14 @@ export function useCallEngine(currentUserId?: string) {
 
     function handleStatusUpdate(row: CallRow) {
       if (!callRef.current || row.id !== callRef.current.id) return
-      callRef.current = { ...callRef.current, ...row }
+      const previous = callRef.current
+      if (roleRef.current === 'caller' && row.is_on_hold && !previous.is_on_hold) announceCallEvent(row.id, 'on-hold')
+      if (roleRef.current === 'caller' && row.status !== previous.status) {
+        if (row.status === 'rejected') announceCallEvent(row.id, 'rejected')
+        else if (row.status === 'missed') announceCallEvent(row.id, 'unanswered')
+        else if (row.status === 'busy') announceCallEvent(row.id, 'busy')
+      }
+      callRef.current = { ...previous, ...row }
       setCall((current) => current?.id === row.id ? { ...current, ...row } : current)
 
       if (row.status === 'accepted' && roleRef.current === 'caller') {
@@ -964,8 +1002,14 @@ export function useCallEngine(currentUserId?: string) {
       // for it happens to get lost.
       const current = callRef.current
       if (current) {
-        const { data: fresh } = await supabase.from('calls').select('status, ended_by, ended_at').eq('id', current.id).single()
-        if (fresh && fresh.status !== current.status) {
+        const { data: fresh } = await supabase.from('calls').select('status, ended_by, ended_at, is_on_hold').eq('id', current.id).single()
+        if (fresh && (fresh.status !== current.status || fresh.is_on_hold !== current.is_on_hold)) {
+          if (roleRef.current === 'caller' && fresh.is_on_hold && !current.is_on_hold) announceCallEvent(current.id, 'on-hold')
+          if (roleRef.current === 'caller' && fresh.status !== current.status) {
+            if (fresh.status === 'rejected') announceCallEvent(current.id, 'rejected')
+            else if (fresh.status === 'missed') announceCallEvent(current.id, 'unanswered')
+            else if (fresh.status === 'busy') announceCallEvent(current.id, 'busy')
+          }
           if (fresh.status === 'accepted' && roleRef.current === 'caller') {
             const acceptedCall = { ...current, status: 'accepted' as CallStatus }
             setCall(acceptedCall)
