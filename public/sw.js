@@ -1,4 +1,4 @@
-const CACHE_NAME = 'geolink-v5'
+const CACHE_NAME = 'socialens-v6'
 const OFFLINE_URL = '/offline'
 
 const PRECACHE = [
