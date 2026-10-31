@@ -61,6 +61,28 @@ export function getRingtoneById(id?: string | null): RingtoneOption {
 
 let audioCtx: AudioContext | null = null
 let intervalId: ReturnType<typeof setInterval> | null = null
+let ringtoneShouldPlay = false
+let ringtonePauseCount = 0
+let activeRingtoneId = DEFAULT_RINGTONE_ID
+let activeRingtoneVolume = DEFAULT_RINGTONE_VOLUME
+
+function beginRingtonePlayback() {
+  if (!ringtoneShouldPlay || ringtonePauseCount > 0 || intervalId) return
+  const ringtone = getRingtoneById(activeRingtoneId)
+  try {
+    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const tick = () => playPattern(ringtone.pattern, activeRingtoneVolume)
+    tick()
+    intervalId = setInterval(tick, ringtone.loopEvery * 1000)
+  } catch {
+    // Audio restrictions - the visual call UI still works.
+  }
+}
+
+function closeRingtoneAudio() {
+  if (intervalId) { clearInterval(intervalId); intervalId = null }
+  if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null }
+}
 
 function playPattern(pattern: [number, number, number][], volume: number) {
   if (!audioCtx) return
@@ -90,21 +112,28 @@ function playPattern(pattern: [number, number, number][], volume: number) {
  * incoming call screen and the outgoing "ringing..." screen.
  */
 export function startRingtone(ringtoneId: string = DEFAULT_RINGTONE_ID, volume: number = DEFAULT_RINGTONE_VOLUME) {
-  if (intervalId) return
-  const ringtone = getRingtoneById(ringtoneId)
-  try {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    const tick = () => playPattern(ringtone.pattern, volume)
-    tick()
-    intervalId = setInterval(tick, ringtone.loopEvery * 1000)
-  } catch {
-    // Autoplay/audio restrictions - fail silently, the visual UI still works.
-  }
+  ringtoneShouldPlay = true
+  activeRingtoneId = ringtoneId
+  activeRingtoneVolume = volume
+  beginRingtonePlayback()
+}
+
+/** Temporarily silences the ringtone while a call announcement is speaking. */
+export function pauseRingtone() {
+  ringtonePauseCount += 1
+  closeRingtoneAudio()
+}
+
+/** Resumes ringing only after every overlapping announcement has finished. */
+export function resumeRingtone() {
+  ringtonePauseCount = Math.max(0, ringtonePauseCount - 1)
+  beginRingtonePlayback()
 }
 
 export function stopRingtone() {
-  if (intervalId) { clearInterval(intervalId); intervalId = null }
-  if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null }
+  ringtoneShouldPlay = false
+  ringtonePauseCount = 0
+  closeRingtoneAudio()
 }
 
 /** Plays one preview loop of a ringtone at a given volume, for the settings picker. */
