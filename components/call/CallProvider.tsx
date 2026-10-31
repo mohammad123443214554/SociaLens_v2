@@ -175,7 +175,6 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           isMuted={engine.isMuted}
           isCameraOff={engine.isCameraOff}
           isOnHold={engine.isOnHold}
-          noiseSuppressionLevel={engine.noiseSuppressionLevel}
           canSwitchCamera={engine.canSwitchCamera}
           callDurationSec={engine.callDurationSec}
           error={engine.error}
@@ -188,7 +187,6 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           onSwitchToAudioOnly={engine.switchToAudioOnly}
           onSwitchCamera={engine.switchCamera}
           onToggleHold={engine.toggleHold}
-          onNoiseSuppressionChange={engine.setNoiseSuppressionLevel}
         />
       )}
     </CallContext.Provider>
