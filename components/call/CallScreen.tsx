@@ -217,7 +217,7 @@ export function CallScreen({
 
   return (
     <div
-      className={isMini ? "fixed z-[250] relative flex flex-col text-white overflow-hidden rounded-2xl border border-white/20 bg-neutral-950 shadow-2xl select-none" : "fixed inset-0 relative bg-neutral-950 z-[200] flex flex-col text-white overflow-hidden"}
+      className={isMini ? "fixed z-[250] flex flex-col text-white overflow-hidden rounded-2xl border border-white/20 bg-neutral-950 shadow-2xl select-none" : "fixed inset-0 bg-neutral-950 z-[200] flex flex-col text-white overflow-hidden"}
       style={isMini ? { width: miniSize, height: Math.round(miniSize * 1.33), left: miniPosition?.x, top: miniPosition?.y, right: miniPosition ? undefined : 12, bottom: miniPosition ? undefined : 80, touchAction: 'none' } : undefined}
       onPointerDown={(event) => { if (isMini) startMiniGesture(event, 'drag') }}
       onPointerMove={moveMiniGesture}
