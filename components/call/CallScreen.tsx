@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock, SlidersHorizontal, Check } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
@@ -16,6 +16,7 @@ interface CallScreenProps {
   isMuted: boolean
   isCameraOff: boolean
   isOnHold: boolean
+  noiseSuppressionLevel: 'off' | 'standard' | 'high'
   canSwitchCamera: boolean
   callDurationSec: number
   error: string | null
@@ -28,6 +29,7 @@ interface CallScreenProps {
   onSwitchToAudioOnly: () => void
   onSwitchCamera: () => void
   onToggleHold: () => void
+  onNoiseSuppressionChange: (level: 'off' | 'standard' | 'high') => Promise<void>
 }
 
 function formatDuration(sec: number) {
@@ -38,8 +40,8 @@ function formatDuration(sec: number) {
 
 export function CallScreen({
   phase, type, peerName, peerAvatar, localStream, remoteStream,
-  isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume,
-  onEnd, onToggleMute, onToggleCamera, onSwitchToAudioOnly, onSwitchCamera, onToggleHold,
+  isMuted, isCameraOff, isOnHold, noiseSuppressionLevel, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume,
+  onEnd, onToggleMute, onToggleCamera, onSwitchToAudioOnly, onSwitchCamera, onToggleHold, onNoiseSuppressionChange,
 }: CallScreenProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -50,6 +52,8 @@ export function CallScreen({
   const [localVideoIsMain, setLocalVideoIsMain] = useState(false)
   const [isSpeakerOn, setIsSpeakerOn] = useState(false)
   const [isScreenLocked, setIsScreenLocked] = useState(false)
+  const [isNoiseMenuOpen, setIsNoiseMenuOpen] = useState(false)
+  const [noiseUpdateError, setNoiseUpdateError] = useState<string | null>(null)
 
   const [isMini, setIsMini] = useState(false)
   const [miniSize, setMiniSize] = useState(300)
@@ -383,6 +387,54 @@ export function CallScreen({
         >
           {isOnHold ? <PlayCircle className="h-6 w-6" /> : <PauseCircle className="h-6 w-6" />}
         </button>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => { setIsNoiseMenuOpen((open) => !open); setNoiseUpdateError(null) }}
+            disabled={phase !== 'in-call'}
+            aria-label={`Noise suppression: ${noiseSuppressionLevel}`}
+            aria-expanded={isNoiseMenuOpen}
+            title="Noise suppression settings"
+            className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${noiseSuppressionLevel === 'off' ? 'bg-white/15 hover:bg-white/25' : 'bg-white/25 hover:bg-white/35'} disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            <SlidersHorizontal className="h-6 w-6" />
+          </button>
+          {isNoiseMenuOpen && (
+            <div className="absolute bottom-full left-1/2 z-[120] mb-3 w-64 -translate-x-1/2 rounded-2xl border border-white/15 bg-neutral-950/95 p-2 text-white shadow-2xl backdrop-blur-xl" role="menu" aria-label="Noise suppression level">
+              <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-white/55">Noise suppression</p>
+              {([
+                { value: 'off', title: 'Off', detail: 'Normal microphone audio' },
+                { value: 'standard', title: 'Standard', detail: 'Balanced background-noise reduction' },
+                { value: 'high', title: 'High', detail: 'Strongest free audio enhancement' },
+              ] as const).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={noiseSuppressionLevel === option.value}
+                  onClick={async () => {
+                    try {
+                      await onNoiseSuppressionChange(option.value)
+                      setNoiseUpdateError(null)
+                      setIsNoiseMenuOpen(false)
+                    } catch {
+                      setNoiseUpdateError('Could not change microphone processing. Your call is still connected.')
+                    }
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-white/10"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">{option.title}</span>
+                    <span className="mt-0.5 block text-xs text-white/55">{option.detail}</span>
+                  </span>
+                  {noiseSuppressionLevel === option.value && <Check className="h-4 w-4 shrink-0 text-emerald-400" />}
+                </button>
+              ))}
+              {noiseUpdateError && <p className="px-3 pb-2 text-xs text-red-300">{noiseUpdateError}</p>}
+            </div>
+          )}
+        </div>
 
         <button
           type="button"
