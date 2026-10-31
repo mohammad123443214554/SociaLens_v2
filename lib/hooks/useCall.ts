@@ -398,7 +398,7 @@ export function useCallEngine(currentUserId?: string) {
         // the video surface blank instead of showing a red error banner.
         const audioPromise = AgoraRTC.createMicrophoneAudioTrack({
           encoderConfig: 'high_quality',
-          AEC: noiseSuppressionLevel === 'high',
+          AEC: noiseSuppressionLevel !== 'off',
           ANS: noiseSuppressionLevel !== 'off',
           AGC: noiseSuppressionLevel === 'high',
         })
@@ -1047,14 +1047,14 @@ export function useCallEngine(currentUserId?: string) {
     const previousLevel = noiseSuppressionLevel
     const audioOptions = {
       encoderConfig: 'high_quality',
-      AEC: level === 'high',
+      AEC: level !== 'off',
       ANS: level !== 'off',
       AGC: level === 'high',
     } as const
 
     try {
       if (agoraRef.current?.client && agoraRef.current.audioTrack) {
-        const { client, audioTrack: oldTrack } = agoraRef.current
+        const { client, audioTrack: oldTrack, videoTrack } = agoraRef.current
         const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
         const nextTrack = await AgoraRTC.createMicrophoneAudioTrack(audioOptions)
         if (isMuted || isOnHold) await nextTrack.setEnabled(false)
@@ -1067,7 +1067,7 @@ export function useCallEngine(currentUserId?: string) {
           nextTrack.close()
           throw publishError
         }
-        agoraRef.current = { ...agoraRef.current, audioTrack: nextTrack }
+        agoraRef.current = { client, audioTrack: nextTrack, videoTrack }
         upsertTrack(localStreamObjRef.current, nextTrack.getMediaStreamTrack())
         setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
         try { oldTrack.close() } catch {}
