@@ -720,7 +720,7 @@ export function useCallEngine(currentUserId?: string) {
   // never creates a new call or changes the accepted call status.
   reconnectActiveCallRef.current = (activeCall: CallRow) => {
     if (transportCleanupRef.current || callRef.current?.id !== activeCall.id || activeCall.status !== 'accepted') return
-    if (connectingCallIdRef.current === activeCall.id && phase === 'in-call') connectingCallIdRef.current = null
+    connectingCallIdRef.current = null
     void (async () => {
       await teardownTransportSilently()
       if (callRef.current?.id !== activeCall.id || callRef.current.status !== 'accepted') return
@@ -738,9 +738,13 @@ export function useCallEngine(currentUserId?: string) {
       const active = callRef.current
       if (active?.status === 'accepted' && phase !== 'in-call') reconnectActiveCallRef.current?.(active)
     }
+    const markOffline = () => { setNetworkQuality('unknown'); setPhase('connecting') }
     window.addEventListener('online', retry)
-    window.addEventListener('offline', () => { setNetworkQuality('unknown'); setPhase('connecting') })
-    return () => window.removeEventListener('online', retry)
+    window.addEventListener('offline', markOffline)
+    return () => {
+      window.removeEventListener('online', retry)
+      window.removeEventListener('offline', markOffline)
+    }
   }, [call?.id, call?.status, phase])
 
   // Called when the person taps "Allow camera & microphone" on our
