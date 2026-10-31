@@ -175,6 +175,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           isMuted={engine.isMuted}
           isCameraOff={engine.isCameraOff}
           isOnHold={engine.isOnHold}
+          canSwitchCamera={engine.canSwitchCamera}
           callDurationSec={engine.callDurationSec}
           error={engine.error}
           ringtoneId={callSettings?.ringtone}
@@ -182,6 +183,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           onEnd={engine.phase === 'outgoing-ringing' ? engine.cancelOutgoing : engine.hangup}
           onToggleMute={engine.toggleMute}
           onToggleCamera={engine.toggleCamera}
+          onSwitchCamera={engine.switchCamera}
           onToggleHold={engine.toggleHold}
         />
       )}
