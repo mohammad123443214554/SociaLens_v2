@@ -373,7 +373,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
       return (
         <div className={cn('flex w-full min-w-0 gap-2 mb-2 group items-end', isOwn && 'flex-row-reverse')}>
           {!isOwn && (
-            <Avatar className="h-5 w-5 sm:h-6 sm:w-6 shrink-0 mb-4">
+            <Avatar className="h-5 w-5 sm:h-6 sm:w-6 shrink-0 mb-1">
               <AvatarImage src={getAvatarUrl(otherAvatarUrl) || undefined} />
               <AvatarFallback className="text-[9px]">{(otherUsername || 'U').slice(0, 1).toUpperCase()}</AvatarFallback>
             </Avatar>
