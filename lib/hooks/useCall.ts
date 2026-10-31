@@ -895,6 +895,20 @@ export function useCallEngine(currentUserId?: string) {
         async (payload: any) => {
           const row = payload.new as CallRow
           if (row.status !== 'ringing') return
+
+          // A second incoming call must not replace the call already shown
+          // to this user. Mark the new caller as busy and let their caller
+          // side play the dedicated busy announcement.
+          const activeCall = callRef.current
+          if (activeCall && activeCall.id !== row.id && ['ringing', 'accepted'].includes(activeCall.status)) {
+            await updateCallStatus(row.id, {
+              status: 'busy',
+              ended_at: new Date().toISOString(),
+              ended_by: currentUserId,
+            })
+            return
+          }
+
           roleRef.current = 'callee'
           const { data: callerProfile } = await supabase
             .from('profiles')
