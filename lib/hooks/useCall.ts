@@ -490,23 +490,42 @@ export function useCallEngine(currentUserId?: string) {
 
     try {
       await attemptConnect(0)
-    } catch (err: any) {
-      console.error('connectMedia failed', err)
-      // A camera/mic error here (rather than a network/provider error)
-      // means the permission pre-check above didn't catch it in time -
-      // most commonly Android's WebView denying the request outright.
-      // Fall back to the same explainer screen (in its "blocked" form)
-      // instead of just leaving them with a generic error.
+    } catch (initialError: any) {
+      let err = initialError
       const errName = String(err?.name || '')
       const errMsg = String(err?.message || err?.code || '')
       const isMediaError = ['NotAllowedError', 'NotFoundError', 'NotReadableError'].includes(errName)
         || /permission|not allowed|notallowed|denied/i.test(errMsg)
         || !navigator.mediaDevices?.getUserMedia
 
-      // Whatever happened, this attempt owns nothing any more. Without this
-      // the next attempt inherits a live client and collides with itself.
+      // Retry transient provider/network failures before ending the call.
+      // A failed join/publish must not immediately turn into a permanent
+      // "ended" call when the network only hiccupped during setup.
+      const isRetryable = !isMediaError && /network|timeout|timed out|failed to fetch|operation_aborted|connection|gateway|temporar|unavailable/i.test(
+        `${errName} ${errMsg} ${String(err?.code || '')}`
+      )
+      if (isRetryable) {
+        for (let retry = 1; retry <= 2; retry += 1) {
+          await teardownTransportSilently()
+          await new Promise((resolve) => setTimeout(resolve, retry * 700))
+          try {
+            const { data: latest } = await supabase
+              .from('calls')
+              .select('status')
+              .eq('id', activeCall.id)
+              .maybeSingle()
+            if (latest?.status !== 'accepted') break
+            await attemptConnect(retry)
+            return
+          } catch (retryError: any) {
+            err = retryError
+            console.warn('[SociaLens Call] transient connection retry failed', retry, retryError)
+          }
+        }
+      }
+
+      console.error('connectMedia failed after retries', err)
       await teardownTransportSilently()
-      // Let the retry buttons actually re-enter connectMedia().
       connectingCallIdRef.current = null
 
       if (isMediaError) {
