@@ -371,8 +371,14 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
       }
 
       return (
-        <div className={cn('flex gap-1 mb-2 group items-center', isOwn && 'flex-row-reverse')}>
-          <div className="flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
+        <div className={cn('flex w-full min-w-0 gap-2 mb-2 group items-end', isOwn && 'flex-row-reverse')}>
+          {!isOwn && (
+            <Avatar className="h-5 w-5 sm:h-6 sm:w-6 shrink-0 mb-4">
+              <AvatarImage src={getAvatarUrl(otherAvatarUrl) || undefined} />
+              <AvatarFallback className="text-[9px]">{(otherUsername || 'U').slice(0, 1).toUpperCase()}</AvatarFallback>
+            </Avatar>
+          )}
+          <div className="min-w-0 w-fit flex-none max-w-[calc(100%-6rem)] sm:max-w-[78%] flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
             <div className={cn(
               'flex items-center gap-2 px-3 py-2 rounded-2xl text-sm',
               isOwn ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-br-sm' : 'bg-muted rounded-bl-sm',
