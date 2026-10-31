@@ -404,9 +404,9 @@ export function CallScreen({
             <div className="absolute bottom-full left-1/2 z-[120] mb-3 w-64 -translate-x-1/2 rounded-2xl border border-white/15 bg-neutral-950/95 p-2 text-white shadow-2xl backdrop-blur-xl" role="menu" aria-label="Noise suppression level">
               <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-white/55">Noise suppression</p>
               {([
-                { value: 'off', title: 'Off', detail: 'Normal microphone audio' },
-                { value: 'standard', title: 'Standard', detail: 'Balanced background-noise reduction' },
-                { value: 'high', title: 'High', detail: 'Strongest free audio enhancement' },
+                { value: 'off', title: 'Noise suppression Off', detail: 'Optional · Normal microphone audio' },
+                { value: 'standard', title: 'Noise suppression Standard', detail: 'Default · Balanced background-noise reduction' },
+                { value: 'high', title: 'Noise suppression High', detail: 'Strong · Full free audio enhancement' },
               ] as const).map((option) => (
                 <button
                   key={option.value}
