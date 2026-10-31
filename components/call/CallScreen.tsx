@@ -166,7 +166,7 @@ export function CallScreen({
           aria-label={isSpeakerOn ? 'Speaker on' : 'Speaker off'}
           aria-pressed={isSpeakerOn}
           title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'}
-          className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-white text-black' : 'bg-white/15 hover:bg-white/25'}`}
+          className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}
         >
           {isSpeakerOn ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
         </button>
@@ -196,7 +196,7 @@ export function CallScreen({
           disabled={phase !== "in-call"}
           aria-label={isOnHold ? 'Resume call' : 'Hold call'}
           title={isOnHold ? 'Resume call' : 'Hold call'}
-          className=`h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed`
+          className="h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isOnHold ? <PlayCircle className="h-6 w-6" /> : <PauseCircle className="h-6 w-6" />}
         </button>
