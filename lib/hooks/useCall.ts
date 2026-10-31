@@ -1026,7 +1026,7 @@ export function useCallEngine(currentUserId?: string) {
           }
           callRef.current = { ...current, ...fresh }
           setCall((existing) => existing?.id === current.id ? { ...existing, ...fresh } : existing)
-          if (fresh.status === 'accepted' && roleRef.current === 'caller') {
+          if (fresh.status === 'accepted' && fresh.status !== current.status && roleRef.current === 'caller') {
             const acceptedCall = { ...current, status: 'accepted' as CallStatus }
             setCall(acceptedCall)
             connectMedia(acceptedCall)
