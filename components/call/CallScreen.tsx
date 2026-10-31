@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight, PauseCircle, PlayCircle, Volume1, Volume2 } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
@@ -16,6 +16,7 @@ interface CallScreenProps {
   isMuted: boolean
   isCameraOff: boolean
   isOnHold: boolean
+  canSwitchCamera: boolean
   callDurationSec: number
   error: string | null
   ringtoneId?: string
@@ -23,6 +24,7 @@ interface CallScreenProps {
   onEnd: () => void
   onToggleMute: () => void
   onToggleCamera: () => void
+  onSwitchCamera: () => void
   onToggleHold: () => void
 }
 
@@ -34,8 +36,8 @@ function formatDuration(sec: number) {
 
 export function CallScreen({
   phase, type, peerName, peerAvatar, localStream, remoteStream,
-  isMuted, isCameraOff, isOnHold, callDurationSec, error, ringtoneId, ringtoneVolume,
-  onEnd, onToggleMute, onToggleCamera, onToggleHold,
+  isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, ringtoneId, ringtoneVolume,
+  onEnd, onToggleMute, onToggleCamera, onSwitchCamera, onToggleHold,
 }: CallScreenProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -206,6 +208,18 @@ export function CallScreen({
             className={`absolute inset-0 block w-full h-full object-cover object-center bg-black transition-opacity duration-150 ${localVideoIsMain && !isCameraOff ? 'opacity-100 scale-x-[-1]' : 'opacity-0 pointer-events-none'}`}
           />
           <div className="absolute bottom-28 left-4 w-24 h-32 sm:w-28 sm:h-36 rounded-xl overflow-hidden ring-2 ring-white/25 bg-neutral-900 z-20 shadow-lg">
+            {canSwitchCamera && (
+              <button
+                type="button"
+                onClick={onSwitchCamera}
+                disabled={isCameraOff || isOnHold}
+                aria-label="Switch front or back camera"
+                title="Switch front or back camera"
+                className="absolute top-1.5 left-1.5 z-30 h-8 w-8 rounded-full bg-black/65 hover:bg-black/85 text-white flex items-center justify-center disabled:opacity-40"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setLocalVideoIsMain((current) => !current)}
