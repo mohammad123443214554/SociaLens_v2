@@ -146,13 +146,6 @@ export function useCallEngine(currentUserId?: string) {
   const [callDurationSec, setCallDurationSec] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [networkQuality, setNetworkQuality] = useState<'excellent' | 'good' | 'weak' | 'unknown'>('unknown')
-  const [noiseSuppressionLevel, setNoiseSuppressionLevelState] = useState<'off' | 'standard' | 'high'>(() => {
-    if (typeof window === 'undefined') return 'standard'
-    try {
-      const saved = window.localStorage.getItem('socialens-call-noise-suppression')
-      return saved === 'off' || saved === 'high' || saved === 'standard' ? saved : 'standard'
-    } catch { return 'standard' }
-  })
 
   const localStreamObjRef = useRef<MediaStream>(new MediaStream())
   const remoteStreamObjRef = useRef<MediaStream>(new MediaStream())
@@ -398,9 +391,9 @@ export function useCallEngine(currentUserId?: string) {
         // the video surface blank instead of showing a red error banner.
         const audioPromise = AgoraRTC.createMicrophoneAudioTrack({
           encoderConfig: 'high_quality',
-          AEC: noiseSuppressionLevel !== 'off',
-          ANS: noiseSuppressionLevel !== 'off',
-          AGC: noiseSuppressionLevel === 'high',
+          AEC: true,
+          ANS: true,
+          AGC: true,
         })
         const videoPromise = activeCall.type === 'video'
           ? AgoraRTC.createCameraVideoTrack({ encoderConfig: '720p_1' }).catch((camErr: any) => {
@@ -544,9 +537,9 @@ export function useCallEngine(currentUserId?: string) {
           inputSettings: {
             audio: {
               settings: {
-                noiseSuppression: noiseSuppressionLevel !== 'off',
-                echoCancellation: noiseSuppressionLevel === 'high',
-                autoGainControl: noiseSuppressionLevel === 'high',
+                noiseSuppression: true,
+                echoCancellation: true,
+                autoGainControl: true,
               },
             },
           },
@@ -678,7 +671,7 @@ export function useCallEngine(currentUserId?: string) {
       await updateCallStatus(activeCall.id, { status: 'ended', ended_at: new Date().toISOString() })
       cleanup('ended')
     }
-  }, [cleanup, updateCallStatus, teardownTransportSilently, prepareConnection, noiseSuppressionLevel])
+  }, [cleanup, updateCallStatus, teardownTransportSilently, prepareConnection])
 
   // Checks the browser's current camera/mic permission state (where the
   // Permissions API is available - Safari doesn't support querying
@@ -1042,55 +1035,6 @@ export function useCallEngine(currentUserId?: string) {
     }
   }, [isOnHold, isMuted, isCameraOff, currentUserId, updateCallStatus])
 
-  const setNoiseSuppressionLevel = useCallback(async (level: 'off' | 'standard' | 'high') => {
-    if (level === noiseSuppressionLevel) return
-    const previousLevel = noiseSuppressionLevel
-    const audioOptions = {
-      encoderConfig: 'high_quality',
-      AEC: level !== 'off',
-      ANS: level !== 'off',
-      AGC: level === 'high',
-    } as const
-
-    try {
-      if (agoraRef.current?.client && agoraRef.current.audioTrack) {
-        const { client, audioTrack: oldTrack, videoTrack } = agoraRef.current
-        const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
-        const nextTrack = await AgoraRTC.createMicrophoneAudioTrack(audioOptions)
-        if (isMuted || isOnHold) await nextTrack.setEnabled(false)
-        try {
-          await client.unpublish(oldTrack)
-          await client.publish(nextTrack)
-        } catch (publishError) {
-          try { await client.unpublish(nextTrack) } catch {}
-          try { await client.publish(oldTrack) } catch {}
-          nextTrack.close()
-          throw publishError
-        }
-        agoraRef.current = { client, audioTrack: nextTrack, videoTrack }
-        upsertTrack(localStreamObjRef.current, nextTrack.getMediaStreamTrack())
-        setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
-        try { oldTrack.close() } catch {}
-      } else if (dailyRef.current) {
-        await dailyRef.current.updateInputSettings({
-          audio: {
-            settings: {
-              noiseSuppression: level !== 'off',
-              echoCancellation: level === 'high',
-              autoGainControl: level === 'high',
-            },
-          },
-        })
-      }
-      setNoiseSuppressionLevelState(level)
-      try { window.localStorage.setItem('socialens-call-noise-suppression', level) } catch {}
-    } catch (noiseError) {
-      console.error('[Call] could not update noise suppression settings', noiseError)
-      setNoiseSuppressionLevelState(previousLevel)
-      throw noiseError
-    }
-  }, [noiseSuppressionLevel, isMuted, isOnHold])
-
   const switchCamera = useCallback(async () => {
     if (!canSwitchCamera || isCameraOff || isOnHold) return
     try {
@@ -1392,8 +1336,6 @@ export function useCallEngine(currentUserId?: string) {
     callDurationSec,
     error,
     networkQuality,
-    noiseSuppressionLevel,
-    setNoiseSuppressionLevel,
     switchToAudioOnly,
     startCall,
     cancelOutgoing,
