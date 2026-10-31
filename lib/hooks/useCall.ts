@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { RING_TIMEOUT_MS } from '@/lib/utils/webrtc'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { canAccessByPrivacy } from '@/lib/utils/privacyAccess'
+import { pauseRingtone, resumeRingtone } from '@/lib/utils/ringtone'
 
 export type CallType = 'audio' | 'video'
 export type CallStatus = 'ringing' | 'accepted' | 'rejected' | 'missed' | 'ended' | 'cancelled' | 'busy'
@@ -90,6 +91,7 @@ const CALL_ANNOUNCEMENT_FILES: Record<CallAnnouncement, string> = {
 
 function playCallAnnouncement(fileName: string): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve()
+  pauseRingtone()
   return new Promise((resolve) => {
     const audio = new Audio(`/audio/calls/${fileName}`)
     audio.preload = 'auto'
@@ -100,6 +102,7 @@ function playCallAnnouncement(fileName: string): Promise<void> {
       settled = true
       audio.onended = null
       audio.onerror = null
+      resumeRingtone()
       resolve()
     }
     audio.onended = finish
