@@ -374,7 +374,7 @@ export function useCallEngine(currentUserId?: string) {
           console.warn('[Agora] remote participant left; verifying call-session status', remoteUser?.uid)
           removeTracksOfKind(remoteStreamObjRef.current, 'video')
           removeTracksOfKind(remoteStreamObjRef.current, 'audio')
-          setRemoteStream(remoteStreamObjRef.current)
+          setRemoteStream(new MediaStream(remoteStreamObjRef.current.getTracks()))
 
           // Agora can report a temporary mobile-network handoff as user-left.
           // A deliberate hangup updates the call row before leaving; a
@@ -444,7 +444,7 @@ export function useCallEngine(currentUserId?: string) {
           upsertTrack(targetStream, ev.track)
           if (ev.participant?.local) setLocalStream(localStreamObjRef.current)
           else {
-            setRemoteStream(remoteStreamObjRef.current)
+            setRemoteStream(new MediaStream(remoteStreamObjRef.current.getTracks()))
             setPhase('in-call')
             if (!startedAtMsRef.current) startedAtMsRef.current = Date.now()
           }
