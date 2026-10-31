@@ -512,7 +512,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
   const isAperonixReply = Boolean((message as any).is_aperonix_reply)
 
   return (
-    <div className={cn('flex w-full min-w-0 gap-2 mb-2 group items-end', isOwn && 'flex-row-reverse')}>
+    <div className={cn('flex w-full min-w-0 flex-wrap gap-2 mb-2 group items-end', isOwn && 'flex-row-reverse')}>
       {!isOwn && (
         <Avatar className="h-5 w-5 sm:h-6 sm:w-6 shrink-0 mb-4">
           <AvatarImage src={getAvatarUrl(otherAvatarUrl) || undefined} />
@@ -675,7 +675,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
       </div>
 
       {!editing && (
-        <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0 self-center">
+        <div className="flex w-full basis-full items-center justify-end gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0 self-center sm:w-auto sm:basis-auto">
           <button ref={menuBtnRef} onClick={openMenu} className="p-1.5 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
             <MoreVertical className="h-4 w-4" />
           </button>
