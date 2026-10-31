@@ -178,6 +178,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           canSwitchCamera={engine.canSwitchCamera}
           callDurationSec={engine.callDurationSec}
           error={engine.error}
+          networkQuality={engine.networkQuality}
           ringtoneId={callSettings?.ringtone}
           ringtoneVolume={callSettings?.volume}
           onEnd={engine.phase === 'outgoing-ringing' ? engine.cancelOutgoing : engine.hangup}
