@@ -40,6 +40,8 @@ export function CallScreen({
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const audioGainRef = useRef<GainNode | null>(null)
   const pipVideoRef = useRef<HTMLVideoElement>(null)
   const [localVideoIsMain, setLocalVideoIsMain] = useState(false)
   const [isSpeakerOn, setIsSpeakerOn] = useState(false)
@@ -50,13 +52,60 @@ export function CallScreen({
 
   useEffect(() => {
     if (type === 'video' && remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream
-    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = remoteStream
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = remoteStream
+      remoteAudioRef.current.volume = 1
+      remoteAudioRef.current.muted = false
+    }
+
+    // Route the remote stream through Web Audio so Speaker ON can boost
+    // above the browser's 100% element-volume ceiling. If Web Audio is
+    // unavailable or blocked, keep normal playback working as a fallback.
+    let disposed = false
+    let source: MediaStreamAudioSourceNode | null = null
+    let context: AudioContext | null = null
+    const connectAudio = async () => {
+      if (!remoteStream?.getAudioTracks().length) return
+      try {
+        const AudioContextClass = window.AudioContext
+        if (!AudioContextClass) return
+        context = new AudioContextClass()
+        source = context.createMediaStreamSource(remoteStream)
+        const gain = context.createGain()
+        gain.gain.value = isSpeakerOn ? 2.2 : 1
+        source.connect(gain)
+        gain.connect(context.destination)
+        audioContextRef.current = context
+        audioGainRef.current = gain
+        await context.resume()
+        if (disposed) return
+        if (context.state === 'running' && remoteAudioRef.current) {
+          remoteAudioRef.current.muted = true
+        }
+      } catch (audioError) {
+        console.warn('[Call] speaker boost unavailable; using normal playback', audioError)
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.muted = false
+          remoteAudioRef.current.volume = 1
+        }
+      }
+    }
+    void connectAudio()
+    return () => {
+      disposed = true
+      try { source?.disconnect() } catch {}
+      if (audioContextRef.current === context) audioContextRef.current = null
+      audioGainRef.current = null
+      if (context && context.state !== 'closed') void context.close().catch(() => {})
+      if (remoteAudioRef.current) remoteAudioRef.current.muted = false
+    }
   }, [remoteStream, type])
 
-  // Browser audio output level control: normal mode is 65%, speaker mode is maximum.
   useEffect(() => {
-    if (remoteAudioRef.current) remoteAudioRef.current.volume = isSpeakerOn ? 1 : 0.65
-  }, [isSpeakerOn, remoteStream, type])
+    if (audioGainRef.current) audioGainRef.current.gain.setTargetAtTime(isSpeakerOn ? 2.2 : 1, audioContextRef.current?.currentTime ?? 0, 0.08)
+    // Browsers without Web Audio support retain their normal 100% playback.
+    if (!audioGainRef.current && remoteAudioRef.current) remoteAudioRef.current.volume = 1
+  }, [isSpeakerOn, remoteStream])
 
   useEffect(() => {
     if (type === 'video' && pipVideoRef.current) {
