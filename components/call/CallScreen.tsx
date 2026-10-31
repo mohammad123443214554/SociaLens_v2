@@ -19,6 +19,7 @@ interface CallScreenProps {
   canSwitchCamera: boolean
   callDurationSec: number
   error: string | null
+  networkQuality: 'excellent' | 'good' | 'weak' | 'unknown'
   ringtoneId?: string
   ringtoneVolume?: number
   onEnd: () => void
@@ -36,7 +37,7 @@ function formatDuration(sec: number) {
 
 export function CallScreen({
   phase, type, peerName, peerAvatar, localStream, remoteStream,
-  isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, ringtoneId, ringtoneVolume,
+  isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume,
   onEnd, onToggleMute, onToggleCamera, onSwitchCamera, onToggleHold,
 }: CallScreenProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null)
@@ -244,6 +245,17 @@ export function CallScreen({
         <div className="flex items-center gap-1.5 text-xs text-white/70">
           {isMini ? <Move className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
           <span>{isMini ? peerName : "SociaLens secure call"}</span>
+          {!isMini && phase === 'in-call' && (
+            <span className={`ml-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+              networkQuality === 'excellent' ? 'border-emerald-400/30 bg-emerald-500/15 text-emerald-300' :
+              networkQuality === 'good' ? 'border-yellow-400/30 bg-yellow-500/15 text-yellow-200' :
+              networkQuality === 'weak' ? 'border-red-400/30 bg-red-500/15 text-red-300' :
+              'border-white/20 bg-white/10 text-white/65'
+            }`} aria-live="polite">
+              <span className={`h-1.5 w-1.5 rounded-full ${networkQuality === 'excellent' ? 'bg-emerald-400' : networkQuality === 'good' ? 'bg-yellow-300' : networkQuality === 'weak' ? 'bg-red-400' : 'bg-white/50'}`} />
+              {networkQuality === 'excellent' ? 'Excellent' : networkQuality === 'good' ? 'Good' : networkQuality === 'weak' ? 'Weak' : 'Checking connection'}
+            </span>
+          )}
           {isMini && <span className="text-white/50">{statusText}</span>}
         </div>
       </div>
