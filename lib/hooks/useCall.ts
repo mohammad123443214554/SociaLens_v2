@@ -427,6 +427,9 @@ export function useCallEngine(currentUserId?: string) {
         })
         client.on('user-unpublished', (_remoteUser: any, mediaType: 'audio' | 'video') => {
           removeTracksOfKind(remoteStreamObjRef.current, mediaType === 'audio' ? 'audio' : 'video')
+          // Publish a fresh stream reference so React immediately removes the
+          // remote video element when the other participant switches camera off.
+          setRemoteStream(new MediaStream(remoteStreamObjRef.current.getTracks()))
         })
         // A transport-level user-left event is NOT a hangup. Mobile networks,
         // browser tab suspension and brief Wi-Fi/cellular handoffs can make
@@ -505,7 +508,7 @@ export function useCallEngine(currentUserId?: string) {
           if (!ev?.track) return
           const targetStream = ev.participant?.local ? localStreamObjRef.current : remoteStreamObjRef.current
           upsertTrack(targetStream, ev.track)
-          if (ev.participant?.local) setLocalStream(localStreamObjRef.current)
+          if (ev.participant?.local) setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
           else {
             setRemoteStream(new MediaStream(remoteStreamObjRef.current.getTracks()))
             setPhase('in-call')
@@ -516,7 +519,9 @@ export function useCallEngine(currentUserId?: string) {
           if (!ev?.track) return
           const targetStream = ev.participant?.local ? localStreamObjRef.current : remoteStreamObjRef.current
           targetStream.removeTrack(ev.track)
-          if (!ev.participant?.local) {
+          if (ev.participant?.local) {
+            setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
+          } else {
             setRemoteStream(new MediaStream(remoteStreamObjRef.current.getTracks()))
           }
         })
