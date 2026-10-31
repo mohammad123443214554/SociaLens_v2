@@ -18,9 +18,10 @@ interface IncomingCallModalProps {
 
 
 function SwipeCallAction({
-  kind, onAction,
+  kind, type, onAction,
 }: {
   kind: 'accept' | 'decline'
+  type: CallType
   onAction: () => void
 }) {
   const startY = useRef(0)
@@ -82,7 +83,7 @@ function SwipeCallAction({
           }}
           className={`relative z-10 h-16 w-16 rounded-full flex items-center justify-center text-white shadow-xl active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40 ${isAccept ? 'bg-gradient-to-br from-emerald-400 to-green-600 shadow-green-500/30' : 'bg-gradient-to-br from-rose-400 to-red-600 shadow-red-500/30'}`}
         >
-          {isAccept ? <Phone className="h-7 w-7" /> : <PhoneOff className="h-7 w-7" />}
+          {isAccept ? (type === 'video' ? <Video className="h-7 w-7" /> : <Phone className="h-7 w-7" />) : <PhoneOff className="h-7 w-7" />}
         </button>
       </div>
       <span className="text-xs font-semibold text-white/80">{isAccept ? 'Accept' : 'Decline'}</span>
@@ -113,8 +114,8 @@ export function IncomingCallModal({ callerName, callerAvatar, type, ringtoneId, 
       </div>
 
       <div className="flex items-start gap-10 md:gap-16">
-        <SwipeCallAction kind="decline" onAction={onReject} />
-        <SwipeCallAction kind="accept" onAction={onAccept} />
+        <SwipeCallAction kind="decline" type={type} onAction={onReject} />
+        <SwipeCallAction kind="accept" type={type} onAction={onAccept} />
       </div>
       <p className="absolute bottom-7 left-0 right-0 text-center text-[11px] text-white/40 md:hidden">
         Swipe a button upward to answer or decline
