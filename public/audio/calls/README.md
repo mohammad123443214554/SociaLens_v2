@@ -8,6 +8,7 @@ Place the following MP3 files directly in this folder. Keep the filenames exactl
 - `call-rejected.mp3` — played when the callee explicitly declines.
 - `call-user-busy.mp3` — played when the callee is already in another SociaLens call and a second call is declined as busy.
 - `call-on-hold.mp3` — played to the caller when the other participant places the active call on hold.
+- `call-resumed.mp3` — played to the caller when the other participant resumes the call.
 
 ## Reserved for future presence / reachability detection
 
