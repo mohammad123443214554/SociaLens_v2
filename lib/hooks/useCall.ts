@@ -678,7 +678,7 @@ export function useCallEngine(currentUserId?: string) {
       await updateCallStatus(activeCall.id, { status: 'ended', ended_at: new Date().toISOString() })
       cleanup('ended')
     }
-  }, [cleanup, updateCallStatus, teardownTransportSilently, prepareConnection])
+  }, [cleanup, updateCallStatus, teardownTransportSilently, prepareConnection, noiseSuppressionLevel])
 
   // Checks the browser's current camera/mic permission state (where the
   // Permissions API is available - Safari doesn't support querying
