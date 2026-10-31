@@ -898,12 +898,12 @@ export function useCallEngine(currentUserId?: string) {
         setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
       } catch (cameraError) {
         console.error('[Agora] camera toggle failed', cameraError)
-        setIsCameraOff(!enabled)
+        setIsCameraOff(!next)
       }
     }
     if (dailyRef.current) {
       try { await dailyRef.current.setLocalVideo(enabled) }
-      catch (cameraError) { console.error('[Daily] camera toggle failed', cameraError); setIsCameraOff(!enabled) }
+      catch (cameraError) { console.error('[Daily] camera toggle failed', cameraError); setIsCameraOff(!next) }
     }
   }, [isCameraOff, isOnHold])
 
