@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight, PauseCircle, PlayCircle } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight, PauseCircle, PlayCircle, Volume1, Volume2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
@@ -42,6 +42,7 @@ export function CallScreen({
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
   const pipVideoRef = useRef<HTMLVideoElement>(null)
   const [localVideoIsMain, setLocalVideoIsMain] = useState(false)
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false)
 
   useEffect(() => {
     if (localVideoRef.current) localVideoRef.current.srcObject = localStream
@@ -51,6 +52,11 @@ export function CallScreen({
     if (type === 'video' && remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = remoteStream
   }, [remoteStream, type])
+
+  // Browser audio output level control: normal mode is 65%, speaker mode is maximum.
+  useEffect(() => {
+    if (remoteAudioRef.current) remoteAudioRef.current.volume = isSpeakerOn ? 1 : 0.65
+  }, [isSpeakerOn, remoteStream, type])
 
   useEffect(() => {
     if (type === 'video' && pipVideoRef.current) {
@@ -155,6 +161,17 @@ export function CallScreen({
       {/* Controls */}
       <div className="relative z-10 flex items-center justify-center gap-4 px-4 pb-12 pt-6 bg-gradient-to-t from-black/50 to-transparent">
         <button
+          type="button"
+          onClick={() => setIsSpeakerOn((current) => !current)}
+          aria-label={isSpeakerOn ? 'Speaker on' : 'Speaker off'}
+          aria-pressed={isSpeakerOn}
+          title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'}
+          className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-white text-black' : 'bg-white/15 hover:bg-white/25'}`}
+        >
+          {isSpeakerOn ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
+        </button>
+
+        <button
           onClick={onToggleMute}
           className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
             isMuted ? 'bg-white text-black' : 'bg-white/15 hover:bg-white/25'
@@ -179,7 +196,7 @@ export function CallScreen({
           disabled={phase !== "in-call"}
           aria-label={isOnHold ? 'Resume call' : 'Hold call'}
           title={isOnHold ? 'Resume call' : 'Hold call'}
-          className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${isOnHold ? 'bg-amber-400 text-black' : 'bg-white/15 hover:bg-white/25'}`}
+          className=`h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed`
         >
           {isOnHold ? <PlayCircle className="h-6 w-6" /> : <PauseCircle className="h-6 w-6" />}
         </button>
