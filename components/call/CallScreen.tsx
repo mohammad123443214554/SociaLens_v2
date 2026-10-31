@@ -72,7 +72,7 @@ export function CallScreen({
         context = new AudioContextClass()
         source = context.createMediaStreamSource(remoteStream)
         const gain = context.createGain()
-        gain.gain.value = isSpeakerOn ? 2.2 : 1
+        gain.gain.value = 1
         source.connect(gain)
         gain.connect(context.destination)
         audioContextRef.current = context
