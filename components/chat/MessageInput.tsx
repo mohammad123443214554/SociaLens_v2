@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Send, X, Smile, Mic, Square, Image as ImageIcon, Sticker as StickerIcon, Trash2, Loader2 } from 'lucide-react'
 import { Message } from '@/lib/types/database.types'
 import { createClient } from '@/lib/supabase/client'
@@ -107,7 +107,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
     el.style.height = `${nextHeight}px`
     setIsComposerExpanded(nextHeight > (window.innerWidth >= 640 ? 44 : 36) + 2)
   }
-  useEffect(() => { resizeTextarea() }, [message])
+  useLayoutEffect(() => { resizeTextarea() }, [message])
 
   const openEmoji = () => {
     const rect = emojiBtnRef.current?.getBoundingClientRect()
@@ -392,7 +392,16 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
           <textarea
             ref={textareaRef}
             value={message}
-            onChange={(e) => { setMessage(e.target.value); onTyping() }}
+            onChange={(e) => {
+              const nextValue = e.target.value
+              const el = e.currentTarget
+              el.style.height = 'auto'
+              const nextHeight = Math.min(el.scrollHeight, 144)
+              el.style.height = `${nextHeight}px`
+              setIsComposerExpanded(nextHeight > (window.innerWidth >= 640 ? 44 : 36) + 2)
+              setMessage(nextValue)
+              onTyping()
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e as unknown as React.FormEvent) }
             }}
