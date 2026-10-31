@@ -352,7 +352,7 @@ export function useCallEngine(currentUserId?: string) {
             const track = mediaType === 'audio' ? remoteUser.audioTrack : remoteUser.videoTrack
             if (track) {
               upsertTrack(remoteStreamObjRef.current, track.getMediaStreamTrack())
-              setRemoteStream(remoteStreamObjRef.current)
+              setRemoteStream(new MediaStream(remoteStreamObjRef.current.getTracks()))
               setPhase('in-call')
               if (!startedAtMsRef.current) startedAtMsRef.current = Date.now()
             }
@@ -453,6 +453,9 @@ export function useCallEngine(currentUserId?: string) {
           if (!ev?.track) return
           const targetStream = ev.participant?.local ? localStreamObjRef.current : remoteStreamObjRef.current
           targetStream.removeTrack(ev.track)
+          if (!ev.participant?.local) {
+            setRemoteStream(new MediaStream(remoteStreamObjRef.current.getTracks()))
+          }
         })
         call.on('left-meeting', async () => {
           if (transportCleanupRef.current || dailyRef.current !== call) return
