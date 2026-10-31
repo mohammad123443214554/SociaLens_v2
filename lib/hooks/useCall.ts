@@ -23,6 +23,7 @@ export interface CallRow {
   ended_at: string | null
   ended_by?: string | null
   is_on_hold?: boolean | null
+  hold_initiated_by?: string | null
 }
 
 interface PeerProfile {
@@ -314,7 +315,7 @@ export function useCallEngine(currentUserId?: string) {
     setCallDurationSec(0)
   }, [reportUsageAndCleanupTransport])
 
-  const updateCallStatus = useCallback(async (callId: string, patch: Partial<Pick<CallRow, 'status' | 'started_at' | 'ended_at' | 'ended_by' | 'is_on_hold'>>) => {
+  const updateCallStatus = useCallback(async (callId: string, patch: Partial<Pick<CallRow, 'status' | 'started_at' | 'ended_at' | 'ended_by' | 'is_on_hold' | 'hold_initiated_by'>>) => {
     await supabase.from('calls').update(patch).eq('id', callId)
   }, [])
 
@@ -919,7 +920,7 @@ export function useCallEngine(currentUserId?: string) {
     const next = !isOnHold
     setIsOnHold(next)
     const activeCall = callRef.current
-    if (activeCall) void updateCallStatus(activeCall.id, { is_on_hold: next })
+    if (activeCall) void updateCallStatus(activeCall.id, { is_on_hold: next, hold_initiated_by: next ? currentUserId : null })
     const audioEnabled = !next && !isMuted
     const videoEnabled = !next && !isCameraOff
     if (agoraRef.current?.audioTrack) void agoraRef.current.audioTrack.setEnabled(audioEnabled)
@@ -935,7 +936,7 @@ export function useCallEngine(currentUserId?: string) {
       void dailyRef.current.setLocalAudio(audioEnabled)
       void dailyRef.current.setLocalVideo(videoEnabled)
     }
-  }, [isOnHold, isMuted, isCameraOff, updateCallStatus])
+  }, [isOnHold, isMuted, isCameraOff, currentUserId, updateCallStatus])
 
   const switchCamera = useCallback(async () => {
     if (!canSwitchCamera || isCameraOff || isOnHold) return
@@ -1052,7 +1053,7 @@ export function useCallEngine(currentUserId?: string) {
     function handleStatusUpdate(row: CallRow) {
       if (!callRef.current || row.id !== callRef.current.id) return
       const previous = callRef.current
-      if (roleRef.current === 'caller' && row.is_on_hold !== previous.is_on_hold) {
+      if (row.is_on_hold !== previous.is_on_hold && row.hold_initiated_by !== currentUserId) {
         void announceCallEvent(row.id, row.is_on_hold ? 'on-hold' : 'resumed')
       }
       let terminalAnnouncement: CallAnnouncement | null = null
@@ -1135,9 +1136,9 @@ export function useCallEngine(currentUserId?: string) {
       // for it happens to get lost.
       const current = callRef.current
       if (current) {
-        const { data: fresh } = await supabase.from('calls').select('status, ended_by, ended_at, is_on_hold').eq('id', current.id).single()
+        const { data: fresh } = await supabase.from('calls').select('status, ended_by, ended_at, is_on_hold, hold_initiated_by').eq('id', current.id).single()
         if (fresh && (fresh.status !== current.status || fresh.is_on_hold !== current.is_on_hold)) {
-          if (roleRef.current === 'caller' && fresh.is_on_hold !== current.is_on_hold) {
+          if (fresh.is_on_hold !== current.is_on_hold && fresh.hold_initiated_by !== currentUserId) {
             void announceCallEvent(current.id, fresh.is_on_hold ? 'on-hold' : 'resumed')
           }
           let terminalAnnouncement: CallAnnouncement | null = null
