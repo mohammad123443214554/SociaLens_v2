@@ -235,6 +235,12 @@ export function useCallEngine(currentUserId?: string) {
       } catch { /* best-effort - never block hangup on this */ }
     }
 
+    if (virtualBackgroundRef.current) {
+      const { processor, track } = virtualBackgroundRef.current
+      try { track?.unpipe?.() } catch {}
+      try { await processor?.release?.() } catch {}
+      virtualBackgroundRef.current = null
+    }
     if (agoraRef.current) {
       const { client, audioTrack, videoTrack } = agoraRef.current
       try { audioTrack?.close() } catch {}
@@ -259,6 +265,12 @@ export function useCallEngine(currentUserId?: string) {
    * itself (AgoraRTCError UID_CONFLICT).
    */
   const teardownTransportSilently = useCallback(async () => {
+    if (virtualBackgroundRef.current) {
+      const { processor, track } = virtualBackgroundRef.current
+      try { track?.unpipe?.() } catch {}
+      try { await processor?.release?.() } catch {}
+      virtualBackgroundRef.current = null
+    }
     if (agoraRef.current) {
       const { client, audioTrack, videoTrack } = agoraRef.current
       try { audioTrack?.close() } catch {}
@@ -350,6 +362,8 @@ export function useCallEngine(currentUserId?: string) {
     setPeer(null)
     setPhase('idle')
     setNetworkQuality('unknown')
+    setBackgroundBlurEnabled(false)
+    setBackgroundBlurIntensity(50)
     if (typeof window !== 'undefined') {
       try { window.sessionStorage.removeItem('socialens-active-call') } catch {}
     }
@@ -1066,6 +1080,9 @@ export function useCallEngine(currentUserId?: string) {
   const toggleCamera = useCallback(async () => {
     const next = !isCameraOff
     setIsCameraOff(next)
+    if (next && backgroundBlurEnabled) {
+      try { await setBackgroundBlur(false, backgroundBlurIntensity) } catch (blurError) { console.warn('[Call] could not disable background blur', blurError) }
+    }
     const enabled = !next && !isOnHold
     const videoTrack = agoraRef.current?.videoTrack
     if (videoTrack) {
@@ -1083,11 +1100,14 @@ export function useCallEngine(currentUserId?: string) {
       try { await dailyRef.current.setLocalVideo(enabled) }
       catch (cameraError) { console.error('[Daily] camera toggle failed', cameraError); setIsCameraOff(!next) }
     }
-  }, [isCameraOff, isOnHold])
+  }, [isCameraOff, isOnHold, backgroundBlurEnabled, backgroundBlurIntensity, setBackgroundBlur])
 
   const switchToAudioOnly = useCallback(async () => {
     if (isCameraOff) return
     setIsCameraOff(true)
+    if (backgroundBlurEnabled) {
+      try { await setBackgroundBlur(false, backgroundBlurIntensity) } catch (blurError) { console.warn('[Call] could not disable background blur', blurError) }
+    }
     const videoTrack = agoraRef.current?.videoTrack
     if (videoTrack) {
       try { await videoTrack.setEnabled(false) } catch (cameraError) { console.warn('[Call] could not disable video track', cameraError) }
@@ -1097,7 +1117,7 @@ export function useCallEngine(currentUserId?: string) {
     if (dailyRef.current) {
       try { await dailyRef.current.setLocalVideo(false) } catch (cameraError) { console.warn('[Call] could not disable Daily video', cameraError) }
     }
-  }, [isCameraOff])
+  }, [isCameraOff, backgroundBlurEnabled, backgroundBlurIntensity, setBackgroundBlur])
 
   // Hold suspends this participant's outgoing media without leaving the
   // RTC room. The remote peer and call session stay connected; Resume
@@ -1105,6 +1125,9 @@ export function useCallEngine(currentUserId?: string) {
   const toggleHold = useCallback(() => {
     const next = !isOnHold
     setIsOnHold(next)
+    if (next && backgroundBlurEnabled) {
+      void setBackgroundBlur(false, backgroundBlurIntensity).catch((blurError) => console.warn('[Call] could not disable background blur on hold', blurError))
+    }
     const activeCall = callRef.current
     if (activeCall) void updateCallStatus(activeCall.id, { is_on_hold: next, hold_initiated_by: currentUserId })
     const audioEnabled = !next && !isMuted
