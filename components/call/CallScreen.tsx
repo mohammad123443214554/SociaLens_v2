@@ -356,7 +356,7 @@ export function CallScreen({
       {/* Video and PiP are rendered together inside the responsive portrait stage above. */}
 
       {/* Controls */}
-      <div className={`relative z-10 flex flex-wrap items-center justify-center ${isMini ? "gap-1 px-1 pb-2 pt-1" : "mt-auto gap-2 px-2 pb-12 pt-6 sm:gap-4 sm:px-4"} bg-gradient-to-t from-black/50 to-transparent`}>
+      <div className={`relative z-10 ${isMini ? "flex flex-wrap items-center justify-center gap-1 px-1 pb-2 pt-1" : "mx-auto mt-auto grid w-full max-w-[320px] grid-cols-5 justify-items-center gap-x-2 gap-y-3 px-2 pb-12 pt-6 sm:gap-x-3 md:mx-0 md:flex md:w-auto md:max-w-none md:flex-nowrap md:items-center md:justify-center md:gap-4 md:px-4"} bg-gradient-to-t from-black/50 to-transparent`}>
         <button
           type="button"
           onClick={() => setIsSpeakerOn((current) => !current)}
