@@ -351,7 +351,7 @@ export function CallScreen({
       )}
 
       {/* Controls */}
-      <div className={`relative z-10 flex items-center justify-center ${isMini ? "gap-1 px-1 pb-2 pt-1" : "gap-4 px-4 pb-12 pt-6"} bg-gradient-to-t from-black/50 to-transparent`}>
+      <div className={`relative z-10 flex flex-wrap items-center justify-center ${isMini ? "gap-1 px-1 pb-2 pt-1" : "gap-2 px-2 pb-12 pt-6 sm:gap-4 sm:px-4"} bg-gradient-to-t from-black/50 to-transparent`}>
         <button
           type="button"
           onClick={() => setIsSpeakerOn((current) => !current)}
