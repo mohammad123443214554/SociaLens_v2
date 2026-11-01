@@ -28,6 +28,9 @@ interface CallScreenProps {
   onSwitchToAudioOnly: () => void
   onSwitchCamera: () => void
   onToggleHold: () => void
+  backgroundBlurEnabled: boolean
+  backgroundBlurIntensity: number
+  onSetBackgroundBlur: (enabled: boolean, intensity: number) => Promise<void>
 }
 
 function formatDuration(sec: number) {
@@ -377,6 +380,22 @@ export function CallScreen({
           >
             {isCameraOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
           </button>
+        )}
+
+        {isVideoCall && (
+          <div className="relative">
+            <button type="button" onClick={() => setEffectsOpen((open) => !open)} disabled={isCameraOff || isOnHold || phase !== 'in-call'} aria-label="Call effects" title="Call effects" className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 ${backgroundBlurEnabled ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white' : 'bg-white/15 hover:bg-white/25'}`}>
+              <Sparkles className="h-6 w-6" />
+            </button>
+            {effectsOpen && (
+              <div className="absolute bottom-16 left-1/2 z-[90] w-56 -translate-x-1/2 rounded-2xl border border-white/15 bg-neutral-900/95 p-2 text-white shadow-2xl backdrop-blur-xl">
+                <button type="button" onClick={() => { setBlurDraft(backgroundBlurIntensity); setBlurError(null); setBlurPopupOpen(true); setEffectsOpen(false) }} className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm hover:bg-white/10">
+                  <span className="flex items-center gap-2"><Sparkles className="h-4 w-4" />Background Blur</span>
+                  <span className={`h-2.5 w-2.5 rounded-full ${backgroundBlurEnabled ? 'bg-emerald-400' : 'bg-white/25'}`} />
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         <button
