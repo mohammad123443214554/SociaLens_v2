@@ -435,23 +435,31 @@ export function CallScreen({
       </div>
 
       {blurPopupOpen && isVideoCall && (
-        <div className="absolute inset-0 z-[120] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-label="Background Blur settings">
-          <div className="w-full max-w-sm rounded-3xl border border-white/15 bg-neutral-900/85 p-5 text-white shadow-2xl backdrop-blur-2xl">
+        <div className="absolute inset-0 z-[120] flex items-center justify-center bg-black/[0.16] p-4 backdrop-blur-[3px]" role="dialog" aria-modal="true" aria-label="Background Blur settings">
+          <div className="w-full max-w-sm rounded-3xl border border-pink-100/[0.18] bg-white/[0.035] p-5 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035]">
             <div className="mb-5 flex items-center justify-between">
-              <div><h3 className="text-base font-semibold">Background Blur</h3><p className="mt-1 text-xs text-white/55">Adjust how strongly your background is blurred</p></div>
-              <button type="button" onClick={() => setBlurPopupOpen(false)} className="rounded-full p-2 text-white/65 hover:bg-white/10" aria-label="Close settings">✕</button>
+              <div>
+                <h3 className="text-base font-semibold tracking-wide text-pink-50/95">Background Blur</h3>
+                <p className="mt-1 text-xs text-pink-100/70">Adjust how strongly your background is blurred</p>
+              </div>
+              <button type="button" onClick={() => setBlurPopupOpen(false)} className="rounded-full border border-pink-100/[0.12] bg-pink-300/[0.05] p-2 text-pink-50/80 transition-colors hover:bg-pink-300/[0.09]" aria-label="Close settings">✕</button>
             </div>
             <div className="mb-4 grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setBlurDraft(32)} aria-pressed={blurDraft <= 50} className={`rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${blurDraft <= 50 ? 'border-pink-400/60 bg-pink-500/15 text-white' : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10'}`}>Natural Portrait</button>
-              <button type="button" onClick={() => setBlurDraft(85)} aria-pressed={blurDraft > 50} className={`rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${blurDraft > 50 ? 'border-pink-400/60 bg-pink-500/15 text-white' : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10'}`}>Strong Blur</button>
+              <button type="button" onClick={() => setBlurDraft(32)} aria-pressed={blurDraft <= 50} className={`rounded-xl border px-3 py-2.5 text-xs font-semibold text-pink-50/90 backdrop-blur-xl transition-all ${blurDraft <= 50 ? 'border-pink-200/35 bg-pink-300/[0.10] shadow-[0_0_18px_rgba(255,105,180,0.07)]' : 'border-pink-100/[0.13] bg-white/[0.025] hover:bg-pink-200/[0.07]'}`}>Natural Portrait</button>
+              <button type="button" onClick={() => setBlurDraft(85)} aria-pressed={blurDraft > 50} className={`rounded-xl border px-3 py-2.5 text-xs font-semibold text-pink-50/90 backdrop-blur-xl transition-all ${blurDraft > 50 ? 'border-pink-200/35 bg-pink-300/[0.10] shadow-[0_0_18px_rgba(255,105,180,0.07)]' : 'border-pink-100/[0.13] bg-white/[0.025] hover:bg-pink-200/[0.07]'}`}>Strong Blur</button>
             </div>
-            <div className="mb-3 flex items-center justify-between text-sm"><span className="text-white/75">Blur intensity</span><span className="font-semibold tabular-nums">{blurDraft}%</span></div>
-            <input type="range" min="0" max="100" step="1" value={blurDraft} onChange={(event) => setBlurDraft(Number(event.target.value))} className="w-full accent-pink-500" aria-label="Blur intensity" />
-            <div className="mt-1 flex justify-between text-[11px] text-white/45"><span>Natural</span><span>Maximum</span></div>
-            {blurError && <p className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-xs text-red-300">{blurError}</p>}
+            <div className="rounded-2xl border border-pink-300/[0.18] bg-pink-400/[0.10] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl">
+              <div className="mb-3 flex items-center justify-between text-sm">
+                <span className="font-medium text-pink-50/95">Blur intensity</span>
+                <span className="rounded-lg border border-pink-100/[0.18] bg-pink-200/[0.08] px-2 py-1 font-semibold tabular-nums text-pink-50">{blurDraft}%</span>
+              </div>
+              <input type="range" min="0" max="100" step="1" value={blurDraft} onChange={(event) => setBlurDraft(Number(event.target.value))} className="w-full cursor-pointer accent-pink-300/70" aria-label="Blur intensity" />
+              <div className="mt-1 flex justify-between text-[11px] text-pink-100/65"><span>Natural</span><span>Maximum</span></div>
+            </div>
+            {blurError && <p className="mt-3 rounded-xl border border-red-300/20 bg-red-400/[0.08] px-3 py-2 text-xs text-red-200">{blurError}</p>}
             <div className="mt-6 flex gap-2">
-              {backgroundBlurEnabled && <button type="button" disabled={blurSaving} onClick={async () => { setBlurSaving(true); setBlurError(null); try { await onSetBackgroundBlur(false, blurDraft); setBlurPopupOpen(false) } catch (error) { setBlurError(error instanceof Error ? error.message : 'Could not turn off Background Blur.') } finally { setBlurSaving(false) } }} className="rounded-xl border border-white/15 px-4 py-3 text-sm font-medium text-white/80 disabled:opacity-50">Turn off</button>}
-              <button type="button" disabled={blurSaving} onClick={async () => { setBlurSaving(true); setBlurError(null); try { await onSetBackgroundBlur(true, blurDraft); setBlurPopupOpen(false) } catch (error) { setBlurError(error instanceof Error ? error.message : 'Could not apply Background Blur.') } finally { setBlurSaving(false) } }} className="flex-1 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-neutral-900 disabled:opacity-50">{blurSaving ? 'Applying…' : 'Done'}</button>
+              {backgroundBlurEnabled && <button type="button" disabled={blurSaving} onClick={async () => { setBlurSaving(true); setBlurError(null); try { await onSetBackgroundBlur(false, blurDraft); setBlurPopupOpen(false) } catch (error) { setBlurError(error instanceof Error ? error.message : 'Could not turn off Background Blur.') } finally { setBlurSaving(false) } }} className="rounded-xl border border-pink-100/[0.18] bg-white/[0.025] px-4 py-3 text-sm font-medium text-pink-50/90 backdrop-blur-xl transition-colors hover:bg-pink-200/[0.07] disabled:opacity-50">Turn off</button>}
+              <button type="button" disabled={blurSaving} onClick={async () => { setBlurSaving(true); setBlurError(null); try { await onSetBackgroundBlur(true, blurDraft); setBlurPopupOpen(false) } catch (error) { setBlurError(error instanceof Error ? error.message : 'Could not apply Background Blur.') } finally { setBlurSaving(false) } }} className="flex-1 rounded-xl border border-pink-200/[0.22] bg-pink-300/[0.10] px-4 py-3 text-sm font-semibold text-pink-50 shadow-[0_4px_18px_rgba(255,105,180,0.08)] backdrop-blur-xl transition-colors hover:bg-pink-300/[0.14] disabled:opacity-50">{blurSaving ? 'Applying…' : 'Done'}</button>
             </div>
           </div>
         </div>
