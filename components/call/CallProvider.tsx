@@ -187,7 +187,6 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           onEnd={engine.phase === 'outgoing-ringing' ? engine.cancelOutgoing : engine.hangup}
           onToggleMute={engine.toggleMute}
           onToggleCamera={engine.toggleCamera}
-          onSwitchToAudioOnly={engine.switchToAudioOnly}
           onSwitchCamera={engine.switchCamera}
           onToggleHold={engine.toggleHold}
         />
