@@ -52,7 +52,7 @@
     "firebase-admin": "^13.0.0",
     "@capacitor/browser": "^7.0.0",
     "@google/genai": "^1.30.0",
-    "@mediapipe/tasks-vision": "^0.10.22"
+    "@mediapipe/tasks-vision": "0.10.22"
   },
   "devDependencies": {
     "@types/node": "^22",
