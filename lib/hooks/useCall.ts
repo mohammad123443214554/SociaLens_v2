@@ -6,6 +6,7 @@ import { RING_TIMEOUT_MS } from '@/lib/utils/webrtc'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { canAccessByPrivacy } from '@/lib/utils/privacyAccess'
 import { pauseRingtone, resumeRingtone } from '@/lib/utils/ringtone'
+import { CallBackgroundBlurProcessor } from '@/lib/utils/call-background-blur'
 
 export type CallType = 'audio' | 'video'
 export type CallStatus = 'ringing' | 'accepted' | 'rejected' | 'missed' | 'ended' | 'cancelled' | 'busy'
@@ -186,7 +187,7 @@ export function useCallEngine(currentUserId?: string) {
   const remoteStreamObjRef = useRef<MediaStream>(new MediaStream())
   const agoraRef = useRef<{ client: any; audioTrack: any; videoTrack: any } | null>(null)
   const dailyRef = useRef<any>(null)
-  const virtualBackgroundRef = useRef<{ extension: any; processor: any; track: any; rawTrack: MediaStreamTrack } | null>(null)
+  const backgroundBlurProcessorRef = useRef<{ processor: CallBackgroundBlurProcessor; rawTrack: MediaStreamTrack; processedTrack: MediaStreamTrack } | null>(null)
   const providerRef = useRef<CallProviderName | null>(null)
   const startedAtMsRef = useRef<number | null>(null)
 
@@ -235,11 +236,9 @@ export function useCallEngine(currentUserId?: string) {
       } catch { /* best-effort - never block hangup on this */ }
     }
 
-    if (virtualBackgroundRef.current) {
-      const { processor, track } = virtualBackgroundRef.current
-      try { track?.unpipe?.() } catch {}
-      try { await processor?.release?.() } catch {}
-      virtualBackgroundRef.current = null
+    if (backgroundBlurProcessorRef.current) {
+      try { backgroundBlurProcessorRef.current.processor.stop() } catch {}
+      backgroundBlurProcessorRef.current = null
     }
     if (agoraRef.current) {
       const { client, audioTrack, videoTrack } = agoraRef.current
@@ -265,11 +264,9 @@ export function useCallEngine(currentUserId?: string) {
    * itself (AgoraRTCError UID_CONFLICT).
    */
   const teardownTransportSilently = useCallback(async () => {
-    if (virtualBackgroundRef.current) {
-      const { processor, track } = virtualBackgroundRef.current
-      try { track?.unpipe?.() } catch {}
-      try { await processor?.release?.() } catch {}
-      virtualBackgroundRef.current = null
+    if (backgroundBlurProcessorRef.current) {
+      try { backgroundBlurProcessorRef.current.processor.stop() } catch {}
+      backgroundBlurProcessorRef.current = null
     }
     if (agoraRef.current) {
       const { client, audioTrack, videoTrack } = agoraRef.current
@@ -1038,55 +1035,68 @@ export function useCallEngine(currentUserId?: string) {
       if (enabled) throw new Error('Turn on your camera and resume the call before enabling Background Blur.')
       return
     }
+
     const safeIntensity = Math.max(0, Math.min(100, Math.round(intensity)))
-    if (agoraRef.current?.videoTrack) {
-      const videoTrack = agoraRef.current.videoTrack
+    const activeAgoraVideoTrack = agoraRef.current?.videoTrack
+
+    if (activeAgoraVideoTrack) {
+      let state = backgroundBlurProcessorRef.current
       if (enabled) {
-        let state = virtualBackgroundRef.current
         if (!state) {
-          const module = await import('agora-extension-virtual-background')
-          const Extension = module.default
-          const extension = new Extension()
-          if (!extension.checkCompatibility()) throw new Error('Background Blur is not supported by this browser or device.')
-          const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
-          if (!(globalThis as any).__socialensAgoraVirtualBackgroundRegistered) {
-            AgoraRTC.registerExtensions([extension])
-            ;(globalThis as any).__socialensAgoraVirtualBackgroundRegistered = true
+          const rawTrack = activeAgoraVideoTrack.getMediaStreamTrack()
+          const processor = await CallBackgroundBlurProcessor.create(rawTrack, safeIntensity)
+          try {
+            await activeAgoraVideoTrack.replaceTrack(processor.processedTrack, false)
+          } catch (error) {
+            processor.stop()
+            throw error
           }
-          const processor = extension.createProcessor()
-          await processor.init()
-          videoTrack.pipe(processor).pipe(videoTrack.processorDestination)
-          state = { extension, processor, track: videoTrack, rawTrack: videoTrack.getMediaStreamTrack() }
-          virtualBackgroundRef.current = state
+          state = { processor, rawTrack, processedTrack: processor.processedTrack }
+          backgroundBlurProcessorRef.current = state
+        } else {
+          state.processor.setIntensity(safeIntensity)
         }
-        state.processor.setOptions({ type: 'blur', blurDegree: safeIntensity < 34 ? 1 : safeIntensity < 68 ? 2 : 3 })
-        await state.processor.enable()
-        const processedTrack = await state.processor.getProcessedTrack?.()
-        if (processedTrack) {
-          upsertTrack(localStreamObjRef.current, processedTrack)
-          setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
-        }
-      } else if (virtualBackgroundRef.current) {
-        await virtualBackgroundRef.current.processor.disable()
-        try { videoTrack.unpipe() } catch {}
-        await virtualBackgroundRef.current.processor.release?.()
-        upsertTrack(localStreamObjRef.current, virtualBackgroundRef.current.rawTrack)
-        setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
-        virtualBackgroundRef.current = null
+        upsertTrack(localStreamObjRef.current, state.processedTrack)
+      } else if (state) {
+        await activeAgoraVideoTrack.replaceTrack(state.rawTrack, false)
+        state.processor.stop()
+        upsertTrack(localStreamObjRef.current, state.rawTrack)
+        backgroundBlurProcessorRef.current = null
       }
+      setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
     } else if (dailyRef.current) {
-      await dailyRef.current.updateInputSettings({
-        video: { processor: enabled
-          ? { type: 'background-blur', config: { strength: safeIntensity / 100 } }
-          : { type: 'none' } },
-      })
+      let state = backgroundBlurProcessorRef.current
+      if (enabled) {
+        if (!state) {
+          const rawTrack = localStreamObjRef.current.getVideoTracks().find((track) => track.readyState === 'live')
+          if (!rawTrack) throw new Error('Your camera is not ready yet. Please try again in a moment.')
+          const processor = await CallBackgroundBlurProcessor.create(rawTrack, safeIntensity)
+          try {
+            await dailyRef.current.setInputDevicesAsync({ videoSource: processor.processedTrack })
+          } catch (error) {
+            processor.stop()
+            throw error
+          }
+          state = { processor, rawTrack, processedTrack: processor.processedTrack }
+          backgroundBlurProcessorRef.current = state
+        } else {
+          state.processor.setIntensity(safeIntensity)
+        }
+        upsertTrack(localStreamObjRef.current, state.processedTrack)
+      } else if (state) {
+        await dailyRef.current.setInputDevicesAsync({ videoSource: state.rawTrack })
+        state.processor.stop()
+        upsertTrack(localStreamObjRef.current, state.rawTrack)
+        backgroundBlurProcessorRef.current = null
+      }
+      setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
     } else {
       throw new Error('The camera is not ready yet. Please try again in a moment.')
     }
+
     setBackgroundBlurEnabled(enabled)
     setBackgroundBlurIntensity(safeIntensity)
   }, [isCameraOff, isOnHold])
-
   const toggleCamera = useCallback(async () => {
     const next = !isCameraOff
     setIsCameraOff(next)
@@ -1159,7 +1169,13 @@ export function useCallEngine(currentUserId?: string) {
 
   const switchCamera = useCallback(async () => {
     if (!canSwitchCamera || isCameraOff || isOnHold) return
+    const restoreBlur = backgroundBlurEnabled
+    let blurTemporarilyDisabled = false
     try {
+      if (restoreBlur) {
+        await setBackgroundBlur(false, backgroundBlurIntensity)
+        blurTemporarilyDisabled = true
+      }
       const cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput')
       if (cameras.length < 2) { setCanSwitchCamera(false); return }
       const videoTrack = agoraRef.current?.videoTrack
@@ -1177,9 +1193,7 @@ export function useCallEngine(currentUserId?: string) {
         upsertTrack(localStreamObjRef.current, videoTrack.getMediaStreamTrack())
         setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
         setCameraFacing(/back|rear|environment/i.test(nextCamera.label || '') ? 'environment' : 'user')
-        return
-      }
-      if (dailyRef.current) {
+      } else if (dailyRef.current) {
         const activeTrack = localStreamObjRef.current.getVideoTracks()[0]
         const activeId = activeTrack?.getSettings?.().deviceId
         const currentIndex = cameras.findIndex((camera) => camera.deviceId === activeId)
@@ -1193,11 +1207,17 @@ export function useCallEngine(currentUserId?: string) {
         await dailyRef.current.setInputDevicesAsync({ videoDeviceId: nextCamera.deviceId })
         setCameraFacing(/back|rear|environment/i.test(nextCamera.label || '') ? 'environment' : 'user')
       }
+      if (blurTemporarilyDisabled) await setBackgroundBlur(true, backgroundBlurIntensity)
     } catch (cameraError) {
+      if (blurTemporarilyDisabled) {
+        try { await setBackgroundBlur(true, backgroundBlurIntensity) } catch (restoreError) {
+          console.warn('[Call] could not restore Background Blur after camera switch', restoreError)
+        }
+      }
       console.error('[Call] camera switch failed', cameraError)
       setError('Could not switch camera. Please try again.')
     }
-  }, [canSwitchCamera, isCameraOff, isOnHold, cameraFacing])
+  }, [canSwitchCamera, isCameraOff, isOnHold, cameraFacing, backgroundBlurEnabled, backgroundBlurIntensity, setBackgroundBlur])
 
   // Persist only the call id while an accepted call is active. The database remains
   // the source of truth; this marker merely lets a refreshed tab find the same session.

@@ -430,9 +430,13 @@ export function CallScreen({
               <div><h3 className="text-base font-semibold">Background Blur</h3><p className="mt-1 text-xs text-white/55">Adjust how strongly your background is blurred</p></div>
               <button type="button" onClick={() => setBlurPopupOpen(false)} className="rounded-full p-2 text-white/65 hover:bg-white/10" aria-label="Close settings">✕</button>
             </div>
+            <div className="mb-4 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setBlurDraft(32)} aria-pressed={blurDraft <= 50} className={`rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${blurDraft <= 50 ? 'border-pink-400/60 bg-pink-500/15 text-white' : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10'}`}>Natural Portrait</button>
+              <button type="button" onClick={() => setBlurDraft(85)} aria-pressed={blurDraft > 50} className={`rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${blurDraft > 50 ? 'border-pink-400/60 bg-pink-500/15 text-white' : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10'}`}>Strong Blur</button>
+            </div>
             <div className="mb-3 flex items-center justify-between text-sm"><span className="text-white/75">Blur intensity</span><span className="font-semibold tabular-nums">{blurDraft}%</span></div>
             <input type="range" min="0" max="100" step="1" value={blurDraft} onChange={(event) => setBlurDraft(Number(event.target.value))} className="w-full accent-pink-500" aria-label="Blur intensity" />
-            <div className="mt-1 flex justify-between text-[11px] text-white/45"><span>Subtle</span><span>Strong</span></div>
+            <div className="mt-1 flex justify-between text-[11px] text-white/45"><span>Natural</span><span>Maximum</span></div>
             {blurError && <p className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-xs text-red-300">{blurError}</p>}
             <div className="mt-6 flex gap-2">
               {backgroundBlurEnabled && <button type="button" disabled={blurSaving} onClick={async () => { setBlurSaving(true); setBlurError(null); try { await onSetBackgroundBlur(false, blurDraft); setBlurPopupOpen(false) } catch (error) { setBlurError(error instanceof Error ? error.message : 'Could not turn off Background Blur.') } finally { setBlurSaving(false) } }} className="rounded-xl border border-white/15 px-4 py-3 text-sm font-medium text-white/80 disabled:opacity-50">Turn off</button>}
