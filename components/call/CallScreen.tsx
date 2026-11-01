@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, Sparkles, ChevronDown, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
@@ -50,6 +50,11 @@ export function CallScreen({
   const [localVideoIsMain, setLocalVideoIsMain] = useState(false)
   const [isSpeakerOn, setIsSpeakerOn] = useState(false)
   const [isScreenLocked, setIsScreenLocked] = useState(false)
+  const [effectsOpen, setEffectsOpen] = useState(false)
+  const [blurPopupOpen, setBlurPopupOpen] = useState(false)
+  const [blurDraft, setBlurDraft] = useState(backgroundBlurIntensity)
+  const [blurSaving, setBlurSaving] = useState(false)
+  const [blurError, setBlurError] = useState<string | null>(null)
 
   const [isMini, setIsMini] = useState(false)
   const [miniSize, setMiniSize] = useState(300)
@@ -403,6 +408,25 @@ export function CallScreen({
           <PhoneOff className="h-7 w-7" />
         </button>
       </div>
+
+      {blurPopupOpen && isVideoCall && (
+        <div className="absolute inset-0 z-[120] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-label="Background Blur settings">
+          <div className="w-full max-w-sm rounded-3xl border border-white/15 bg-neutral-900/85 p-5 text-white shadow-2xl backdrop-blur-2xl">
+            <div className="mb-5 flex items-center justify-between">
+              <div><h3 className="text-base font-semibold">Background Blur</h3><p className="mt-1 text-xs text-white/55">Adjust how strongly your background is blurred</p></div>
+              <button type="button" onClick={() => setBlurPopupOpen(false)} className="rounded-full p-2 text-white/65 hover:bg-white/10" aria-label="Close settings">✕</button>
+            </div>
+            <div className="mb-3 flex items-center justify-between text-sm"><span className="text-white/75">Blur intensity</span><span className="font-semibold tabular-nums">{blurDraft}%</span></div>
+            <input type="range" min="0" max="100" step="1" value={blurDraft} onChange={(event) => setBlurDraft(Number(event.target.value))} className="w-full accent-pink-500" aria-label="Blur intensity" />
+            <div className="mt-1 flex justify-between text-[11px] text-white/45"><span>Subtle</span><span>Strong</span></div>
+            {blurError && <p className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-xs text-red-300">{blurError}</p>}
+            <div className="mt-6 flex gap-2">
+              {backgroundBlurEnabled && <button type="button" disabled={blurSaving} onClick={async () => { setBlurSaving(true); setBlurError(null); try { await onSetBackgroundBlur(false, blurDraft); setBlurPopupOpen(false) } catch (error) { setBlurError(error instanceof Error ? error.message : 'Could not turn off Background Blur.') } finally { setBlurSaving(false) } }} className="rounded-xl border border-white/15 px-4 py-3 text-sm font-medium text-white/80 disabled:opacity-50">Turn off</button>}
+              <button type="button" disabled={blurSaving} onClick={async () => { setBlurSaving(true); setBlurError(null); try { await onSetBackgroundBlur(true, blurDraft); setBlurPopupOpen(false) } catch (error) { setBlurError(error instanceof Error ? error.message : 'Could not apply Background Blur.') } finally { setBlurSaving(false) } }} className="flex-1 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-neutral-900 disabled:opacity-50">{blurSaving ? 'Applying…' : 'Done'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isScreenLocked && (
         <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-black/75 backdrop-blur-sm text-white" role="dialog" aria-modal="true" aria-label="Call screen locked">
