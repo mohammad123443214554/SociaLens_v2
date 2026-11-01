@@ -76,6 +76,39 @@ function upsertTrack(stream: MediaStream, track: MediaStreamTrack) {
   stream.getTracks().filter((t) => t.kind === track.kind).forEach((t) => stream.removeTrack(t))
   stream.addTrack(track)
 }
+/** Apply a conservative camera profile based on the measured call network. */
+async function applyAdaptiveVideoQuality(stream: MediaStream, quality: 'excellent' | 'good' | 'weak' | 'unknown') {
+  if (quality === 'unknown') return
+  const track = stream.getVideoTracks().find((item) => item.readyState === 'live')
+  if (!track || typeof track.applyConstraints !== 'function') return
+
+  const profile = quality === 'weak'
+    ? { width: 640, height: 360, frameRate: 15 }
+    : quality === 'good'
+      ? { width: 960, height: 540, frameRate: 24 }
+      : { width: 1280, height: 720, frameRate: 30 }
+
+  const current = track.getSettings()
+  if (
+    current.width === profile.width &&
+    current.height === profile.height &&
+    current.frameRate === profile.frameRate
+  ) return
+
+  try {
+    await track.applyConstraints({
+      width: { ideal: profile.width },
+      height: { ideal: profile.height },
+      frameRate: { ideal: profile.frameRate },
+    })
+    console.info('[SociaLens Call] adaptive video profile applied', quality, profile)
+  } catch (error) {
+    // Some cameras/browser implementations do not support live constraint changes.
+    // Keep the call alive; the provider can continue with its negotiated quality.
+    console.warn('[SociaLens Call] adaptive video profile change unavailable', error)
+  }
+}
+
 function removeTracksOfKind(stream: MediaStream, kind: string) {
   stream.getTracks().filter((t) => t.kind === kind).forEach((t) => stream.removeTrack(t))
 }
@@ -475,7 +508,11 @@ export function useCallEngine(currentUserId?: string) {
           const values = [stats?.uplinkNetworkQuality, stats?.downlinkNetworkQuality].filter((value): value is number => typeof value === 'number' && value > 0)
           if (!values.length) { setNetworkQuality('unknown'); return }
           const worst = Math.max(...values)
-          setNetworkQuality(worst <= 1 ? 'excellent' : worst <= 2 ? 'good' : 'weak')
+          const quality = worst <= 1 ? 'excellent' : worst <= 2 ? 'good' : 'weak'
+          setNetworkQuality(quality)
+          if (activeCall.type === 'video') {
+            void applyAdaptiveVideoQuality(localStreamObjRef.current, quality)
+          }
         })
         client.on('connection-state-change', (curState: string, _prevState: string, reason: string) => {
           console.log('[Agora] connection state ->', curState, reason)
@@ -603,7 +640,11 @@ export function useCallEngine(currentUserId?: string) {
           if (!candidates.length) { setNetworkQuality('unknown'); return }
           const rtt = Math.max(Number(stats?.inbound?.rtt ?? 0), Number(stats?.outbound?.rtt ?? 0))
           const loss = Math.max(Number(stats?.inbound?.packetLoss ?? 0), Number(stats?.outbound?.packetLoss ?? 0))
-          setNetworkQuality(rtt <= 150 && loss <= 2 ? 'excellent' : rtt <= 300 && loss <= 5 ? 'good' : 'weak')
+          const quality = rtt <= 150 && loss <= 2 ? 'excellent' : rtt <= 300 && loss <= 5 ? 'good' : 'weak'
+          setNetworkQuality(quality)
+          if (activeCall.type === 'video') {
+            void applyAdaptiveVideoQuality(localStreamObjRef.current, quality)
+          }
         })
         call.on('error', (ev: any) => { console.error('[Daily] error', ev); setError(describeCallError(ev, 'connect')) })
 
