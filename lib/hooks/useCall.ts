@@ -179,11 +179,14 @@ export function useCallEngine(currentUserId?: string) {
   const [callDurationSec, setCallDurationSec] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [networkQuality, setNetworkQuality] = useState<'excellent' | 'good' | 'weak' | 'unknown'>('unknown')
+  const [backgroundBlurEnabled, setBackgroundBlurEnabled] = useState(false)
+  const [backgroundBlurIntensity, setBackgroundBlurIntensity] = useState(50)
 
   const localStreamObjRef = useRef<MediaStream>(new MediaStream())
   const remoteStreamObjRef = useRef<MediaStream>(new MediaStream())
   const agoraRef = useRef<{ client: any; audioTrack: any; videoTrack: any } | null>(null)
   const dailyRef = useRef<any>(null)
+  const virtualBackgroundRef = useRef<{ extension: any; processor: any; track: any } | null>(null)
   const providerRef = useRef<CallProviderName | null>(null)
   const startedAtMsRef = useRef<number | null>(null)
 
@@ -1015,6 +1018,51 @@ export function useCallEngine(currentUserId?: string) {
     if (dailyRef.current) void dailyRef.current.setLocalAudio(enabled)
   }, [isMuted, isOnHold])
 
+  const setBackgroundBlur = useCallback(async (enabled: boolean, intensity: number) => {
+    const activeCall = callRef.current
+    if (!activeCall || activeCall.type !== 'video' || isCameraOff || isOnHold) {
+      if (enabled) throw new Error('Turn on your camera and resume the call before enabling Background Blur.')
+      return
+    }
+    const safeIntensity = Math.max(0, Math.min(100, Math.round(intensity)))
+    if (agoraRef.current?.videoTrack) {
+      const videoTrack = agoraRef.current.videoTrack
+      if (enabled) {
+        let state = virtualBackgroundRef.current
+        if (!state) {
+          const module = await import('agora-extension-virtual-background')
+          const Extension = module.default
+          const extension = new Extension()
+          if (!extension.checkCompatibility()) throw new Error('Background Blur is not supported by this browser or device.')
+          const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
+          AgoraRTC.registerExtensions([extension])
+          const processor = extension.createProcessor()
+          await processor.init()
+          videoTrack.pipe(processor).pipe(videoTrack.processorDestination)
+          state = { extension, processor, track: videoTrack }
+          virtualBackgroundRef.current = state
+        }
+        state.processor.setOptions({ type: 'blur', blurDegree: safeIntensity < 34 ? 1 : safeIntensity < 68 ? 2 : 3 })
+        await state.processor.enable()
+      } else if (virtualBackgroundRef.current) {
+        await virtualBackgroundRef.current.processor.disable()
+        try { videoTrack.unpipe() } catch {}
+        await virtualBackgroundRef.current.processor.release?.()
+        virtualBackgroundRef.current = null
+      }
+    } else if (dailyRef.current) {
+      await dailyRef.current.updateInputSettings({
+        video: { processor: enabled
+          ? { type: 'background-blur', config: { strength: safeIntensity / 100 } }
+          : { type: 'none' } },
+      })
+    } else {
+      throw new Error('The camera is not ready yet. Please try again in a moment.')
+    }
+    setBackgroundBlurEnabled(enabled)
+    setBackgroundBlurIntensity(safeIntensity)
+  }, [isCameraOff, isOnHold])
+
   const toggleCamera = useCallback(async () => {
     const next = !isCameraOff
     setIsCameraOff(next)
@@ -1074,7 +1122,7 @@ export function useCallEngine(currentUserId?: string) {
       void dailyRef.current.setLocalAudio(audioEnabled)
       void dailyRef.current.setLocalVideo(videoEnabled)
     }
-  }, [isOnHold, isMuted, isCameraOff, currentUserId, updateCallStatus])
+  }, [isOnHold, isMuted, isCameraOff, currentUserId, updateCallStatus, backgroundBlurEnabled, backgroundBlurIntensity, setBackgroundBlur])
 
   const switchCamera = useCallback(async () => {
     if (!canSwitchCamera || isCameraOff || isOnHold) return
