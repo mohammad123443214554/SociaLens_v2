@@ -23,6 +23,8 @@ export class CallBackgroundBlurProcessor {
   private stopped = false
   private inferencePending = false
   private lastInferenceAt = 0
+  private lastRenderAt = 0
+  private inferenceIntervalMs = 85
   private lastVideoTime = -1
   private maskValues: Float32Array | null = null
 
@@ -85,7 +87,11 @@ export class CallBackgroundBlurProcessor {
 
     const sourceWidth = this.video.videoWidth || 640
     const sourceHeight = this.video.videoHeight || 360
-    const scale = Math.min(1, 1280 / sourceWidth)
+    const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory
+    const lowPowerDevice = (navigator.hardwareConcurrency || 4) <= 4 || (typeof deviceMemory === 'number' && deviceMemory <= 4)
+    const maxWidth = lowPowerDevice ? 720 : 1280
+    this.inferenceIntervalMs = lowPowerDevice ? 130 : 85
+    const scale = Math.min(1, maxWidth / sourceWidth)
     const width = Math.max(320, Math.round(sourceWidth * scale))
     const height = Math.max(240, Math.round(sourceHeight * scale))
     this.canvas.width = width
@@ -152,8 +158,13 @@ export class CallBackgroundBlurProcessor {
 
   private renderFrame = (now = performance.now()) => {
     if (this.stopped) return
-    if (this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && this.video.videoWidth > 0) {
-      if (!this.inferencePending && now - this.lastInferenceAt >= 85 && this.video.currentTime !== this.lastVideoTime) {
+    if (
+      this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+      this.video.videoWidth > 0 &&
+      now - this.lastRenderAt >= 1000 / 30
+    ) {
+      this.lastRenderAt = now
+      if (!this.inferencePending && now - this.lastInferenceAt >= this.inferenceIntervalMs && this.video.currentTime !== this.lastVideoTime) {
         this.inferencePending = true
         this.lastInferenceAt = now
         this.lastVideoTime = this.video.currentTime
