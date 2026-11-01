@@ -234,16 +234,59 @@ export function CallScreen({
       onPointerUp={endMiniGesture}
       onPointerCancel={endMiniGesture}
     >
-      {/* Remote video fills the background for video calls */}
+      {/* Portrait video stage: full-screen on phones, phone-shaped and centered on laptops. */}
       {isVideoCall && (
-        <video
-          ref={remoteVideoRef}
-          autoPlay
-          playsInline
-          muted
-          style={{ objectFit: "cover", objectPosition: "center center", backgroundColor: "#000" }}
-          className={`absolute inset-0 block w-full h-full object-cover object-center bg-black ${showRemoteVideo && !localVideoIsMain ? 'opacity-100' : 'opacity-0'}`}
-        />
+        <div className={`absolute overflow-hidden bg-black ${isMini
+          ? 'inset-0'
+          : 'inset-0 md:inset-auto md:top-1/2 md:left-1/2 md:right-auto md:bottom-auto md:w-[min(34vw,420px,39.375vh)] md:aspect-[9/16] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:ring-1 md:ring-white/20 md:shadow-2xl'}`}>
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{ objectFit: "cover", objectPosition: "center center", backgroundColor: "#000" }}
+            className={`absolute inset-0 block h-full w-full object-cover object-center bg-black ${showRemoteVideo && !localVideoIsMain ? 'opacity-100' : 'opacity-0'}`}
+          />
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{ objectFit: "cover", objectPosition: "center center", backgroundColor: "#000" }}
+            className={`absolute inset-0 block h-full w-full object-cover object-center bg-black transition-opacity duration-150 ${localVideoIsMain && localVideoAvailable ? 'opacity-100 scale-x-[-1]' : 'opacity-0 pointer-events-none'}`}
+          />
+          <div className={`absolute z-20 overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-2 ring-white/25 ${isMini ? "bottom-16 right-2 h-20 w-16" : "bottom-28 left-4 h-32 w-24 sm:h-36 sm:w-28 md:bottom-5 md:left-4"}`}>
+            {canSwitchCamera && (
+              <button
+                type="button"
+                onClick={onSwitchCamera}
+                disabled={isCameraOff || isOnHold}
+                aria-label="Switch front or back camera"
+                title="Switch front or back camera"
+                className="absolute top-1.5 left-1.5 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85 disabled:opacity-40"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setLocalVideoIsMain((current) => !current)}
+              aria-label="Swap video positions"
+              title="Swap video positions"
+              className="absolute top-1.5 right-1.5 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85"
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+            </button>
+            <video
+              ref={pipVideoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ objectFit: "cover", objectPosition: "center center", backgroundColor: "#000" }}
+              className={`block h-full w-full bg-black object-cover object-center ${localVideoIsMain ? '' : 'scale-x-[-1]'}`}
+            />
+          </div>
+        </div>
       )}
       <audio ref={remoteAudioRef} autoPlay className="hidden" />
 
@@ -298,54 +341,10 @@ export function CallScreen({
 
 
 
-      {/* Main video and movable picture-in-picture preview. A missing camera
-          intentionally stays blank; it must never turn into a call error. */}
-      {isVideoCall && (
-        <>
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted
-            style={{ objectFit: "cover", objectPosition: "center center", backgroundColor: "#000" }}
-            className={`absolute inset-0 block w-full h-full object-cover object-center bg-black transition-opacity duration-150 ${localVideoIsMain && localVideoAvailable ? 'opacity-100 scale-x-[-1]' : 'opacity-0 pointer-events-none'}`}
-          />
-          <div className={`absolute ${isMini ? "bottom-16 right-2 w-16 h-20" : "bottom-28 left-4 w-24 h-32 sm:w-28 sm:h-36"} rounded-xl overflow-hidden ring-2 ring-white/25 bg-neutral-900 z-20 shadow-lg`}>
-            {canSwitchCamera && (
-              <button
-                type="button"
-                onClick={onSwitchCamera}
-                disabled={isCameraOff || isOnHold}
-                aria-label="Switch front or back camera"
-                title="Switch front or back camera"
-                className="absolute top-1.5 left-1.5 z-30 h-8 w-8 rounded-full bg-black/65 hover:bg-black/85 text-white flex items-center justify-center disabled:opacity-40"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setLocalVideoIsMain((current) => !current)}
-              aria-label="Swap video positions"
-              title="Swap video positions"
-              className="absolute top-1.5 right-1.5 z-30 h-8 w-8 rounded-full bg-black/65 hover:bg-black/85 text-white flex items-center justify-center"
-            >
-              <ArrowLeftRight className="h-4 w-4" />
-            </button>
-            <video
-              ref={pipVideoRef}
-              autoPlay
-              playsInline
-              muted
-              style={{ objectFit: "cover", objectPosition: "center center", backgroundColor: "#000" }}
-              className={`block w-full h-full object-cover object-center bg-black ${localVideoIsMain ? '' : 'scale-x-[-1]'}`}
-            />
-          </div>
-        </>
-      )}
+      {/* Video and PiP are rendered together inside the responsive portrait stage above. */}
 
       {/* Controls */}
-      <div className={`relative z-10 flex flex-wrap items-center justify-center ${isMini ? "gap-1 px-1 pb-2 pt-1" : "gap-2 px-2 pb-12 pt-6 sm:gap-4 sm:px-4"} bg-gradient-to-t from-black/50 to-transparent`}>
+      <div className={`relative z-10 flex flex-wrap items-center justify-center ${isMini ? "gap-1 px-1 pb-2 pt-1" : "mt-auto gap-2 px-2 pb-12 pt-6 sm:gap-4 sm:px-4"} bg-gradient-to-t from-black/50 to-transparent`}>
         <button
           type="button"
           onClick={() => setIsSpeakerOn((current) => !current)}
