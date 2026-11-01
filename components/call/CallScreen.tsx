@@ -255,7 +255,7 @@ export function CallScreen({
             style={{ objectFit: "cover", objectPosition: "center center", backgroundColor: "#000" }}
             className={`absolute inset-0 block h-full w-full object-cover object-center bg-black transition-opacity duration-150 ${localVideoIsMain && localVideoAvailable ? 'opacity-100 scale-x-[-1]' : 'opacity-0 pointer-events-none'}`}
           />
-          <div className={`absolute z-20 overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-2 ring-white/25 ${isMini ? "bottom-16 right-2 h-20 w-16" : "bottom-28 left-4 h-32 w-24 sm:h-36 sm:w-28 md:bottom-5 md:left-4"}`}>
+          <div className={`absolute z-20 overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-2 ring-white/25 ${isMini ? "bottom-16 right-2 h-20 w-16" : "bottom-44 left-3 h-32 w-24 sm:h-36 sm:w-28 md:bottom-5 md:left-4"}`}>
             {canSwitchCamera && (
               <button
                 type="button"
@@ -370,28 +370,28 @@ export function CallScreen({
 
         <button
           onClick={onToggleMute}
-          className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
+          className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${
             isMuted ? 'bg-white text-black' : 'bg-white/15 hover:bg-white/25'
           }`}
         >
-          {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+          {isMuted ? <MicOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Mic className="h-5 w-5 sm:h-6 sm:w-6" />}
         </button>
 
         {isVideoCall && (
           <button
             onClick={onToggleCamera}
-            className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
+            className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${
               isCameraOff ? 'bg-white text-black' : 'bg-white/15 hover:bg-white/25'
             }`}
           >
-            {isCameraOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+            {isCameraOff ? <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Video className="h-5 w-5 sm:h-6 sm:w-6" />}
           </button>
         )}
 
         {isVideoCall && (
           <div className="relative">
-            <button type="button" onClick={() => setEffectsOpen((open) => !open)} disabled={isCameraOff || isOnHold || phase !== 'in-call'} aria-label="Call effects" title="Call effects" className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 ${backgroundBlurEnabled ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white' : 'bg-white/15 hover:bg-white/25'}`}>
-              <Sparkles className="h-6 w-6" />
+            <button type="button" onClick={() => setEffectsOpen((open) => !open)} disabled={isCameraOff || isOnHold || phase !== 'in-call'} aria-label="Call effects" title="Call effects" className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 ${backgroundBlurEnabled ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white' : 'bg-white/15 hover:bg-white/25'}`}>
+              <Sparkles className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
             {effectsOpen && (
               <div className="absolute bottom-16 left-1/2 z-[90] w-56 -translate-x-1/2 rounded-2xl border border-white/15 bg-neutral-900/95 p-2 text-white shadow-2xl backdrop-blur-xl">
@@ -409,9 +409,9 @@ export function CallScreen({
           disabled={phase !== "in-call"}
           aria-label={isOnHold ? 'Resume call' : 'Hold call'}
           title={isOnHold ? 'Resume call' : 'Hold call'}
-          className="h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {isOnHold ? <PlayCircle className="h-6 w-6" /> : <PauseCircle className="h-6 w-6" />}
+          {isOnHold ? <PlayCircle className="h-5 w-5 sm:h-6 sm:w-6" /> : <PauseCircle className="h-5 w-5 sm:h-6 sm:w-6" />}
         </button>
 
         <button
@@ -419,18 +419,18 @@ export function CallScreen({
           onClick={() => setIsScreenLocked(true)}
           aria-label="Lock call screen"
           title="Lock screen · prevent accidental touches"
-          className="h-14 w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25"
+          className="h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25"
         >
-          <Lock className="h-6 w-6" />
+          <Lock className="h-5 w-5 sm:h-6 sm:w-6" />
         </button>
 
         <button
           onClick={onEnd}
           aria-label="End call"
           title="End call"
-          className="h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors shadow-lg shadow-red-500/30"
+          className="h-11 w-11 sm:h-16 sm:w-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors shadow-lg shadow-red-500/30"
         >
-          <PhoneOff className="h-7 w-7" />
+          <PhoneOff className="h-5 w-5 sm:h-7 sm:w-7" />
         </button>
       </div>
 
