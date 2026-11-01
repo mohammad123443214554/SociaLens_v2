@@ -1082,15 +1082,17 @@ export function useCallEngine(currentUserId?: string) {
           // input when a custom MediaStreamTrack is installed.
           const rawTrack = originalTrack.clone()
           const sourceTrack = originalTrack.clone()
-          const processor = await CallBackgroundBlurProcessor.create(sourceTrack, safeIntensity)
+          let processor: CallBackgroundBlurProcessor | null = null
           try {
+            processor = await CallBackgroundBlurProcessor.create(sourceTrack, safeIntensity)
             await dailyRef.current.setInputDevicesAsync({ videoSource: processor.processedTrack })
           } catch (error) {
-            processor.stop()
+            processor?.stop()
             rawTrack.stop()
             sourceTrack.stop()
             throw error
           }
+          if (!processor) throw new Error('Background Blur could not start.')
           state = { processor, rawTrack, sourceTrack, originalTrack, processedTrack: processor.processedTrack }
           backgroundBlurProcessorRef.current = state
         } else {
