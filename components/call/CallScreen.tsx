@@ -334,10 +334,10 @@ export function CallScreen({
       {/* Audio calls keep the centered profile layout. On phones the existing
           full-screen video-call profile placement is retained; desktop video
           calls render the profile inside the portrait video stage above. */}
-      {(!isVideoCall || showRemoteVideo || isMini) && (
+      {(!isVideoCall || showRemoteVideo || isMini || (isVideoCall && !showRemoteVideo)) && (
         <div className={`relative z-10 flex flex-col items-center gap-3 transition-all duration-300 ${
           showRemoteVideo ? (isMini ? 'pt-1' : 'pt-6') : 'flex-1 justify-center'
-        }`}>
+        } ${isVideoCall && !showRemoteVideo ? 'md:hidden' : ''}`}>
           {!showRemoteVideo && (
             <Avatar className={`${isMini ? "h-16 w-16" : "h-32 w-32"} ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/10 md:hidden`}>
               <AvatarImage src={peerAvatar} alt={peerName} />
