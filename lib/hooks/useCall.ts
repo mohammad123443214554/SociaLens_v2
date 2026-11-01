@@ -187,7 +187,7 @@ export function useCallEngine(currentUserId?: string) {
   const remoteStreamObjRef = useRef<MediaStream>(new MediaStream())
   const agoraRef = useRef<{ client: any; audioTrack: any; videoTrack: any } | null>(null)
   const dailyRef = useRef<any>(null)
-  const backgroundBlurProcessorRef = useRef<{ processor: CallBackgroundBlurProcessor; rawTrack: MediaStreamTrack; processedTrack: MediaStreamTrack } | null>(null)
+  const backgroundBlurProcessorRef = useRef<{ processor: CallBackgroundBlurProcessor; rawTrack: MediaStreamTrack; processedTrack: MediaStreamTrack; sourceTrack?: MediaStreamTrack; originalTrack?: MediaStreamTrack } | null>(null)
   const providerRef = useRef<CallProviderName | null>(null)
   const startedAtMsRef = useRef<number | null>(null)
 
@@ -237,7 +237,11 @@ export function useCallEngine(currentUserId?: string) {
     }
 
     if (backgroundBlurProcessorRef.current) {
-      try { backgroundBlurProcessorRef.current.processor.stop() } catch {}
+      const activeBlur = backgroundBlurProcessorRef.current
+      try { activeBlur.processor.stop() } catch {}
+      try { activeBlur.rawTrack.stop() } catch {}
+      try { activeBlur.sourceTrack?.stop() } catch {}
+      try { activeBlur.originalTrack?.stop() } catch {}
       backgroundBlurProcessorRef.current = null
     }
     if (agoraRef.current) {
@@ -265,7 +269,11 @@ export function useCallEngine(currentUserId?: string) {
    */
   const teardownTransportSilently = useCallback(async () => {
     if (backgroundBlurProcessorRef.current) {
-      try { backgroundBlurProcessorRef.current.processor.stop() } catch {}
+      const activeBlur = backgroundBlurProcessorRef.current
+      try { activeBlur.processor.stop() } catch {}
+      try { activeBlur.rawTrack.stop() } catch {}
+      try { activeBlur.sourceTrack?.stop() } catch {}
+      try { activeBlur.originalTrack?.stop() } catch {}
       backgroundBlurProcessorRef.current = null
     }
     if (agoraRef.current) {
@@ -1068,16 +1076,22 @@ export function useCallEngine(currentUserId?: string) {
       let state = backgroundBlurProcessorRef.current
       if (enabled) {
         if (!state) {
-          const rawTrack = localStreamObjRef.current.getVideoTracks().find((track) => track.readyState === 'live')
-          if (!rawTrack) throw new Error('Your camera is not ready yet. Please try again in a moment.')
-          const processor = await CallBackgroundBlurProcessor.create(rawTrack, safeIntensity)
+          const originalTrack = localStreamObjRef.current.getVideoTracks().find((track) => track.readyState === 'live')
+          if (!originalTrack) throw new Error('Your camera is not ready yet. Please try again in a moment.')
+          // Keep a live backup track because Daily may stop its previous camera
+          // input when a custom MediaStreamTrack is installed.
+          const rawTrack = originalTrack.clone()
+          const sourceTrack = originalTrack.clone()
+          const processor = await CallBackgroundBlurProcessor.create(sourceTrack, safeIntensity)
           try {
             await dailyRef.current.setInputDevicesAsync({ videoSource: processor.processedTrack })
           } catch (error) {
             processor.stop()
+            rawTrack.stop()
+            sourceTrack.stop()
             throw error
           }
-          state = { processor, rawTrack, processedTrack: processor.processedTrack }
+          state = { processor, rawTrack, sourceTrack, originalTrack, processedTrack: processor.processedTrack }
           backgroundBlurProcessorRef.current = state
         } else {
           state.processor.setIntensity(safeIntensity)
@@ -1086,6 +1100,8 @@ export function useCallEngine(currentUserId?: string) {
       } else if (state) {
         await dailyRef.current.setInputDevicesAsync({ videoSource: state.rawTrack })
         state.processor.stop()
+        try { state.sourceTrack?.stop() } catch {}
+        try { state.originalTrack?.stop() } catch {}
         upsertTrack(localStreamObjRef.current, state.rawTrack)
         backgroundBlurProcessorRef.current = null
       }
@@ -1177,7 +1193,11 @@ export function useCallEngine(currentUserId?: string) {
         blurTemporarilyDisabled = true
       }
       const cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput')
-      if (cameras.length < 2) { setCanSwitchCamera(false); return }
+      if (cameras.length < 2) {
+        setCanSwitchCamera(false)
+        if (blurTemporarilyDisabled) await setBackgroundBlur(true, backgroundBlurIntensity)
+        return
+      }
       const videoTrack = agoraRef.current?.videoTrack
       if (videoTrack) {
         const activeId = videoTrack.getMediaStreamTrack()?.getSettings?.().deviceId
