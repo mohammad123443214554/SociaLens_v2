@@ -238,7 +238,7 @@ export function CallScreen({
       {isVideoCall && (
         <div className={`absolute overflow-hidden bg-black ${isMini
           ? 'inset-0'
-          : 'inset-0 md:inset-auto md:top-1/2 md:left-1/2 md:right-auto md:bottom-auto md:w-[min(34vw,420px,39.375vh)] md:aspect-[9/16] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:ring-1 md:ring-white/20 md:shadow-2xl'}`}>
+          : 'inset-0 md:inset-auto md:top-[44%] md:left-1/2 md:right-auto md:bottom-auto md:w-[min(34vw,420px,39.375vh)] md:aspect-[9/16] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:ring-1 md:ring-white/20 md:shadow-2xl'}`}>
           <video
             ref={remoteVideoRef}
             autoPlay
@@ -286,6 +286,16 @@ export function CallScreen({
               className={`block h-full w-full bg-black object-cover object-center ${localVideoIsMain ? '' : 'scale-x-[-1]'}`}
             />
           </div>
+          {!isMini && !showRemoteVideo && (
+            <div className="absolute inset-x-3 top-5 z-10 hidden flex-col items-center gap-3 text-center md:flex">
+              <Avatar className="h-28 w-28 ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/20">
+                <AvatarImage src={peerAvatar} alt={peerName} />
+                <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-4xl">{peerName[0]?.toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <h2 className="text-xl font-bold drop-shadow-lg">{peerName}</h2>
+              <p className={`text-sm drop-shadow-lg ${error ? 'text-red-400' : 'text-white/65'}`}>{statusText}</p>
+            </div>
+          )}
         </div>
       )}
       <audio ref={remoteAudioRef} autoPlay className="hidden" />
@@ -321,23 +331,25 @@ export function CallScreen({
         <div data-mini-resize className="absolute z-[70] left-0 right-10 bottom-0 h-2 cursor-ns-resize touch-none" onPointerDown={(event) => { event.stopPropagation(); startMiniGesture(event, 'resize') }} />
       </>}
 
-      {/* Peer info - Centered when no remote video yet, top-aligned once video is live */}
-      <div
-        className={`relative z-10 flex flex-col items-center gap-3 transition-all duration-300 ${
+      {/* Audio calls keep the centered profile layout. On phones the existing
+          full-screen video-call profile placement is retained; desktop video
+          calls render the profile inside the portrait video stage above. */}
+      {(!isVideoCall || showRemoteVideo || isMini) && (
+        <div className={`relative z-10 flex flex-col items-center gap-3 transition-all duration-300 ${
           showRemoteVideo ? (isMini ? 'pt-1' : 'pt-6') : 'flex-1 justify-center'
-        }`}
-      >
-        {!showRemoteVideo && (
-          <Avatar className={`${isMini ? "h-16 w-16" : "h-32 w-32"} ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/10`}>
-            <AvatarImage src={peerAvatar} alt={peerName} />
-            <AvatarFallback className="text-4xl bg-gradient-to-br from-pink-500 to-purple-600">{peerName[0]?.toUpperCase()}</AvatarFallback>
-          </Avatar>
-        )}
-        <h2 className={`font-bold ${isMini ? 'text-sm' : showRemoteVideo ? 'text-lg drop-shadow-lg' : 'text-2xl'}`}>{peerName}</h2>
-        <p className={`text-sm ${error ? 'text-red-400' : 'text-white/60'}`}>{statusText}</p>
-      </div>
+        }`}>
+          {!showRemoteVideo && (
+            <Avatar className={`${isMini ? "h-16 w-16" : "h-32 w-32"} ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/10 md:hidden`}>
+              <AvatarImage src={peerAvatar} alt={peerName} />
+              <AvatarFallback className="text-4xl bg-gradient-to-br from-pink-500 to-purple-600">{peerName[0]?.toUpperCase()}</AvatarFallback>
+            </Avatar>
+          )}
+          <h2 className={`font-bold ${isMini ? 'text-sm' : showRemoteVideo ? 'text-lg drop-shadow-lg' : 'text-2xl'}`}>{peerName}</h2>
+          <p className={`text-sm ${error ? 'text-red-400' : 'text-white/60'}`}>{statusText}</p>
+        </div>
+      )}
 
-      {!showRemoteVideo && <div className="flex-1" />}
+      {!showRemoteVideo && (!isVideoCall || isMini) && <div className="flex-1" />}
 
 
 
