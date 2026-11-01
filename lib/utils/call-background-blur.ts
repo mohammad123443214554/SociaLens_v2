@@ -175,7 +175,9 @@ export class CallBackgroundBlurProcessor {
       const blurPixels = 2 + this.intensity * 0.26
       this.context.save()
       this.context.clearRect(0, 0, width, height)
-      this.context.filter = `blur(${blurPixels}px)`
+      // Until the first AI mask arrives, keep the camera image sharp rather
+      // than briefly blurring the caller's entire face/body.
+      this.context.filter = this.maskValues ? `blur(${blurPixels}px)` : 'none'
       this.context.drawImage(this.video, 0, 0, width, height)
       this.context.restore()
 
