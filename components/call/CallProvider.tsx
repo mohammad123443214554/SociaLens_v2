@@ -179,6 +179,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           callDurationSec={engine.callDurationSec}
           error={engine.error}
           networkQuality={engine.networkQuality}
+          backgroundBlurEnabled={engine.backgroundBlurEnabled}
+          backgroundBlurIntensity={engine.backgroundBlurIntensity}
+          onSetBackgroundBlur={engine.setBackgroundBlur}
           ringtoneId={callSettings?.ringtone}
           ringtoneVolume={callSettings?.volume}
           onEnd={engine.phase === 'outgoing-ringing' ? engine.cancelOutgoing : engine.hangup}
