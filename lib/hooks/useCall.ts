@@ -186,7 +186,7 @@ export function useCallEngine(currentUserId?: string) {
   const remoteStreamObjRef = useRef<MediaStream>(new MediaStream())
   const agoraRef = useRef<{ client: any; audioTrack: any; videoTrack: any } | null>(null)
   const dailyRef = useRef<any>(null)
-  const virtualBackgroundRef = useRef<{ extension: any; processor: any; track: any } | null>(null)
+  const virtualBackgroundRef = useRef<{ extension: any; processor: any; track: any; rawTrack: MediaStreamTrack } | null>(null)
   const providerRef = useRef<CallProviderName | null>(null)
   const startedAtMsRef = useRef<number | null>(null)
 
@@ -1049,19 +1049,29 @@ export function useCallEngine(currentUserId?: string) {
           const extension = new Extension()
           if (!extension.checkCompatibility()) throw new Error('Background Blur is not supported by this browser or device.')
           const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
-          AgoraRTC.registerExtensions([extension])
+          if (!(globalThis as any).__socialensAgoraVirtualBackgroundRegistered) {
+            AgoraRTC.registerExtensions([extension])
+            ;(globalThis as any).__socialensAgoraVirtualBackgroundRegistered = true
+          }
           const processor = extension.createProcessor()
           await processor.init()
           videoTrack.pipe(processor).pipe(videoTrack.processorDestination)
-          state = { extension, processor, track: videoTrack }
+          state = { extension, processor, track: videoTrack, rawTrack: videoTrack.getMediaStreamTrack() }
           virtualBackgroundRef.current = state
         }
         state.processor.setOptions({ type: 'blur', blurDegree: safeIntensity < 34 ? 1 : safeIntensity < 68 ? 2 : 3 })
         await state.processor.enable()
+        const processedTrack = await state.processor.getProcessedTrack?.()
+        if (processedTrack) {
+          upsertTrack(localStreamObjRef.current, processedTrack)
+          setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
+        }
       } else if (virtualBackgroundRef.current) {
         await virtualBackgroundRef.current.processor.disable()
         try { videoTrack.unpipe() } catch {}
         await virtualBackgroundRef.current.processor.release?.()
+        upsertTrack(localStreamObjRef.current, virtualBackgroundRef.current.rawTrack)
+        setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
         virtualBackgroundRef.current = null
       }
     } else if (dailyRef.current) {
