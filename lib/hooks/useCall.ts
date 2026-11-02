@@ -562,7 +562,7 @@ export function useCallEngine(currentUserId?: string) {
           const quality = worst <= 1 ? 'excellent' : worst <= 2 ? 'good' : 'weak'
           setNetworkQuality(quality)
           if (activeCall.type === 'video') {
-            void applyAdaptiveVideoQuality(localStreamObjRef.current, quality)
+            void applyAdaptiveVideoQuality(new MediaStream([videoTrack?.getMediaStreamTrack?.()].filter(Boolean)), quality)
           }
         })
         client.on('connection-state-change', (curState: string, _prevState: string, reason: string) => {
@@ -694,7 +694,7 @@ export function useCallEngine(currentUserId?: string) {
           const quality = rtt <= 150 && loss <= 2 ? 'excellent' : rtt <= 300 && loss <= 5 ? 'good' : 'weak'
           setNetworkQuality(quality)
           if (activeCall.type === 'video') {
-            void applyAdaptiveVideoQuality(localStreamObjRef.current, quality)
+            void applyAdaptiveVideoQuality(new MediaStream([call.participants?.()?.local?.tracks?.video?.persistentTrack].filter(Boolean)), quality)
           }
         })
         call.on('error', (ev: any) => { console.error('[Daily] error', ev); setError(describeCallError(ev, 'connect')) })
@@ -1274,7 +1274,7 @@ export function useCallEngine(currentUserId?: string) {
       try {
         await videoTrack.setEnabled(enabled)
         if (callEffectsAgoraTrackRef.current) await callEffectsAgoraTrackRef.current.setEnabled(enabled)
-        if (enabled) upsertTrack(localStreamObjRef.current, videoTrack.getMediaStreamTrack())
+        if (enabled) upsertTrack(localStreamObjRef.current, callEffectsEngineRef.current?.processedTrack ?? videoTrack.getMediaStreamTrack())
         else removeTracksOfKind(localStreamObjRef.current, 'video')
         setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
       } catch (cameraError) {
@@ -1323,7 +1323,7 @@ export function useCallEngine(currentUserId?: string) {
     if (videoTrack) {
       void videoTrack.setEnabled(videoEnabled).then(async () => {
         if (callEffectsAgoraTrackRef.current) await callEffectsAgoraTrackRef.current.setEnabled(videoEnabled)
-        if (videoEnabled) upsertTrack(localStreamObjRef.current, videoTrack.getMediaStreamTrack())
+        if (videoEnabled) upsertTrack(localStreamObjRef.current, callEffectsEngineRef.current?.processedTrack ?? videoTrack.getMediaStreamTrack())
         else removeTracksOfKind(localStreamObjRef.current, 'video')
         setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
       }).catch((cameraError: any) => console.error('[Agora] hold camera transition failed', cameraError))
