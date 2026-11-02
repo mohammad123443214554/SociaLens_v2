@@ -14,8 +14,11 @@ type VideoFrameElement = HTMLVideoElement & {
  * No camera permission is requested and the source track is never stopped here.
  */
 export class CallVideoEffectsEngine {
-  readonly processedTrack: MediaStreamTrack
-  private readonly sourceTrack: MediaStreamTrack
+  private outputTrack: MediaStreamTrack | null = null
+  get processedTrack() {
+    if (!this.outputTrack) throw new Error('The camera effects output is not ready yet.')
+    return this.outputTrack
+  }
   private readonly video: VideoFrameElement
   private readonly canvas: HTMLCanvasElement
   private readonly context: CanvasRenderingContext2D
@@ -32,7 +35,6 @@ export class CallVideoEffectsEngine {
   private running = false
 
   private constructor(sourceTrack: MediaStreamTrack, options: CallEffectsEngineOptions) {
-    this.sourceTrack = sourceTrack
     this.options = options
     this.video = document.createElement('video') as VideoFrameElement
     this.video.autoplay = true
@@ -46,8 +48,6 @@ export class CallVideoEffectsEngine {
     const profile = getCallEffectsRenderProfile()
     const fps = Math.max(15, Math.min(30, options.frameRate ?? profile.frameRate))
     this.targetFrameInterval = 1000 / fps
-    // Assigned after camera metadata determines the output dimensions.
-    this.processedTrack = null as unknown as MediaStreamTrack
   }
 
   static async create(sourceTrack: MediaStreamTrack, options: CallEffectsEngineOptions = {}) {
@@ -102,7 +102,7 @@ export class CallVideoEffectsEngine {
       throw new Error('Could not create the processed camera track.')
     }
     this.outputStream = stream
-    ;(this as { processedTrack: MediaStreamTrack }).processedTrack = track
+    this.outputTrack = track
     this.running = true
     this.scheduleNextFrame()
   }
