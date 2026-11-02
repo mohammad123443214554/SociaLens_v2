@@ -195,6 +195,7 @@ export function useCallEngine(currentUserId?: string) {
   const callEffectsAgoraTrackRef = useRef<any>(null)
   const callEffectsSourceTrackRef = useRef<MediaStreamTrack | null>(null)
   const callEffectsStageRef = useRef<{ setIntensity?: (value: number) => void } | null>(null)
+  const setCallEffectRef = useRef<((effectId: string | null, intensity?: number, forceRebuild?: boolean) => Promise<void>) | null>(null)
   const providerRef = useRef<CallProviderName | null>(null)
   const startedAtMsRef = useRef<number | null>(null)
 
@@ -1104,7 +1105,9 @@ export function useCallEngine(currentUserId?: string) {
       let state = backgroundBlurProcessorRef.current
       if (enabled) {
         if (!state) {
-          const originalTrack = localStreamObjRef.current.getVideoTracks().find((track) => track.readyState === 'live')
+          const originalTrack = callEffectsSourceTrackRef.current?.readyState === 'live'
+            ? callEffectsSourceTrackRef.current
+            : localStreamObjRef.current.getVideoTracks().find((track) => track.readyState === 'live')
           if (!originalTrack) throw new Error('Your camera is not ready yet. Please try again in a moment.')
           // Keep a live backup track because Daily may stop its previous camera
           // input when a custom MediaStreamTrack is installed.
@@ -1142,8 +1145,8 @@ export function useCallEngine(currentUserId?: string) {
 
     setBackgroundBlurEnabled(enabled)
     setBackgroundBlurIntensity(safeIntensity)
-    if (selectedCallEffectId) await setCallEffect(selectedCallEffectId, callEffectIntensity, true)
-  }, [isCameraOff, isOnHold, selectedCallEffectId, callEffectIntensity, setCallEffect])
+    if (selectedCallEffectId) await setCallEffectRef.current?.(selectedCallEffectId, callEffectIntensity, true)
+  }, [isCameraOff, isOnHold, selectedCallEffectId, callEffectIntensity])
   const setCallEffect = useCallback(async (effectId: string | null, intensity = callEffectIntensity, forceRebuild = false) => {
     const activeCall = callRef.current
     if (!activeCall || activeCall.type !== 'video' || isCameraOff || isOnHold) {
@@ -1168,6 +1171,7 @@ export function useCallEngine(currentUserId?: string) {
     }
 
     if (!effectId) {
+      const restoreTrack = callEffectsSourceTrackRef.current
       if (agora && callEffectsAgoraTrackRef.current) {
         await agora.client.unpublish([callEffectsAgoraTrackRef.current])
         try { callEffectsAgoraTrackRef.current.close() } catch {}
@@ -1175,7 +1179,6 @@ export function useCallEngine(currentUserId?: string) {
         await agora.client.publish([agora.videoTrack])
         upsertTrack(localStreamObjRef.current, agora.videoTrack.getMediaStreamTrack())
       } else if (daily && callEffectsEngineRef.current) {
-        const restoreTrack = callEffectsSourceTrackRef.current
         if (restoreTrack?.readyState === 'live') {
           await daily.setInputDevicesAsync({ videoSource: restoreTrack })
           upsertTrack(localStreamObjRef.current, restoreTrack)
@@ -1257,6 +1260,7 @@ export function useCallEngine(currentUserId?: string) {
       throw error
     }
   }, [callEffectIntensity, selectedCallEffectId, isCameraOff, isOnHold])
+  setCallEffectRef.current = setCallEffect
 
   const toggleCamera = useCallback(async () => {
     const next = !isCameraOff
