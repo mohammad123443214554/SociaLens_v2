@@ -11,8 +11,7 @@
     "test:recommendation": "node --experimental-strip-types --test tests/recommendation-scoring.test.ts",
     "test:emoji-slider": "node --experimental-strip-types --test tests/emoji-slider.test.ts",
     "test:photo-collage": "node --experimental-strip-types --test tests/photo-collage.test.ts",
-    "test:shape-cut": "node --experimental-strip-types --test tests/shape-cut.test.ts",
-    "test:call-effects": "node --experimental-strip-types --test tests/call-effects-presets.test.ts"
+    "test:shape-cut": "node --experimental-strip-types --test tests/shape-cut.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
