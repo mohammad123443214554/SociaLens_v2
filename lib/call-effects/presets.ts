@@ -60,3 +60,18 @@ export function getPartFourLightingPreset(id: string) {
 export function getPartFourCreativePreset(id: string) {
   return PART_FOUR_CREATIVE_PRESETS.find((preset) => preset.id === id) ?? null
 }
+
+
+/** Part 5: six iris-colour lenses using the 478-point MediaPipe face mesh. */
+export const PART_FIVE_EYE_LENS_PRESETS: readonly CallEffectDefinition[] = [
+  { id: 'ocean-blue', categoryId: 'eye-lenses', name: 'Ocean Blue', description: 'A cool ocean-blue iris tint that preserves the natural pupil and iris detail.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 62 },
+  { id: 'emerald-green', categoryId: 'eye-lenses', name: 'Emerald Green', description: 'A rich emerald iris colour with a restrained natural finish.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 60 },
+  { id: 'honey-hazel', categoryId: 'eye-lenses', name: 'Honey Hazel', description: 'Warm honey-hazel tones with golden detail around the iris.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 58 },
+  { id: 'silver-grey', categoryId: 'eye-lenses', name: 'Silver Grey', description: 'A cool silver-grey iris tint with soft charcoal definition.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 58 },
+  { id: 'amethyst-violet', categoryId: 'eye-lenses', name: 'Amethyst Violet', description: 'A subtle amethyst-violet iris colour with a luminous centre.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 56 },
+  { id: 'golden-amber', categoryId: 'eye-lenses', name: 'Golden Amber', description: 'A warm golden-amber iris tint with natural eye detail retained.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 60 },
+] as const
+
+export function getPartFiveEyeLensPreset(id: string) {
+  return PART_FIVE_EYE_LENS_PRESETS.find((preset) => preset.id === id) ?? null
+}
