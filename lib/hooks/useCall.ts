@@ -251,6 +251,7 @@ export function useCallEngine(currentUserId?: string) {
     callEffectsEngineRef.current?.stop()
     callEffectsEngineRef.current = null
     callEffectsStageRef.current = null
+    try { callEffectsSourceTrackRef.current?.stop() } catch {}
     callEffectsSourceTrackRef.current = null
     if (backgroundBlurProcessorRef.current) {
       const activeBlur = backgroundBlurProcessorRef.current
@@ -1141,8 +1142,9 @@ export function useCallEngine(currentUserId?: string) {
 
     setBackgroundBlurEnabled(enabled)
     setBackgroundBlurIntensity(safeIntensity)
-  }, [isCameraOff, isOnHold])
-  const setCallEffect = useCallback(async (effectId: string | null, intensity = callEffectIntensity) => {
+    if (selectedCallEffectId) await setCallEffect(selectedCallEffectId, callEffectIntensity, true)
+  }, [isCameraOff, isOnHold, selectedCallEffectId, callEffectIntensity, setCallEffect])
+  const setCallEffect = useCallback(async (effectId: string | null, intensity = callEffectIntensity, forceRebuild = false) => {
     const activeCall = callRef.current
     if (!activeCall || activeCall.type !== 'video' || isCameraOff || isOnHold) {
       if (effectId) throw new Error('Turn on your camera and resume the video call before applying a filter.')
@@ -1155,7 +1157,9 @@ export function useCallEngine(currentUserId?: string) {
 
     const agora = agoraRef.current
     const daily = dailyRef.current
-    const rawTrack = agora?.videoTrack?.getMediaStreamTrack?.()
+    const rawTrack = backgroundBlurProcessorRef.current?.processedTrack
+      ?? agora?.videoTrack?.getMediaStreamTrack?.()
+      ?? (forceRebuild ? daily?.participants?.()?.local?.tracks?.video?.persistentTrack : null)
       ?? callEffectsSourceTrackRef.current
       ?? localStreamObjRef.current.getVideoTracks().find((track) => track.readyState === 'live')
     if (!rawTrack || rawTrack.readyState !== 'live') {
@@ -1180,13 +1184,14 @@ export function useCallEngine(currentUserId?: string) {
       callEffectsEngineRef.current?.stop()
       callEffectsEngineRef.current = null
       callEffectsStageRef.current = null
+      if (callEffectsSourceTrackRef.current && callEffectsSourceTrackRef.current !== restoreTrack) callEffectsSourceTrackRef.current.stop()
       callEffectsSourceTrackRef.current = null
       setSelectedCallEffectId(null)
       setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
       return
     }
 
-    if (callEffectsEngineRef.current && callEffectsStageRef.current && selectedCallEffectId === effectId) {
+    if (!forceRebuild && callEffectsEngineRef.current && callEffectsStageRef.current && selectedCallEffectId === effectId) {
       callEffectsStageRef.current.setIntensity?.(intensity)
       setCallEffectIntensity(intensity)
       return
@@ -1236,7 +1241,10 @@ export function useCallEngine(currentUserId?: string) {
         throw new Error('The active calling provider is not ready for camera effects.')
       }
 
-      callEffectsEngineRef.current?.stop()
+      const previousEngine = callEffectsEngineRef.current
+      const previousSource = callEffectsSourceTrackRef.current
+      previousEngine?.stop()
+      if (previousSource && previousSource !== sourceForEngine) previousSource.stop()
       callEffectsEngineRef.current = engine
       callEffectsStageRef.current = stage
       callEffectsSourceTrackRef.current = sourceForEngine
@@ -1261,6 +1269,7 @@ export function useCallEngine(currentUserId?: string) {
     if (videoTrack) {
       try {
         await videoTrack.setEnabled(enabled)
+        if (callEffectsAgoraTrackRef.current) await callEffectsAgoraTrackRef.current.setEnabled(enabled)
         if (enabled) upsertTrack(localStreamObjRef.current, videoTrack.getMediaStreamTrack())
         else removeTracksOfKind(localStreamObjRef.current, 'video')
         setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
@@ -1308,7 +1317,8 @@ export function useCallEngine(currentUserId?: string) {
     if (agoraRef.current?.audioTrack) void agoraRef.current.audioTrack.setEnabled(audioEnabled)
     const videoTrack = agoraRef.current?.videoTrack
     if (videoTrack) {
-      void videoTrack.setEnabled(videoEnabled).then(() => {
+      void videoTrack.setEnabled(videoEnabled).then(async () => {
+        if (callEffectsAgoraTrackRef.current) await callEffectsAgoraTrackRef.current.setEnabled(videoEnabled)
         if (videoEnabled) upsertTrack(localStreamObjRef.current, videoTrack.getMediaStreamTrack())
         else removeTracksOfKind(localStreamObjRef.current, 'video')
         setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
@@ -1350,6 +1360,7 @@ export function useCallEngine(currentUserId?: string) {
         upsertTrack(localStreamObjRef.current, videoTrack.getMediaStreamTrack())
         setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
         setCameraFacing(/back|rear|environment/i.test(nextCamera.label || '') ? 'environment' : 'user')
+        if (selectedCallEffectId) await setCallEffect(selectedCallEffectId, callEffectIntensity, true)
       } else if (dailyRef.current) {
         const activeTrack = localStreamObjRef.current.getVideoTracks()[0]
         const activeId = activeTrack?.getSettings?.().deviceId
@@ -1362,6 +1373,7 @@ export function useCallEngine(currentUserId?: string) {
           ? facingMatch
           : cameras[(currentIndex + 1 + cameras.length) % cameras.length]
         await dailyRef.current.setInputDevicesAsync({ videoDeviceId: nextCamera.deviceId })
+        if (selectedCallEffectId) await setCallEffect(selectedCallEffectId, callEffectIntensity, true)
         setCameraFacing(/back|rear|environment/i.test(nextCamera.label || '') ? 'environment' : 'user')
       }
       if (blurTemporarilyDisabled) await setBackgroundBlur(true, backgroundBlurIntensity)
@@ -1374,7 +1386,7 @@ export function useCallEngine(currentUserId?: string) {
       console.error('[Call] camera switch failed', cameraError)
       setError('Could not switch camera. Please try again.')
     }
-  }, [canSwitchCamera, isCameraOff, isOnHold, cameraFacing, backgroundBlurEnabled, backgroundBlurIntensity, setBackgroundBlur])
+  }, [canSwitchCamera, isCameraOff, isOnHold, cameraFacing, backgroundBlurEnabled, backgroundBlurIntensity, setBackgroundBlur, selectedCallEffectId, callEffectIntensity, setCallEffect])
 
   // Persist only the call id while an accepted call is active. The database remains
   // the source of truth; this marker merely lets a refreshed tab find the same session.
