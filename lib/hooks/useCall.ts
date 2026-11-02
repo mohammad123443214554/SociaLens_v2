@@ -7,6 +7,7 @@ import { getAvatarUrl } from '@/lib/utils/helpers'
 import { canAccessByPrivacy } from '@/lib/utils/privacyAccess'
 import { pauseRingtone, resumeRingtone } from '@/lib/utils/ringtone'
 import { CallBackgroundBlurProcessor } from '@/lib/utils/call-background-blur'
+import { CallVideoEffectsEngine, FaceLandmarkEffectStage, ColorLookEffectStage, PART_TWO_FACE_PRESETS, PART_THREE_MAKEUP_PRESETS, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS, PART_FIVE_EYE_LENS_PRESETS } from '@/lib/call-effects'
 
 export type CallType = 'audio' | 'video'
 export type CallStatus = 'ringing' | 'accepted' | 'rejected' | 'missed' | 'ended' | 'cancelled' | 'busy'
@@ -182,12 +183,18 @@ export function useCallEngine(currentUserId?: string) {
   const [networkQuality, setNetworkQuality] = useState<'excellent' | 'good' | 'weak' | 'unknown'>('unknown')
   const [backgroundBlurEnabled, setBackgroundBlurEnabled] = useState(false)
   const [backgroundBlurIntensity, setBackgroundBlurIntensity] = useState(50)
+  const [selectedCallEffectId, setSelectedCallEffectId] = useState<string | null>(null)
+  const [callEffectIntensity, setCallEffectIntensity] = useState(60)
 
   const localStreamObjRef = useRef<MediaStream>(new MediaStream())
   const remoteStreamObjRef = useRef<MediaStream>(new MediaStream())
   const agoraRef = useRef<{ client: any; audioTrack: any; videoTrack: any } | null>(null)
   const dailyRef = useRef<any>(null)
   const backgroundBlurProcessorRef = useRef<{ processor: CallBackgroundBlurProcessor; rawTrack: MediaStreamTrack; processedTrack: MediaStreamTrack; sourceTrack?: MediaStreamTrack; originalTrack?: MediaStreamTrack } | null>(null)
+  const callEffectsEngineRef = useRef<CallVideoEffectsEngine | null>(null)
+  const callEffectsAgoraTrackRef = useRef<any>(null)
+  const callEffectsSourceTrackRef = useRef<MediaStreamTrack | null>(null)
+  const callEffectsStageRef = useRef<{ setIntensity?: (value: number) => void } | null>(null)
   const providerRef = useRef<CallProviderName | null>(null)
   const startedAtMsRef = useRef<number | null>(null)
 
@@ -236,6 +243,15 @@ export function useCallEngine(currentUserId?: string) {
       } catch { /* best-effort - never block hangup on this */ }
     }
 
+    if (callEffectsAgoraTrackRef.current) {
+      try { await agoraRef.current?.client?.unpublish([callEffectsAgoraTrackRef.current]) } catch {}
+      try { callEffectsAgoraTrackRef.current.close() } catch {}
+      callEffectsAgoraTrackRef.current = null
+    }
+    callEffectsEngineRef.current?.stop()
+    callEffectsEngineRef.current = null
+    callEffectsStageRef.current = null
+    callEffectsSourceTrackRef.current = null
     if (backgroundBlurProcessorRef.current) {
       const activeBlur = backgroundBlurProcessorRef.current
       try { activeBlur.processor.stop() } catch {}
@@ -268,6 +284,15 @@ export function useCallEngine(currentUserId?: string) {
    * itself (AgoraRTCError UID_CONFLICT).
    */
   const teardownTransportSilently = useCallback(async () => {
+    if (callEffectsAgoraTrackRef.current) {
+      try { await agoraRef.current?.client?.unpublish([callEffectsAgoraTrackRef.current]) } catch {}
+      try { callEffectsAgoraTrackRef.current.close() } catch {}
+      callEffectsAgoraTrackRef.current = null
+    }
+    callEffectsEngineRef.current?.stop()
+    callEffectsEngineRef.current = null
+    callEffectsStageRef.current = null
+    callEffectsSourceTrackRef.current = null
     if (backgroundBlurProcessorRef.current) {
       const activeBlur = backgroundBlurProcessorRef.current
       try { activeBlur.processor.stop() } catch {}
@@ -369,6 +394,8 @@ export function useCallEngine(currentUserId?: string) {
     setNetworkQuality('unknown')
     setBackgroundBlurEnabled(false)
     setBackgroundBlurIntensity(50)
+    setSelectedCallEffectId(null)
+    setCallEffectIntensity(60)
     if (typeof window !== 'undefined') {
       try { window.sessionStorage.removeItem('socialens-active-call') } catch {}
     }
@@ -1115,6 +1142,114 @@ export function useCallEngine(currentUserId?: string) {
     setBackgroundBlurEnabled(enabled)
     setBackgroundBlurIntensity(safeIntensity)
   }, [isCameraOff, isOnHold])
+  const setCallEffect = useCallback(async (effectId: string | null, intensity = callEffectIntensity) => {
+    const activeCall = callRef.current
+    if (!activeCall || activeCall.type !== 'video' || isCameraOff || isOnHold) {
+      if (effectId) throw new Error('Turn on your camera and resume the video call before applying a filter.')
+      return
+    }
+    const allPresets = [...PART_TWO_FACE_PRESETS, ...PART_THREE_MAKEUP_PRESETS, ...PART_FOUR_LIGHTING_PRESETS, ...PART_FOUR_CREATIVE_PRESETS, ...PART_FIVE_EYE_LENS_PRESETS]
+    const preset = effectId ? allPresets.find((item) => item.id === effectId) : null
+    if (effectId && !preset) throw new Error('This camera effect is not available.')
+    if (effectId && !HTMLCanvasElement.prototype.captureStream) throw new Error('Live camera effects are not supported by this browser.')
+
+    const agora = agoraRef.current
+    const daily = dailyRef.current
+    const rawTrack = agora?.videoTrack?.getMediaStreamTrack?.()
+      ?? callEffectsSourceTrackRef.current
+      ?? localStreamObjRef.current.getVideoTracks().find((track) => track.readyState === 'live')
+    if (!rawTrack || rawTrack.readyState !== 'live') {
+      if (effectId) throw new Error('Your camera is not ready yet. Please try again in a moment.')
+      return
+    }
+
+    if (!effectId) {
+      if (agora && callEffectsAgoraTrackRef.current) {
+        await agora.client.unpublish([callEffectsAgoraTrackRef.current])
+        try { callEffectsAgoraTrackRef.current.close() } catch {}
+        callEffectsAgoraTrackRef.current = null
+        await agora.client.publish([agora.videoTrack])
+        upsertTrack(localStreamObjRef.current, agora.videoTrack.getMediaStreamTrack())
+      } else if (daily && callEffectsEngineRef.current) {
+        const restoreTrack = callEffectsSourceTrackRef.current
+        if (restoreTrack?.readyState === 'live') {
+          await daily.setInputDevicesAsync({ videoSource: restoreTrack })
+          upsertTrack(localStreamObjRef.current, restoreTrack)
+        }
+      }
+      callEffectsEngineRef.current?.stop()
+      callEffectsEngineRef.current = null
+      callEffectsStageRef.current = null
+      callEffectsSourceTrackRef.current = null
+      setSelectedCallEffectId(null)
+      setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
+      return
+    }
+
+    if (callEffectsEngineRef.current && callEffectsStageRef.current && selectedCallEffectId === effectId) {
+      callEffectsStageRef.current.setIntensity?.(intensity)
+      setCallEffectIntensity(intensity)
+      return
+    }
+
+    const sourceForEngine = rawTrack.clone()
+    let engine: CallVideoEffectsEngine | null = null
+    let stage: FaceLandmarkEffectStage | ColorLookEffectStage | null = null
+    try {
+      engine = await CallVideoEffectsEngine.create(sourceForEngine, {
+        maxWidth: 960,
+        frameRate: 24,
+        onStageError: (stageId, error) => console.warn('[Call effects] stage removed after render error', stageId, error),
+      })
+      stage = preset!.categoryId === 'aesthetic-lighting' || preset!.categoryId === 'creative-looks'
+        ? new ColorLookEffectStage(preset!, intensity)
+        : new FaceLandmarkEffectStage({
+            preset: preset!,
+            intensity,
+            onError: (error) => console.warn('[Call effects] face tracking unavailable', error),
+          })
+      engine.addStage(stage)
+
+      if (agora) {
+        const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
+        const outgoingTrack = AgoraRTC.createCustomVideoTrack({ mediaStreamTrack: engine.processedTrack })
+        const previous = callEffectsAgoraTrackRef.current
+        if (previous) {
+          await agora.client.unpublish([previous])
+          try { previous.close() } catch {}
+        } else if (agora.videoTrack) {
+          await agora.client.unpublish([agora.videoTrack])
+        }
+        try {
+          await agora.client.publish([outgoingTrack])
+        } catch (publishError) {
+          try { outgoingTrack.close() } catch {}
+          if (!previous && agora.videoTrack) await agora.client.publish([agora.videoTrack]).catch(() => {})
+          throw publishError
+        }
+        callEffectsAgoraTrackRef.current = outgoingTrack
+        upsertTrack(localStreamObjRef.current, engine.processedTrack)
+      } else if (daily) {
+        await daily.setInputDevicesAsync({ videoSource: engine.processedTrack })
+        upsertTrack(localStreamObjRef.current, engine.processedTrack)
+      } else {
+        throw new Error('The active calling provider is not ready for camera effects.')
+      }
+
+      callEffectsEngineRef.current?.stop()
+      callEffectsEngineRef.current = engine
+      callEffectsStageRef.current = stage
+      callEffectsSourceTrackRef.current = sourceForEngine
+      setSelectedCallEffectId(effectId)
+      setCallEffectIntensity(intensity)
+      setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
+    } catch (error) {
+      engine?.stop()
+      if (sourceForEngine.readyState === 'live') sourceForEngine.stop()
+      throw error
+    }
+  }, [callEffectIntensity, selectedCallEffectId, isCameraOff, isOnHold])
+
   const toggleCamera = useCallback(async () => {
     const next = !isCameraOff
     setIsCameraOff(next)
@@ -1503,6 +1638,9 @@ export function useCallEngine(currentUserId?: string) {
     backgroundBlurEnabled,
     backgroundBlurIntensity,
     setBackgroundBlur,
+    selectedCallEffectId,
+    callEffectIntensity,
+    setCallEffect,
     switchToAudioOnly,
     startCall,
     cancelOutgoing,
