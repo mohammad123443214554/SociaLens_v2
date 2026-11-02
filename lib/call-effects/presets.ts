@@ -20,20 +20,6 @@ export function getPartTwoFacePreset(id: string) {
   return PART_TWO_FACE_PRESETS.find((preset) => preset.id === id) ?? null
 }
 
-/** Part 3: six makeup looks built from tracked facial regions; no external SDK. */
-export const PART_THREE_MAKEUP_PRESETS: readonly CallEffectDefinition[] = [
-  { id: 'soft-pink', categoryId: 'makeup', name: 'Soft Pink', description: 'A delicate pink lip, diffused cheek colour and a soft rosy eye wash.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 52 },
-  { id: 'rose-makeup', categoryId: 'makeup', name: 'Rose Makeup', description: 'Rose-toned lips and cheeks with softly defined eyes.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 58 },
-  { id: 'peach-makeup', categoryId: 'makeup', name: 'Peach Makeup', description: 'Warm peach cheeks, a fresh peach lip and subtle eye warmth.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 54 },
-  { id: 'korean-makeup', categoryId: 'makeup', name: 'Korean Makeup', description: 'A soft gradient lip, youthful cheek tint and delicate aegyo-sal highlight.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 50 },
-  { id: 'glam-look', categoryId: 'makeup', name: 'Glam Look', description: 'Defined eyeliner, richer lipstick, eye shadow and cheek highlight.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 62 },
-  { id: 'nude-makeup', categoryId: 'makeup', name: 'Nude Makeup', description: 'Neutral nude lips, understated contour and a natural eye definition.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 46 },
-] as const
-
-export function getPartThreeMakeupPreset(id: string) {
-  return PART_THREE_MAKEUP_PRESETS.find((preset) => preset.id === id) ?? null
-}
-
 /** Part 4: local colour-grade and light-treatment presets. */
 export const PART_FOUR_LIGHTING_PRESETS: readonly CallEffectDefinition[] = [
   { id: 'golden-hour', categoryId: 'aesthetic-lighting', name: 'Golden Hour', description: 'Warm late-afternoon light with a gentle highlight bloom.', renderKind: 'color', requiresFace: false, defaultIntensity: 58 },
@@ -59,19 +45,4 @@ export function getPartFourLightingPreset(id: string) {
 
 export function getPartFourCreativePreset(id: string) {
   return PART_FOUR_CREATIVE_PRESETS.find((preset) => preset.id === id) ?? null
-}
-
-
-/** Part 5: six iris-colour lenses using the 478-point MediaPipe face mesh. */
-export const PART_FIVE_EYE_LENS_PRESETS: readonly CallEffectDefinition[] = [
-  { id: 'ocean-blue', categoryId: 'eye-lenses', name: 'Ocean Blue', description: 'A cool ocean-blue iris tint that preserves the natural pupil and iris detail.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 62 },
-  { id: 'emerald-green', categoryId: 'eye-lenses', name: 'Emerald Green', description: 'A rich emerald iris colour with a restrained natural finish.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 60 },
-  { id: 'honey-hazel', categoryId: 'eye-lenses', name: 'Honey Hazel', description: 'Warm honey-hazel tones with golden detail around the iris.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 58 },
-  { id: 'silver-grey', categoryId: 'eye-lenses', name: 'Silver Grey', description: 'A cool silver-grey iris tint with soft charcoal definition.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 58 },
-  { id: 'amethyst-violet', categoryId: 'eye-lenses', name: 'Amethyst Violet', description: 'A subtle amethyst-violet iris colour with a luminous centre.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 56 },
-  { id: 'golden-amber', categoryId: 'eye-lenses', name: 'Golden Amber', description: 'A warm golden-amber iris tint with natural eye detail retained.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 60 },
-] as const
-
-export function getPartFiveEyeLensPreset(id: string) {
-  return PART_FIVE_EYE_LENS_PRESETS.find((preset) => preset.id === id) ?? null
 }
