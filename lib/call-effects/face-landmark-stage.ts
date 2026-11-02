@@ -132,6 +132,7 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
     if (this.preset.id === 'soft-contour') this.drawContour(context, points, width, height, amount)
     if (this.preset.id === 'portrait-polish') this.drawBlush(context, points, width, height, amount * 0.18)
 
+    if (this.preset.categoryId === 'makeup') this.drawMakeupLook(context, points, width, height, amount)
     if (this.preset.id === 'natural-glow' || this.preset.id === 'fresh-face' || this.preset.id === 'portrait-polish') {
       const overlay = this.preset.id === 'fresh-face' ? 'rgba(255,238,220,0.055)' : 'rgba(255,218,178,0.07)'
       context.save()
@@ -141,6 +142,190 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
       context.restore()
     }
     void video
+  }
+
+  /**
+   * Makeup is painted from the same live face mesh used by the other presets.
+   * Each look combines tracked lip/eye/cheek regions rather than using a
+   * screen-wide colour wash, so the effect follows head movement.
+   */
+  private drawMakeupLook(context: CanvasRenderingContext2D, points: Float32Array, width: number, height: number, amount: number) {
+    const id = this.preset.id
+    const looks: Record<string, { cheek: string; lip: string; shadow: string; liner: string; cheekAlpha: number; lipAlpha: number; eyeAlpha: number; linerWidth: number; highlight: boolean; gradientLip?: boolean }> = {
+      'soft-pink': { cheek: '#f18da9', lip: '#dc718f', shadow: '#d98ca7', liner: '#65434f', cheekAlpha: 0.34, lipAlpha: 0.42, eyeAlpha: 0.14, linerWidth: 0.65, highlight: true },
+      'rose-makeup': { cheek: '#d96f89', lip: '#a83e5d', shadow: '#a85d78', liner: '#49303e', cheekAlpha: 0.38, lipAlpha: 0.64, eyeAlpha: 0.25, linerWidth: 1.05, highlight: true },
+      'peach-makeup': { cheek: '#f2a477', lip: '#df866b', shadow: '#d89b83', liner: '#705044', cheekAlpha: 0.35, lipAlpha: 0.48, eyeAlpha: 0.15, linerWidth: 0.7, highlight: true },
+      'korean-makeup': { cheek: '#f28e9e', lip: '#e45c70', shadow: '#c88d9b', liner: '#634a53', cheekAlpha: 0.3, lipAlpha: 0.55, eyeAlpha: 0.12, linerWidth: 0.55, highlight: true, gradientLip: true },
+      'glam-look': { cheek: '#c87580', lip: '#9c294c', shadow: '#80516f', liner: '#211b2b', cheekAlpha: 0.43, lipAlpha: 0.78, eyeAlpha: 0.4, linerWidth: 1.8, highlight: true },
+      'nude-makeup': { cheek: '#c58e79', lip: '#b8796f', shadow: '#a9877c', liner: '#51413c', cheekAlpha: 0.2, lipAlpha: 0.35, eyeAlpha: 0.12, linerWidth: 0.85, highlight: false },
+    }
+    const look = looks[id]
+    if (!look) return
+    this.drawMakeupShadow(context, points, width, height, look.shadow, amount * look.eyeAlpha)
+    this.drawMakeupLiner(context, points, width, height, look.liner, amount * look.linerWidth)
+    this.drawMakeupLashes(context, points, width, height, amount, id === 'glam-look')
+    this.drawMakeupCheeks(context, points, width, height, look.cheek, amount * look.cheekAlpha)
+    this.drawMakeupLips(context, points, width, height, look.lip, amount * look.lipAlpha, Boolean(look.gradientLip))
+    if (look.highlight) this.drawMakeupHighlight(context, points, width, height, amount, id === 'korean-makeup')
+    if (id === 'glam-look') this.drawMakeupContour(context, points, width, height, amount)
+  }
+
+  private drawMakeupShadow(context: CanvasRenderingContext2D, points: Float32Array, width: number, height: number, color: string, amount: number) {
+    if (amount <= 0) return
+    context.save()
+    context.globalCompositeOperation = 'multiply'
+    for (const [contour, centerIndex] of [[LEFT_EYE, 159], [RIGHT_EYE, 386]] as const) {
+      const center = getPoint(points, centerIndex, width, height)
+      const eye = polygonPath(points, contour, width, height)
+      if (!center || !eye) continue
+      const radius = Math.max(9, width * 0.035)
+      const gradient = context.createRadialGradient(center.x, center.y - radius * 0.22, 1, center.x, center.y, radius)
+      gradient.addColorStop(0, colorWithAlpha(color, 0.24 * amount))
+      gradient.addColorStop(1, colorWithAlpha(color, 0))
+      context.fillStyle = gradient
+      context.globalAlpha = 0.92
+      context.fillRect(center.x - radius, center.y - radius, radius * 2, radius * 1.55)
+      context.globalCompositeOperation = 'source-over'
+      context.globalAlpha = 0.1 * amount
+      context.fill(eye)
+      context.globalCompositeOperation = 'multiply'
+    }
+    context.restore()
+  }
+
+  private drawMakeupLiner(context: CanvasRenderingContext2D, points: Float32Array, width: number, height: number, color: string, amount: number) {
+    if (amount <= 0) return
+    context.save()
+    context.strokeStyle = color
+    context.lineCap = 'round'
+    context.lineJoin = 'round'
+    context.globalAlpha = Math.min(0.82, 0.34 + amount * 0.2)
+    context.lineWidth = Math.max(0.7, width * 0.00115 * amount)
+    for (const indices of [[33, 160, 158, 133], [362, 385, 387, 263]]) {
+      const path = openLandmarkPath(points, indices, width, height)
+      if (path) context.stroke(path)
+    }
+    // Small outward wings, anchored to the outer eye corners.
+    for (const [cornerIndex, adjacentIndex, direction] of [[33, 133, -1], [263, 362, 1]] as const) {
+      const corner = getPoint(points, cornerIndex, width, height)
+      const adjacent = getPoint(points, adjacentIndex, width, height)
+      if (!corner || !adjacent) continue
+      const dx = (corner.x - adjacent.x) * 0.32
+      const dy = (corner.y - adjacent.y) * 0.2 - width * 0.002 * amount
+      context.beginPath()
+      context.moveTo(corner.x, corner.y)
+      context.quadraticCurveTo(corner.x + dx * 0.55 + direction * width * 0.002, corner.y + dy * 0.4, corner.x + dx + direction * width * 0.003, corner.y + dy)
+      context.stroke()
+    }
+    context.restore()
+  }
+
+  private drawMakeupLashes(context: CanvasRenderingContext2D, points: Float32Array, width: number, height: number, amount: number, dramatic: boolean) {
+    if (amount <= 0.05) return
+    context.save()
+    context.strokeStyle = '#241b24'
+    context.lineCap = 'round'
+    context.lineWidth = Math.max(0.55, width * (dramatic ? 0.00105 : 0.00055))
+    context.globalAlpha = (dramatic ? 0.5 : 0.22) * amount
+    for (const [a, b] of [[33, 160], [160, 158], [158, 133], [362, 385], [385, 387], [387, 263]]) {
+      const start = getPoint(points, a, width, height)
+      const end = getPoint(points, b, width, height)
+      if (!start || !end) continue
+      const count = dramatic ? 3 : 2
+      for (let i = 1; i <= count; i++) {
+        const t = i / (count + 1)
+        const x = start.x + (end.x - start.x) * t
+        const y = start.y + (end.y - start.y) * t
+        const lift = width * (dramatic ? 0.006 : 0.0035) * amount
+        context.beginPath()
+        context.moveTo(x, y)
+        context.quadraticCurveTo(x + (end.x - start.x) * 0.035, y - lift * 0.55, x + (end.x - start.x) * 0.07, y - lift)
+        context.stroke()
+      }
+    }
+    context.restore()
+  }
+
+  private drawMakeupCheeks(context: CanvasRenderingContext2D, points: Float32Array, width: number, height: number, color: string, amount: number) {
+    if (amount <= 0) return
+    context.save()
+    context.globalCompositeOperation = 'soft-light'
+    for (const index of [CHEEK_LEFT, CHEEK_RIGHT]) {
+      const point = getPoint(points, index, width, height)
+      if (!point) continue
+      const radiusX = Math.max(13, width * 0.072)
+      const radiusY = radiusX * 0.58
+      const gradient = context.createRadialGradient(point.x, point.y, 1, point.x, point.y, radiusX)
+      gradient.addColorStop(0, colorWithAlpha(color, 0.55 * amount))
+      gradient.addColorStop(0.62, colorWithAlpha(color, 0.2 * amount))
+      gradient.addColorStop(1, colorWithAlpha(color, 0))
+      context.fillStyle = gradient
+      context.beginPath()
+      context.ellipse(point.x, point.y, radiusX, radiusY, 0, 0, Math.PI * 2)
+      context.fill()
+    }
+    context.restore()
+  }
+
+  private drawMakeupLips(context: CanvasRenderingContext2D, points: Float32Array, width: number, height: number, color: string, amount: number, gradientLip: boolean) {
+    const outer = polygonPath(points, OUTER_LIPS, width, height)
+    if (!outer) return
+    context.save()
+    context.globalCompositeOperation = 'multiply'
+    context.globalAlpha = Math.min(0.78, 0.22 + amount * 0.48)
+    context.fillStyle = color
+    context.fill(outer)
+    if (gradientLip) {
+      const center = getPoint(points, 13, width, height)
+      if (center) {
+        const radius = Math.max(3, width * 0.025)
+        const gradient = context.createRadialGradient(center.x, center.y, 0, center.x, center.y, radius)
+        gradient.addColorStop(0, colorWithAlpha('#8f243d', 0.44 * amount))
+        gradient.addColorStop(1, colorWithAlpha('#8f243d', 0))
+        context.globalCompositeOperation = 'source-atop'
+        context.fillStyle = gradient
+        context.fillRect(center.x - radius, center.y - radius, radius * 2, radius * 2)
+      }
+    }
+    context.restore()
+  }
+
+  private drawMakeupHighlight(context: CanvasRenderingContext2D, points: Float32Array, width: number, height: number, amount: number, aegyo: boolean) {
+    context.save()
+    context.globalCompositeOperation = 'screen'
+    context.globalAlpha = (aegyo ? 0.2 : 0.15) * amount
+    for (const index of aegyo ? [111, 340, 4] : [4, 195, 425]) {
+      const point = getPoint(points, index, width, height)
+      if (!point) continue
+      const radius = Math.max(5, width * 0.025)
+      const gradient = context.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius)
+      gradient.addColorStop(0, 'rgba(255,239,222,0.48)')
+      gradient.addColorStop(1, 'rgba(255,239,222,0)')
+      context.fillStyle = gradient
+      context.beginPath()
+      context.ellipse(point.x, point.y, radius, radius * 0.48, 0, 0, Math.PI * 2)
+      context.fill()
+    }
+    context.restore()
+  }
+
+  private drawMakeupContour(context: CanvasRenderingContext2D, points: Float32Array, width: number, height: number, amount: number) {
+    context.save()
+    context.globalCompositeOperation = 'multiply'
+    context.globalAlpha = 0.1 * amount
+    for (const index of [234, 454]) {
+      const point = getPoint(points, index, width, height)
+      if (!point) continue
+      const radius = Math.max(15, width * 0.05)
+      const gradient = context.createRadialGradient(point.x, point.y, 1, point.x, point.y, radius)
+      gradient.addColorStop(0, 'rgba(100,61,55,0.42)')
+      gradient.addColorStop(1, 'rgba(100,61,55,0)')
+      context.fillStyle = gradient
+      context.beginPath()
+      context.arc(point.x, point.y, radius, 0, Math.PI * 2)
+      context.fill()
+    }
+    context.restore()
   }
 
   private drawSkinSoftening(frame: CallEffectFrame, points: Float32Array, amount: number) {
@@ -272,6 +457,26 @@ function getPoint(points: Float32Array, index: number, width: number, height: nu
   const y = points[offset + 1]
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
   return { x: x * width, y: y * height }
+}
+
+function colorWithAlpha(color: string, alpha: number) {
+  const hex = color.replace('#', '')
+  const normalized = hex.length === 3 ? hex.split('').map((part) => part + part).join('') : hex
+  const value = Number.parseInt(normalized, 16)
+  if (!Number.isFinite(value)) return `rgba(180,120,130,${alpha})`
+  return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${Math.max(0, Math.min(1, alpha))})`
+}
+
+function openLandmarkPath(points: Float32Array, indices: number[], width: number, height: number) {
+  const path = new Path2D()
+  let started = false
+  for (const index of indices) {
+    const point = getPoint(points, index, width, height)
+    if (!point) continue
+    if (!started) { path.moveTo(point.x, point.y); started = true }
+    else path.lineTo(point.x, point.y)
+  }
+  return started ? path : null
 }
 
 function polygonPath(points: Float32Array, indices: number[], width: number, height: number) {
