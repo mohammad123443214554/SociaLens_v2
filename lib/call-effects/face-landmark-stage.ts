@@ -133,6 +133,7 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
     if (this.preset.id === 'portrait-polish') this.drawBlush(context, points, width, height, amount * 0.18)
 
     if (this.preset.categoryId === 'makeup') this.drawMakeupLook(context, points, width, height, amount)
+    if (this.preset.categoryId === 'eye-lenses') this.drawEyeLens(context, points, width, height, amount)
     if (this.preset.id === 'natural-glow' || this.preset.id === 'fresh-face' || this.preset.id === 'portrait-polish') {
       const overlay = this.preset.id === 'fresh-face' ? 'rgba(255,238,220,0.055)' : 'rgba(255,218,178,0.07)'
       context.save()
@@ -390,6 +391,71 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
     context.fillStyle = '#d96f83'
     context.fill(path)
     context.restore()
+  }
+
+  private drawEyeLens(context: CanvasRenderingContext2D, points: Float32Array, width: number, height: number, amount: number) {
+    // FaceLandmarker returns iris landmarks 468-477 when using the full face mesh.
+    // If a browser/model ever supplies a shorter mesh, skip safely instead of
+    // painting guessed circles over the eyes.
+    if (points.length < 478 * 2) return
+    const palettes: Record<string, { base: string; light: string; dark: string }> = {
+      'ocean-blue': { base: '#287fc1', light: '#9bdcff', dark: '#123e78' },
+      'emerald-green': { base: '#268b61', light: '#9be7b4', dark: '#124b38' },
+      'honey-hazel': { base: '#a87935', light: '#f5d58b', dark: '#65421e' },
+      'silver-grey': { base: '#788a9a', light: '#e0e8ee', dark: '#394854' },
+      'amethyst-violet': { base: '#8052b5', light: '#d8b5ff', dark: '#432568' },
+      'golden-amber': { base: '#b77b24', light: '#ffe09a', dark: '#75400f' },
+    }
+    const palette = palettes[this.preset.id]
+    if (!palette) return
+
+    const eyes = [
+      { center: 468, ring: [469, 470, 471, 472] as const, contour: LEFT_EYE },
+      { center: 473, ring: [474, 475, 476, 477] as const, contour: RIGHT_EYE },
+    ]
+    for (const eye of eyes) {
+      const center = getPoint(points, eye.center, width, height)
+      const ringPoints = eye.ring.map((index) => getPoint(points, index, width, height))
+      const eyeOpening = polygonPath(points, eye.contour, width, height)
+      if (!center || ringPoints.some((point) => !point) || !eyeOpening) continue
+      const validRing = ringPoints as Array<{ x: number; y: number }>
+      const radius = validRing.reduce((sum, point) => sum + Math.hypot(point.x - center.x, point.y - center.y), 0) / validRing.length
+      if (!Number.isFinite(radius) || radius < 2 || radius > width * 0.04) continue
+
+      const iris = new Path2D()
+      validRing.forEach((point, index) => {
+        if (index === 0) iris.moveTo(point.x, point.y)
+        else iris.lineTo(point.x, point.y)
+      })
+      iris.closePath()
+      // The even-odd pupil cut-out keeps the real pupil and its reflections intact.
+      iris.moveTo(center.x + radius * 0.34, center.y)
+      iris.arc(center.x, center.y, radius * 0.34, 0, Math.PI * 2)
+      iris.closePath()
+
+      context.save()
+      context.clip(eyeOpening)
+      context.globalCompositeOperation = 'color'
+      context.globalAlpha = 0.78 * amount
+      context.fillStyle = palette.base
+      context.fill(iris, 'evenodd')
+
+      context.globalCompositeOperation = 'soft-light'
+      context.globalAlpha = 0.48 * amount
+      const sheen = context.createRadialGradient(center.x - radius * 0.2, center.y - radius * 0.28, 1, center.x, center.y, radius * 1.05)
+      sheen.addColorStop(0, palette.light)
+      sheen.addColorStop(0.58, palette.base)
+      sheen.addColorStop(1, palette.dark)
+      context.fillStyle = sheen
+      context.fill(iris, 'evenodd')
+
+      context.globalCompositeOperation = 'multiply'
+      context.globalAlpha = 0.2 * amount
+      context.strokeStyle = palette.dark
+      context.lineWidth = Math.max(0.65, radius * 0.1)
+      context.stroke(iris)
+      context.restore()
+    }
   }
 
   private drawEyeBrightness(context: CanvasRenderingContext2D, points: Float32Array, width: number, height: number, amount: number) {
