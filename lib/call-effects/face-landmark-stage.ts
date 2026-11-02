@@ -136,8 +136,15 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
 
   private drawSkinSoftening(frame: CallEffectFrame, points: Float32Array, amount: number) {
     const { width, height, context, video } = frame
-    const path = polygonPath(points, FACE_OVAL, width, height)
-    if (!path) return
+    const facePath = polygonPath(points, FACE_OVAL, width, height)
+    if (!facePath) return
+    // Keep the eye and mouth areas crisp instead of smoothing over facial details.
+    const eyeLeftPath = polygonPath(points, LEFT_EYE, width, height)
+    const eyeRightPath = polygonPath(points, RIGHT_EYE, width, height)
+    const lipPath = polygonPath(points, OUTER_LIPS, width, height)
+    if (eyeLeftPath) facePath.addPath(eyeLeftPath)
+    if (eyeRightPath) facePath.addPath(eyeRightPath)
+    if (lipPath) facePath.addPath(lipPath)
     this.scratch.width = width
     this.scratch.height = height
     const scratch = this.scratchContext
@@ -149,7 +156,7 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
 
     context.save()
     context.globalAlpha = amount * (this.preset.id === 'glass-skin' ? 0.23 : 0.17)
-    context.clip(path)
+    context.clip(facePath, 'evenodd')
     context.drawImage(this.scratch, 0, 0)
     context.restore()
   }
