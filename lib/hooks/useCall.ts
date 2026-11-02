@@ -196,6 +196,8 @@ export function useCallEngine(currentUserId?: string) {
   const callEffectsSourceTrackRef = useRef<MediaStreamTrack | null>(null)
   const callEffectsStageRef = useRef<{ setIntensity?: (value: number) => void } | null>(null)
   const setCallEffectRef = useRef<((effectId: string | null, intensity?: number, forceRebuild?: boolean) => Promise<void>) | null>(null)
+  const selectedCallEffectIdRef = useRef<string | null>(null)
+  const callEffectIntensityRef = useRef(60)
   const providerRef = useRef<CallProviderName | null>(null)
   const startedAtMsRef = useRef<number | null>(null)
 
@@ -215,6 +217,8 @@ export function useCallEngine(currentUserId?: string) {
   const reconnectActiveCallRef = useRef<((activeCall: CallRow) => void) | null>(null)
 
   useEffect(() => { callRef.current = call }, [call])
+  selectedCallEffectIdRef.current = selectedCallEffectId
+  callEffectIntensityRef.current = callEffectIntensity
   useEffect(() => { console.log('[SociaLens Call] phase changed ->', phase) }, [phase])
 
   const clearRingTimeout = () => { if (ringTimeoutRef.current) { clearTimeout(ringTimeoutRef.current); ringTimeoutRef.current = null } }
@@ -715,6 +719,9 @@ export function useCallEngine(currentUserId?: string) {
 
     try {
       await attemptConnect(0)
+      if (selectedCallEffectIdRef.current) {
+        await setCallEffectRef.current?.(selectedCallEffectIdRef.current, callEffectIntensityRef.current, true).catch((effectError) => console.warn('[Call effects] could not restore selected filter after connection', effectError))
+      }
     } catch (initialError: any) {
       let err = initialError
       const errName = String(err?.name || '')
@@ -741,6 +748,9 @@ export function useCallEngine(currentUserId?: string) {
               .maybeSingle()
             if (latest?.status !== 'accepted') break
             await attemptConnect(retry)
+            if (selectedCallEffectIdRef.current) {
+              await setCallEffectRef.current?.(selectedCallEffectIdRef.current, callEffectIntensityRef.current, true).catch((effectError) => console.warn('[Call effects] could not restore selected filter after reconnect', effectError))
+            }
             return
           } catch (retryError: any) {
             err = retryError
