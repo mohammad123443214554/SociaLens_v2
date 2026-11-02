@@ -373,19 +373,8 @@ export function CallScreen({
 
       {/* Controls */}
       <div className={`relative z-10 ${isMini ? "flex flex-wrap items-center justify-center gap-1 px-1 pb-2 pt-1" : "mx-auto mt-auto grid w-full max-w-[320px] grid-cols-5 justify-items-center gap-x-2 gap-y-3 px-2 pb-12 pt-6 sm:gap-x-3 md:mx-0 md:flex md:w-auto md:max-w-none md:flex-nowrap md:items-center md:justify-center md:gap-4 md:px-4"} bg-gradient-to-t from-black/50 to-transparent`}>
-        <button
-          type="button"
-          onClick={() => setIsSpeakerOn((current) => !current)}
-          aria-label={isSpeakerOn ? 'Speaker on' : 'Speaker off'}
-          aria-pressed={isSpeakerOn}
-          title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'}
-          className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}
-        >
-          {isSpeakerOn ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
-        </button>
-
         <div className="relative">
-          <button type="button" onClick={() => { setMoreMenuOpen((open) => !open); setEffectsMenuOpen(false) }} aria-label="More call controls" aria-expanded={moreMenuOpen} title="More options" className={\`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center border transition-all \${moreMenuOpen ? 'border-pink-200/30 bg-pink-300/[0.12] text-pink-50 shadow-[0_0_18px_rgba(255,105,180,0.08)]' : 'border-white/10 bg-white/10 hover:bg-white/15'}\`}>
+          <button type="button" onClick={() => { setMoreMenuOpen((open) => !open); setEffectsMenuOpen(false) }} aria-label="More call controls" aria-expanded={moreMenuOpen} title="More options" className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center border transition-all ${moreMenuOpen ? 'border-pink-200/30 bg-pink-300/[0.12] text-pink-50 shadow-[0_0_18px_rgba(255,105,180,0.08)]' : 'border-white/10 bg-white/10 hover:bg-white/15'}`}>
             <MoreHorizontal className="h-6 w-6" />
           </button>
           {moreMenuOpen && (
@@ -394,13 +383,13 @@ export function CallScreen({
               <button type="button" onClick={onToggleMute} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                 {isMuted ? <MicOff className="h-4 w-4 text-pink-200" /> : <Mic className="h-4 w-4" />}
                 <span className="flex-1">{isMuted ? 'Turn microphone on' : 'Turn microphone off'}</span>
-                <span className={\`h-2 w-2 rounded-full \${isMuted ? 'bg-pink-300' : 'bg-white/25'}\`} />
+                <span className={`h-2 w-2 rounded-full ${isMuted ? 'bg-pink-300' : 'bg-white/25'}`} />
               </button>
               {isVideoCall && (
                 <button type="button" onClick={onToggleCamera} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                   {isCameraOff ? <VideoOff className="h-4 w-4 text-pink-200" /> : <Video className="h-4 w-4" />}
                   <span className="flex-1">{isCameraOff ? 'Turn camera on' : 'Turn camera off'}</span>
-                  <span className={\`h-2 w-2 rounded-full \${isCameraOff ? 'bg-pink-300' : 'bg-white/25'}\`} />
+                  <span className={`h-2 w-2 rounded-full ${isCameraOff ? 'bg-pink-300' : 'bg-white/25'}`} />
                 </button>
               )}
               <button type="button" onClick={() => { setIsScreenLocked(true); setMoreMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
@@ -415,7 +404,7 @@ export function CallScreen({
           )}
         </div>
 
-        <button type="button" onClick={() => setIsSpeakerOn((current) => !current)} aria-label={isSpeakerOn ? 'Speaker on' : 'Speaker off'} aria-pressed={isSpeakerOn} title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'} className={\`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors \${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}\`}>
+        <button type="button" onClick={() => setIsSpeakerOn((current) => !current)} aria-label={isSpeakerOn ? 'Speaker on' : 'Speaker off'} aria-pressed={isSpeakerOn} title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}>
           {isSpeakerOn ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
         </button>
 
@@ -426,7 +415,7 @@ export function CallScreen({
               <button type="button" onClick={() => setEffectsMenuOpen(false)} className="rounded-full px-2 py-1 text-xs text-pink-50/65 hover:bg-pink-300/[0.08]" aria-label="Close effects menu">✕</button>
             </div>
             <button type="button" onClick={() => { setBlurDraft(backgroundBlurIntensity); setBlurError(null); setBlurPopupOpen(true); setEffectsMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-pink-300/[0.07]">
-              <Sparkles className="h-4 w-4" /><span className="flex-1">Background Blur</span><span className={\`h-2 w-2 rounded-full \${backgroundBlurEnabled ? 'bg-pink-300' : 'bg-white/25'}\`} />
+              <Sparkles className="h-4 w-4" /><span className="flex-1">Background Blur</span><span className={`h-2 w-2 rounded-full ${backgroundBlurEnabled ? 'bg-pink-300' : 'bg-white/25'}`} />
             </button>
             <button type="button" onClick={() => { setDraftEffectId(selectedCallEffectId); setEffectDraftIntensity(callEffectIntensity); setEffectError(null); setFiltersOpen(true); setEffectsMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-pink-300/[0.07]">
               <WandSparkles className="h-4 w-4" /><span className="flex-1">Filters</span><span className="text-pink-100/45">›</span>
@@ -442,6 +431,46 @@ export function CallScreen({
           <PhoneOff className="h-5 w-5 sm:h-7 sm:w-7" />
         </button>
       </div>
+
+
+      {filtersOpen && isVideoCall && (
+        <div className="absolute inset-0 z-[125] flex items-center justify-center bg-black/[0.16] p-4 backdrop-blur-[3px]" role="dialog" aria-modal="true" aria-label="Choose call filters">
+          <div className="w-full max-w-lg max-h-[min(82vh,680px)] overflow-hidden rounded-3xl border border-pink-100/[0.18] bg-white/[0.035] p-4 sm:p-5 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035]">
+            <div className="mb-4 flex items-center justify-between">
+              <div><h3 className="text-base font-semibold tracking-wide text-pink-50/95">Filters</h3><p className="mt-1 text-xs text-pink-100/65">Choose a look, then press Done to apply</p></div>
+              <button type="button" onClick={() => setFiltersOpen(false)} className="rounded-full border border-pink-100/[0.12] bg-pink-300/[0.05] p-2 text-pink-50/80 transition-colors hover:bg-pink-300/[0.09]" aria-label="Close filters">✕</button>
+            </div>
+            <div className="mb-3 flex gap-1.5 overflow-x-auto pb-2">
+              {availableEffectCategories.map((category) => (
+                <button key={category.id} type="button" onClick={() => setEffectsCategory(category.id)} className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-medium backdrop-blur-xl transition-colors ${effectsCategory === category.id ? 'border-pink-200/35 bg-pink-300/[0.12] text-pink-50' : 'border-pink-100/[0.13] bg-white/[0.025] text-pink-100/65 hover:bg-pink-200/[0.07]'}`}>{category.label}</button>
+              ))}
+            </div>
+            <div className="max-h-[min(46vh,390px)] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setDraftEffectId(null)} className={`rounded-xl border px-3 py-3 text-left backdrop-blur-xl transition-colors ${draftEffectId === null ? 'border-pink-200/35 bg-pink-300/[0.12]' : 'border-pink-100/[0.13] bg-white/[0.025] hover:bg-pink-200/[0.07]'}`}>
+                  <span className="block text-xs font-semibold">No filter</span><span className="mt-1 block text-[10px] text-pink-100/55">Use original camera</span>
+                </button>
+                {visibleCallEffects.map((effect) => (
+                  <button key={effect.id} type="button" onClick={() => { setDraftEffectId(effect.id); setEffectDraftIntensity(effect.defaultIntensity) }} className={`rounded-xl border px-3 py-3 text-left backdrop-blur-xl transition-colors ${draftEffectId === effect.id ? 'border-pink-200/35 bg-pink-300/[0.12]' : 'border-pink-100/[0.13] bg-white/[0.025] hover:bg-pink-200/[0.07]'}`}>
+                    <span className="block text-xs font-semibold">{effect.name}</span><span className="mt-1 block text-[10px] leading-snug text-pink-100/55">{effect.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {activeCallEffect && (
+              <div className="mt-3 rounded-2xl border border-pink-300/[0.18] bg-pink-400/[0.08] p-3 backdrop-blur-xl">
+                <div className="mb-2 flex items-center justify-between text-xs"><span className="font-medium">{activeCallEffect.name} intensity</span><span className="tabular-nums text-pink-100/75">{effectDraftIntensity}%</span></div>
+                <input type="range" min="0" max="100" value={effectDraftIntensity} onChange={(event) => setEffectDraftIntensity(Number(event.target.value))} className="w-full cursor-pointer accent-pink-300" aria-label="Filter intensity" />
+              </div>
+            )}
+            {effectError && <p className="mt-3 rounded-xl border border-red-300/20 bg-red-400/[0.08] px-3 py-2 text-xs text-red-200">{effectError}</p>}
+            <div className="mt-4 flex gap-2 border-t border-pink-100/[0.10] pt-3">
+              <button type="button" disabled={effectSaving} onClick={() => setFiltersOpen(false)} className="flex-1 rounded-xl border border-pink-100/[0.18] bg-white/[0.025] px-4 py-3 text-sm font-medium text-pink-50/90 backdrop-blur-xl transition-colors hover:bg-pink-200/[0.07] disabled:opacity-50">Cancel</button>
+              <button type="button" disabled={effectSaving} onClick={async () => { setEffectSaving(true); setEffectError(null); try { await onSetCallEffect(draftEffectId, effectDraftIntensity); setFiltersOpen(false) } catch (error) { setEffectError(error instanceof Error ? error.message : 'Could not apply this filter.') } finally { setEffectSaving(false) } }} className="flex-1 rounded-xl border border-pink-200/[0.22] bg-pink-300/[0.10] px-4 py-3 text-sm font-semibold text-pink-50 shadow-[0_4px_18px_rgba(255,105,180,0.08)] backdrop-blur-xl transition-colors hover:bg-pink-300/[0.14] disabled:opacity-50">{effectSaving ? 'Applying…' : 'Done'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {blurPopupOpen && isVideoCall && (
         <div className="absolute inset-0 z-[120] flex items-center justify-center bg-black/[0.16] p-4 backdrop-blur-[3px]" role="dialog" aria-modal="true" aria-label="Background Blur settings">
