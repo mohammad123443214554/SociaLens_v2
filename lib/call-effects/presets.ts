@@ -19,3 +19,17 @@ export const PART_TWO_FACE_PRESETS: readonly CallEffectDefinition[] = [
 export function getPartTwoFacePreset(id: string) {
   return PART_TWO_FACE_PRESETS.find((preset) => preset.id === id) ?? null
 }
+
+/** Part 3: six makeup looks built from tracked facial regions; no external SDK. */
+export const PART_THREE_MAKEUP_PRESETS: readonly CallEffectDefinition[] = [
+  { id: 'soft-pink', categoryId: 'makeup', name: 'Soft Pink', description: 'A delicate pink lip, diffused cheek colour and a soft rosy eye wash.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 52 },
+  { id: 'rose-makeup', categoryId: 'makeup', name: 'Rose Makeup', description: 'Rose-toned lips and cheeks with softly defined eyes.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 58 },
+  { id: 'peach-makeup', categoryId: 'makeup', name: 'Peach Makeup', description: 'Warm peach cheeks, a fresh peach lip and subtle eye warmth.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 54 },
+  { id: 'korean-makeup', categoryId: 'makeup', name: 'Korean Makeup', description: 'A soft gradient lip, youthful cheek tint and delicate aegyo-sal highlight.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 50 },
+  { id: 'glam-look', categoryId: 'makeup', name: 'Glam Look', description: 'Defined eyeliner, richer lipstick, eye shadow and cheek highlight.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 62 },
+  { id: 'nude-makeup', categoryId: 'makeup', name: 'Nude Makeup', description: 'Neutral nude lips, understated contour and a natural eye definition.', renderKind: 'face-landmark', requiresFace: true, defaultIntensity: 46 },
+] as const
+
+export function getPartThreeMakeupPreset(id: string) {
+  return PART_THREE_MAKEUP_PRESETS.find((preset) => preset.id === id) ?? null
+}
