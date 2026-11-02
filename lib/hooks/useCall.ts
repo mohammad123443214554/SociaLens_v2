@@ -198,6 +198,9 @@ export function useCallEngine(currentUserId?: string) {
   const setCallEffectRef = useRef<((effectId: string | null, intensity?: number, forceRebuild?: boolean) => Promise<void>) | null>(null)
   const selectedCallEffectIdRef = useRef<string | null>(null)
   const callEffectIntensityRef = useRef(60)
+  const backgroundBlurEnabledRef = useRef(false)
+  const backgroundBlurIntensityRef = useRef(50)
+  const setBackgroundBlurRef = useRef<((enabled: boolean, intensity: number) => Promise<void>) | null>(null)
   const providerRef = useRef<CallProviderName | null>(null)
   const startedAtMsRef = useRef<number | null>(null)
 
@@ -219,6 +222,8 @@ export function useCallEngine(currentUserId?: string) {
   useEffect(() => { callRef.current = call }, [call])
   selectedCallEffectIdRef.current = selectedCallEffectId
   callEffectIntensityRef.current = callEffectIntensity
+  backgroundBlurEnabledRef.current = backgroundBlurEnabled
+  backgroundBlurIntensityRef.current = backgroundBlurIntensity
   useEffect(() => { console.log('[SociaLens Call] phase changed ->', phase) }, [phase])
 
   const clearRingTimeout = () => { if (ringTimeoutRef.current) { clearTimeout(ringTimeoutRef.current); ringTimeoutRef.current = null } }
@@ -719,7 +724,10 @@ export function useCallEngine(currentUserId?: string) {
 
     try {
       await attemptConnect(0)
-      if (selectedCallEffectIdRef.current) {
+      if (backgroundBlurEnabledRef.current) {
+        await setBackgroundBlurRef.current?.(true, backgroundBlurIntensityRef.current).catch((blurError) => { console.warn('[Call effects] could not restore Background Blur after connection', blurError); setBackgroundBlurEnabled(false) })
+      }
+      if (selectedCallEffectIdRef.current && !backgroundBlurEnabledRef.current) {
         await setCallEffectRef.current?.(selectedCallEffectIdRef.current, callEffectIntensityRef.current, true).catch((effectError) => console.warn('[Call effects] could not restore selected filter after connection', effectError))
       }
     } catch (initialError: any) {
@@ -748,7 +756,10 @@ export function useCallEngine(currentUserId?: string) {
               .maybeSingle()
             if (latest?.status !== 'accepted') break
             await attemptConnect(retry)
-            if (selectedCallEffectIdRef.current) {
+            if (backgroundBlurEnabledRef.current) {
+              await setBackgroundBlurRef.current?.(true, backgroundBlurIntensityRef.current).catch((blurError) => { console.warn('[Call effects] could not restore Background Blur after reconnect', blurError); setBackgroundBlurEnabled(false) })
+            }
+            if (selectedCallEffectIdRef.current && !backgroundBlurEnabledRef.current) {
               await setCallEffectRef.current?.(selectedCallEffectIdRef.current, callEffectIntensityRef.current, true).catch((effectError) => console.warn('[Call effects] could not restore selected filter after reconnect', effectError))
             }
             return
@@ -1157,6 +1168,7 @@ export function useCallEngine(currentUserId?: string) {
     setBackgroundBlurIntensity(safeIntensity)
     if (selectedCallEffectId) await setCallEffectRef.current?.(selectedCallEffectId, callEffectIntensity, true)
   }, [isCameraOff, isOnHold, selectedCallEffectId, callEffectIntensity])
+  setBackgroundBlurRef.current = setBackgroundBlur
   const setCallEffect = useCallback(async (effectId: string | null, intensity = callEffectIntensity, forceRebuild = false) => {
     const activeCall = callRef.current
     if (!activeCall || activeCall.type !== 'video' || isCameraOff || isOnHold) {
