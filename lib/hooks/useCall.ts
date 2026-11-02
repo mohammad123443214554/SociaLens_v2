@@ -562,7 +562,7 @@ export function useCallEngine(currentUserId?: string) {
           const quality = worst <= 1 ? 'excellent' : worst <= 2 ? 'good' : 'weak'
           setNetworkQuality(quality)
           if (activeCall.type === 'video') {
-            void applyAdaptiveVideoQuality(new MediaStream([videoTrack?.getMediaStreamTrack?.()].filter(Boolean)), quality)
+            void applyAdaptiveVideoQuality(new MediaStream([videoTrack?.getMediaStreamTrack?.()].filter((track): track is MediaStreamTrack => Boolean(track))), quality)
           }
         })
         client.on('connection-state-change', (curState: string, _prevState: string, reason: string) => {
