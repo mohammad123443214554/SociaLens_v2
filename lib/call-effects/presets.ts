@@ -33,3 +33,30 @@ export const PART_THREE_MAKEUP_PRESETS: readonly CallEffectDefinition[] = [
 export function getPartThreeMakeupPreset(id: string) {
   return PART_THREE_MAKEUP_PRESETS.find((preset) => preset.id === id) ?? null
 }
+
+/** Part 4: local colour-grade and light-treatment presets. */
+export const PART_FOUR_LIGHTING_PRESETS: readonly CallEffectDefinition[] = [
+  { id: 'golden-hour', categoryId: 'aesthetic-lighting', name: 'Golden Hour', description: 'Warm late-afternoon light with a gentle highlight bloom.', renderKind: 'color', requiresFace: false, defaultIntensity: 58 },
+  { id: 'warm-light', categoryId: 'aesthetic-lighting', name: 'Warm Light', description: 'A soft amber-white balance for a cosy natural look.', renderKind: 'color', requiresFace: false, defaultIntensity: 48 },
+  { id: 'cool-light', categoryId: 'aesthetic-lighting', name: 'Cool Light', description: 'A clean cool daylight treatment with controlled contrast.', renderKind: 'color', requiresFace: false, defaultIntensity: 45 },
+  { id: 'dreamy-glow', categoryId: 'aesthetic-lighting', name: 'Dreamy Glow', description: 'Soft luminous highlights with a delicate diffusion halo.', renderKind: 'overlay', requiresFace: false, defaultIntensity: 52 },
+  { id: 'vintage-film', categoryId: 'aesthetic-lighting', name: 'Vintage Film', description: 'Warm film-inspired colour, gentle vignette and fine grain.', renderKind: 'overlay', requiresFace: false, defaultIntensity: 50 },
+  { id: 'cinematic', categoryId: 'aesthetic-lighting', name: 'Cinematic', description: 'A deeper cinematic grade with restrained contrast and vignette.', renderKind: 'color', requiresFace: false, defaultIntensity: 48 },
+] as const
+
+export const PART_FOUR_CREATIVE_PRESETS: readonly CallEffectDefinition[] = [
+  { id: 'pastel-dream', categoryId: 'creative-looks', name: 'Pastel Dream', description: 'Airy pastel colour with softened contrast and a gentle glow.', renderKind: 'color', requiresFace: false, defaultIntensity: 54 },
+  { id: 'lavender', categoryId: 'creative-looks', name: 'Lavender', description: 'A delicate lavender-violet colour mood.', renderKind: 'color', requiresFace: false, defaultIntensity: 50 },
+  { id: 'milky-tone', categoryId: 'creative-looks', name: 'Milky Tone', description: 'A creamy, lifted colour grade with muted saturation.', renderKind: 'color', requiresFace: false, defaultIntensity: 46 },
+  { id: 'soft-focus', categoryId: 'creative-looks', name: 'Soft Focus', description: 'A subtle optical diffusion while keeping the main image readable.', renderKind: 'overlay', requiresFace: false, defaultIntensity: 42 },
+  { id: 'rose-gold', categoryId: 'creative-looks', name: 'Rose Gold', description: 'A refined rosy warmth with a soft metallic highlight tint.', renderKind: 'color', requiresFace: false, defaultIntensity: 52 },
+  { id: 'night-glow', categoryId: 'creative-looks', name: 'Night Glow', description: 'A low-light friendly luminous grade with cool shadows and warm highlights.', renderKind: 'overlay', requiresFace: false, defaultIntensity: 56 },
+] as const
+
+export function getPartFourLightingPreset(id: string) {
+  return PART_FOUR_LIGHTING_PRESETS.find((preset) => preset.id === id) ?? null
+}
+
+export function getPartFourCreativePreset(id: string) {
+  return PART_FOUR_CREATIVE_PRESETS.find((preset) => preset.id === id) ?? null
+}
