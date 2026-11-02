@@ -1224,7 +1224,6 @@ export function useCallEngine(currentUserId?: string) {
         const previous = callEffectsAgoraTrackRef.current
         if (previous) {
           await agora.client.unpublish([previous])
-          try { previous.close() } catch {}
         } else if (agora.videoTrack) {
           await agora.client.unpublish([agora.videoTrack])
         }
@@ -1232,9 +1231,11 @@ export function useCallEngine(currentUserId?: string) {
           await agora.client.publish([outgoingTrack])
         } catch (publishError) {
           try { outgoingTrack.close() } catch {}
-          if (!previous && agora.videoTrack) await agora.client.publish([agora.videoTrack]).catch(() => {})
+          if (previous) await agora.client.publish([previous]).catch(() => {})
+          else if (agora.videoTrack) await agora.client.publish([agora.videoTrack]).catch(() => {})
           throw publishError
         }
+        if (previous) { try { previous.close() } catch {} }
         callEffectsAgoraTrackRef.current = outgoingTrack
         upsertTrack(localStreamObjRef.current, engine.processedTrack)
       } else if (daily) {
