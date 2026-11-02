@@ -5,6 +5,7 @@ import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, Sparkles, ArrowLef
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
+import { CALL_EFFECT_CATEGORIES, PART_TWO_FACE_PRESETS, PART_THREE_MAKEUP_PRESETS, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS, PART_FIVE_EYE_LENS_PRESETS } from '@/lib/call-effects'
 
 interface CallScreenProps {
   phase: CallPhase
@@ -30,6 +31,9 @@ interface CallScreenProps {
   backgroundBlurEnabled: boolean
   backgroundBlurIntensity: number
   onSetBackgroundBlur: (enabled: boolean, intensity: number) => Promise<void>
+  selectedCallEffectId: string | null
+  callEffectIntensity: number
+  onSetCallEffect: (effectId: string | null, intensity?: number) => Promise<void>
 }
 
 function formatDuration(sec: number) {
@@ -43,6 +47,7 @@ export function CallScreen({
   isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume,
   onEnd, onToggleMute, onToggleCamera, onSwitchCamera, onToggleHold,
   backgroundBlurEnabled, backgroundBlurIntensity, onSetBackgroundBlur,
+  selectedCallEffectId, callEffectIntensity, onSetCallEffect,
 }: CallScreenProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -54,10 +59,17 @@ export function CallScreen({
   const [isSpeakerOn, setIsSpeakerOn] = useState(false)
   const [isScreenLocked, setIsScreenLocked] = useState(false)
   const [effectsOpen, setEffectsOpen] = useState(false)
+  const [effectsCategory, setEffectsCategory] = useState('eye-lenses')
+  const [effectDraftIntensity, setEffectDraftIntensity] = useState(callEffectIntensity)
+  const [effectSaving, setEffectSaving] = useState(false)
+  const [effectError, setEffectError] = useState<string | null>(null)
   const [blurPopupOpen, setBlurPopupOpen] = useState(false)
   const [blurDraft, setBlurDraft] = useState(backgroundBlurIntensity)
   const [blurSaving, setBlurSaving] = useState(false)
   const [blurError, setBlurError] = useState<string | null>(null)
+  const allCallEffects = [...PART_TWO_FACE_PRESETS, ...PART_THREE_MAKEUP_PRESETS, ...PART_FOUR_LIGHTING_PRESETS, ...PART_FOUR_CREATIVE_PRESETS, ...PART_FIVE_EYE_LENS_PRESETS]
+  const visibleCallEffects = allCallEffects.filter((effect) => effect.categoryId === effectsCategory)
+  const activeCallEffect = allCallEffects.find((effect) => effect.id === selectedCallEffectId) ?? null
 
   const [isMini, setIsMini] = useState(false)
   const [miniSize, setMiniSize] = useState(300)
@@ -390,15 +402,56 @@ export function CallScreen({
 
         {isVideoCall && (
           <div className="relative">
-            <button type="button" onClick={() => setEffectsOpen((open) => !open)} disabled={isCameraOff || isOnHold || phase !== 'in-call'} aria-label="Call effects" title="Call effects" className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 ${backgroundBlurEnabled ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white' : 'bg-white/15 hover:bg-white/25'}`}>
+            <button type="button" onClick={() => setEffectsOpen((open) => !open)} disabled={isCameraOff || isOnHold || phase !== 'in-call'} aria-label="Call effects" title="Call effects" className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 ${backgroundBlurEnabled || selectedCallEffectId ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white' : 'bg-white/15 hover:bg-white/25'}`}>
               <Sparkles className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
             {effectsOpen && (
-              <div className="absolute bottom-16 left-1/2 z-[90] w-56 -translate-x-1/2 rounded-2xl border border-white/15 bg-neutral-900/95 p-2 text-white shadow-2xl backdrop-blur-xl">
-                <button type="button" onClick={() => { setBlurDraft(backgroundBlurIntensity); setBlurError(null); setBlurPopupOpen(true); setEffectsOpen(false) }} className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm hover:bg-white/10">
-                  <span className="flex items-center gap-2"><Sparkles className="h-4 w-4" />Background Blur</span>
-                  <span className={`h-2.5 w-2.5 rounded-full ${backgroundBlurEnabled ? 'bg-emerald-400' : 'bg-white/25'}`} />
-                </button>
+              <div className="absolute bottom-16 left-1/2 z-[90] w-[min(340px,calc(100vw-28px))] -translate-x-1/2 rounded-2xl border border-white/15 bg-neutral-950/95 p-3 text-white shadow-2xl backdrop-blur-xl">
+                <div className="mb-3 flex items-center justify-between">
+                  <div><p className="text-sm font-semibold">Camera Effects</p><p className="mt-0.5 text-[10px] text-white/50">On-device filters · no downloads</p></div>
+                  <button type="button" onClick={() => setEffectsOpen(false)} className="rounded-full px-2 py-1 text-white/60 hover:bg-white/10" aria-label="Close effects">✕</button>
+                </div>
+                <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
+                  {CALL_EFFECT_CATEGORIES.map((category) => (
+                    <button key={category.id} type="button" onClick={() => { setEffectsCategory(category.id); setEffectError(null) }} className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-medium ${effectsCategory === category.id ? 'border-pink-400/60 bg-pink-500/20 text-pink-100' : 'border-white/10 bg-white/[0.04] text-white/65'}`}>{category.label}</button>
+                  ))}
+                </div>
+                <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto pr-1">
+                  {visibleCallEffects.map((effect) => (
+                    <button key={effect.id} type="button" disabled={effectSaving || isCameraOff || isOnHold} onClick={async () => {
+                      setEffectSaving(true); setEffectError(null)
+                      try {
+                        await onSetCallEffect(effect.id, effect.defaultIntensity)
+                        setEffectDraftIntensity(effect.defaultIntensity)
+                      } catch (error) { setEffectError(error instanceof Error ? error.message : 'Could not apply this effect.') }
+                      finally { setEffectSaving(false) }
+                    }} className={`rounded-xl border px-3 py-2.5 text-left transition-colors disabled:opacity-45 ${selectedCallEffectId === effect.id ? 'border-pink-400/60 bg-pink-500/20' : 'border-white/10 bg-white/[0.035] hover:bg-white/10'}`}>
+                      <span className="block text-xs font-semibold">{effect.name}</span>
+                      <span className="mt-1 block text-[10px] leading-snug text-white/45">{effect.description}</span>
+                    </button>
+                  ))}
+                </div>
+                {activeCallEffect && (
+                  <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                    <div className="mb-2 flex items-center justify-between text-xs"><span>{activeCallEffect.name}</span><span className="tabular-nums text-white/60">{effectDraftIntensity}%</span></div>
+                    <input type="range" min="0" max="100" value={effectDraftIntensity} onChange={(event) => setEffectDraftIntensity(Number(event.target.value))} onPointerUp={async () => {
+                      setEffectSaving(true); setEffectError(null)
+                      try { await onSetCallEffect(selectedCallEffectId, effectDraftIntensity) }
+                      catch (error) { setEffectError(error instanceof Error ? error.message : 'Could not adjust this effect.') }
+                      finally { setEffectSaving(false) }
+                    }} onKeyUp={async () => {
+                      try { await onSetCallEffect(selectedCallEffectId, effectDraftIntensity) } catch {}
+                    }} className="w-full cursor-pointer accent-pink-400" aria-label="Filter intensity" />
+                  </div>
+                )}
+                {effectError && <p className="mt-2 text-[11px] text-red-300">{effectError}</p>}
+                <div className="mt-3 border-t border-white/10 pt-2">
+                  <button type="button" onClick={() => { setBlurDraft(backgroundBlurIntensity); setBlurError(null); setBlurPopupOpen(true); setEffectsOpen(false) }} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs hover:bg-white/10">
+                    <span className="flex items-center gap-2"><Sparkles className="h-4 w-4" />Background Blur</span>
+                    <span className={`h-2 w-2 rounded-full ${backgroundBlurEnabled ? 'bg-emerald-400' : 'bg-white/25'}`} />
+                  </button>
+                  {selectedCallEffectId && <button type="button" disabled={effectSaving} onClick={async () => { setEffectSaving(true); try { await onSetCallEffect(null); setEffectDraftIntensity(60) } catch (error) { setEffectError(error instanceof Error ? error.message : 'Could not remove the filter.') } finally { setEffectSaving(false) } }} className="mt-1 w-full rounded-xl px-3 py-2 text-left text-xs text-white/65 hover:bg-white/10 disabled:opacity-40">Remove selected filter</button>}
+                </div>
               </div>
             )}
           </div>
