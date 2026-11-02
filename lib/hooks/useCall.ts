@@ -1171,7 +1171,7 @@ export function useCallEngine(currentUserId?: string) {
     }
 
     if (!effectId) {
-      const restoreTrack = callEffectsSourceTrackRef.current
+      const restoreTrack = backgroundBlurProcessorRef.current?.processedTrack ?? callEffectsSourceTrackRef.current
       if (agora && callEffectsAgoraTrackRef.current) {
         const activeEffectsTrack = callEffectsAgoraTrackRef.current
         await agora.client.unpublish([activeEffectsTrack])
