@@ -1,6 +1,6 @@
 export { CALL_EFFECT_CATEGORIES } from './categories'
 export { getCallEffectsCapabilities, getCallEffectsRenderProfile } from './capabilities'
-export { PART_TWO_FACE_PRESETS, getPartTwoFacePreset, PART_THREE_MAKEUP_PRESETS, getPartThreeMakeupPreset, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS, getPartFourLightingPreset, getPartFourCreativePreset } from './presets'
+export { PART_TWO_FACE_PRESETS, getPartTwoFacePreset, PART_THREE_MAKEUP_PRESETS, getPartThreeMakeupPreset, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS, getPartFourLightingPreset, getPartFourCreativePreset, PART_FIVE_EYE_LENS_PRESETS, getPartFiveEyeLensPreset } from './presets'
 export { CallVideoEffectsEngine } from './engine'
 export { FaceLandmarkEffectStage } from './face-landmark-stage'
 export type { FaceLandmarkStageOptions } from './face-landmark-stage'
