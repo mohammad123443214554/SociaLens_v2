@@ -42,6 +42,8 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
   private snapshot: LandmarkSnapshot = { points: null, receivedAt: 0 }
   private lastInferenceAt = 0
   private inferencePending = false
+  private workerReady = false
+  private workerFailed = false
   private disposed = false
   private intensity: number
   private errorReported = false
@@ -51,6 +53,9 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
     this.preset = preset
     this.intensity = clamp(intensity, 0, 100)
     this.onError = onError
+    if (typeof Worker === 'undefined' || typeof createImageBitmap === 'undefined') {
+      throw new Error('Live face filters are not supported by this browser version.')
+    }
     const context = this.scratch.getContext('2d', { alpha: true })
     if (!context) throw new Error('This device cannot create the face-effects drawing surface.')
     this.scratchContext = context
@@ -64,11 +69,14 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
 
   private handleWorkerMessage = (event: MessageEvent<WorkerResponse>) => {
     const message = event.data
-    if (message.type === 'landmarks') {
+    if (message.type === 'ready') {
+      this.workerReady = true
+    } else if (message.type === 'landmarks') {
       this.inferencePending = false
       this.snapshot = { points: message.points ? new Float32Array(message.points) : null, receivedAt: performance.now() }
     } else if (message.type === 'error') {
       this.inferencePending = false
+      this.workerFailed = true
       this.reportError(new Error(message.message))
     } else if (message.type === 'frame-error') {
       this.inferencePending = false
@@ -78,6 +86,7 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
 
   private handleWorkerError = () => {
     this.inferencePending = false
+    this.workerFailed = true
     this.reportError(new Error('The on-device face tracking worker stopped unexpectedly.'))
   }
 
@@ -90,7 +99,7 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
   render(frame: CallEffectFrame) {
     if (this.disposed) return
     const now = frame.timestamp
-    if (!this.inferencePending && now - this.lastInferenceAt >= 90) {
+    if (this.workerReady && !this.workerFailed && !this.inferencePending && now - this.lastInferenceAt >= 90) {
       this.inferencePending = true
       this.lastInferenceAt = now
       void createImageBitmap(frame.video).then((bitmap) => {
