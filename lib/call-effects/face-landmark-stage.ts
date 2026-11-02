@@ -276,6 +276,8 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
     context.fillStyle = color
     context.fill(outer)
     if (gradientLip) {
+      context.save()
+      context.clip(outer)
       const center = getPoint(points, 13, width, height)
       if (center) {
         const radius = Math.max(3, width * 0.025)
@@ -286,6 +288,7 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
         context.fillStyle = gradient
         context.fillRect(center.x - radius, center.y - radius, radius * 2, radius * 2)
       }
+      context.restore()
     }
     context.restore()
   }
@@ -467,7 +470,7 @@ function colorWithAlpha(color: string, alpha: number) {
   return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${Math.max(0, Math.min(1, alpha))})`
 }
 
-function openLandmarkPath(points: Float32Array, indices: number[], width: number, height: number) {
+function openLandmarkPath(points: Float32Array, indices: readonly number[], width: number, height: number) {
   const path = new Path2D()
   let started = false
   for (const index of indices) {
@@ -479,7 +482,7 @@ function openLandmarkPath(points: Float32Array, indices: number[], width: number
   return started ? path : null
 }
 
-function polygonPath(points: Float32Array, indices: number[], width: number, height: number) {
+function polygonPath(points: Float32Array, indices: readonly number[], width: number, height: number) {
   const path = new Path2D()
   let started = false
   for (const index of indices) {
