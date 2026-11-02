@@ -7,7 +7,7 @@ import { getAvatarUrl } from '@/lib/utils/helpers'
 import { canAccessByPrivacy } from '@/lib/utils/privacyAccess'
 import { pauseRingtone, resumeRingtone } from '@/lib/utils/ringtone'
 import { CallBackgroundBlurProcessor } from '@/lib/utils/call-background-blur'
-import { CallVideoEffectsEngine, FaceLandmarkEffectStage, ColorLookEffectStage, PART_TWO_FACE_PRESETS, PART_THREE_MAKEUP_PRESETS, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS, PART_FIVE_EYE_LENS_PRESETS } from '@/lib/call-effects'
+import { CallVideoEffectsEngine, FaceLandmarkEffectStage, ColorLookEffectStage, PART_TWO_FACE_PRESETS, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS } from '@/lib/call-effects'
 
 export type CallType = 'audio' | 'video'
 export type CallStatus = 'ringing' | 'accepted' | 'rejected' | 'missed' | 'ended' | 'cancelled' | 'busy'
@@ -1175,7 +1175,7 @@ export function useCallEngine(currentUserId?: string) {
       if (effectId) throw new Error('Turn on your camera and resume the video call before applying a filter.')
       return
     }
-    const allPresets = [...PART_TWO_FACE_PRESETS, ...PART_THREE_MAKEUP_PRESETS, ...PART_FOUR_LIGHTING_PRESETS, ...PART_FOUR_CREATIVE_PRESETS, ...PART_FIVE_EYE_LENS_PRESETS]
+    const allPresets = [...PART_TWO_FACE_PRESETS, ...PART_FOUR_LIGHTING_PRESETS, ...PART_FOUR_CREATIVE_PRESETS]
     const preset = effectId ? allPresets.find((item) => item.id === effectId) : null
     if (effectId && !preset) throw new Error('This camera effect is not available.')
     if (effectId && !HTMLCanvasElement.prototype.captureStream) throw new Error('Live camera effects are not supported by this browser.')
