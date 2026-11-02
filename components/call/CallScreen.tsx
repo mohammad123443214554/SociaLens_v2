@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, Sparkles, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, Sparkles, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock, MoreHorizontal, WandSparkles } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
-import { CALL_EFFECT_CATEGORIES, PART_TWO_FACE_PRESETS, PART_THREE_MAKEUP_PRESETS, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS, PART_FIVE_EYE_LENS_PRESETS } from '@/lib/call-effects'
+import { CALL_EFFECT_CATEGORIES, PART_TWO_FACE_PRESETS, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS } from '@/lib/call-effects'
 
 interface CallScreenProps {
   phase: CallPhase
@@ -58,8 +58,11 @@ export function CallScreen({
   const [localVideoIsMain, setLocalVideoIsMain] = useState(false)
   const [isSpeakerOn, setIsSpeakerOn] = useState(false)
   const [isScreenLocked, setIsScreenLocked] = useState(false)
-  const [effectsOpen, setEffectsOpen] = useState(false)
-  const [effectsCategory, setEffectsCategory] = useState('eye-lenses')
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+  const [effectsMenuOpen, setEffectsMenuOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [effectsCategory, setEffectsCategory] = useState('natural-beauty')
+  const [draftEffectId, setDraftEffectId] = useState<string | null>(selectedCallEffectId)
   const [effectDraftIntensity, setEffectDraftIntensity] = useState(callEffectIntensity)
   const [effectSaving, setEffectSaving] = useState(false)
   const [effectError, setEffectError] = useState<string | null>(null)
@@ -67,9 +70,10 @@ export function CallScreen({
   const [blurDraft, setBlurDraft] = useState(backgroundBlurIntensity)
   const [blurSaving, setBlurSaving] = useState(false)
   const [blurError, setBlurError] = useState<string | null>(null)
-  const allCallEffects = [...PART_TWO_FACE_PRESETS, ...PART_THREE_MAKEUP_PRESETS, ...PART_FOUR_LIGHTING_PRESETS, ...PART_FOUR_CREATIVE_PRESETS, ...PART_FIVE_EYE_LENS_PRESETS]
+  const allCallEffects = [...PART_TWO_FACE_PRESETS, ...PART_FOUR_LIGHTING_PRESETS, ...PART_FOUR_CREATIVE_PRESETS]
   const visibleCallEffects = allCallEffects.filter((effect) => effect.categoryId === effectsCategory)
-  const activeCallEffect = allCallEffects.find((effect) => effect.id === selectedCallEffectId) ?? null
+  const activeCallEffect = allCallEffects.find((effect) => effect.id === draftEffectId) ?? null
+  const availableEffectCategories = CALL_EFFECT_CATEGORIES.filter((category) => category.id !== 'makeup' && category.id !== 'eye-lenses')
 
   const [isMini, setIsMini] = useState(false)
   const [miniSize, setMiniSize] = useState(300)
@@ -380,109 +384,61 @@ export function CallScreen({
           {isSpeakerOn ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
         </button>
 
-        <button
-          onClick={onToggleMute}
-          className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${
-            isMuted ? 'bg-white text-black' : 'bg-white/15 hover:bg-white/25'
-          }`}
-        >
-          {isMuted ? <MicOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Mic className="h-5 w-5 sm:h-6 sm:w-6" />}
+        <div className="relative">
+          <button type="button" onClick={() => { setMoreMenuOpen((open) => !open); setEffectsMenuOpen(false) }} aria-label="More call controls" aria-expanded={moreMenuOpen} title="More options" className={\`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center border transition-all \${moreMenuOpen ? 'border-pink-200/30 bg-pink-300/[0.12] text-pink-50 shadow-[0_0_18px_rgba(255,105,180,0.08)]' : 'border-white/10 bg-white/10 hover:bg-white/15'}\`}>
+            <MoreHorizontal className="h-6 w-6" />
+          </button>
+          {moreMenuOpen && (
+            <div className="absolute bottom-16 left-0 z-[100] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035]">
+              <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Call controls</p>
+              <button type="button" onClick={onToggleMute} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
+                {isMuted ? <MicOff className="h-4 w-4 text-pink-200" /> : <Mic className="h-4 w-4" />}
+                <span className="flex-1">{isMuted ? 'Turn microphone on' : 'Turn microphone off'}</span>
+                <span className={\`h-2 w-2 rounded-full \${isMuted ? 'bg-pink-300' : 'bg-white/25'}\`} />
+              </button>
+              {isVideoCall && (
+                <button type="button" onClick={onToggleCamera} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
+                  {isCameraOff ? <VideoOff className="h-4 w-4 text-pink-200" /> : <Video className="h-4 w-4" />}
+                  <span className="flex-1">{isCameraOff ? 'Turn camera on' : 'Turn camera off'}</span>
+                  <span className={\`h-2 w-2 rounded-full \${isCameraOff ? 'bg-pink-300' : 'bg-white/25'}\`} />
+                </button>
+              )}
+              <button type="button" onClick={() => { setIsScreenLocked(true); setMoreMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
+                <Lock className="h-4 w-4" /><span className="flex-1">Lock screen</span>
+              </button>
+              {isVideoCall && (
+                <button type="button" onClick={() => { setEffectsMenuOpen(true); setMoreMenuOpen(false) }} disabled={isCameraOff || isOnHold || phase !== 'in-call'} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07] disabled:opacity-40">
+                  <WandSparkles className="h-4 w-4" /><span className="flex-1">Effects</span><span className="text-pink-100/45">›</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <button type="button" onClick={() => setIsSpeakerOn((current) => !current)} aria-label={isSpeakerOn ? 'Speaker on' : 'Speaker off'} aria-pressed={isSpeakerOn} title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'} className={\`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors \${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}\`}>
+          {isSpeakerOn ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
         </button>
 
-        {isVideoCall && (
-          <button
-            onClick={onToggleCamera}
-            className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${
-              isCameraOff ? 'bg-white text-black' : 'bg-white/15 hover:bg-white/25'
-            }`}
-          >
-            {isCameraOff ? <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Video className="h-5 w-5 sm:h-6 sm:w-6" />}
-          </button>
-        )}
-
-        {isVideoCall && (
-          <div className="relative">
-            <button type="button" onClick={() => setEffectsOpen((open) => !open)} disabled={isCameraOff || isOnHold || phase !== 'in-call'} aria-label="Call effects" title="Call effects" className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 ${backgroundBlurEnabled || selectedCallEffectId ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white' : 'bg-white/15 hover:bg-white/25'}`}>
-              <Sparkles className="h-5 w-5 sm:h-6 sm:w-6" />
+        {isVideoCall && effectsMenuOpen && (
+          <div className="absolute bottom-16 left-0 z-[100] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035]">
+            <div className="flex items-center justify-between px-3 pb-2 pt-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Effects</p>
+              <button type="button" onClick={() => setEffectsMenuOpen(false)} className="rounded-full px-2 py-1 text-xs text-pink-50/65 hover:bg-pink-300/[0.08]" aria-label="Close effects menu">✕</button>
+            </div>
+            <button type="button" onClick={() => { setBlurDraft(backgroundBlurIntensity); setBlurError(null); setBlurPopupOpen(true); setEffectsMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-pink-300/[0.07]">
+              <Sparkles className="h-4 w-4" /><span className="flex-1">Background Blur</span><span className={\`h-2 w-2 rounded-full \${backgroundBlurEnabled ? 'bg-pink-300' : 'bg-white/25'}\`} />
             </button>
-            {effectsOpen && (
-              <div className="absolute bottom-16 left-1/2 z-[90] w-[min(340px,calc(100vw-28px))] -translate-x-1/2 rounded-2xl border border-white/15 bg-neutral-950/95 p-3 text-white shadow-2xl backdrop-blur-xl">
-                <div className="mb-3 flex items-center justify-between">
-                  <div><p className="text-sm font-semibold">Camera Effects</p><p className="mt-0.5 text-[10px] text-white/50">On-device filters · no downloads</p></div>
-                  <button type="button" onClick={() => setEffectsOpen(false)} className="rounded-full px-2 py-1 text-white/60 hover:bg-white/10" aria-label="Close effects">✕</button>
-                </div>
-                <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
-                  {CALL_EFFECT_CATEGORIES.map((category) => (
-                    <button key={category.id} type="button" onClick={() => { setEffectsCategory(category.id); setEffectError(null) }} className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-medium ${effectsCategory === category.id ? 'border-pink-400/60 bg-pink-500/20 text-pink-100' : 'border-white/10 bg-white/[0.04] text-white/65'}`}>{category.label}</button>
-                  ))}
-                </div>
-                <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto pr-1">
-                  {visibleCallEffects.map((effect) => (
-                    <button key={effect.id} type="button" disabled={effectSaving || isCameraOff || isOnHold} onClick={async () => {
-                      setEffectSaving(true); setEffectError(null)
-                      try {
-                        await onSetCallEffect(effect.id, effect.defaultIntensity)
-                        setEffectDraftIntensity(effect.defaultIntensity)
-                      } catch (error) { setEffectError(error instanceof Error ? error.message : 'Could not apply this effect.') }
-                      finally { setEffectSaving(false) }
-                    }} className={`rounded-xl border px-3 py-2.5 text-left transition-colors disabled:opacity-45 ${selectedCallEffectId === effect.id ? 'border-pink-400/60 bg-pink-500/20' : 'border-white/10 bg-white/[0.035] hover:bg-white/10'}`}>
-                      <span className="block text-xs font-semibold">{effect.name}</span>
-                      <span className="mt-1 block text-[10px] leading-snug text-white/45">{effect.description}</span>
-                    </button>
-                  ))}
-                </div>
-                {activeCallEffect && (
-                  <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-                    <div className="mb-2 flex items-center justify-between text-xs"><span>{activeCallEffect.name}</span><span className="tabular-nums text-white/60">{effectDraftIntensity}%</span></div>
-                    <input type="range" min="0" max="100" value={effectDraftIntensity} onChange={(event) => setEffectDraftIntensity(Number(event.target.value))} onPointerUp={async () => {
-                      setEffectSaving(true); setEffectError(null)
-                      try { await onSetCallEffect(selectedCallEffectId, effectDraftIntensity) }
-                      catch (error) { setEffectError(error instanceof Error ? error.message : 'Could not adjust this effect.') }
-                      finally { setEffectSaving(false) }
-                    }} onKeyUp={async () => {
-                      try { await onSetCallEffect(selectedCallEffectId, effectDraftIntensity) } catch {}
-                    }} className="w-full cursor-pointer accent-pink-400" aria-label="Filter intensity" />
-                  </div>
-                )}
-                {effectError && <p className="mt-2 text-[11px] text-red-300">{effectError}</p>}
-                <div className="mt-3 border-t border-white/10 pt-2">
-                  <button type="button" onClick={() => { setBlurDraft(backgroundBlurIntensity); setBlurError(null); setBlurPopupOpen(true); setEffectsOpen(false) }} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs hover:bg-white/10">
-                    <span className="flex items-center gap-2"><Sparkles className="h-4 w-4" />Background Blur</span>
-                    <span className={`h-2 w-2 rounded-full ${backgroundBlurEnabled ? 'bg-emerald-400' : 'bg-white/25'}`} />
-                  </button>
-                  {selectedCallEffectId && <button type="button" disabled={effectSaving} onClick={async () => { setEffectSaving(true); try { await onSetCallEffect(null); setEffectDraftIntensity(60) } catch (error) { setEffectError(error instanceof Error ? error.message : 'Could not remove the filter.') } finally { setEffectSaving(false) } }} className="mt-1 w-full rounded-xl px-3 py-2 text-left text-xs text-white/65 hover:bg-white/10 disabled:opacity-40">Remove selected filter</button>}
-                </div>
-              </div>
-            )}
+            <button type="button" onClick={() => { setDraftEffectId(selectedCallEffectId); setEffectDraftIntensity(callEffectIntensity); setEffectError(null); setFiltersOpen(true); setEffectsMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-pink-300/[0.07]">
+              <WandSparkles className="h-4 w-4" /><span className="flex-1">Filters</span><span className="text-pink-100/45">›</span>
+            </button>
           </div>
         )}
 
-        <button
-          onClick={onToggleHold}
-          disabled={phase !== "in-call"}
-          aria-label={isOnHold ? 'Resume call' : 'Hold call'}
-          title={isOnHold ? 'Resume call' : 'Hold call'}
-          className="h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
+        <button onClick={onToggleHold} disabled={phase !== "in-call"} aria-label={isOnHold ? 'Resume call' : 'Hold call'} title={isOnHold ? 'Resume call' : 'Hold call'} className="h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed">
           {isOnHold ? <PlayCircle className="h-5 w-5 sm:h-6 sm:w-6" /> : <PauseCircle className="h-5 w-5 sm:h-6 sm:w-6" />}
         </button>
 
-        <button
-          type="button"
-          onClick={() => setIsScreenLocked(true)}
-          aria-label="Lock call screen"
-          title="Lock screen · prevent accidental touches"
-          className="h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25"
-        >
-          <Lock className="h-5 w-5 sm:h-6 sm:w-6" />
-        </button>
-
-        <button
-          onClick={onEnd}
-          aria-label="End call"
-          title="End call"
-          className="h-11 w-11 sm:h-16 sm:w-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors shadow-lg shadow-red-500/30"
-        >
+        <button onClick={onEnd} aria-label="End call" title="End call" className="h-11 w-11 sm:h-16 sm:w-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors shadow-lg shadow-red-500/30">
           <PhoneOff className="h-5 w-5 sm:h-7 sm:w-7" />
         </button>
       </div>
