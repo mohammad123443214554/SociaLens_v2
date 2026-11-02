@@ -355,9 +355,9 @@ export function CallScreen({
           showRemoteVideo ? (isMini ? 'pt-1' : 'pt-6') : 'flex-1 justify-center'
         } ${isVideoCall && !showRemoteVideo ? 'md:hidden' : ''}`}>
           {!showRemoteVideo && (
-            <Avatar className={`${isMini ? "h-16 w-16" : "h-32 w-32"} ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/10 md:hidden`}>
+            <Avatar className={`${isMini ? "h-16 w-16" : "h-32 w-32"} ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/10 ${isVideoCall && !isMini ? 'md:hidden' : ''}`}>
               <AvatarImage src={peerAvatar} alt={peerName} />
-              <AvatarFallback className="text-4xl bg-gradient-to-br from-pink-500 to-purple-600">{peerName[0]?.toUpperCase()}</AvatarFallback>
+              <AvatarFallback className="text-4xl bg-gradient-to-br from-pink-500 to-purple-600">{peerName?.[0]?.toUpperCase() || 'S'}</AvatarFallback>
             </Avatar>
           )}
           <h2 className={`font-bold ${isMini ? 'text-sm' : showRemoteVideo ? 'text-lg drop-shadow-lg' : 'text-2xl'}`}>{peerName}</h2>
