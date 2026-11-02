@@ -1173,10 +1173,16 @@ export function useCallEngine(currentUserId?: string) {
     if (!effectId) {
       const restoreTrack = callEffectsSourceTrackRef.current
       if (agora && callEffectsAgoraTrackRef.current) {
-        await agora.client.unpublish([callEffectsAgoraTrackRef.current])
-        try { callEffectsAgoraTrackRef.current.close() } catch {}
+        const activeEffectsTrack = callEffectsAgoraTrackRef.current
+        await agora.client.unpublish([activeEffectsTrack])
+        try {
+          await agora.client.publish([agora.videoTrack])
+        } catch (publishError) {
+          await agora.client.publish([activeEffectsTrack]).catch(() => {})
+          throw publishError
+        }
+        try { activeEffectsTrack.close() } catch {}
         callEffectsAgoraTrackRef.current = null
-        await agora.client.publish([agora.videoTrack])
         upsertTrack(localStreamObjRef.current, agora.videoTrack.getMediaStreamTrack())
       } else if (daily && callEffectsEngineRef.current) {
         if (restoreTrack?.readyState === 'live') {
