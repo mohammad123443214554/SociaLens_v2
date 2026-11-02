@@ -378,7 +378,7 @@ export function CallScreen({
             <MoreHorizontal className="h-6 w-6" />
           </button>
           {moreMenuOpen && (
-            <div className="absolute bottom-16 left-0 z-[100] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035]">
+            <div className="absolute bottom-[calc(100%+14rem)] left-0 z-[110] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-16">
               <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Call controls</p>
               <button type="button" onClick={onToggleMute} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                 {isMuted ? <MicOff className="h-4 w-4 text-pink-200" /> : <Mic className="h-4 w-4" />}
@@ -402,26 +402,27 @@ export function CallScreen({
               )}
             </div>
           )}
+                    {isVideoCall && effectsMenuOpen && (
+            <div className="absolute bottom-16 left-0 z-[100] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035]">
+              <div className="flex items-center justify-between px-3 pb-2 pt-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Effects</p>
+                <button type="button" onClick={() => setEffectsMenuOpen(false)} className="rounded-full px-2 py-1 text-xs text-pink-50/65 hover:bg-pink-300/[0.08]" aria-label="Close effects menu">✕</button>
+              </div>
+              <button type="button" onClick={() => { setBlurDraft(backgroundBlurIntensity); setBlurError(null); setBlurPopupOpen(true); setEffectsMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-pink-300/[0.07]">
+                <Sparkles className="h-4 w-4" /><span className="flex-1">Background Blur</span><span className={`h-2 w-2 rounded-full ${backgroundBlurEnabled ? 'bg-pink-300' : 'bg-white/25'}`} />
+              </button>
+              <button type="button" onClick={() => { setDraftEffectId(selectedCallEffectId); setEffectDraftIntensity(callEffectIntensity); setEffectError(null); setFiltersOpen(true); setEffectsMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-pink-300/[0.07]">
+                <Sparkles className="h-4 w-4" /><span className="flex-1">Filters</span><span className="text-pink-100/45">›</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <button type="button" onClick={() => setIsSpeakerOn((current) => !current)} aria-label={isSpeakerOn ? 'Speaker on' : 'Speaker off'} aria-pressed={isSpeakerOn} title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}>
           {isSpeakerOn ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
         </button>
 
-        {isVideoCall && effectsMenuOpen && (
-          <div className="absolute bottom-16 left-0 z-[100] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035]">
-            <div className="flex items-center justify-between px-3 pb-2 pt-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Effects</p>
-              <button type="button" onClick={() => setEffectsMenuOpen(false)} className="rounded-full px-2 py-1 text-xs text-pink-50/65 hover:bg-pink-300/[0.08]" aria-label="Close effects menu">✕</button>
-            </div>
-            <button type="button" onClick={() => { setBlurDraft(backgroundBlurIntensity); setBlurError(null); setBlurPopupOpen(true); setEffectsMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-pink-300/[0.07]">
-              <Sparkles className="h-4 w-4" /><span className="flex-1">Background Blur</span><span className={`h-2 w-2 rounded-full ${backgroundBlurEnabled ? 'bg-pink-300' : 'bg-white/25'}`} />
-            </button>
-            <button type="button" onClick={() => { setDraftEffectId(selectedCallEffectId); setEffectDraftIntensity(callEffectIntensity); setEffectError(null); setFiltersOpen(true); setEffectsMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-pink-300/[0.07]">
-              <Sparkles className="h-4 w-4" /><span className="flex-1">Filters</span><span className="text-pink-100/45">›</span>
-            </button>
-          </div>
-        )}
+
 
         <button onClick={onToggleHold} disabled={phase !== "in-call"} aria-label={isOnHold ? 'Resume call' : 'Hold call'} title={isOnHold ? 'Resume call' : 'Hold call'} className="h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed">
           {isOnHold ? <PlayCircle className="h-5 w-5 sm:h-6 sm:w-6" /> : <PauseCircle className="h-5 w-5 sm:h-6 sm:w-6" />}
