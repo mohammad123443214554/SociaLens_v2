@@ -270,14 +270,18 @@ export class FaceLandmarkEffectStage implements CallEffectStage {
   private drawMakeupLips(context: CanvasRenderingContext2D, points: Float32Array, width: number, height: number, color: string, amount: number, gradientLip: boolean) {
     const outer = polygonPath(points, OUTER_LIPS, width, height)
     if (!outer) return
+    const inner = polygonPath(points, INNER_LIPS, width, height)
+    const lipMask = new Path2D()
+    lipMask.addPath(outer)
+    if (inner) lipMask.addPath(inner)
     context.save()
     context.globalCompositeOperation = 'multiply'
     context.globalAlpha = Math.min(0.78, 0.22 + amount * 0.48)
     context.fillStyle = color
-    context.fill(outer)
+    context.fill(lipMask, 'evenodd')
     if (gradientLip) {
       context.save()
-      context.clip(outer)
+      context.clip(lipMask, 'evenodd')
       const center = getPoint(points, 13, width, height)
       if (center) {
         const radius = Math.max(3, width * 0.025)
