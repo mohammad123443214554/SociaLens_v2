@@ -114,7 +114,28 @@ function getCodepointMap(icons) {
 
 function resolveCodepoint(fileName, currentText, maps) {
   const fileSlug = path.basename(fileName, '.json')
-  const nameMatch = currentText.match(/"nm"\\s*:\\s*"([^"]+)"/)
+
+  // Exact Unicode sequences for upstream Noto assets whose source labels
+  // are editorial names rather than Unicode names/shortcodes.
+  const knownCodepoints = {
+    comet: '2604',
+    'dizzy-face': '1f635',
+    'eye': '1f441',
+    'fire-heart': '2764_fe0f_200d_1f525',
+    'head-nod': '1f642_200d_2195_fe0f',
+    'head-shake': '1f642_200d_2196_fe0f',
+    'heart-exclamation-point': '2763_fe0f',
+    'jack-o-lantern': '1f383',
+    phoenix: '1fab6',
+    'rain-cloud': '1f327',
+    'snowflake': '2744_fe0f',
+    'snowman-with-snow': '2603',
+    tornado: '1f32a',
+    'warm-smile': '263a_fe0f',
+    'wind-face': '1f32c',
+  }
+  if (knownCodepoints[fileSlug]) return knownCodepoints[fileSlug]
+  const nameMatch = currentText.match(/"nm"\s*:\s*"([^"]+)"/)
   const sourceName = nameMatch?.[1] ?? ''
   const codepointMatch = sourceName.match(/emoji_u([0-9a-f]+(?:_[0-9a-f]+)*)/i)
   if (codepointMatch) {
