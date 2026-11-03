@@ -355,43 +355,54 @@ export function CallScreen({
       {heartBurstId > 0 && (
         <div key={`burst-${heartBurstId}`} className="pointer-events-none fixed inset-0 z-[181] overflow-hidden" aria-label="Heart burst reaction" role="img">
           <style>{`
-            @keyframes socia-heart-orbit {
-              0% { left: 50%; top: 50%; opacity: 0; transform:translate(-50%,-50%) rotate(0deg) scale(.35); }
-              8% { opacity: 1; }
-              24% { left:80%; top:24%; transform:translate(-50%,-50%) rotate(105deg) scale(1.05); }
-              44% { left:82%; top:74%; transform:translate(-50%,-50%) rotate(205deg) scale(.9); }
-              62% { left:18%; top:78%; transform:translate(-50%,-50%) rotate(290deg) scale(1.08); }
-              78% { left:16%; top:22%; transform:translate(-50%,-50%) rotate(345deg) scale(1.12); }
-              88% { left:50%; top:50%; transform:translate(-50%,-50%) rotate(390deg) scale(1.35); opacity:1; }
-              100% { left:50%; top:50%; transform:translate(-50%,-50%) rotate(420deg) scale(1.9); opacity:0; }
+            @keyframes socia-burst-heart-flight {
+              0% { left:-12%; top:72%; opacity:0; transform:translate3d(0,18px,0) rotate(-18deg) scale(.55); }
+              8% { opacity:1; }
+              22% { left:22%; top:48%; transform:translate3d(0,0,0) rotate(10deg) scale(.92); }
+              39% { left:46%; top:18%; transform:translate3d(0,0,0) rotate(-8deg) scale(1.08); }
+              57% { left:72%; top:39%; transform:translate3d(0,0,0) rotate(14deg) scale(.96); }
+              73% { left:82%; top:70%; transform:translate3d(0,0,0) rotate(-5deg) scale(1.1); }
+              88% { left:50%; top:50%; opacity:1; transform:translate(-50%,-50%) rotate(0deg) scale(1.18); }
+              94% { left:50%; top:50%; opacity:1; transform:translate(-50%,-50%) rotate(0deg) scale(1.42); }
+              100% { left:50%; top:50%; opacity:0; transform:translate(-50%,-50%) rotate(0deg) scale(.25); }
             }
-            @keyframes socia-heart-particle {
-              0% { opacity:0; transform:translate(-50%,-50%) scale(.25) rotate(-15deg); }
-              12% { opacity:1; }
+            @keyframes socia-heart-burst-particle {
+              0% { opacity:0; transform:translate(-50%,-50%) scale(.18) rotate(-18deg); }
+              9% { opacity:1; }
+              76% { opacity:1; }
               100% { opacity:0; transform:translate(calc(-50% + var(--burst-x)),calc(-50% + var(--burst-y))) scale(var(--burst-scale)) rotate(var(--burst-rotate)); }
             }
-            .socia-heart-orbit { position:absolute; width:clamp(76px,13vw,150px); height:clamp(76px,13vw,150px); animation:socia-heart-orbit 5.8s ease-in-out both; filter:drop-shadow(0 0 24px rgba(255,67,151,.75)); }
-            .socia-heart-particle { position:absolute; left:50%; top:50%; font-size:clamp(20px,3vw,38px); animation:socia-heart-particle 1.8s cubic-bezier(.16,.72,.24,1) both; animation-delay:5.8s; }
+            @keyframes socia-heart-wing-left { 0%,100% { transform:rotate(-12deg) scaleY(.82); } 50% { transform:rotate(22deg) scaleY(1.12); } }
+            @keyframes socia-heart-wing-right { 0%,100% { transform:rotate(12deg) scaleY(.82); } 50% { transform:rotate(-22deg) scaleY(1.12); } }
+            .socia-burst-heart-flight { position:absolute; width:clamp(82px,14vw,158px); height:clamp(82px,14vw,158px); animation:socia-burst-heart-flight 4.8s cubic-bezier(.42,0,.58,1) both; filter:drop-shadow(0 8px 22px rgba(255,70,145,.58)); }
+            .socia-burst-wing-left { transform-origin:100% 55%; animation:socia-heart-wing-left .22s ease-in-out infinite; }
+            .socia-burst-wing-right { transform-origin:0 55%; animation:socia-heart-wing-right .22s ease-in-out infinite; }
+            .socia-heart-particle { position:absolute; left:50%; top:50%; font-size:clamp(19px,2.8vw,36px); animation:socia-heart-burst-particle 3.8s cubic-bezier(.16,.72,.24,1) both; animation-delay:4.8s; will-change:transform,opacity; }
           `}</style>
-          <div className="socia-heart-orbit">
+          <div className="socia-burst-heart-flight" aria-label="Flying heart burst" role="img">
             <svg viewBox="0 0 100 100" className="h-full w-full" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M50 88 C40 78 14 59 14 39 C14 14 43 10 50 33 C57 10 86 14 86 39 C86 59 60 78 50 88Z" fill="#FF4F91" stroke="#FFE0ED" strokeWidth="4"/>
-              <path d="M29 35 C33 23 45 23 49 33" stroke="#FFF0F6" strokeWidth="5" strokeLinecap="round"/>
-              <path d="M12 16 L4 8 M88 16 L96 8 M50 5 V-2" stroke="#FFC2DB" strokeWidth="3" strokeLinecap="round"/>
+              <path className="socia-burst-wing-left" d="M43 48 C23 14 2 22 13 42 C19 53 31 57 43 58" fill="#FFE6F1" stroke="#FF8DBB" strokeWidth="2.5"/>
+              <path className="socia-burst-wing-right" d="M57 48 C77 14 98 22 87 42 C81 53 69 57 57 58" fill="#FFE6F1" stroke="#FF8DBB" strokeWidth="2.5"/>
+              <path d="M50 86 C42 78 18 61 18 42 C18 20 44 15 50 35 C56 15 82 20 82 42 C82 61 58 78 50 86Z" fill="#FF4F91" stroke="#FFD1E3" strokeWidth="3"/>
+              <path d="M31 39 C33 29 43 27 47 35" stroke="#FFEAF3" strokeWidth="4" strokeLinecap="round" opacity=".9"/>
+              <path d="M24 19 L19 12 M76 18 L82 11 M50 8 V2" stroke="#FFC2DB" strokeWidth="3" strokeLinecap="round"/>
             </svg>
           </div>
           {[
-            [-44,-38,.9,-25],[-24,-50,1.1,18],[0,-54,.85,-12],[26,-48,1.05,24],[46,-28,.9,-18],
-            [52,0,1.1,16],[44,34,.95,-22],[24,50,1.15,20],[0,55,.9,-10],[-26,48,1.05,18],
-            [-48,28,.9,-20],[-55,0,1.15,12],[-32,-18,.8,28],[32,-18,.9,-26],[-30,22,1.1,16],[30,22,.85,-16],
-            [-12,-32,1.05,24],[14,34,.9,-22],[-15,40,1.1,12],[16,-40,.85,-14]
+            [-58,-42,.9,-25],[-43,-58,1.05,18],[-24,-64,.82,-12],[-4,-68,1.1,24],[18,-64,.92,-18],[40,-55,1.08,16],[59,-38,.88,-22],
+            [66,-16,1.12,12],[68,8,.94,-20],[61,34,1.08,18],[45,54,.86,-14],[24,66,1.12,22],[0,70,.94,-10],[-25,65,1.08,18],
+            [-47,53,.9,-20],[-63,34,1.12,12],[-69,10,.86,28],[-68,-15,1.04,-26],[-51,-2,.92,16],[-38,20,1.1,-16],
+            [-34,-28,.86,24],[-14,-42,1.05,-18],[12,-43,.9,14],[35,-28,1.12,-24],[43,0,.84,18],[34,28,1.06,-12],
+            [12,43,.92,22],[-13,42,1.1,-20],[-39,31,.86,14],[-48,-22,1.08,-18],[-18,8,.94,20],[20,10,1.1,-14],
+            [-5,25,.88,16],[54,18,1.04,-22],[-56,0,.92,12],[5,-22,1.12,-18],[-28,54,.9,22],[29,56,1.06,-16],
+            [70,-48,.86,18],[-72,48,1.1,-20]
           ].map(([x,y,scale,rotate], index) => (
             <span key={index} className="socia-heart-particle" style={{
-              ['--burst-x' as string]: `${x * 1.45}vw`,
-              ['--burst-y' as string]: `${y * 1.45}vh`,
+              ['--burst-x' as string]: `${x * 1.25}vw`,
+              ['--burst-y' as string]: `${y * 1.05}vh`,
               ['--burst-scale' as string]: scale,
               ['--burst-rotate' as string]: `${rotate}deg`,
-            } as React.CSSProperties} onAnimationEnd={() => { if (index === 19) setHeartBurstId(0) }}>💗</span>
+            } as React.CSSProperties} onAnimationEnd={() => { if (index === 39) setHeartBurstId(0) }}>💗</span>
           ))}
         </div>
       )}
