@@ -114,7 +114,7 @@ function getCodepointMap(icons) {
 
 function resolveCodepoint(fileName, currentText, maps) {
   const fileSlug = path.basename(fileName, '.json')
-  const nameMatch = currentText.match(/"nm"\s*:\s*"([^"]+)"/)
+  const nameMatch = currentText.match(/"nm"\\s*:\\s*"([^"]+)"/)
   const sourceName = nameMatch?.[1] ?? ''
   const codepointMatch = sourceName.match(/emoji_u([0-9a-f]+(?:_[0-9a-f]+)*)/i)
   if (codepointMatch) {
@@ -122,12 +122,32 @@ function resolveCodepoint(fileName, currentText, maps) {
     if (found) return found
   }
 
-  const candidates = [fileSlug, slug(sourceName)].filter(Boolean)
+  // Skin-tone filenames use the same base emoji tag plus a tone suffix.
+  // Resolve the tone explicitly so a generic tag (e.g. crossed-fingers)
+  // never accidentally selects a different skin-tone variant.
+  const toneSuffixes = [
+    ['-medium-dark', '1f3fe'],
+    ['-medium-light', '1f3fc'],
+    ['-medium', '1f3fd'],
+    ['-dark', '1f3ff'],
+    ['-light', '1f3fb'],
+  ]
+  const tone = toneSuffixes.find(([suffix]) => fileSlug.endsWith(suffix))
+  const baseSlug = tone ? fileSlug.slice(0, -tone[0].length) : fileSlug
+  const sourceSlug = slug(sourceName)
+  const candidates = [...new Set([baseSlug, fileSlug, sourceSlug].filter(Boolean))]
+
   for (const candidate of candidates) {
     const matches = [...new Set(maps.byTag.get(candidate) ?? [])]
-    if (matches.length === 1) return matches[0]
-    if (matches.length > 1) {
-      throw new Error(`Ambiguous Google emoji mapping for ${fileName} via "${candidate}": ${matches.join(', ')}`)
+    if (matches.length === 0) continue
+
+    const selected = tone
+      ? matches.filter((codepoint) => codepoint.endsWith('_' + tone[1]))
+      : matches.filter((codepoint) => !codepoint.includes('_'))
+
+    if (selected.length === 1) return selected[0]
+    if (selected.length > 1) {
+      throw new Error(`Ambiguous Google emoji mapping for ${fileName} via "${candidate}": ${selected.join(', ')}`)
     }
   }
   return null
