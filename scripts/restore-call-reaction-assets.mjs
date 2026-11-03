@@ -228,7 +228,12 @@ async function main() {
   await runPool(invalid, async (item) => {
     const codepoint = resolveCodepoint(item.name, item.currentText, maps)
     const url = ASSET_URL(codepoint)
-    const body = await fetchWithRetry(url)
+    let body
+    try {
+      body = await fetchWithRetry(url)
+    } catch (error) {
+      throw new Error(`Failed to restore ${item.name} from ${url}: ${error.message}`)
+    }
     parseLottie(body, item.name)
     const tempPath = item.fullPath + '.restore-tmp'
     await writeFile(tempPath, body, 'utf8')
