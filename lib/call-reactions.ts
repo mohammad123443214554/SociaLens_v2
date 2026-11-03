@@ -307,13 +307,39 @@ export function isCallReactionId(value: unknown): value is CallReactionId {
   return typeof value === 'string' && CALL_REACTION_ID_SET.has(value)
 }
 
-export function getCallReactionLabel(id: CallReactionAssetId): string {
-  return id
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
+
+export type CallReactionCategoryId = 'recent' | 'faces' | 'love' | 'gestures' | 'animals' | 'celebrations' | 'symbols'
+
+export const CALL_REACTION_CATEGORIES: { id: CallReactionCategoryId; label: string }[] = [
+  { id: 'recent', label: 'Recently Used' },
+  { id: 'faces', label: 'Faces & Feelings' },
+  { id: 'love', label: 'Love & Hearts' },
+  { id: 'gestures', label: 'Hands & Gestures' },
+  { id: 'animals', label: 'Animals & Nature' },
+  { id: 'celebrations', label: 'Celebrations' },
+  { id: 'symbols', label: 'Symbols & Objects' },
+]
+
+export const CALL_REACTION_ALL_IDS: CallReactionId[] = [...CALL_REACTION_CUSTOM_IDS, ...CALL_REACTION_ASSET_IDS]
+
+const CATEGORY_PREFIXES: Record<Exclude<CallReactionCategoryId, 'recent'>, string[]> = {
+  love: ['heart', 'love', 'kiss', 'kissing', 'cupid', 'hug', 'flying-heart', 'revolving-hearts', 'two-hearts'],
+  gestures: ['crossed-fingers', 'ear', 'fist', 'folded-hands', 'foot', 'hand', 'head-nod', 'head-shake', 'index-finger', 'leg', 'middle-finger', 'muscle', 'nail-care', 'nose', 'ok', 'open-hands', 'palms-up', 'pinch', 'point', 'raised-fist', 'raising-hands', 'salute', 'selfie', 'thumbs', 'victory', 'wave', 'writing-hand'],
+  animals: ['cow-face', 'crocodile', 'dancer-woman', 'dinosaur', 'dog', 'donkey', 'dragon', 'eagle', 'frog', 'gorilla', 'monkey', 'kangaroo', 'lizard', 'orangutan', 'otter', 'owl', 'ox', 'phoenix', 'pig', 'rabbit', 'racehorse', 'rat', 'rooster', 'snake', 'tiger', 'turtle', 'unicorn', 'fallen-leaf', 'leafless-tree', 'leaves', 'plant', 'rose', 'wilted-flower', 'ocean', 'rainbow', 'rain-cloud', 'snowflake', 'snowman', 'sunrise', 'sun-with-face', 'tornado', 'volcano', 'wind-face', 'fire', 'electricity', 'droplet', 'comet'],
+  celebrations: ['confetti', 'gift', 'party', 'partying'],
+  faces: ['concerned', 'cowboy', 'cry', 'cursing', 'disguise', 'distraught', 'dizzy', 'dotted-line-face', 'drool', 'exhale', 'expressionless', 'flushed', 'grimacing', 'grin', 'grinning', 'halo', 'hand-over-mouth', 'happy-cry', 'holding-back-tears', 'hot-face', 'imp-', 'joy', 'laughing', 'liar', 'mask', 'melting', 'mind-blown', 'money-face', 'monocle', 'nerd-face', 'peeking', 'pensive', 'pleading', 'pouting-cat', 'rage', 'raised-eyebrow', 'relieved', 'rofl', 'rolling-eyes', 'sad', 'scream', 'screaming', 'scrunched', 'shaking-face', 'shushing-face', 'sick', 'sleep', 'slightly-happy', 'smile', 'smirk', 'sneeze', 'star-struck', 'stuck-out-tongue', 'surprised', 'sweat', 'thermometer-face', 'thinking-face', 'tired', 'triumph', 'unamused', 'upside-down-face', 'vomit', 'warm-smile', 'weary', 'wink', 'woozy', 'worried', 'x-eyes', 'yawn'],
+  symbols: [],
 }
 
-export function getCallReactionAssetUrl(id: CallReactionAssetId): string {
-  return `/animations/call-reactions/${id}.json`
+export function getCallReactionCategory(id: CallReactionId): Exclude<CallReactionCategoryId, 'recent'> {
+  for (const category of ['love', 'gestures', 'animals', 'celebrations', 'faces', 'symbols'] as const) {
+    if (CATEGORY_PREFIXES[category].some((prefix) => id === prefix || id.startsWith(prefix))) return category
+  }
+  return 'symbols'
+}
+
+export function getCallReactionLabel(id: CallReactionId): string {
+  const custom = CALL_REACTION_CUSTOM_OPTIONS.find((item) => item.id === id)
+  if (custom) return custom.label
+  return id.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
 }
