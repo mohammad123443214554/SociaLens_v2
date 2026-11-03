@@ -1,5 +1,6 @@
 'use client'
 
+import { createClient } from '@/lib/supabase/client'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useUser } from '@/lib/hooks/useUser'
 import { useCallEngine, peerAvatar, type CallType } from '@/lib/hooks/useCall'
@@ -49,6 +50,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   usePushSubscription(user?.id)
   useNativePush(user?.id)
   const [bannerError, setBannerError] = useState<string | null>(null)
+  const [supabase] = useState(() => createClient())
+  const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const [incomingReaction, setIncomingReaction] = useState<{ id: string; reaction: 'flying-heart' | 'heart-burst' } | null>(null)
 
   // Tapping "Accept" on the OS call notification lands here with
   // ?incomingCall=<id> in the URL - from public/sw.js on the web, and from
@@ -117,6 +121,56 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     window.setTimeout(() => setBannerError((current) => (current === reason ? null : current)), 5000)
   }
 
+  // Ephemeral reactions are broadcast only to the two members of this call.
+  // They are not stored in chat history or the calls table.
+  useEffect(() => {
+    const activeCallId = engine.call?.id
+    if (!activeCallId || engine.phase !== 'in-call' || !user?.id) {
+      reactionChannelRef.current = null
+      return
+    }
+
+    let active = true
+    const channel = supabase.channel(`call-reactions:${activeCallId}`, {
+      config: { broadcast: { self: false, ack: true } },
+    })
+    reactionChannelRef.current = channel
+    channel
+      .on('broadcast', { event: 'call-reaction' }, ({ payload }) => {
+        if (!active || !payload || payload.senderId === user.id) return
+        if (payload.reaction !== 'flying-heart' && payload.reaction !== 'heart-burst') return
+        if (typeof payload.id !== 'string') return
+        setIncomingReaction({ id: payload.id, reaction: payload.reaction })
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[SociaLens Call] reaction channel unavailable:', status)
+        }
+      })
+
+    return () => {
+      active = false
+      if (reactionChannelRef.current === channel) reactionChannelRef.current = null
+      void supabase.removeChannel(channel)
+    }
+  }, [engine.call?.id, engine.phase, user?.id, supabase])
+
+  const sendCallReaction = async (reaction: 'flying-heart' | 'heart-burst') => {
+    const channel = reactionChannelRef.current
+    if (!channel || engine.phase !== 'in-call' || !user?.id) return
+    const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const result = await channel.send({
+      type: 'broadcast',
+      event: 'call-reaction',
+      payload: { id, reaction, senderId: user.id },
+    })
+    if (result !== 'ok') {
+      console.warn('[SociaLens Call] reaction broadcast was not acknowledged:', result)
+    }
+  }
+
   const startCall = async (peer: StartCallPeer, chatId: string | null, type: CallType) => {
     console.log('[SociaLens Call] startCall requested', { peer, chatId, type, phase: engine.phase })
     if (engine.phase !== 'idle') {
@@ -170,6 +224,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           type={engine.call.type}
           peerName={peerName}
           peerAvatar={peerAvatarUrl}
+          onSendCallReaction={sendCallReaction}
+          incomingReaction={incomingReaction}
           localStream={engine.localStream}
           remoteStream={engine.remoteStream}
           isMuted={engine.isMuted}
