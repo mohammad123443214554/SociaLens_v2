@@ -72,6 +72,7 @@ export function CallScreen({
   const [reactionSearch, setReactionSearch] = useState('')
   const [reactionCategory, setReactionCategory] = useState<CallReactionCategoryId>('recent')
   const [recentReactionIds, setRecentReactionIds] = useState<CallReactionId[]>([])
+  const reactionScrollRef = useRef<HTMLDivElement>(null)
   const recentStorageKey = `socialens:call-reactions:recent:${userId}`
 
   useEffect(() => {
@@ -83,6 +84,11 @@ export function CallScreen({
       setRecentReactionIds([])
     }
   }, [recentStorageKey])
+
+  useLayoutEffect(() => {
+    if (reactionScrollRef.current) reactionScrollRef.current.scrollTop = 0
+  }, [reactionCategory, reactionSearch, reactionPickerOpen])
+
   const [effectsMenuOpen, setEffectsMenuOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [effectsCategory, setEffectsCategory] = useState('natural-beauty')
@@ -759,26 +765,26 @@ export function CallScreen({
                 className="w-full rounded-xl border border-pink-100/[0.14] bg-white/[0.035] px-3 py-2.5 text-sm text-pink-50 outline-none placeholder:text-pink-100/40 focus:border-pink-200/35 focus:bg-pink-300/[0.06]"
               />
             </div>
-            <div className="mb-3 flex gap-1.5 overflow-x-auto pb-2">
+            <div className="mb-3 grid shrink-0 grid-cols-2 gap-1.5 sm:grid-cols-4">
               {CALL_REACTION_CATEGORIES.map((category) => (
-                <button key={category.id} type="button" onClick={() => setReactionCategory(category.id)} aria-pressed={reactionCategory === category.id} className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-medium transition-colors ${reactionCategory === category.id ? "border-pink-200/35 bg-pink-300/[0.14] text-pink-50" : "border-pink-100/[0.13] bg-white/[0.025] text-pink-100/65 hover:bg-pink-200/[0.07]"}`}>
-                  {category.label}
+                <button key={category.id} type="button" onClick={() => setReactionCategory(category.id)} aria-pressed={reactionCategory === category.id} className={`flex min-h-9 min-w-0 items-center justify-center rounded-xl border px-2 py-2 text-center text-[10px] font-medium leading-tight transition-colors sm:text-[11px] ${reactionCategory === category.id ? "border-pink-200/35 bg-pink-300/[0.14] text-pink-50" : "border-pink-100/[0.13] bg-white/[0.025] text-pink-100/65 hover:bg-pink-200/[0.07]"}`}>
+                  <span className="break-words">{category.label}</span>
                 </button>
               ))}
             </div>
-            <div data-call-reaction-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+            <div ref={reactionScrollRef} data-call-reaction-scroll className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]">
               {(() => {
                 const query = reactionSearch.trim().toLowerCase()
                 const candidates = reactionCategory === "recent" && !query ? recentReactionIds : CALL_REACTION_ALL_IDS.filter((id) => (query || reactionCategory === "recent" || getCallReactionCategory(id) === reactionCategory) && getCallReactionLabel(id).toLowerCase().includes(query))
                 const visibleIds = candidates.filter((id, index) => candidates.indexOf(id) === index)
                 return visibleIds.length ? (
-                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                  <div className="grid grid-cols-4 auto-rows-[92px] items-stretch gap-2 sm:grid-cols-5">
                     {visibleIds.map((id) => {
                       const custom = CALL_REACTION_CUSTOM_OPTIONS.find((item) => item.id === id)
                       return (
-                        <button key={id} type="button" onClick={() => triggerCallReaction(id)} title={getCallReactionLabel(id)} aria-label={getCallReactionLabel(id)} className="flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-1.5 py-2 text-center transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200/50">
-                          {custom ? <span className="text-[30px] leading-none" aria-hidden="true">{custom.emoji}</span> : <CallReactionLottie reaction={id as CallReactionAssetId} loop className="h-10 w-10" />}
-                          <span className="line-clamp-2 text-[10px] leading-tight text-pink-50/90">{getCallReactionLabel(id)}</span>
+                        <button key={id} type="button" onClick={() => triggerCallReaction(id)} title={getCallReactionLabel(id)} aria-label={getCallReactionLabel(id)} className="flex h-[92px] min-h-[92px] min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-1.5 py-2 text-center transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200/50">
+                          {custom ? <span className="flex h-10 w-10 shrink-0 items-center justify-center text-[30px] leading-none" aria-hidden="true">{custom.emoji}</span> : <CallReactionLottie reaction={id as CallReactionAssetId} loop className="h-10 w-10 shrink-0" />}
+                          <span className="line-clamp-2 h-6 w-full overflow-hidden text-[10px] leading-3 text-pink-50/90">{getCallReactionLabel(id)}</span>
                         </button>
                       )
                     })}
