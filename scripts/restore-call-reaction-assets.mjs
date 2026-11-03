@@ -135,7 +135,7 @@ function resolveCodepoint(fileName, currentText, maps) {
     'head-shake': '1f642_200d_2194_fe0f',
     'heart-exclamation-point': '2763_fe0f',
     'jack-o-lantern': '1f383',
-    phoenix: '1fab6',
+    phoenix: '1f426_200d_1f525',
     'rain-cloud': '1f327',
     'snowflake': '2744_fe0f',
     'snowman-with-snow': '2603',
