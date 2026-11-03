@@ -53,7 +53,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [bannerError, setBannerError] = useState<string | null>(null)
   const [supabase] = useState(() => createClient())
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-  const [incomingReaction, setIncomingReaction] = useState<{ id: string; reaction: CallReactionId } | null>(null)
+  const [incomingReaction, setIncomingReaction] = useState<{ id: string; reaction: CallReactionId; callId: string } | null>(null)
 
   // Tapping "Accept" on the OS call notification lands here with
   // ?incomingCall=<id> in the URL - from public/sw.js on the web, and from
@@ -127,10 +127,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const activeCallId = engine.call?.id
     if (!activeCallId || engine.phase !== 'in-call' || !user?.id) {
+      setIncomingReaction(null)
       reactionChannelRef.current = null
       return
     }
 
+    setIncomingReaction(null)
     let active = true
     const channel = supabase.channel(`call-reactions:${activeCallId}`, {
       config: { broadcast: { self: false, ack: true } },
@@ -141,7 +143,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         if (!active || !payload || payload.senderId === user.id) return
         if (!isCallReactionId(payload.reaction)) return
         if (typeof payload.id !== 'string') return
-        setIncomingReaction({ id: payload.id, reaction: payload.reaction })
+        setIncomingReaction({ id: payload.id, reaction: payload.reaction, callId: activeCallId })
       })
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -221,12 +223,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
       {(engine.phase === 'outgoing-ringing' || engine.phase === 'connecting' || engine.phase === 'in-call') && engine.call && (
         <CallScreen
+          key={`${user?.id ?? 'anonymous'}:${engine.call.id}`}
+          userId={user?.id ?? 'anonymous'}
           phase={engine.phase}
           type={engine.call.type}
           peerName={peerName}
           peerAvatar={peerAvatarUrl}
           onSendCallReaction={sendCallReaction}
-          incomingReaction={incomingReaction}
+          incomingReaction={incomingReaction?.callId === engine.call.id ? incomingReaction : null}
           localStream={engine.localStream}
           remoteStream={engine.remoteStream}
           isMuted={engine.isMuted}
