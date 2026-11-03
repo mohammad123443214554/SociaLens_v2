@@ -119,6 +119,15 @@ function resolveCodepoint(fileName, currentText, maps) {
   // are editorial names rather than Unicode names/shortcodes.
   const knownCodepoints = {
     comet: '2604',
+    dinosaur: '1f995',
+    cupid: '1f498',
+    'cow-face': '1f42e',
+    exhale: '1f62e_200d_1f4a8',
+    'face-in-clouds': '1f636_200d_1f32b_fe0f',
+    'index-finger': '261d_fe0f',
+    'red-heart': '2764_fe0f',
+    victory: '270c_fe0f',
+    'writing-hand': '270d_fe0f',
     'dizzy-face': '1f635',
     'eye': '1f441',
     'fire-heart': '2764_fe0f_200d_1f525',
