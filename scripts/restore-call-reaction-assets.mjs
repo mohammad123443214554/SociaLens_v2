@@ -9,7 +9,7 @@
  * This intentionally downloads only assets already listed in
  * lib/call-reactions.ts. It never adds/removes reaction choices.
  */
-import { readFile, writeFile, readdir } from 'node:fs/promises'
+import { readFile, writeFile, readdir, rename, unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -180,10 +180,9 @@ async function main() {
     const url = ASSET_URL(codepoint)
     const body = await fetchWithRetry(url)
     parseLottie(body, item.name)
-    await writeFile(item.fullPath + '.restore-tmp', body, 'utf8')
-    await writeFile(item.fullPath, await readFile(item.fullPath + '.restore-tmp', 'utf8'), 'utf8')
-    const { unlink } = await import('node:fs/promises')
-    await unlink(item.fullPath + '.restore-tmp')
+    const tempPath = item.fullPath + '.restore-tmp'
+    await writeFile(tempPath, body, 'utf8')
+    await rename(tempPath, item.fullPath)
     restored.push({ name: item.name, codepoint, bytes: Buffer.byteLength(body) })
   })
 
