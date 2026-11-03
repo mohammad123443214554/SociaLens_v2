@@ -103,7 +103,7 @@ export function CallReactionLottie({ reaction, loop = true, onComplete, classNam
 
   // Never substitute a sparkle emoji for a real reaction.
   if (failed) {
-    return <div ref={hostRef} className={['flex items-center justify-center', className].filter(Boolean).join(' ')} aria-hidden="true" />
+    return <div ref={hostRef} className={['flex shrink-0 items-center justify-center overflow-hidden', className].filter(Boolean).join(' ')} aria-hidden="true" />
   }
 
   if (!animationData) {
@@ -119,7 +119,7 @@ export function CallReactionLottie({ reaction, loop = true, onComplete, classNam
         loop={loop}
         autoplay
         onComplete={onComplete}
-        style={{ width: '100%', height: '100%', display: 'block' }}
+        style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', display: 'block', overflow: 'hidden' }}
         rendererSettings={{ preserveAspectRatio: 'xMidYMid meet', progressiveLoad: true }}
       />
     </div>
