@@ -12,8 +12,8 @@ interface CallScreenProps {
   type: CallType
   peerName: string
   peerAvatar: string
-  onSendCallReaction: (reaction: 'flying-heart' | 'heart-burst') => Promise<void>
-  incomingReaction: { id: string; reaction: 'flying-heart' | 'heart-burst' } | null
+  onSendCallReaction: (reaction: 'flying-heart' | 'heart-burst' | 'love-face') => Promise<void>
+  incomingReaction: { id: string; reaction: 'flying-heart' | 'heart-burst' | 'love-face' } | null
   localStream: MediaStream | null
   remoteStream: MediaStream | null
   isMuted: boolean
@@ -64,6 +64,7 @@ export function CallScreen({
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
   const [heartReactionId, setHeartReactionId] = useState(0)
   const [heartBurstId, setHeartBurstId] = useState(0)
+  const [loveFaceId, setLoveFaceId] = useState(0)
   const [effectsMenuOpen, setEffectsMenuOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [effectsCategory, setEffectsCategory] = useState('natural-beauty')
@@ -79,6 +80,7 @@ export function CallScreen({
     if (!incomingReaction) return
     if (incomingReaction.reaction === 'flying-heart') setHeartReactionId((value) => value + 1)
     if (incomingReaction.reaction === 'heart-burst') setHeartBurstId((value) => value + 1)
+    if (incomingReaction.reaction === 'love-face') setLoveFaceId((value) => value + 1)
   }, [incomingReaction?.id])
 
   const allCallEffects = [...PART_TWO_FACE_PRESETS, ...PART_FOUR_LIGHTING_PRESETS, ...PART_FOUR_CREATIVE_PRESETS]
@@ -325,6 +327,62 @@ export function CallScreen({
           )}
         </div>
       )}
+      {loveFaceId > 0 && (
+        <div key={`love-face-${loveFaceId}`} className="pointer-events-none fixed inset-0 z-[182] flex items-center justify-center overflow-hidden" aria-label="Love face reaction" role="img">
+          <style>{`
+            @keyframes socia-love-face-appear {
+              0% { opacity:0; transform:scale(.42) translateY(18px); }
+              12% { opacity:1; transform:scale(1.06) translateY(0); }
+              22%,78% { opacity:1; transform:scale(1) translateY(0); }
+              100% { opacity:0; transform:scale(.88) translateY(-12px); }
+            }
+            @keyframes socia-love-face-float {
+              0%,100% { transform:translateY(0) rotate(-2deg); }
+              50% { transform:translateY(-9px) rotate(2deg); }
+            }
+            @keyframes socia-love-heart-float {
+              0% { opacity:0; transform:translate(var(--love-start-x),var(--love-start-y)) scale(.35) rotate(-18deg); }
+              14% { opacity:1; }
+              72% { opacity:1; transform:translate(var(--love-mid-x),var(--love-mid-y)) scale(1) rotate(var(--love-rotate)); }
+              100% { opacity:0; transform:translate(var(--love-end-x),var(--love-end-y)) scale(.72) rotate(var(--love-end-rotate)); }
+            }
+            .socia-love-face-halo { position:absolute; width:min(72vw,520px); aspect-ratio:1; border-radius:9999px; background:radial-gradient(circle,rgba(255,117,183,.25) 0%,rgba(255,117,183,.12) 34%,rgba(255,117,183,0) 72%); animation:socia-love-face-appear 5.8s ease both; }
+            .socia-love-face-main { position:relative; width:clamp(112px,22vw,190px); height:clamp(112px,22vw,190px); filter:drop-shadow(0 8px 24px rgba(255,75,145,.48)); animation:socia-love-face-appear 5.8s ease both,socia-love-face-float 1.45s ease-in-out infinite; }
+            .socia-love-heart { position:absolute; left:50%; top:50%; width:clamp(22px,4.2vw,42px); height:clamp(22px,4.2vw,42px); filter:drop-shadow(0 4px 10px rgba(255,45,100,.35)); animation:socia-love-heart-float 5.4s cubic-bezier(.22,.68,.25,1) both; animation-delay:var(--love-delay); }
+          `}</style>
+          <div className="socia-love-face-halo" />
+          <div className="absolute inset-0">
+            {[
+              [-82,-42,-116,-86,-145,-112,-18,.0],[-48,-78,-70,-120,-86,-145,14,.18],[8,-88,18,-128,32,-154,-12,.32],
+              [66,-62,98,-96,126,-126,20,.08],[86,-8,128,-14,156,-24,-16,.24],[62,54,98,88,122,116,18,.42],
+              [4,78,8,120,14,148,-14,.16],[-62,58,-100,92,-126,122,16,.34],[-90,4,-132,10,-160,20,-20,.5]
+            ].map(([sx,sy,mx,my,ex,ey,rot,delay], index) => (
+              <svg key={index} className="socia-love-heart" viewBox="0 0 100 100" fill="none" aria-hidden="true" style={{
+                ['--love-start-x' as string]: `${sx}px`, ['--love-start-y' as string]: `${sy}px`,
+                ['--love-mid-x' as string]: `${mx}px`, ['--love-mid-y' as string]: `${my}px`,
+                ['--love-end-x' as string]: `${ex}px`, ['--love-end-y' as string]: `${ey}px`,
+                ['--love-rotate' as string]: `${rot}deg`, ['--love-end-rotate' as string]: `${rot * 1.8}deg`,
+                ['--love-delay' as string]: `${delay}s`,
+              } as React.CSSProperties}>
+                <path d="M50 88 C42 80 12 59 12 37 C12 12 42 8 50 31 C58 8 88 12 88 37 C88 59 58 80 50 88Z" fill="#FF365F" stroke="#FFD5E1" strokeWidth="4"/>
+                <path d="M27 35 C29 23 40 21 45 30" stroke="#FFF0F4" strokeWidth="5" strokeLinecap="round"/>
+              </svg>
+            ))}
+          </div>
+          <div className="socia-love-face-main">
+            <svg viewBox="0 0 200 200" className="h-full w-full" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <defs><radialGradient id="socia-love-face-yellow" cx="36%" cy="28%" r="75%"><stop offset="0%" stopColor="#FFF77A"/><stop offset="68%" stopColor="#FFD52E"/><stop offset="100%" stopColor="#F4A900"/></radialGradient></defs>
+              <circle cx="100" cy="100" r="82" fill="url(#socia-love-face-yellow)" stroke="#FFF0A0" strokeWidth="5"/>
+              <path d="M48 78 Q62 65 77 78" stroke="#8B4B13" strokeWidth="7" strokeLinecap="round" fill="none"/>
+              <path d="M123 78 Q138 65 153 78" stroke="#8B4B13" strokeWidth="7" strokeLinecap="round" fill="none"/>
+              <path d="M65 119 Q100 153 135 119" stroke="#8B3F12" strokeWidth="8" strokeLinecap="round" fill="none"/>
+              <ellipse cx="49" cy="111" rx="14" ry="8" fill="#FF8B68" opacity=".48"/>
+              <ellipse cx="151" cy="111" rx="14" ry="8" fill="#FF8B68" opacity=".48"/>
+              <path d="M34 43 Q48 29 64 37" stroke="#FFF9C5" strokeWidth="7" strokeLinecap="round" opacity=".65"/>
+            </svg>
+          </div>
+        </div>
+      )}
       {heartReactionId > 0 && (
         <div key={`flying-${heartReactionId}`} className="pointer-events-none fixed inset-0 z-[180] overflow-hidden" aria-live="off">
           <style>{`
@@ -494,6 +552,11 @@ export function CallScreen({
             <button type="button" onClick={() => { setHeartBurstId((value) => value + 1); void onSendCallReaction('heart-burst'); setReactionPickerOpen(false) }} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-3 py-3 text-left transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10]">
               <span className="text-2xl" aria-hidden="true">💞</span>
               <span className="flex-1"><span className="block text-sm font-medium">Heart burst</span><span className="block text-[11px] text-pink-100/50">A heart-filled surprise</span></span>
+              <span className="text-pink-100/45">›</span>
+            </button>
+            <button type="button" onClick={() => { setLoveFaceId((value) => value + 1); void onSendCallReaction('love-face'); setReactionPickerOpen(false) }} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-3 py-3 text-left transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10]">
+              <span className="text-2xl" aria-hidden="true">🥰</span>
+              <span className="flex-1"><span className="block text-sm font-medium">Love face</span><span className="block text-[11px] text-pink-100/50">A smiling face surrounded by hearts</span></span>
               <span className="text-pink-100/45">›</span>
             </button>
           </div>
