@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Lottie from 'lottie-react'
 import { getCallReactionAssetUrl, type CallReactionAssetId } from '@/lib/call-reactions'
 
-type AnimationData = Record<string, unknown>
+type AnimationData = any
 
 const animationCache = new Map<string, Promise<AnimationData>>()
 
@@ -33,10 +33,30 @@ interface CallReactionLottieProps {
 }
 
 export function CallReactionLottie({ reaction, loop = true, onComplete, className }: CallReactionLottieProps) {
+  const hostRef = useRef<HTMLDivElement>(null)
+  const [isVisible, setIsVisible] = useState(false)
   const [animationData, setAnimationData] = useState<AnimationData | null>(null)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true)
+      return
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setIsVisible(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: '140px' })
+    observer.observe(host)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!isVisible) return
     let active = true
     setAnimationData(null)
     setFailed(false)
@@ -47,18 +67,18 @@ export function CallReactionLottie({ reaction, loop = true, onComplete, classNam
       if (active) setFailed(true)
     })
     return () => { active = false }
-  }, [reaction])
+  }, [reaction, isVisible])
 
   if (failed) {
-    return <div className={className} aria-hidden="true"><span className="text-2xl">✨</span></div>
+    return <div ref={hostRef} className={className} aria-hidden="true"><span className="text-2xl">✨</span></div>
   }
 
   if (!animationData) {
-    return <div className={className} aria-hidden="true"><span className="block h-5 w-5 animate-pulse rounded-full bg-pink-200/20" /></div>
+    return <div ref={hostRef} className={className} aria-hidden="true"><span className="block h-5 w-5 animate-pulse rounded-full bg-pink-200/20" /></div>
   }
 
   return (
-    <div className={className} aria-hidden="true">
+    <div ref={hostRef} className={className} aria-hidden="true">
       <Lottie
         animationData={animationData}
         loop={loop}
