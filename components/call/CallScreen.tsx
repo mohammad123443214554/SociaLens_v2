@@ -756,7 +756,7 @@ export function CallScreen({
                     aria-label={getCallReactionLabel(id)}
                     className="flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-1.5 py-2 text-center transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200/50"
                   >
-                    <CallReactionLottie reaction={id} className="h-10 w-10" />
+                    <CallReactionLottie reaction={id} loop={false} className="h-10 w-10" />
                     <span className="line-clamp-2 text-[10px] leading-tight text-pink-50/90">{getCallReactionLabel(id)}</span>
                   </button>
                 ))}
