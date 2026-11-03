@@ -361,8 +361,8 @@ export function CallScreen({
               24% { transform:translate(-50%,-50%) rotate(105deg) scale(1.05); }
               48% { transform:translate(-50%,-50%) rotate(230deg) scale(.9); }
               70% { transform:translate(-50%,-50%) rotate(330deg) scale(1.08); }
-              84% { left:50%; top:50%; transform:translate(-50%,-50%) rotate(360deg) scale(1.45); opacity:1; }
-              100% { left:50%; top:50%; transform:translate(-50%,-50%) rotate(360deg) scale(0); opacity:0; }
+              84% { left:50%; top:50%; transform:translate(-50%,-50%) rotate(360deg) scale(1.35); opacity:1; }
+              100% { left:50%; top:50%; transform:translate(-50%,-50%) rotate(360deg) scale(1.9); opacity:0; }
             }
             @keyframes socia-heart-particle {
               0% { opacity:0; transform:translate(-50%,-50%) scale(.25) rotate(-15deg); }
@@ -370,9 +370,9 @@ export function CallScreen({
               100% { opacity:0; transform:translate(calc(-50% + var(--burst-x)),calc(-50% + var(--burst-y))) scale(var(--burst-scale)) rotate(var(--burst-rotate)); }
             }
             .socia-heart-orbit { position:absolute; width:clamp(76px,13vw,150px); height:clamp(76px,13vw,150px); animation:socia-heart-orbit 5.8s ease-in-out both; filter:drop-shadow(0 0 24px rgba(255,67,151,.75)); }
-            .socia-heart-particle { position:absolute; left:50%; top:50%; font-size:clamp(20px,3vw,38px); animation:socia-heart-particle 1.8s cubic-bezier(.16,.72,.24,1) both; animation-delay:5.72s; }
+            .socia-heart-particle { position:absolute; left:50%; top:50%; font-size:clamp(20px,3vw,38px); animation:socia-heart-particle 1.8s cubic-bezier(.16,.72,.24,1) both; animation-delay:5.8s; }
           `}</style>
-          <div className="socia-heart-orbit" onAnimationEnd={(event) => { if (event.target === event.currentTarget && event.animationName === 'socia-heart-orbit') setHeartBurstId(0) }}>
+          <div className="socia-heart-orbit">
             <svg viewBox="0 0 100 100" className="h-full w-full" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M50 88 C40 78 14 59 14 39 C14 14 43 10 50 33 C57 10 86 14 86 39 C86 59 60 78 50 88Z" fill="#FF4F91" stroke="#FFE0ED" strokeWidth="4"/>
               <path d="M29 35 C33 23 45 23 49 33" stroke="#FFF0F6" strokeWidth="5" strokeLinecap="round"/>
@@ -390,7 +390,7 @@ export function CallScreen({
               ['--burst-y' as string]: `${y * 1.45}vh`,
               ['--burst-scale' as string]: scale,
               ['--burst-rotate' as string]: `${rotate}deg`,
-            } as React.CSSProperties}>💗</span>
+            } as React.CSSProperties} onAnimationEnd={() => { if (index === 19) setHeartBurstId(0) }}>💗</span>
           ))}
         </div>
       )}
