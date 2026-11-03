@@ -377,7 +377,9 @@ export function CallScreen({
             .socia-burst-heart-flight { position:absolute; width:clamp(82px,14vw,158px); height:clamp(82px,14vw,158px); animation:socia-burst-heart-flight 4.8s cubic-bezier(.42,0,.58,1) both; filter:drop-shadow(0 8px 22px rgba(255,70,145,.58)); }
             .socia-burst-wing-left { transform-origin:100% 55%; animation:socia-heart-wing-left .22s ease-in-out infinite; }
             .socia-burst-wing-right { transform-origin:0 55%; animation:socia-heart-wing-right .22s ease-in-out infinite; }
-            .socia-heart-particle { position:absolute; left:50%; top:50%; font-size:clamp(19px,2.8vw,36px); animation:socia-heart-burst-particle 3.8s cubic-bezier(.16,.72,.24,1) both; animation-delay:4.8s; will-change:transform,opacity; }
+            .socia-heart-particle { position:absolute; left:50%; top:50%; display:block; width:clamp(25px,3.6vw,42px); height:clamp(25px,3.6vw,42px); animation:socia-heart-burst-particle 3.8s cubic-bezier(.16,.72,.24,1) both; animation-delay:4.8s; will-change:transform,opacity; filter:drop-shadow(0 3px 8px rgba(255,70,145,.42)); }
+            .socia-particle-wing-left { transform-origin:100% 55%; animation:socia-heart-wing-left .22s ease-in-out infinite; }
+            .socia-particle-wing-right { transform-origin:0 55%; animation:socia-heart-wing-right .22s ease-in-out infinite; }
           `}</style>
           <div className="socia-burst-heart-flight" aria-label="Flying heart burst" role="img">
             <svg viewBox="0 0 100 100" className="h-full w-full" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -402,7 +404,15 @@ export function CallScreen({
               ['--burst-y' as string]: `${y * 1.05}vh`,
               ['--burst-scale' as string]: scale,
               ['--burst-rotate' as string]: `${rotate}deg`,
-            } as React.CSSProperties} onAnimationEnd={() => { if (index === 39) setHeartBurstId(0) }}>💗</span>
+            } as React.CSSProperties} onAnimationEnd={() => { if (index === 39) setHeartBurstId(0) }}>
+              <svg viewBox="0 0 100 100" className="h-full w-full" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path className="socia-particle-wing-left" d="M43 48 C23 14 2 22 13 42 C19 53 31 57 43 58" fill="#FFE6F1" stroke="#FF8DBB" strokeWidth="2.5"/>
+                <path className="socia-particle-wing-right" d="M57 48 C77 14 98 22 87 42 C81 53 69 57 57 58" fill="#FFE6F1" stroke="#FF8DBB" strokeWidth="2.5"/>
+                <path d="M50 86 C42 78 18 61 18 42 C18 20 44 15 50 35 C56 15 82 20 82 42 C82 61 58 78 50 86Z" fill="#FF4F91" stroke="#FFD1E3" strokeWidth="3"/>
+                <path d="M31 39 C33 29 43 27 47 35" stroke="#FFEAF3" strokeWidth="4" strokeLinecap="round" opacity=".9"/>
+                <path d="M24 19 L19 12 M76 18 L82 11 M50 8 V2" stroke="#FFC2DB" strokeWidth="3" strokeLinecap="round"/>
+              </svg>
+            </span>
           ))}
         </div>
       )}
