@@ -367,6 +367,11 @@ export function CallScreen({
               filter:blur(18px);
               animation:socia-love-emoji-enter 5.6s ease both;
             }
+             .socia-love-emoji-enter {
+              position:relative;
+              animation:socia-love-emoji-enter 5.6s cubic-bezier(.2,.72,.22,1) both;
+              will-change:transform,opacity;
+            }
             .socia-love-emoji-art {
               position:relative;
               width:clamp(270px,52vw,520px);
@@ -374,16 +379,17 @@ export function CallScreen({
               aspect-ratio:1.82;
               overflow:visible;
               filter:drop-shadow(0 12px 22px rgba(255,91,144,.26));
-              animation:socia-love-emoji-enter 5.6s cubic-bezier(.2,.72,.22,1) both,socia-love-emoji-sway 2.2s ease-in-out infinite;
-              will-change:transform,opacity;
+              animation:socia-love-emoji-sway 2.2s ease-in-out infinite;
+              will-change:transform;
             }
             .socia-love-heart-a { transform-box:fill-box; transform-origin:center; animation:socia-love-heart-one 1.35s ease-in-out infinite; }
             .socia-love-heart-b { transform-box:fill-box; transform-origin:center; animation:socia-love-heart-two 1.55s ease-in-out infinite; }
             @media (prefers-reduced-motion: reduce) {
-              .socia-love-emoji-art,.socia-love-emoji-glow,.socia-love-heart-a,.socia-love-heart-b { animation-duration:5.6s; animation-iteration-count:1; }
+               .socia-love-emoji-enter,.socia-love-emoji-art,.socia-love-emoji-glow,.socia-love-heart-a,.socia-love-heart-b { animation-duration:5.6s; animation-iteration-count:1; }
             }
           `}</style>
           <div className="socia-love-emoji-glow" />
+          <div className="socia-love-emoji-enter">
           <svg className="socia-love-emoji-art" viewBox="0 0 560 310" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <defs>
               <radialGradient id="socia-love-oval-face" cx="42%" cy="27%" r="76%">
@@ -431,6 +437,7 @@ export function CallScreen({
               <path d="M385 214 C388 199 405 196 418 208" fill="none" stroke="#FFE4D9" strokeWidth="6" strokeLinecap="round" opacity=".85" />
             </g>
           </svg>
+          </div>
         </div>
       )}
       {heartReactionId > 0 && (
