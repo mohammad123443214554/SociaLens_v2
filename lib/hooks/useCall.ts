@@ -205,6 +205,7 @@ export function useCallEngine(currentUserId?: string) {
   const startedAtMsRef = useRef<number | null>(null)
 
   const ringTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const ringTimeoutCallIdRef = useRef<string | null>(null)
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const callRef = useRef<CallRow | null>(null)
   const pendingCallRef = useRef<CallRow | null>(null)
@@ -226,7 +227,11 @@ export function useCallEngine(currentUserId?: string) {
   backgroundBlurIntensityRef.current = backgroundBlurIntensity
   useEffect(() => { console.log('[SociaLens Call] phase changed ->', phase) }, [phase])
 
-  const clearRingTimeout = () => { if (ringTimeoutRef.current) { clearTimeout(ringTimeoutRef.current); ringTimeoutRef.current = null } }
+  const clearRingTimeout = () => {
+    if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current)
+    ringTimeoutRef.current = null
+    ringTimeoutCallIdRef.current = null
+  }
   const clearDurationTimer = () => { if (durationIntervalRef.current) { clearInterval(durationIntervalRef.current); durationIntervalRef.current = null } }
   const clearRemoteLeftTimeout = () => { if (remoteLeftTimeoutRef.current) { clearTimeout(remoteLeftTimeoutRef.current); remoteLeftTimeoutRef.current = null } }
 
@@ -895,6 +900,43 @@ export function useCallEngine(currentUserId?: string) {
     await doConnectMedia(pendingCallRef.current)
   }, [doConnectMedia])
 
+  // One guarded deadline per call. Realtime and polling may discover the same call concurrently.
+  const scheduleRingTimeout = (callId: string, delayMs: number, onStillRinging: () => Promise<void>) => {
+    clearRingTimeout()
+    ringTimeoutCallIdRef.current = callId
+    ringTimeoutRef.current = setTimeout(async () => {
+      ringTimeoutRef.current = null
+      ringTimeoutCallIdRef.current = null
+      const active = callRef.current
+      if (!active || active.id !== callId || active.status !== 'ringing') return
+      const { data: fresh, error: statusError } = await supabase.from('calls')
+        .select('id, status, started_at, ended_at, ended_by, is_on_hold, hold_initiated_by').eq('id', callId).maybeSingle()
+      if (statusError || !fresh) { console.warn('[SociaLens Call] ring deadline could not verify status; keeping call visible', statusError); return }
+      if (fresh.status !== 'ringing') {
+        const latest = { ...active, ...fresh } as CallRow
+        callRef.current = latest
+        setCall((current) => current?.id === callId ? latest : current)
+        if (fresh.status === 'accepted') void connectMedia(latest)
+        else if (['rejected', 'missed', 'cancelled', 'busy', 'ended'].includes(fresh.status)) cleanup(fresh.status as CallStatus)
+        return
+      }
+      if (callRef.current?.id !== callId || callRef.current.status !== 'ringing') return
+      await onStillRinging()
+    }, Math.max(0, delayMs))
+  }
+  const expireRingingCall = async (callId: string) => {
+    const { data: expired, error: expireError } = await supabase.from('calls')
+      .update({ status: 'missed', ended_at: new Date().toISOString(), ended_by: currentUserId ?? null })
+      .eq('id', callId).eq('status', 'ringing').select('id, status, started_at, ended_at, ended_by').maybeSingle()
+    if (expireError) { console.warn('[SociaLens Call] could not atomically expire ringing call', expireError); return }
+    if (!expired || callRef.current?.id !== callId) return
+    const missedCall = { ...callRef.current, ...expired } as CallRow
+    callRef.current = missedCall
+    setCall((current) => current?.id === callId ? missedCall : current)
+    if (roleRef.current === 'caller') await announceCallEvent(callId, 'unanswered')
+    if (callRef.current?.id === callId) cleanup('missed')
+  }
+
   // ------------------------------------------------------------------
   // Outgoing call
   // ------------------------------------------------------------------
@@ -923,6 +965,7 @@ export function useCallEngine(currentUserId?: string) {
       console.log('[SociaLens Call] insert result', { newCall, insertError })
       if (insertError || !newCall) throw insertError || new Error('Could not start call')
 
+      callRef.current = newCall as CallRow
       setCall(newCall as CallRow)
       setPeer(calleeProfile)
       setPhase('outgoing-ringing')
@@ -941,11 +984,7 @@ export function useCallEngine(currentUserId?: string) {
         body: JSON.stringify({ callId: newCall.id }),
       }).catch(() => {})
 
-      ringTimeoutRef.current = setTimeout(async () => {
-        await updateCallStatus(newCall.id, { status: 'missed' })
-        await announceCallEvent(newCall.id, 'unanswered')
-        cleanup('missed')
-      }, RING_TIMEOUT_MS)
+      scheduleRingTimeout(newCall.id, RING_TIMEOUT_MS, () => expireRingingCall(newCall.id))
     } catch (err: any) {
       console.error('[SociaLens Call] startCall failed', err)
       const message = describeCallError(err, 'connect')
@@ -1523,6 +1562,7 @@ export function useCallEngine(currentUserId?: string) {
             .select('id, username, avatar_url, is_verified, verification_type')
             .eq('id', row.caller_id)
             .single()
+          callRef.current = row
           setCall(row)
           setPeer(callerProfile as PeerProfile)
           setPhase('incoming-ringing')
@@ -1530,7 +1570,7 @@ export function useCallEngine(currentUserId?: string) {
             console.warn('[SociaLens Call] incoming connection pre-warm failed; will retry on accept', prewarmError)
           })
 
-          ringTimeoutRef.current = setTimeout(() => cleanup(), RING_TIMEOUT_MS)
+          scheduleRingTimeout(row.id, RING_TIMEOUT_MS, () => expireRingingCall(row.id))
         }
       )
       .on(
@@ -1612,13 +1652,14 @@ export function useCallEngine(currentUserId?: string) {
             .select('id, username, avatar_url, is_verified, verification_type')
             .eq('id', incoming.caller_id)
             .single()
+          callRef.current = incoming as CallRow
           setCall(incoming as CallRow)
           setPeer(callerProfile as PeerProfile)
           setPhase('incoming-ringing')
           void prepareConnection(incoming as CallRow, 0).catch((prewarmError) => {
             console.warn('[SociaLens Call] polled incoming connection pre-warm failed', prewarmError)
           })
-          ringTimeoutRef.current = setTimeout(() => cleanup(), RING_TIMEOUT_MS - (Date.now() - new Date(incoming.created_at).getTime()))
+          scheduleRingTimeout(incoming.id, RING_TIMEOUT_MS - (Date.now() - new Date(incoming.created_at).getTime()), () => expireRingingCall(incoming.id))
         }
         return
       }
