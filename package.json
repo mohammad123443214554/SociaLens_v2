@@ -11,7 +11,8 @@
     "test:recommendation": "node --experimental-strip-types --test tests/recommendation-scoring.test.ts",
     "test:emoji-slider": "node --experimental-strip-types --test tests/emoji-slider.test.ts",
     "test:photo-collage": "node --experimental-strip-types --test tests/photo-collage.test.ts",
-    "test:shape-cut": "node --experimental-strip-types --test tests/shape-cut.test.ts"
+    "test:shape-cut": "node --experimental-strip-types --test tests/shape-cut.test.ts",
+    "prebuild": "node scripts/restore-call-reaction-assets.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
