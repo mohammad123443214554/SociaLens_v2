@@ -317,7 +317,7 @@ export function CallScreen({
         </div>
       )}
       {heartReactionId > 0 && (
-        <div key={heartReactionId} className={`pointer-events-none absolute z-[180] overflow-visible ${isVideoCall ? 'left-1/2 top-[44%] h-[min(56vh,720px)] w-[min(34vw,420px,39.375vh)] -translate-x-1/2 -translate-y-1/2 max-md:inset-0 max-md:h-full max-md:w-full max-md:translate-x-0 max-md:translate-y-0' : 'inset-x-0 top-1/2 h-48 -translate-y-1/2'}`} onAnimationEnd={() => setHeartReactionId(0)}>
+        <div key={heartReactionId} className={`pointer-events-none absolute z-[180] overflow-visible ${isVideoCall ? 'left-1/2 top-[44%] h-[min(56vh,720px)] w-[min(34vw,420px,39.375vh)] -translate-x-1/2 -translate-y-1/2 max-md:inset-0 max-md:h-full max-md:w-full max-md:translate-x-0 max-md:translate-y-0' : 'inset-x-0 top-1/2 h-48 -translate-y-1/2'}`}>
           <style>{`
             @keyframes socia-heart-flight {
               0% { left: -18%; top: 72%; transform: translate3d(0, 18px, 0) rotate(-18deg) scale(.55); opacity: 0; }
@@ -332,7 +332,7 @@ export function CallScreen({
             .socia-heart-wing-left { transform-origin:100% 55%; animation:socia-heart-wing-left .22s ease-in-out infinite; }
             .socia-heart-wing-right { transform-origin:0 55%; animation:socia-heart-wing-right .22s ease-in-out infinite; }
           `}</style>
-          <div className="socia-heart-flight" aria-label="Flying heart reaction" role="img">
+          <div className="socia-heart-flight" aria-label="Flying heart reaction" role="img" onAnimationEnd={(event) => { if (event.target === event.currentTarget && event.animationName === 'socia-heart-flight') setHeartReactionId(0) }}>
             <svg viewBox="0 0 100 100" className="h-full w-full" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path className="socia-heart-wing-left" d="M43 48 C23 14 2 22 13 42 C19 53 31 57 43 58" fill="#FFE6F1" stroke="#FF8DBB" strokeWidth="2.5"/>
               <path className="socia-heart-wing-right" d="M57 48 C77 14 98 22 87 42 C81 53 69 57 57 58" fill="#FFE6F1" stroke="#FF8DBB" strokeWidth="2.5"/>
