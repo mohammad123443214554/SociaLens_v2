@@ -328,7 +328,7 @@ export function CallScreen({
             }
             @keyframes socia-heart-wing-left { 0%,100% { transform: rotate(-12deg) scaleY(.82); } 50% { transform: rotate(22deg) scaleY(1.12); } }
             @keyframes socia-heart-wing-right { 0%,100% { transform: rotate(12deg) scaleY(.82); } 50% { transform: rotate(-22deg) scaleY(1.12); } }
-            .socia-heart-flight { position:absolute; width:76px; height:76px; animation:socia-heart-flight 2.35s cubic-bezier(.2,.72,.25,1) both; filter:drop-shadow(0 8px 18px rgba(255,70,145,.45)); }
+            .socia-heart-flight { position:absolute; width:76px; height:76px; animation:socia-heart-flight 5.6s linear both; filter:drop-shadow(0 8px 18px rgba(255,70,145,.45)); }
             .socia-heart-wing-left { transform-origin:100% 55%; animation:socia-heart-wing-left .22s ease-in-out infinite; }
             .socia-heart-wing-right { transform-origin:0 55%; animation:socia-heart-wing-right .22s ease-in-out infinite; }
           `}</style>
@@ -407,6 +407,19 @@ export function CallScreen({
           <button type="button" onClick={() => { setMoreMenuOpen((open) => !open); setEffectsMenuOpen(false) }} aria-label="More call controls" aria-expanded={moreMenuOpen} title="More options" className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center border transition-all ${moreMenuOpen ? 'border-pink-200/30 bg-pink-300/[0.12] text-pink-50 shadow-[0_0_18px_rgba(255,105,180,0.08)]' : 'border-white/10 bg-white/10 hover:bg-white/15'}`}>
             <MoreHorizontal className="h-6 w-6" />
           </button>
+        {reactionPickerOpen && (
+          <div className="absolute bottom-[calc(100%+14rem)] left-0 z-[115] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-3 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-16">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Call reaction</p>
+              <button type="button" onClick={() => setReactionPickerOpen(false)} className="rounded-full px-2 py-1 text-xs text-pink-50/65 hover:bg-pink-300/[0.08]" aria-label="Close call reactions">✕</button>
+            </div>
+            <button type="button" onClick={() => { setHeartReactionId((value) => value + 1); setReactionPickerOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-3 py-3 text-left transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10]">
+              <span className="text-2xl" aria-hidden="true">💗</span>
+              <span className="flex-1"><span className="block text-sm font-medium">Flying heart</span><span className="block text-[11px] text-pink-100/50">A little love in the call</span></span>
+              <span className="text-pink-100/45">›</span>
+            </button>
+          </div>
+        )}
           {moreMenuOpen && (
             <div className="absolute bottom-[calc(100%+14rem)] left-0 z-[110] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-16">
               <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Call controls</p>
@@ -451,19 +464,6 @@ export function CallScreen({
           )}
         </div>
 
-        {reactionPickerOpen && (
-          <div className="absolute bottom-[calc(100%+14rem)] left-0 z-[115] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-3 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-16">
-            <div className="mb-2 flex items-center justify-between px-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Call reaction</p>
-              <button type="button" onClick={() => setReactionPickerOpen(false)} className="rounded-full px-2 py-1 text-xs text-pink-50/65 hover:bg-pink-300/[0.08]" aria-label="Close call reactions">✕</button>
-            </div>
-            <button type="button" onClick={() => { setHeartReactionId((value) => value + 1); setReactionPickerOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-3 py-3 text-left transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10]">
-              <span className="text-2xl" aria-hidden="true">💗</span>
-              <span className="flex-1"><span className="block text-sm font-medium">Flying heart</span><span className="block text-[11px] text-pink-100/50">A little love in the call</span></span>
-              <span className="text-pink-100/45">›</span>
-            </button>
-          </div>
-        )}
 
         <button type="button" onClick={() => setIsSpeakerOn((current) => !current)} aria-label={isSpeakerOn ? 'Speaker on' : 'Speaker off'} aria-pressed={isSpeakerOn} title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}>
           {isSpeakerOn ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
