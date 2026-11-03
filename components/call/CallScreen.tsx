@@ -6,14 +6,16 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
 import { CALL_EFFECT_CATEGORIES, PART_TWO_FACE_PRESETS, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS } from '@/lib/call-effects'
+import { CallReactionLottie } from './CallReactionLottie'
+import { CALL_REACTION_ASSET_IDS, CALL_REACTION_CUSTOM_OPTIONS, getCallReactionLabel, type CallReactionAssetId, type CallReactionId } from '@/lib/call-reactions'
 
 interface CallScreenProps {
   phase: CallPhase
   type: CallType
   peerName: string
   peerAvatar: string
-  onSendCallReaction: (reaction: 'flying-heart' | 'heart-burst' | 'love-face') => Promise<void>
-  incomingReaction: { id: string; reaction: 'flying-heart' | 'heart-burst' | 'love-face' } | null
+  onSendCallReaction: (reaction: CallReactionId) => Promise<void>
+  incomingReaction: { id: string; reaction: CallReactionId } | null
   localStream: MediaStream | null
   remoteStream: MediaStream | null
   isMuted: boolean
@@ -65,6 +67,8 @@ export function CallScreen({
   const [heartReactionId, setHeartReactionId] = useState(0)
   const [heartBurstId, setHeartBurstId] = useState(0)
   const [loveFaceId, setLoveFaceId] = useState(0)
+  const [lottieReaction, setLottieReaction] = useState<{ id: string; reaction: CallReactionAssetId } | null>(null)
+  const [reactionSearch, setReactionSearch] = useState('')
   const [effectsMenuOpen, setEffectsMenuOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [effectsCategory, setEffectsCategory] = useState('natural-beauty')
@@ -78,10 +82,43 @@ export function CallScreen({
   const [blurError, setBlurError] = useState<string | null>(null)
   useEffect(() => {
     if (!incomingReaction) return
-    if (incomingReaction.reaction === 'flying-heart') setHeartReactionId((value) => value + 1)
-    if (incomingReaction.reaction === 'heart-burst') setHeartBurstId((value) => value + 1)
-    if (incomingReaction.reaction === 'love-face') setLoveFaceId((value) => value + 1)
+    switch (incomingReaction.reaction) {
+      case 'flying-heart':
+        setHeartReactionId((value) => value + 1)
+        break
+      case 'heart-burst':
+        setHeartBurstId((value) => value + 1)
+        break
+      case 'love-face':
+        setLoveFaceId((value) => value + 1)
+        break
+      default:
+        setLottieReaction({ id: incomingReaction.id, reaction: incomingReaction.reaction })
+    }
   }, [incomingReaction?.id])
+
+  const triggerCallReaction = (reaction: CallReactionId) => {
+    switch (reaction) {
+      case 'flying-heart':
+        setHeartReactionId((value) => value + 1)
+        break
+      case 'heart-burst':
+        setHeartBurstId((value) => value + 1)
+        break
+      case 'love-face':
+        setLoveFaceId((value) => value + 1)
+        break
+      default: {
+        const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+        setLottieReaction({ id, reaction })
+      }
+    }
+    void onSendCallReaction(reaction)
+    setReactionPickerOpen(false)
+    setReactionSearch('')
+  }
 
   const allCallEffects = [...PART_TWO_FACE_PRESETS, ...PART_FOUR_LIGHTING_PRESETS, ...PART_FOUR_CREATIVE_PRESETS]
   const visibleCallEffects = allCallEffects.filter((effect) => effect.categoryId === effectsCategory)
@@ -325,6 +362,16 @@ export function CallScreen({
               <p className={`text-sm drop-shadow-lg ${error ? 'text-red-400' : 'text-white/65'}`}>{statusText}</p>
             </div>
           )}
+        </div>
+      )}
+      {lottieReaction && (
+        <div key={lottieReaction.id} className="pointer-events-none fixed inset-0 z-[183] flex items-center justify-center overflow-hidden" aria-label={`${lottieReaction.reaction} call reaction`} role="img">
+          <CallReactionLottie
+            reaction={lottieReaction.reaction}
+            loop={false}
+            onComplete={() => setLottieReaction((current) => current?.id === lottieReaction.id ? null : current)}
+            className="h-[min(62vw,440px)] w-[min(62vw,440px)] drop-shadow-[0_12px_30px_rgba(255,105,180,0.28)]"
+          />
         </div>
       )}
       {loveFaceId > 0 && (
@@ -595,29 +642,6 @@ export function CallScreen({
           <button type="button" onClick={() => { setMoreMenuOpen((open) => !open); setEffectsMenuOpen(false) }} aria-label="More call controls" aria-expanded={moreMenuOpen} title="More options" className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center border transition-all ${moreMenuOpen ? 'border-pink-200/30 bg-pink-300/[0.12] text-pink-50 shadow-[0_0_18px_rgba(255,105,180,0.08)]' : 'border-white/10 bg-white/10 hover:bg-white/15'}`}>
             <MoreHorizontal className="h-6 w-6" />
           </button>
-        {reactionPickerOpen && (
-          <div className="absolute bottom-[calc(100%+14rem)] left-0 z-[115] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-3 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-16">
-            <div className="mb-2 flex items-center justify-between px-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Call reaction</p>
-              <button type="button" onClick={() => setReactionPickerOpen(false)} className="rounded-full px-2 py-1 text-xs text-pink-50/65 hover:bg-pink-300/[0.08]" aria-label="Close call reactions">✕</button>
-            </div>
-            <button type="button" onClick={() => { setHeartReactionId((value) => value + 1); void onSendCallReaction('flying-heart'); setReactionPickerOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-3 py-3 text-left transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10]">
-              <span className="text-2xl" aria-hidden="true">💗</span>
-              <span className="flex-1"><span className="block text-sm font-medium">Flying heart</span><span className="block text-[11px] text-pink-100/50">A little love in the call</span></span>
-              <span className="text-pink-100/45">›</span>
-            </button>
-            <button type="button" onClick={() => { setHeartBurstId((value) => value + 1); void onSendCallReaction('heart-burst'); setReactionPickerOpen(false) }} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-3 py-3 text-left transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10]">
-              <span className="text-2xl" aria-hidden="true">💞</span>
-              <span className="flex-1"><span className="block text-sm font-medium">Heart burst</span><span className="block text-[11px] text-pink-100/50">A heart-filled surprise</span></span>
-              <span className="text-pink-100/45">›</span>
-            </button>
-            <button type="button" onClick={() => { setLoveFaceId((value) => value + 1); void onSendCallReaction('love-face'); setReactionPickerOpen(false) }} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-3 py-3 text-left transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10]">
-              <span className="text-2xl" aria-hidden="true">🥰</span>
-              <span className="flex-1"><span className="block text-sm font-medium">Love face</span><span className="block text-[11px] text-pink-100/50">A smiling face surrounded by hearts</span></span>
-              <span className="text-pink-100/45">›</span>
-            </button>
-          </div>
-        )}
           {moreMenuOpen && (
             <div className="absolute bottom-[calc(100%+14rem)] left-0 z-[110] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-16">
               <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Call controls</p>
@@ -678,6 +702,74 @@ export function CallScreen({
         </button>
       </div>
 
+
+      {reactionPickerOpen && (
+        <div
+          className="absolute inset-0 z-[120] flex items-center justify-center bg-black/[0.16] p-4 backdrop-blur-[3px]"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Call reactions"
+          onClick={(event) => { if (event.target === event.currentTarget) { setReactionPickerOpen(false); setReactionSearch('') } }}
+        >
+          <div
+            className="flex max-h-[min(82vh,680px)] w-full max-w-sm flex-col overflow-hidden rounded-3xl border border-pink-100/[0.18] bg-white/[0.035] p-5 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex shrink-0 items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold tracking-wide text-pink-50/95">Call reactions</h3>
+                <p className="mt-1 text-xs text-pink-100/70">Choose an animated reaction to send</p>
+              </div>
+              <button type="button" onClick={() => { setReactionPickerOpen(false); setReactionSearch('') }} className="rounded-full border border-pink-100/[0.12] bg-pink-300/[0.05] p-2 text-pink-50/80 transition-colors hover:bg-pink-300/[0.09]" aria-label="Close call reactions">✕</button>
+            </div>
+            <div className="mb-3 shrink-0">
+              <input
+                type="search"
+                value={reactionSearch}
+                onChange={(event) => setReactionSearch(event.target.value)}
+                placeholder="Search reactions"
+                aria-label="Search call reactions"
+                className="w-full rounded-xl border border-pink-100/[0.14] bg-white/[0.035] px-3 py-2.5 text-sm text-pink-50 outline-none placeholder:text-pink-100/40 focus:border-pink-200/35 focus:bg-pink-300/[0.06]"
+              />
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                {CALL_REACTION_CUSTOM_OPTIONS.filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(reactionSearch.trim().toLowerCase())).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => triggerCallReaction(item.id)}
+                    title={item.label}
+                    aria-label={item.label}
+                    className="flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-1.5 py-2 text-center transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200/50"
+                  >
+                    <span className="text-[30px] leading-none" aria-hidden="true">{item.emoji}</span>
+                    <span className="line-clamp-2 text-[10px] leading-tight text-pink-50/90">{item.label}</span>
+                  </button>
+                ))}
+                {CALL_REACTION_ASSET_IDS.filter((id) => getCallReactionLabel(id).toLowerCase().includes(reactionSearch.trim().toLowerCase())).map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => triggerCallReaction(id)}
+                    title={getCallReactionLabel(id)}
+                    aria-label={getCallReactionLabel(id)}
+                    className="flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-1.5 py-2 text-center transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200/50"
+                  >
+                    <CallReactionLottie reaction={id} className="h-10 w-10" />
+                    <span className="line-clamp-2 text-[10px] leading-tight text-pink-50/90">{getCallReactionLabel(id)}</span>
+                  </button>
+                ))}
+              </div>
+              {CALL_REACTION_CUSTOM_OPTIONS.every((item) => !`${item.label} ${item.description}`.toLowerCase().includes(reactionSearch.trim().toLowerCase())) &&
+                CALL_REACTION_ASSET_IDS.every((id) => !getCallReactionLabel(id).toLowerCase().includes(reactionSearch.trim().toLowerCase())) && (
+                  <p className="px-3 py-10 text-center text-sm text-pink-100/55">No reactions found.</p>
+                )}
+            </div>
+            <p className="mt-3 shrink-0 border-t border-pink-100/[0.10] pt-3 text-center text-[10px] text-pink-100/45">288 animated reactions</p>
+          </div>
+        </div>
+      )}
 
       {filtersOpen && isVideoCall && (
         <div className="absolute inset-0 z-[125] flex items-center justify-center bg-black/[0.16] p-4 backdrop-blur-[3px]" role="dialog" aria-modal="true" aria-label="Choose call filters">
