@@ -358,11 +358,12 @@ export function CallScreen({
             @keyframes socia-heart-orbit {
               0% { left: 50%; top: 50%; opacity: 0; transform:translate(-50%,-50%) rotate(0deg) scale(.35); }
               8% { opacity: 1; }
-              24% { transform:translate(-50%,-50%) rotate(105deg) scale(1.05); }
-              48% { transform:translate(-50%,-50%) rotate(230deg) scale(.9); }
-              70% { transform:translate(-50%,-50%) rotate(330deg) scale(1.08); }
-              84% { left:50%; top:50%; transform:translate(-50%,-50%) rotate(360deg) scale(1.35); opacity:1; }
-              100% { left:50%; top:50%; transform:translate(-50%,-50%) rotate(360deg) scale(1.9); opacity:0; }
+              24% { left:80%; top:24%; transform:translate(-50%,-50%) rotate(105deg) scale(1.05); }
+              44% { left:82%; top:74%; transform:translate(-50%,-50%) rotate(205deg) scale(.9); }
+              62% { left:18%; top:78%; transform:translate(-50%,-50%) rotate(290deg) scale(1.08); }
+              78% { left:16%; top:22%; transform:translate(-50%,-50%) rotate(345deg) scale(1.12); }
+              88% { left:50%; top:50%; transform:translate(-50%,-50%) rotate(390deg) scale(1.35); opacity:1; }
+              100% { left:50%; top:50%; transform:translate(-50%,-50%) rotate(420deg) scale(1.9); opacity:0; }
             }
             @keyframes socia-heart-particle {
               0% { opacity:0; transform:translate(-50%,-50%) scale(.25) rotate(-15deg); }
