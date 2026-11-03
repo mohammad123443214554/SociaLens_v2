@@ -59,6 +59,8 @@ export function CallScreen({
   const [isSpeakerOn, setIsSpeakerOn] = useState(false)
   const [isScreenLocked, setIsScreenLocked] = useState(false)
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
+  const [heartReactionId, setHeartReactionId] = useState(0)
   const [effectsMenuOpen, setEffectsMenuOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [effectsCategory, setEffectsCategory] = useState('natural-beauty')
@@ -314,6 +316,34 @@ export function CallScreen({
           )}
         </div>
       )}
+      {heartReactionId > 0 && (
+        <div key={heartReactionId} className={`pointer-events-none absolute z-[180] overflow-visible ${isVideoCall ? 'left-1/2 top-[44%] h-[min(56vh,720px)] w-[min(34vw,420px,39.375vh)] -translate-x-1/2 -translate-y-1/2 max-md:inset-0 max-md:h-full max-md:w-full max-md:translate-x-0 max-md:translate-y-0' : 'inset-x-0 top-1/2 h-48 -translate-y-1/2'}`} onAnimationEnd={() => setHeartReactionId(0)}>
+          <style>{`
+            @keyframes socia-heart-flight {
+              0% { left: -18%; top: 72%; transform: translate3d(0, 18px, 0) rotate(-18deg) scale(.55); opacity: 0; }
+              10% { opacity: 1; }
+              48% { top: 28%; transform: translate3d(0, 0, 0) rotate(8deg) scale(1.08); }
+              88% { opacity: 1; }
+              100% { left: 112%; top: 43%; transform: translate3d(0, -12px, 0) rotate(18deg) scale(.72); opacity: 0; }
+            }
+            @keyframes socia-heart-wing-left { 0%,100% { transform: rotate(-12deg) scaleY(.82); } 50% { transform: rotate(22deg) scaleY(1.12); } }
+            @keyframes socia-heart-wing-right { 0%,100% { transform: rotate(12deg) scaleY(.82); } 50% { transform: rotate(-22deg) scaleY(1.12); } }
+            .socia-heart-flight { position:absolute; width:76px; height:76px; animation:socia-heart-flight 2.35s cubic-bezier(.2,.72,.25,1) both; filter:drop-shadow(0 8px 18px rgba(255,70,145,.45)); }
+            .socia-heart-wing-left { transform-origin:100% 55%; animation:socia-heart-wing-left .22s ease-in-out infinite; }
+            .socia-heart-wing-right { transform-origin:0 55%; animation:socia-heart-wing-right .22s ease-in-out infinite; }
+          `}</style>
+          <div className="socia-heart-flight" aria-label="Flying heart reaction" role="img">
+            <svg viewBox="0 0 100 100" className="h-full w-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path className="socia-heart-wing-left" d="M43 48 C23 14 2 22 13 42 C19 53 31 57 43 58" fill="#FFE6F1" stroke="#FF8DBB" strokeWidth="2.5"/>
+              <path className="socia-heart-wing-right" d="M57 48 C77 14 98 22 87 42 C81 53 69 57 57 58" fill="#FFE6F1" stroke="#FF8DBB" strokeWidth="2.5"/>
+              <path d="M50 86 C42 78 18 61 18 42 C18 20 44 15 50 35 C56 15 82 20 82 42 C82 61 58 78 50 86Z" fill="#FF4F91" stroke="#FFD1E3" strokeWidth="3"/>
+              <path d="M31 39 C33 29 43 27 47 35" stroke="#FFEAF3" strokeWidth="4" strokeLinecap="round" opacity=".9"/>
+              <path d="M24 19 L19 12 M76 18 L82 11 M50 8 V2" stroke="#FFC2DB" strokeWidth="3" strokeLinecap="round"/>
+            </svg>
+          </div>
+        </div>
+      )}
+
       <audio ref={remoteAudioRef} autoPlay className="hidden" />
 
       {/* Keep remote camera image unfiltered; controls have their own contrast. */}
@@ -395,6 +425,9 @@ export function CallScreen({
               <button type="button" onClick={() => { setIsScreenLocked(true); setMoreMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                 <Lock className="h-4 w-4" /><span className="flex-1">Lock screen</span>
               </button>
+              <button type="button" onClick={() => { setReactionPickerOpen(true); setMoreMenuOpen(false) }} disabled={phase !== 'in-call' || isOnHold} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07] disabled:opacity-40">
+                <span className="text-lg leading-none" aria-hidden="true">💗</span><span className="flex-1">Call reaction</span><span className="text-pink-100/45">›</span>
+              </button>
               {isVideoCall && (
                 <button type="button" onClick={() => { setEffectsMenuOpen(true); setMoreMenuOpen(false) }} disabled={isCameraOff || isOnHold || phase !== 'in-call'} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07] disabled:opacity-40">
                   <Sparkles className="h-4 w-4" /><span className="flex-1">Effects</span><span className="text-pink-100/45">›</span>
@@ -418,7 +451,21 @@ export function CallScreen({
           )}
         </div>
 
-        <button type="button" onClick={() => setIsSpeakerOn((current) => !current)} aria-label={isSpeakerOn ? 'Speaker on' : 'Speaker off'} aria-pressed={isSpeakerOn} title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}>
+        {reactionPickerOpen && (
+          <div className="absolute bottom-[calc(100%+14rem)] left-0 z-[115] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-3 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-16">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Call reaction</p>
+              <button type="button" onClick={() => setReactionPickerOpen(false)} className="rounded-full px-2 py-1 text-xs text-pink-50/65 hover:bg-pink-300/[0.08]" aria-label="Close call reactions">✕</button>
+            </div>
+            <button type="button" onClick={() => { setHeartReactionId((value) => value + 1); setReactionPickerOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-3 py-3 text-left transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10]">
+              <span className="text-2xl" aria-hidden="true">💗</span>
+              <span className="flex-1"><span className="block text-sm font-medium">Flying heart</span><span className="block text-[11px] text-pink-100/50">A little love in the call</span></span>
+              <span className="text-pink-100/45">›</span>
+            </button>
+          </div>
+        )}
+
+        <button type="button" onClick={() => setIsSpeakerOn((current) => !current) aria-label={isSpeakerOn ? 'Speaker on' : 'Speaker off'} aria-pressed={isSpeakerOn} title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}>
           {isSpeakerOn ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
         </button>
 
