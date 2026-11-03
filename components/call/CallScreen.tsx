@@ -97,6 +97,15 @@ export function CallScreen({
     }
   }, [incomingReaction?.id])
 
+  useEffect(() => {
+    const activeReactionId = lottieReaction?.id
+    if (!activeReactionId) return
+    const timer = window.setTimeout(() => {
+      setLottieReaction((current) => current?.id === activeReactionId ? null : current)
+    }, 5600)
+    return () => window.clearTimeout(timer)
+  }, [lottieReaction?.id])
+
   const triggerCallReaction = (reaction: CallReactionId) => {
     switch (reaction) {
       case 'flying-heart':
@@ -368,9 +377,8 @@ export function CallScreen({
         <div key={lottieReaction.id} className="pointer-events-none fixed inset-0 z-[183] flex items-center justify-center overflow-hidden" aria-label={`${lottieReaction.reaction} call reaction`} role="img">
           <CallReactionLottie
             reaction={lottieReaction.reaction}
-            loop={false}
-            onComplete={() => setLottieReaction((current) => current?.id === lottieReaction.id ? null : current)}
-            className="h-[min(62vw,440px)] w-[min(62vw,440px)] drop-shadow-[0_12px_30px_rgba(255,105,180,0.28)]"
+            loop
+            className="h-[min(72vw,520px)] w-[min(72vw,520px)] drop-shadow-[0_12px_30px_rgba(255,105,180,0.28)]"
           />
         </div>
       )}
@@ -732,7 +740,7 @@ export function CallScreen({
                 className="w-full rounded-xl border border-pink-100/[0.14] bg-white/[0.035] px-3 py-2.5 text-sm text-pink-50 outline-none placeholder:text-pink-100/40 focus:border-pink-200/35 focus:bg-pink-300/[0.06]"
               />
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+            <div data-call-reaction-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
                 {CALL_REACTION_CUSTOM_OPTIONS.filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(reactionSearch.trim().toLowerCase())).map((item) => (
                   <button
@@ -756,7 +764,7 @@ export function CallScreen({
                     aria-label={getCallReactionLabel(id)}
                     className="flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-1.5 py-2 text-center transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200/50"
                   >
-                    <CallReactionLottie reaction={id} loop={false} className="h-10 w-10" />
+                    <CallReactionLottie reaction={id} loop className="h-10 w-10" />
                     <span className="line-clamp-2 text-[10px] leading-tight text-pink-50/90">{getCallReactionLabel(id)}</span>
                   </button>
                 ))}
