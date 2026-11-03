@@ -1,0 +1,7 @@
+Animated Noto Emoji assets in this directory are from Google Fonts' Animated Noto Emoji project:
+https://googlefonts.github.io/noto-emoji-animation/
+
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Attribution: Animated Noto Emoji by Google.
