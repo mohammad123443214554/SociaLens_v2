@@ -328,59 +328,109 @@ export function CallScreen({
         </div>
       )}
       {loveFaceId > 0 && (
-        <div key={`love-face-${loveFaceId}`} className="pointer-events-none fixed inset-0 z-[182] flex items-center justify-center overflow-hidden" aria-label="Love face reaction" role="img">
+        <div
+          key={`love-face-${loveFaceId}`}
+          className="pointer-events-none fixed inset-0 z-[182] flex items-center justify-center overflow-hidden"
+          aria-label="Love face reaction"
+          role="img"
+        >
           <style>{`
-            @keyframes socia-love-face-appear {
-              0% { opacity:0; transform:scale(.42) translateY(18px); }
-              12% { opacity:1; transform:scale(1.06) translateY(0); }
-              22%,78% { opacity:1; transform:scale(1) translateY(0); }
-              100% { opacity:0; transform:scale(.88) translateY(-12px); }
+            @keyframes socia-love-emoji-enter {
+              0% { opacity:0; transform:translateY(18px) scale(.78); }
+              12% { opacity:1; transform:translateY(0) scale(1.035); }
+              20%,82% { opacity:1; transform:translateY(0) scale(1); }
+              100% { opacity:0; transform:translateY(-8px) scale(.94); }
             }
-            @keyframes socia-love-face-float {
-              0%,100% { transform:translateY(0) rotate(-2deg); }
-              50% { transform:translateY(-9px) rotate(2deg); }
+            @keyframes socia-love-emoji-sway {
+              0%,100% { transform:rotate(-2.2deg) translateY(0); }
+              25% { transform:rotate(1.5deg) translateY(-4px); }
+              50% { transform:rotate(2.2deg) translateY(1px); }
+              75% { transform:rotate(-1.2deg) translateY(-3px); }
             }
-            @keyframes socia-love-heart-float {
-              0% { opacity:0; transform:translate(var(--love-start-x),var(--love-start-y)) scale(.35) rotate(-18deg); }
-              14% { opacity:1; }
-              72% { opacity:1; transform:translate(var(--love-mid-x),var(--love-mid-y)) scale(1) rotate(var(--love-rotate)); }
-              100% { opacity:0; transform:translate(var(--love-end-x),var(--love-end-y)) scale(.72) rotate(var(--love-end-rotate)); }
+            @keyframes socia-love-heart-one {
+              0%,100% { transform:translate(0,0) rotate(-9deg) scale(1); }
+              25% { transform:translate(-5px,-8px) rotate(-2deg) scale(1.04); }
+              50% { transform:translate(2px,-3px) rotate(5deg) scale(.98); }
+              75% { transform:translate(-3px,3px) rotate(-4deg) scale(1.03); }
             }
-            .socia-love-face-halo { position:absolute; width:min(72vw,520px); aspect-ratio:1; border-radius:9999px; background:radial-gradient(circle,rgba(255,117,183,.25) 0%,rgba(255,117,183,.12) 34%,rgba(255,117,183,0) 72%); animation:socia-love-face-appear 5.8s ease both; }
-            .socia-love-face-main { position:relative; width:clamp(112px,22vw,190px); height:clamp(112px,22vw,190px); filter:drop-shadow(0 8px 24px rgba(255,75,145,.48)); animation:socia-love-face-appear 5.8s ease both,socia-love-face-float 1.45s ease-in-out infinite; }
-            .socia-love-heart { position:absolute; left:50%; top:50%; width:clamp(22px,4.2vw,42px); height:clamp(22px,4.2vw,42px); filter:drop-shadow(0 4px 10px rgba(255,45,100,.35)); animation:socia-love-heart-float 5.4s cubic-bezier(.22,.68,.25,1) both; animation-delay:var(--love-delay); }
+            @keyframes socia-love-heart-two {
+              0%,100% { transform:translate(0,0) rotate(8deg) scale(1); }
+              30% { transform:translate(5px,4px) rotate(1deg) scale(1.04); }
+              60% { transform:translate(-2px,-6px) rotate(-7deg) scale(.97); }
+            }
+            .socia-love-emoji-glow {
+              position:absolute;
+              width:clamp(280px,58vw,560px);
+              aspect-ratio:1.8;
+              border-radius:50%;
+              background:radial-gradient(ellipse,rgba(255,255,255,.88) 0%,rgba(255,220,239,.62) 30%,rgba(255,105,174,.22) 55%,rgba(255,105,174,0) 76%);
+              filter:blur(18px);
+              animation:socia-love-emoji-enter 5.6s ease both;
+            }
+            .socia-love-emoji-art {
+              position:relative;
+              width:clamp(270px,52vw,520px);
+              height:auto;
+              aspect-ratio:1.82;
+              overflow:visible;
+              filter:drop-shadow(0 12px 22px rgba(255,91,144,.26));
+              animation:socia-love-emoji-enter 5.6s cubic-bezier(.2,.72,.22,1) both,socia-love-emoji-sway 2.2s ease-in-out infinite;
+              will-change:transform,opacity;
+            }
+            .socia-love-heart-a { transform-box:fill-box; transform-origin:center; animation:socia-love-heart-one 1.35s ease-in-out infinite; }
+            .socia-love-heart-b { transform-box:fill-box; transform-origin:center; animation:socia-love-heart-two 1.55s ease-in-out infinite; }
+            @media (prefers-reduced-motion: reduce) {
+              .socia-love-emoji-art,.socia-love-emoji-glow,.socia-love-heart-a,.socia-love-heart-b { animation-duration:5.6s; animation-iteration-count:1; }
+            }
           `}</style>
-          <div className="socia-love-face-halo" />
-          <div className="absolute inset-0">
-            {[
-              [-82,-42,-116,-86,-145,-112,-18,.0],[-48,-78,-70,-120,-86,-145,14,.18],[8,-88,18,-128,32,-154,-12,.32],
-              [66,-62,98,-96,126,-126,20,.08],[86,-8,128,-14,156,-24,-16,.24],[62,54,98,88,122,116,18,.42],
-              [4,78,8,120,14,148,-14,.16],[-62,58,-100,92,-126,122,16,.34],[-90,4,-132,10,-160,20,-20,.5]
-            ].map(([sx,sy,mx,my,ex,ey,rot,delay], index) => (
-              <svg key={index} className="socia-love-heart" viewBox="0 0 100 100" fill="none" aria-hidden="true" style={{
-                ['--love-start-x' as string]: `${sx}px`, ['--love-start-y' as string]: `${sy}px`,
-                ['--love-mid-x' as string]: `${mx}px`, ['--love-mid-y' as string]: `${my}px`,
-                ['--love-end-x' as string]: `${ex}px`, ['--love-end-y' as string]: `${ey}px`,
-                ['--love-rotate' as string]: `${rot}deg`, ['--love-end-rotate' as string]: `${rot * 1.8}deg`,
-                ['--love-delay' as string]: `${delay}s`,
-              } as React.CSSProperties}>
-                <path d="M50 88 C42 80 12 59 12 37 C12 12 42 8 50 31 C58 8 88 12 88 37 C88 59 58 80 50 88Z" fill="#FF365F" stroke="#FFD5E1" strokeWidth="4"/>
-                <path d="M27 35 C29 23 40 21 45 30" stroke="#FFF0F4" strokeWidth="5" strokeLinecap="round"/>
-              </svg>
-            ))}
-          </div>
-          <div className="socia-love-face-main">
-            <svg viewBox="0 0 200 200" className="h-full w-full" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <defs><radialGradient id="socia-love-face-yellow" cx="36%" cy="28%" r="75%"><stop offset="0%" stopColor="#FFF77A"/><stop offset="68%" stopColor="#FFD52E"/><stop offset="100%" stopColor="#F4A900"/></radialGradient></defs>
-              <circle cx="100" cy="100" r="82" fill="url(#socia-love-face-yellow)" stroke="#FFF0A0" strokeWidth="5"/>
-              <path d="M48 78 Q62 65 77 78" stroke="#8B4B13" strokeWidth="7" strokeLinecap="round" fill="none"/>
-              <path d="M123 78 Q138 65 153 78" stroke="#8B4B13" strokeWidth="7" strokeLinecap="round" fill="none"/>
-              <path d="M65 119 Q100 153 135 119" stroke="#8B3F12" strokeWidth="8" strokeLinecap="round" fill="none"/>
-              <ellipse cx="49" cy="111" rx="14" ry="8" fill="#FF8B68" opacity=".48"/>
-              <ellipse cx="151" cy="111" rx="14" ry="8" fill="#FF8B68" opacity=".48"/>
-              <path d="M34 43 Q48 29 64 37" stroke="#FFF9C5" strokeWidth="7" strokeLinecap="round" opacity=".65"/>
-            </svg>
-          </div>
+          <div className="socia-love-emoji-glow" />
+          <svg className="socia-love-emoji-art" viewBox="0 0 560 310" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <radialGradient id="socia-love-oval-face" cx="42%" cy="27%" r="76%">
+                <stop offset="0%" stopColor="#FFFDA8" />
+                <stop offset="43%" stopColor="#FFE85B" />
+                <stop offset="78%" stopColor="#FFC52E" />
+                <stop offset="100%" stopColor="#D98208" />
+              </radialGradient>
+              <linearGradient id="socia-love-oval-edge" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#FFF07A" />
+                <stop offset="100%" stopColor="#E99413" />
+              </linearGradient>
+              <linearGradient id="socia-love-heart-red" x1="0" y1="0" x2="0.2" y2="1">
+                <stop offset="0%" stopColor="#FF7770" />
+                <stop offset="45%" stopColor="#FF2928" />
+                <stop offset="100%" stopColor="#C90012" />
+              </linearGradient>
+              <filter id="socia-love-heart-shadow" x="-35%" y="-35%" width="170%" height="180%">
+                <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
+                <feOffset dy="4" />
+                <feComponentTransfer><feFuncA type="linear" slope=".28" /></feComponentTransfer>
+                <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+            </defs>
+            {/* Wide, softly shaded emoji face from the supplied reference clip. */}
+            <ellipse cx="280" cy="166" rx="226" ry="132" fill="url(#socia-love-oval-edge)" opacity=".96" />
+            <ellipse cx="280" cy="157" rx="218" ry="126" fill="url(#socia-love-oval-face)" stroke="#F5B91D" strokeWidth="5" />
+            <ellipse cx="205" cy="191" rx="35" ry="18" fill="#FF7B35" opacity=".38" filter="url(#socia-love-heart-shadow)" />
+            <ellipse cx="355" cy="191" rx="35" ry="18" fill="#FF7B35" opacity=".38" filter="url(#socia-love-heart-shadow)" />
+            <path d="M145 119 Q177 101 211 105" fill="none" stroke="#8C4A16" strokeWidth="11" strokeLinecap="round" />
+            <path d="M350 105 Q384 101 416 119" fill="none" stroke="#8C4A16" strokeWidth="11" strokeLinecap="round" />
+            <path d="M153 153 Q178 137 213 145 Q226 150 218 164 Q198 178 163 169 Q147 165 153 153Z" fill="#704016" />
+            <path d="M347 145 Q382 137 407 153 Q413 165 397 169 Q362 178 342 164 Q334 150 347 145Z" fill="#704016" />
+            <path d="M229 207 Q280 245 331 207 Q319 251 280 252 Q241 251 229 207Z" fill="#713B12" />
+            <path d="M241 211 Q280 235 319 211" fill="none" stroke="#FFF0B1" strokeWidth="5" strokeLinecap="round" opacity=".72" />
+            <path d="M100 102 Q130 53 192 50" fill="none" stroke="#FFF9C5" strokeWidth="12" strokeLinecap="round" opacity=".5" />
+            {/* Glossy red hearts attached to opposite corners, moving gently like the reference. */}
+            <g className="socia-love-heart-a" filter="url(#socia-love-heart-shadow)">
+              <path d="M137 97 C115 80 65 57 65 29 C65 1 103 -8 137 24 C171 -8 209 1 209 29 C209 57 159 80 137 97Z" fill="url(#socia-love-heart-red)" stroke="#A71918" strokeWidth="3" />
+              <path d="M83 29 C85 12 104 7 119 21" fill="none" stroke="#FFE4D9" strokeWidth="7" strokeLinecap="round" opacity=".85" />
+              <path d="M79 42 Q91 57 108 64" fill="none" stroke="#FFB2A1" strokeWidth="3" strokeLinecap="round" opacity=".65" />
+            </g>
+            <g className="socia-love-heart-b" filter="url(#socia-love-heart-shadow)">
+              <path d="M432 276 C413 261 370 240 370 215 C370 190 403 181 432 209 C461 181 494 190 494 215 C494 240 451 261 432 276Z" fill="url(#socia-love-heart-red)" stroke="#A71918" strokeWidth="3" />
+              <path d="M385 214 C388 199 405 196 418 208" fill="none" stroke="#FFE4D9" strokeWidth="6" strokeLinecap="round" opacity=".85" />
+            </g>
+          </svg>
         </div>
       )}
       {heartReactionId > 0 && (
