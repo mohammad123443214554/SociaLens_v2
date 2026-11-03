@@ -107,13 +107,13 @@ export function CallReactionLottie({ reaction, loop = true, onComplete, classNam
   }
 
   if (!animationData) {
-    return <div ref={hostRef} className={['flex items-center justify-center', className].filter(Boolean).join(' ')} aria-hidden="true">
+    return <div ref={hostRef} className={['flex shrink-0 items-center justify-center overflow-hidden', className].filter(Boolean).join(' ')} aria-hidden="true">
       <span className="block h-5 w-5 animate-pulse rounded-full bg-pink-200/20" />
     </div>
   }
 
   return (
-    <div ref={hostRef} className={['flex items-center justify-center', className].filter(Boolean).join(' ')} aria-hidden="true">
+    <div ref={hostRef} className={['flex shrink-0 items-center justify-center overflow-hidden', className].filter(Boolean).join(' ')} aria-hidden="true">
       <Lottie
         animationData={animationData}
         loop={loop}
