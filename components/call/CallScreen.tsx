@@ -12,6 +12,8 @@ interface CallScreenProps {
   type: CallType
   peerName: string
   peerAvatar: string
+  onSendCallReaction: (reaction: 'flying-heart' | 'heart-burst') => Promise<void>
+  incomingReaction: { id: string; reaction: 'flying-heart' | 'heart-burst' } | null
   localStream: MediaStream | null
   remoteStream: MediaStream | null
   isMuted: boolean
@@ -43,7 +45,7 @@ function formatDuration(sec: number) {
 }
 
 export function CallScreen({
-  phase, type, peerName, peerAvatar, localStream, remoteStream,
+  phase, type, peerName, peerAvatar, localStream, remoteStream, onSendCallReaction, incomingReaction,
   isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume,
   onEnd, onToggleMute, onToggleCamera, onSwitchCamera, onToggleHold,
   backgroundBlurEnabled, backgroundBlurIntensity, onSetBackgroundBlur,
@@ -61,6 +63,7 @@ export function CallScreen({
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
   const [heartReactionId, setHeartReactionId] = useState(0)
+  const [heartBurstId, setHeartBurstId] = useState(0)
   const [effectsMenuOpen, setEffectsMenuOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [effectsCategory, setEffectsCategory] = useState('natural-beauty')
@@ -72,6 +75,12 @@ export function CallScreen({
   const [blurDraft, setBlurDraft] = useState(backgroundBlurIntensity)
   const [blurSaving, setBlurSaving] = useState(false)
   const [blurError, setBlurError] = useState<string | null>(null)
+  useEffect(() => {
+    if (!incomingReaction) return
+    if (incomingReaction.reaction === 'flying-heart') setHeartReactionId((value) => value + 1)
+    if (incomingReaction.reaction === 'heart-burst') setHeartBurstId((value) => value + 1)
+  }, [incomingReaction?.id])
+
   const allCallEffects = [...PART_TWO_FACE_PRESETS, ...PART_FOUR_LIGHTING_PRESETS, ...PART_FOUR_CREATIVE_PRESETS]
   const visibleCallEffects = allCallEffects.filter((effect) => effect.categoryId === effectsCategory)
   const activeCallEffect = allCallEffects.find((effect) => effect.id === draftEffectId) ?? null
@@ -317,17 +326,17 @@ export function CallScreen({
         </div>
       )}
       {heartReactionId > 0 && (
-        <div key={heartReactionId} className={`pointer-events-none absolute z-[180] overflow-visible ${isVideoCall ? 'left-1/2 top-[44%] h-[min(56vh,720px)] w-[min(34vw,420px,39.375vh)] -translate-x-1/2 -translate-y-1/2 max-md:inset-0 max-md:h-full max-md:w-full max-md:translate-x-0 max-md:translate-y-0' : 'inset-x-0 top-1/2 h-48 -translate-y-1/2'}`}>
+        <div key={`flying-${heartReactionId}`} className="pointer-events-none fixed inset-0 z-[180] overflow-hidden" aria-live="off">
           <style>{`
             @keyframes socia-heart-flight {
-              0% { left: -18%; top: 72%; transform: translate3d(0, 18px, 0) rotate(-18deg) scale(.55); opacity: 0; }
+              0% { left: -12%; top: 72%; transform: translate3d(0,18px,0) rotate(-18deg) scale(.55); opacity: 0; }
               10% { opacity: 1; }
-              48% { top: 28%; transform: translate3d(0, 0, 0) rotate(8deg) scale(1.08); }
+              48% { top: 28%; transform: translate3d(0,0,0) rotate(8deg) scale(1.08); }
               88% { opacity: 1; }
-              100% { left: 112%; top: 43%; transform: translate3d(0, -12px, 0) rotate(18deg) scale(.72); opacity: 0; }
+              100% { left: 112%; top: 43%; transform: translate3d(0,-12px,0) rotate(18deg) scale(.72); opacity: 0; }
             }
-            @keyframes socia-heart-wing-left { 0%,100% { transform: rotate(-12deg) scaleY(.82); } 50% { transform: rotate(22deg) scaleY(1.12); } }
-            @keyframes socia-heart-wing-right { 0%,100% { transform: rotate(12deg) scaleY(.82); } 50% { transform: rotate(-22deg) scaleY(1.12); } }
+            @keyframes socia-heart-wing-left { 0%,100% { transform:rotate(-12deg) scaleY(.82); } 50% { transform:rotate(22deg) scaleY(1.12); } }
+            @keyframes socia-heart-wing-right { 0%,100% { transform:rotate(12deg) scaleY(.82); } 50% { transform:rotate(-22deg) scaleY(1.12); } }
             .socia-heart-flight { position:absolute; width:76px; height:76px; animation:socia-heart-flight 5.6s linear both; filter:drop-shadow(0 8px 18px rgba(255,70,145,.45)); }
             .socia-heart-wing-left { transform-origin:100% 55%; animation:socia-heart-wing-left .22s ease-in-out infinite; }
             .socia-heart-wing-right { transform-origin:0 55%; animation:socia-heart-wing-right .22s ease-in-out infinite; }
@@ -341,6 +350,48 @@ export function CallScreen({
               <path d="M24 19 L19 12 M76 18 L82 11 M50 8 V2" stroke="#FFC2DB" strokeWidth="3" strokeLinecap="round"/>
             </svg>
           </div>
+        </div>
+      )}
+      {heartBurstId > 0 && (
+        <div key={`burst-${heartBurstId}`} className="pointer-events-none fixed inset-0 z-[181] overflow-hidden" aria-label="Heart burst reaction" role="img">
+          <style>{`
+            @keyframes socia-heart-orbit {
+              0% { left: 50%; top: 50%; opacity: 0; transform:translate(-50%,-50%) rotate(0deg) scale(.35); }
+              8% { opacity: 1; }
+              24% { transform:translate(-50%,-50%) rotate(105deg) scale(1.05); }
+              48% { transform:translate(-50%,-50%) rotate(230deg) scale(.9); }
+              70% { transform:translate(-50%,-50%) rotate(330deg) scale(1.08); }
+              84% { left:50%; top:50%; transform:translate(-50%,-50%) rotate(360deg) scale(1.45); opacity:1; }
+              100% { left:50%; top:50%; transform:translate(-50%,-50%) rotate(360deg) scale(0); opacity:0; }
+            }
+            @keyframes socia-heart-particle {
+              0% { opacity:0; transform:translate(-50%,-50%) scale(.25) rotate(-15deg); }
+              12% { opacity:1; }
+              100% { opacity:0; transform:translate(calc(-50% + var(--burst-x)),calc(-50% + var(--burst-y))) scale(var(--burst-scale)) rotate(var(--burst-rotate)); }
+            }
+            .socia-heart-orbit { position:absolute; width:clamp(76px,13vw,150px); height:clamp(76px,13vw,150px); animation:socia-heart-orbit 5.8s ease-in-out both; filter:drop-shadow(0 0 24px rgba(255,67,151,.75)); }
+            .socia-heart-particle { position:absolute; left:50%; top:50%; font-size:clamp(20px,3vw,38px); animation:socia-heart-particle 1.8s cubic-bezier(.16,.72,.24,1) both; animation-delay:5.72s; }
+          `}</style>
+          <div className="socia-heart-orbit" onAnimationEnd={(event) => { if (event.target === event.currentTarget && event.animationName === 'socia-heart-orbit') setHeartBurstId(0) }}>
+            <svg viewBox="0 0 100 100" className="h-full w-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M50 88 C40 78 14 59 14 39 C14 14 43 10 50 33 C57 10 86 14 86 39 C86 59 60 78 50 88Z" fill="#FF4F91" stroke="#FFE0ED" strokeWidth="4"/>
+              <path d="M29 35 C33 23 45 23 49 33" stroke="#FFF0F6" strokeWidth="5" strokeLinecap="round"/>
+              <path d="M12 16 L4 8 M88 16 L96 8 M50 5 V-2" stroke="#FFC2DB" strokeWidth="3" strokeLinecap="round"/>
+            </svg>
+          </div>
+          {[
+            [-44,-38,.9,-25],[-24,-50,1.1,18],[0,-54,.85,-12],[26,-48,1.05,24],[46,-28,.9,-18],
+            [52,0,1.1,16],[44,34,.95,-22],[24,50,1.15,20],[0,55,.9,-10],[-26,48,1.05,18],
+            [-48,28,.9,-20],[-55,0,1.15,12],[-32,-18,.8,28],[32,-18,.9,-26],[-30,22,1.1,16],[30,22,.85,-16],
+            [-12,-32,1.05,24],[14,34,.9,-22],[-15,40,1.1,12],[16,-40,.85,-14]
+          ].map(([x,y,scale,rotate], index) => (
+            <span key={index} className="socia-heart-particle" style={{
+              ['--burst-x' as string]: `${x * 1.45}vw`,
+              ['--burst-y' as string]: `${y * 1.45}vh`,
+              ['--burst-scale' as string]: scale,
+              ['--burst-rotate' as string]: `${rotate}deg`,
+            } as React.CSSProperties}>💗</span>
+          ))}
         </div>
       )}
 
@@ -413,9 +464,14 @@ export function CallScreen({
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Call reaction</p>
               <button type="button" onClick={() => setReactionPickerOpen(false)} className="rounded-full px-2 py-1 text-xs text-pink-50/65 hover:bg-pink-300/[0.08]" aria-label="Close call reactions">✕</button>
             </div>
-            <button type="button" onClick={() => { setHeartReactionId((value) => value + 1); setReactionPickerOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-3 py-3 text-left transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10]">
+            <button type="button" onClick={() => { setHeartReactionId((value) => value + 1); void onSendCallReaction('flying-heart'); setReactionPickerOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-3 py-3 text-left transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10]">
               <span className="text-2xl" aria-hidden="true">💗</span>
               <span className="flex-1"><span className="block text-sm font-medium">Flying heart</span><span className="block text-[11px] text-pink-100/50">A little love in the call</span></span>
+              <span className="text-pink-100/45">›</span>
+            </button>
+            <button type="button" onClick={() => { setHeartBurstId((value) => value + 1); void onSendCallReaction('heart-burst'); setReactionPickerOpen(false) }} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-3 py-3 text-left transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10]">
+              <span className="text-2xl" aria-hidden="true">💞</span>
+              <span className="flex-1"><span className="block text-sm font-medium">Heart burst</span><span className="block text-[11px] text-pink-100/50">A heart-filled surprise</span></span>
               <span className="text-pink-100/45">›</span>
             </button>
           </div>
