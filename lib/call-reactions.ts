@@ -343,3 +343,7 @@ export function getCallReactionLabel(id: CallReactionId): string {
   if (custom) return custom.label
   return id.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
 }
+
+export function getCallReactionAssetUrl(id: CallReactionAssetId): string {
+  return `/animations/call-reactions/${id}.json`
+}
