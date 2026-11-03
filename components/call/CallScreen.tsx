@@ -7,9 +7,10 @@ import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
 import { CALL_EFFECT_CATEGORIES, PART_TWO_FACE_PRESETS, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS } from '@/lib/call-effects'
 import { CallReactionLottie } from './CallReactionLottie'
-import { CALL_REACTION_ASSET_IDS, CALL_REACTION_CUSTOM_OPTIONS, getCallReactionLabel, type CallReactionAssetId, type CallReactionId } from '@/lib/call-reactions'
+import { CALL_REACTION_ALL_IDS, CALL_REACTION_CATEGORIES, CALL_REACTION_CUSTOM_OPTIONS, getCallReactionCategory, getCallReactionLabel, isCallReactionId, type CallReactionAssetId, type CallReactionCategoryId, type CallReactionId } from '@/lib/call-reactions'
 
 interface CallScreenProps {
+  userId: string
   phase: CallPhase
   type: CallType
   peerName: string
@@ -47,7 +48,7 @@ function formatDuration(sec: number) {
 }
 
 export function CallScreen({
-  phase, type, peerName, peerAvatar, localStream, remoteStream, onSendCallReaction, incomingReaction,
+  userId, phase, type, peerName, peerAvatar, localStream, remoteStream, onSendCallReaction, incomingReaction,
   isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume,
   onEnd, onToggleMute, onToggleCamera, onSwitchCamera, onToggleHold,
   backgroundBlurEnabled, backgroundBlurIntensity, onSetBackgroundBlur,
@@ -69,6 +70,19 @@ export function CallScreen({
   const [loveFaceId, setLoveFaceId] = useState(0)
   const [lottieReaction, setLottieReaction] = useState<{ id: string; reaction: CallReactionAssetId } | null>(null)
   const [reactionSearch, setReactionSearch] = useState('')
+  const [reactionCategory, setReactionCategory] = useState<CallReactionCategoryId>('recent')
+  const [recentReactionIds, setRecentReactionIds] = useState<CallReactionId[]>([])
+  const recentStorageKey = `socialens:call-reactions:recent:${userId}`
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(recentStorageKey)
+      const parsed: unknown = saved ? JSON.parse(saved) : []
+      setRecentReactionIds(Array.isArray(parsed) ? parsed.filter(isCallReactionId).slice(0, 24) : [])
+    } catch {
+      setRecentReactionIds([])
+    }
+  }, [recentStorageKey])
   const [effectsMenuOpen, setEffectsMenuOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [effectsCategory, setEffectsCategory] = useState('natural-beauty')
@@ -124,6 +138,11 @@ export function CallScreen({
         setLottieReaction({ id, reaction })
       }
     }
+    setRecentReactionIds((current) => {
+      const next = [reaction, ...current.filter((id) => id !== reaction)].slice(0, 24)
+      try { window.localStorage.setItem(recentStorageKey, JSON.stringify(next)) } catch {}
+      return next
+    })
     void onSendCallReaction(reaction)
     setReactionPickerOpen(false)
     setReactionSearch('')
@@ -740,41 +759,34 @@ export function CallScreen({
                 className="w-full rounded-xl border border-pink-100/[0.14] bg-white/[0.035] px-3 py-2.5 text-sm text-pink-50 outline-none placeholder:text-pink-100/40 focus:border-pink-200/35 focus:bg-pink-300/[0.06]"
               />
             </div>
-            <div data-call-reaction-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-                {CALL_REACTION_CUSTOM_OPTIONS.filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(reactionSearch.trim().toLowerCase())).map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => triggerCallReaction(item.id)}
-                    title={item.label}
-                    aria-label={item.label}
-                    className="flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-1.5 py-2 text-center transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200/50"
-                  >
-                    <span className="text-[30px] leading-none" aria-hidden="true">{item.emoji}</span>
-                    <span className="line-clamp-2 text-[10px] leading-tight text-pink-50/90">{item.label}</span>
-                  </button>
-                ))}
-                {CALL_REACTION_ASSET_IDS.filter((id) => getCallReactionLabel(id).toLowerCase().includes(reactionSearch.trim().toLowerCase())).map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => triggerCallReaction(id)}
-                    title={getCallReactionLabel(id)}
-                    aria-label={getCallReactionLabel(id)}
-                    className="flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-1.5 py-2 text-center transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200/50"
-                  >
-                    <CallReactionLottie reaction={id} loop className="h-10 w-10" />
-                    <span className="line-clamp-2 text-[10px] leading-tight text-pink-50/90">{getCallReactionLabel(id)}</span>
-                  </button>
-                ))}
-              </div>
-              {CALL_REACTION_CUSTOM_OPTIONS.every((item) => !`${item.label} ${item.description}`.toLowerCase().includes(reactionSearch.trim().toLowerCase())) &&
-                CALL_REACTION_ASSET_IDS.every((id) => !getCallReactionLabel(id).toLowerCase().includes(reactionSearch.trim().toLowerCase())) && (
-                  <p className="px-3 py-10 text-center text-sm text-pink-100/55">No reactions found.</p>
-                )}
+            <div className="mb-3 flex gap-1.5 overflow-x-auto pb-2">
+              {CALL_REACTION_CATEGORIES.map((category) => (
+                <button key={category.id} type="button" onClick={() => setReactionCategory(category.id)} aria-pressed={reactionCategory === category.id} className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-medium transition-colors ${reactionCategory === category.id ? "border-pink-200/35 bg-pink-300/[0.14] text-pink-50" : "border-pink-100/[0.13] bg-white/[0.025] text-pink-100/65 hover:bg-pink-200/[0.07]"}`}>
+                  {category.label}
+                </button>
+              ))}
             </div>
-            <p className="mt-3 shrink-0 border-t border-pink-100/[0.10] pt-3 text-center text-[10px] text-pink-100/45">288 animated reactions</p>
+            <div data-call-reaction-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+              {(() => {
+                const query = reactionSearch.trim().toLowerCase()
+                const candidates = reactionCategory === "recent" && !query ? recentReactionIds : CALL_REACTION_ALL_IDS.filter((id) => (query || reactionCategory === "recent" || getCallReactionCategory(id) === reactionCategory) && getCallReactionLabel(id).toLowerCase().includes(query))
+                const visibleIds = candidates.filter((id, index) => candidates.indexOf(id) === index)
+                return visibleIds.length ? (
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                    {visibleIds.map((id) => {
+                      const custom = CALL_REACTION_CUSTOM_OPTIONS.find((item) => item.id === id)
+                      return (
+                        <button key={id} type="button" onClick={() => triggerCallReaction(id)} title={getCallReactionLabel(id)} aria-label={getCallReactionLabel(id)} className="flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-xl border border-pink-100/[0.10] bg-pink-300/[0.045] px-1.5 py-2 text-center transition-colors hover:border-pink-200/25 hover:bg-pink-300/[0.10] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200/50">
+                          {custom ? <span className="text-[30px] leading-none" aria-hidden="true">{custom.emoji}</span> : <CallReactionLottie reaction={id as CallReactionAssetId} loop className="h-10 w-10" />}
+                          <span className="line-clamp-2 text-[10px] leading-tight text-pink-50/90">{getCallReactionLabel(id)}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : <p className="px-3 py-10 text-center text-sm text-pink-100/55">{reactionCategory === "recent" && !query ? "Your recently sent reactions will appear here." : "No reactions found in this category."}</p>
+              })()}
+            </div>
+            <p className="mt-3 shrink-0 border-t border-pink-100/[0.10] pt-3 text-center text-[10px] text-pink-100/45">285 animated reactions + 3 custom</p>
           </div>
         </div>
       )}
