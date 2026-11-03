@@ -394,7 +394,11 @@ export function useCallEngine(currentUserId?: string) {
     clearRemoteLeftTimeout()
     if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null }
     reconnectAttemptsRef.current = 0
+    // reportUsageAndCleanupTransport captures the active row synchronously;
+    // clear the ref immediately afterwards so stale callbacks cannot act on
+    // a call that has already been torn down.
     void reportUsageAndCleanupTransport()
+    callRef.current = null
 
     localStreamObjRef.current.getTracks().forEach((t) => { t.stop(); localStreamObjRef.current.removeTrack(t) })
     remoteStreamObjRef.current.getTracks().forEach((t) => remoteStreamObjRef.current.removeTrack(t))
