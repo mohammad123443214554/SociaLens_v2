@@ -10,6 +10,7 @@ import { useNativePush } from '@/lib/hooks/useNativePush'
 import { IncomingCallModal } from './IncomingCallModal'
 import { CallScreen } from './CallScreen'
 import { PermissionGate } from './PermissionGate'
+import { isCallReactionId, type CallReactionId } from '@/lib/call-reactions'
 
 interface StartCallPeer {
   id: string
@@ -52,7 +53,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [bannerError, setBannerError] = useState<string | null>(null)
   const [supabase] = useState(() => createClient())
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-  const [incomingReaction, setIncomingReaction] = useState<{ id: string; reaction: 'flying-heart' | 'heart-burst' | 'love-face' } | null>(null)
+  const [incomingReaction, setIncomingReaction] = useState<{ id: string; reaction: CallReactionId } | null>(null)
 
   // Tapping "Accept" on the OS call notification lands here with
   // ?incomingCall=<id> in the URL - from public/sw.js on the web, and from
@@ -138,7 +139,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     channel
       .on('broadcast', { event: 'call-reaction' }, ({ payload }) => {
         if (!active || !payload || payload.senderId === user.id) return
-        if (payload.reaction !== 'flying-heart' && payload.reaction !== 'heart-burst' && payload.reaction !== 'love-face') return
+        if (!isCallReactionId(payload.reaction)) return
         if (typeof payload.id !== 'string') return
         setIncomingReaction({ id: payload.id, reaction: payload.reaction })
       })
@@ -155,7 +156,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
   }, [engine.call?.id, engine.phase, user?.id, supabase])
 
-  const sendCallReaction = async (reaction: 'flying-heart' | 'heart-burst' | 'love-face') => {
+  const sendCallReaction = async (reaction: CallReactionId) => {
     const channel = reactionChannelRef.current
     if (!channel || engine.phase !== 'in-call' || !user?.id) return
     const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
