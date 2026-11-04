@@ -120,3 +120,17 @@ The creator is inserted as the first joined participant. The 10-person capacity 
 - Existing one-to-one call engine, calls table, and existing connect endpoint were not modified.
 - Current Part 3 verification is limited to repository/deployment build verification. Real two-device/multi-device audio, background notification wake-up, reconnect, and 10-user concurrency testing remain required before production acceptance.
 - The first iteration exposes a dedicated Group call launcher while no one-to-one call is active. The richer in-call 3-dot integration, polished multi-participant roster/speaking indicators, and recipient-targeted reactions remain follow-up work in Parts 4–5.
+
+
+## Part 4 — Group call screen and controls (implemented; live-device verification pending)
+
+- Reworked the group call's expanded view into a responsive participant grid, with a compact floating view retained for minimized use.
+- Every joined participant is shown with their profile photo/fallback, display name, and connection state. Pending invitees are shown separately so they are not confused with joined participants.
+- Enabled Agora audio volume indication and map each server-minted participant UID back to the corresponding SociaLens user ID. Active speakers receive a live speaking ring/icon and a "Speaking" state on their participant tile.
+- Added group-call controls for microphone mute/unmute, speaker playback-level mode, hold/resume, invite more participants, and leave. Hold disables the local microphone and suppresses remote playback locally; resuming restores both according to mute/speaker settings.
+- Added a realtime subscription for both participant roster changes and group-call end state, plus a 12-second roster recovery refresh to cover missed Realtime updates.
+- Added rollback cleanup if the database accepts a participant but Agora media connection fails, preventing the failed client from remaining marked as joined when the leave endpoint is reachable.
+- Reset mute/hold/speaker/speaking state between sessions so controls from a previous call cannot leak into the next call.
+- Existing one-to-one CallScreen and useCall engine remain unchanged.
+- Speaker mode changes the Agora playback level; actual physical output-device routing remains governed by the browser/OS because browser audio output routing is not consistently exposed across desktop, mobile and Capacitor WebViews.
+- Verification still required: Vercel production build, at least two authenticated devices speaking/listening simultaneously, hold/resume, mute, speaker level, participant join/leave, last-participant call end, reconnect, and mobile/Capacitor layout. No claim of complete real-device verification is made until those checks pass.
