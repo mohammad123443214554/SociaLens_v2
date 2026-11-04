@@ -330,7 +330,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       }
     }, 3000)
     return () => { alive = false; window.clearInterval(recovery); void supabase.removeChannel(channel) }
-  }, [activeCallId, supabase, refreshRoster, cleanupMedia, onError])
+  }, [activeCallId, userId, supabase, refreshRoster, cleanupMedia, onError])
 
   useEffect(() => {
     if (!activeCallId) {
