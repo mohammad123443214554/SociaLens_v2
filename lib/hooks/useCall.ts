@@ -26,6 +26,7 @@ export interface CallRow {
   ended_by?: string | null
   is_on_hold?: boolean | null
   hold_initiated_by?: string | null
+  group_call_id?: string | null
 }
 
 interface PeerProfile {
@@ -188,6 +189,7 @@ export function useCallEngine(currentUserId?: string) {
 
   const localStreamObjRef = useRef<MediaStream>(new MediaStream())
   const remoteStreamObjRef = useRef<MediaStream>(new MediaStream())
+  const remoteAgoraAudioTracksRef = useRef<Map<string, MediaStreamTrack>>(new Map())
   const agoraRef = useRef<{ client: any; audioTrack: any; videoTrack: any } | null>(null)
   const dailyRef = useRef<any>(null)
   const backgroundBlurProcessorRef = useRef<{ processor: CallBackgroundBlurProcessor; rawTrack: MediaStreamTrack; processedTrack: MediaStreamTrack; sourceTrack?: MediaStreamTrack; originalTrack?: MediaStreamTrack } | null>(null)
@@ -527,7 +529,16 @@ export function useCallEngine(currentUserId?: string) {
             await client.subscribe(remoteUser, mediaType)
             const track = mediaType === 'audio' ? remoteUser.audioTrack : remoteUser.videoTrack
             if (track) {
-              upsertTrack(remoteStreamObjRef.current, track.getMediaStreamTrack())
+              const mediaTrack = track.getMediaStreamTrack()
+              if (mediaType === 'audio') {
+                const uid = String(remoteUser.uid)
+                const previous = remoteAgoraAudioTracksRef.current.get(uid)
+                if (previous && previous !== mediaTrack) remoteStreamObjRef.current.removeTrack(previous)
+                remoteAgoraAudioTracksRef.current.set(uid, mediaTrack)
+                if (!remoteStreamObjRef.current.getTracks().includes(mediaTrack)) remoteStreamObjRef.current.addTrack(mediaTrack)
+              } else {
+                upsertTrack(remoteStreamObjRef.current, mediaTrack)
+              }
               setRemoteStream(new MediaStream(remoteStreamObjRef.current.getTracks()))
               setPhase('in-call')
               if (!startedAtMsRef.current) startedAtMsRef.current = Date.now()
@@ -538,10 +549,15 @@ export function useCallEngine(currentUserId?: string) {
           // The other side is back - cancel any pending "they disconnected" grace timer.
           if (remoteLeftTimeoutRef.current) { clearTimeout(remoteLeftTimeoutRef.current); remoteLeftTimeoutRef.current = null }
         })
-        client.on('user-unpublished', (_remoteUser: any, mediaType: 'audio' | 'video') => {
-          removeTracksOfKind(remoteStreamObjRef.current, mediaType === 'audio' ? 'audio' : 'video')
-          // Publish a fresh stream reference so React immediately removes the
-          // remote video element when the other participant switches camera off.
+        client.on('user-unpublished', (remoteUser: any, mediaType: 'audio' | 'video') => {
+          if (mediaType === 'audio') {
+            const uid = String(remoteUser.uid)
+            const previous = remoteAgoraAudioTracksRef.current.get(uid)
+            if (previous) remoteStreamObjRef.current.removeTrack(previous)
+            remoteAgoraAudioTracksRef.current.delete(uid)
+          } else {
+            removeTracksOfKind(remoteStreamObjRef.current, 'video')
+          }
           setRemoteStream(new MediaStream(remoteStreamObjRef.current.getTracks()))
         })
         // A transport-level user-left event is NOT a hangup. Mobile networks,
@@ -551,8 +567,16 @@ export function useCallEngine(currentUserId?: string) {
         // a participant presses End) is allowed to finish the call.
         client.on('user-left', async (remoteUser: any) => {
           console.warn('[Agora] remote participant left; verifying call-session status', remoteUser?.uid)
-          removeTracksOfKind(remoteStreamObjRef.current, 'video')
-          removeTracksOfKind(remoteStreamObjRef.current, 'audio')
+          const uid = String(remoteUser?.uid ?? '')
+          const departedAudioTrack = remoteAgoraAudioTracksRef.current.get(uid)
+          if (departedAudioTrack) remoteStreamObjRef.current.removeTrack(departedAudioTrack)
+          remoteAgoraAudioTracksRef.current.delete(uid)
+          // A group call can have several remote audio publishers. A single
+          // participant leaving must never silence the other participants.
+          if (!callRef.current?.group_call_id) {
+            removeTracksOfKind(remoteStreamObjRef.current, 'video')
+            if (remoteAgoraAudioTracksRef.current.size === 0) removeTracksOfKind(remoteStreamObjRef.current, 'audio')
+          }
           setRemoteStream(new MediaStream(remoteStreamObjRef.current.getTracks()))
 
           // Agora can report a temporary mobile-network handoff as user-left.
