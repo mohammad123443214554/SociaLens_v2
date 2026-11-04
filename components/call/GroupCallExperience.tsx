@@ -300,7 +300,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       return
     }
     let alive = true
-    const channel = supabase.channel(`group-call-reactions:${userId}`, {
+    const channel = supabase.channel(`group-call-reactions:${activeCallId}:${userId}`, {
       config: { private: true, broadcast: { self: false, ack: false } },
     })
       .on('broadcast', { event: 'call-reaction' }, ({ payload }) => {
