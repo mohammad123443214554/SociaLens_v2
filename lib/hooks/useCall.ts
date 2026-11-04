@@ -404,6 +404,7 @@ export function useCallEngine(currentUserId?: string) {
 
     localStreamObjRef.current.getTracks().forEach((t) => { t.stop(); localStreamObjRef.current.removeTrack(t) })
     remoteStreamObjRef.current.getTracks().forEach((t) => remoteStreamObjRef.current.removeTrack(t))
+    remoteAgoraAudioTracksRef.current.clear()
 
     roleRef.current = null
     pendingCallRef.current = null
