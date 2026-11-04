@@ -78,6 +78,10 @@ export function CallScreen({
   const [sendingInvites, setSendingInvites] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
+  const [recipientPickerOpen, setRecipientPickerOpen] = useState(false)
+  const [pendingGroupReaction, setPendingGroupReaction] = useState<CallReactionId | null>(null)
+  const [selectedGroupReactionRecipients, setSelectedGroupReactionRecipients] = useState<string[]>([])
+  const [sendingGroupReaction, setSendingGroupReaction] = useState(false)
   const [heartReactionId, setHeartReactionId] = useState(0)
   const [heartBurstId, setHeartBurstId] = useState(0)
   const [lottieReaction, setLottieReaction] = useState<{ id: string; reaction: CallReactionAssetId } | null>(null)
@@ -135,7 +139,18 @@ export function CallScreen({
     return () => window.clearTimeout(timer)
   }, [lottieReaction?.id])
 
+  const joinedGroupReactionRecipients = groupParticipants.filter((person) => person.status === 'joined' && person.id !== userId)
+
   const triggerCallReaction = (reaction: CallReactionId) => {
+    if (groupCallId && phase === 'in-call') {
+      if (!joinedGroupReactionRecipients.length) return
+      setPendingGroupReaction(reaction)
+      setSelectedGroupReactionRecipients(joinedGroupReactionRecipients.map((person) => person.id))
+      setReactionPickerOpen(false)
+      setReactionSearch('')
+      setRecipientPickerOpen(true)
+      return
+    }
     switch (reaction) {
       case 'flying-heart':
         setHeartReactionId((value) => value + 1)
@@ -158,6 +173,18 @@ export function CallScreen({
     void onSendCallReaction(reaction)
     setReactionPickerOpen(false)
     setReactionSearch('')
+  }
+
+  const sendGroupReaction = async () => {
+    if (!groupCallId || !pendingGroupReaction || !selectedGroupReactionRecipients.length || sendingGroupReaction) return
+    setSendingGroupReaction(true)
+    try {
+      const response = await fetch(`/api/group-calls/${groupCallId}/reactions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reaction: pendingGroupReaction, recipientIds: selectedGroupReactionRecipients }) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Could not send reaction')
+      setRecipientPickerOpen(false); setPendingGroupReaction(null); setSelectedGroupReactionRecipients([])
+    } catch (error) { console.error('[CallScreen] group reaction delivery failed', error) }
+    finally { setSendingGroupReaction(false) }
   }
 
   const allCallEffects = [...PART_TWO_FACE_PRESETS, ...PART_FOUR_LIGHTING_PRESETS, ...PART_FOUR_CREATIVE_PRESETS]
@@ -607,11 +634,11 @@ export function CallScreen({
           {moreMenuOpen && (
             <div className="absolute bottom-[calc(100%+14rem)] left-0 z-[110] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-16">
               <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Call controls</p>
-              <button type="button" onClick={onToggleMute} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
+              {!groupCallId && <button type="button" onClick={onToggleMute} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                 {isMuted ? <MicOff className="h-4 w-4 text-pink-200" /> : <Mic className="h-4 w-4" />}
                 <span className="flex-1">{isMuted ? 'Turn microphone on' : 'Turn microphone off'}</span>
                 <span className={`h-2 w-2 rounded-full ${isMuted ? 'bg-pink-300' : 'bg-white/25'}`} />
-              </button>
+              </button>}
               {isVideoCall && (
                 <button type="button" onClick={onToggleCamera} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                   {isCameraOff ? <VideoOff className="h-4 w-4 text-pink-200" /> : <Video className="h-4 w-4" />}
@@ -619,9 +646,9 @@ export function CallScreen({
                   <span className={`h-2 w-2 rounded-full ${isCameraOff ? 'bg-pink-300' : 'bg-white/25'}`} />
                 </button>
               )}
-              <button type="button" onClick={() => { setIsScreenLocked(true); setMoreMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
+              {!groupCallId && <button type="button" onClick={() => { setIsScreenLocked(true); setMoreMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                 <Lock className="h-4 w-4" /><span className="flex-1">Lock screen</span>
-              </button>
+              </button>}
               {phase === 'in-call' && type === 'audio' && (
                 <button type="button" onClick={async () => {
                   setMoreMenuOpen(false)
@@ -674,6 +701,10 @@ export function CallScreen({
           )}
         </div>
 
+
+        {groupCallId && type === 'audio' && <button type="button" onClick={onToggleMute} aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'} title={isMuted ? 'Unmute microphone' : 'Mute microphone'} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${isMuted ? 'bg-white text-neutral-900' : 'bg-white/15 hover:bg-white/25'}`}>
+          {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+        </button>}
 
         <button type="button" onClick={() => setIsSpeakerOn((current) => !current)} aria-label={isSpeakerOn ? 'Speaker on' : 'Speaker off'} aria-pressed={isSpeakerOn} title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}>
           {isSpeakerOn ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
@@ -820,6 +851,16 @@ export function CallScreen({
               {backgroundBlurEnabled && <button type="button" disabled={blurSaving} onClick={async () => { setBlurSaving(true); setBlurError(null); try { await onSetBackgroundBlur(false, blurDraft); setBlurPopupOpen(false) } catch (error) { setBlurError(error instanceof Error ? error.message : 'Could not turn off Background Blur.') } finally { setBlurSaving(false) } }} className="rounded-xl border border-pink-100/[0.18] bg-white/[0.025] px-4 py-3 text-sm font-medium text-pink-50/90 backdrop-blur-xl transition-colors hover:bg-pink-200/[0.07] disabled:opacity-50">Turn off</button>}
               <button type="button" disabled={blurSaving} onClick={async () => { setBlurSaving(true); setBlurError(null); try { await onSetBackgroundBlur(true, blurDraft); setBlurPopupOpen(false) } catch (error) { setBlurError(error instanceof Error ? error.message : 'Could not apply Background Blur.') } finally { setBlurSaving(false) } }} className="flex-1 rounded-xl border border-pink-200/[0.22] bg-pink-300/[0.10] px-4 py-3 text-sm font-semibold text-pink-50 shadow-[0_4px_18px_rgba(255,105,180,0.08)] backdrop-blur-xl transition-colors hover:bg-pink-300/[0.14] disabled:opacity-50">{blurSaving ? 'Applying…' : 'Done'}</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {recipientPickerOpen && groupCallId && pendingGroupReaction && (
+        <div className="absolute inset-0 z-[125] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Choose group reaction recipients">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#19191f] text-white shadow-2xl">
+            <div className="border-b border-white/10 p-4"><div className="flex items-center justify-between"><div><h3 className="font-semibold">Who should receive this reaction?</h3><p className="mt-1 text-xs text-white/55">Only selected participants will receive it.</p></div><button type="button" onClick={() => { setRecipientPickerOpen(false); setPendingGroupReaction(null); setSelectedGroupReactionRecipients([]) }} aria-label="Cancel reaction" className="rounded-full p-2 hover:bg-white/10">✕</button></div><p className="mt-3 rounded-xl bg-white/5 px-3 py-2 text-sm text-pink-200">{CALL_REACTION_CUSTOM_OPTIONS.find((option) => option.id === pendingGroupReaction)?.emoji || '✨'} {getCallReactionLabel(pendingGroupReaction)}</p></div>
+            <div className="max-h-[52dvh] overflow-y-auto p-2">{joinedGroupReactionRecipients.map((person) => <button key={person.id} type="button" onClick={() => setSelectedGroupReactionRecipients((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : current.length < 9 ? [...current, person.id] : current)} className="flex w-full items-center gap-3 rounded-xl p-3 text-left hover:bg-white/5"><Avatar className="h-10 w-10"><AvatarImage src={person.avatarUrl || undefined} /><AvatarFallback>{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback></Avatar><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{person.fullName || person.username}</span><span className="block truncate text-xs text-white/45">@{person.username}</span></span><span className={`flex h-5 w-5 items-center justify-center rounded-full border ${selectedGroupReactionRecipients.includes(person.id) ? 'border-pink-500 bg-pink-600 text-white' : 'border-white/30'}`}>{selectedGroupReactionRecipients.includes(person.id) && <Check className="h-3 w-3" />}</span></button>)}</div>
+            <div className="flex items-center justify-between border-t border-white/10 p-4"><span className="text-xs text-white/55">{selectedGroupReactionRecipients.length} selected · defaults to everyone</span><button type="button" disabled={!selectedGroupReactionRecipients.length || sendingGroupReaction} onClick={() => void sendGroupReaction()} className="rounded-full bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{sendingGroupReaction ? 'Sending…' : 'Done'}</button></div>
           </div>
         </div>
       )}
