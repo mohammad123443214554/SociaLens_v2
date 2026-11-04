@@ -123,7 +123,6 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
           remoteUser.audioTrack?.setVolume(heldRef.current ? 0 : speakerRef.current ? 100 : 55)
           remoteUser.audioTrack?.play()
         }
-        if (mountedRef.current) setSpeakingUids((current) => new Set(current))
       } catch (error) {
         console.error('[Group Call] remote participant subscription failed', error)
       }
@@ -472,24 +471,29 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
           </div>
 
           <div className="flex w-full flex-1 flex-col items-center justify-center gap-4 py-8">
-            <div className="flex max-w-[min(90vw,520px)] flex-wrap items-center justify-center gap-3">
-              {roster.filter(person => person.status === 'joined').map((person) => {
+            {(() => {
+              const joined = roster.filter(person => person.status === 'joined')
+              const featured = joined.find(person => person.id !== userId) || joined[0]
+              const speaking = featured ? speakingUids.has(String(groupAgoraUid(featured.id))) : false
+              return featured ? (
+                <Avatar className={`h-36 w-36 ring-4 ${speaking ? 'ring-emerald-400 shadow-[0_0_30px_rgba(52,211,153,0.25)]' : 'ring-pink-500/30 shadow-2xl shadow-pink-500/10'}`}>
+                  <AvatarImage src={featured.avatarUrl || undefined} />
+                  <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-4xl">{(featured.fullName || featured.username).slice(0,1).toUpperCase()}</AvatarFallback>
+                </Avatar>
+              ) : null
+            })()}
+            <h1 className="text-2xl font-bold tracking-tight">Group Call</h1>
+            <div className="flex max-w-[min(90vw,420px)] items-center justify-center -space-x-2">
+              {roster.filter(person => person.status === 'joined').slice(0,10).map((person) => {
                 const speaking = speakingUids.has(String(groupAgoraUid(person.id)))
                 return (
-                  <div key={person.id} className="flex w-[min(26vw,112px)] flex-col items-center gap-2">
-                    <div className="relative">
-                      <Avatar className={`h-[min(22vw,88px)] w-[min(22vw,88px)] ring-2 ${speaking ? 'ring-emerald-400 shadow-[0_0_24px_rgba(52,211,153,0.3)]' : 'ring-white/15'}`}>
-                        <AvatarImage src={person.avatarUrl || undefined} />
-                        <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-xl">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      {speaking && <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-black"><Signal className="h-3 w-3 text-white" /></span>}
-                    </div>
-                    <span className="max-w-full truncate text-xs font-medium">{person.id === userId ? 'You' : person.fullName || person.username}</span>
-                  </div>
+                  <Avatar key={person.id} className={`h-10 w-10 border-2 border-black ring-1 ${speaking ? 'ring-emerald-400' : 'ring-white/15'}`}>
+                    <AvatarImage src={person.avatarUrl || undefined} />
+                    <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-xs">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
+                  </Avatar>
                 )
               })}
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">Group Call</h1>
             <p className="text-sm tabular-nums text-white/55">{Math.floor(elapsedSeconds / 60).toString().padStart(2,'0')}:{(elapsedSeconds % 60).toString().padStart(2,'0')}</p>
             <p className="text-xs text-white/40">{roster.filter(person => person.status === 'joined').length}/10 participants connected</p>
           </div>
