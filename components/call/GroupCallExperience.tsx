@@ -56,6 +56,8 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   const remoteUsersRef = useRef<Map<string | number, any>>(new Map())
   const mountedRef = useRef(true)
   const activeCallIdRef = useRef<string | null>(null)
+  const rosterStatusRef = useRef<Map<string, RosterPerson['status']>>(new Map())
+  const announcedDeparturesRef = useRef<Set<string>>(new Set())
 
   const loadIncoming = useCallback(async () => {
     try {
@@ -84,7 +86,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       : { data: [] }
     const map = new Map((profiles || []).map((p) => [p.id, p]))
     if (!mountedRef.current) return
-    setRoster((data || []).map((row) => {
+    const nextRoster = (data || []).map((row) => {
       const profile = map.get(row.user_id)
       return {
         id: row.user_id,
@@ -95,7 +97,30 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
         invitedBy: row.invited_by || null,
         inviterAvatarUrl: row.invited_by ? map.get(row.invited_by)?.avatar_url || null : null,
       } as RosterPerson
-    }))
+    })
+
+    // Announce each remote participant departure once to the people who remain
+    // in the group. The user who leaves should not hear their own departure cue.
+    const previousStatuses = rosterStatusRef.current
+    for (const person of nextRoster) {
+      const departureKey = `${groupCallId}:${person.id}`
+      if (
+        person.id !== userId &&
+        person.status === 'left' &&
+        previousStatuses.get(person.id) === 'joined' &&
+        !announcedDeparturesRef.current.has(departureKey)
+      ) {
+        announcedDeparturesRef.current.add(departureKey)
+        const audio = new Audio('/audio/calls/group-call-leave.mp3')
+        audio.preload = 'auto'
+        audio.volume = 1
+        void audio.play().catch((playbackError) => {
+          console.warn('[Group Call] participant-leave announcement playback failed', playbackError)
+        })
+      }
+    }
+    rosterStatusRef.current = new Map(nextRoster.map((person) => [person.id, person.status]))
+    setRoster(nextRoster)
   }, [supabase])
 
   const cleanupMedia = useCallback(async () => {
