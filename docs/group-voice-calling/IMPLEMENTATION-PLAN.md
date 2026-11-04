@@ -167,3 +167,5 @@ The creator is inserted as the first joined participant. The 10-person capacity 
 - Updated `leave_group_voice_call` transactionally: after a participant leaves, if zero or one joined participant remains, the final participant is marked left, the group call is marked ended, and pending invitations are marked missed. The parent-row lock prevents concurrent leave operations from leaving a one-person room active.
 - Added migration `20261105123000_end_group_call_when_one_participant_remains.sql` and applied it to the production Supabase project.
 - Build and live multi-device UI verification remain pending; the migration itself was applied successfully.
+
+- Added a 3-second database-status recovery check in both the standalone group-call client and the converted-call provider. If Realtime delivery is missed after the final participant is automatically marked left, the remaining client's media session and call UI still close.
