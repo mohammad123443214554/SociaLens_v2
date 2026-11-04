@@ -5,7 +5,8 @@ import AgoraRTC from 'agora-rtc-sdk-ng'
 import type { IAgoraRTCClient, ILocalAudioTrack } from 'agora-rtc-sdk-ng'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Phone, PhoneOff, Users, X, Plus, Check, Mic, MicOff, Volume2, Pause, Play, Signal, SmilePlus, Search } from 'lucide-react'
+import { Phone, PhoneOff, Users, X, Plus, Check, Mic, MicOff, Volume2, Pause, Play, Signal, SmilePlus, Search, MoreHorizontal, ShieldCheck } from 'lucide-react'
+import { IncomingCallModal } from './IncomingCallModal'
 import { CallReactionLottie } from './CallReactionLottie'
 import { CALL_REACTION_ALL_IDS, CALL_REACTION_CATEGORIES, CALL_REACTION_CUSTOM_OPTIONS, getCallReactionCategory, getCallReactionLabel, isCallReactionId, type CallReactionCategoryId, type CallReactionId } from '@/lib/call-reactions'
 
@@ -36,7 +37,9 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   const [held, setHeld] = useState(false)
   const [speakerOn, setSpeakerOn] = useState(false)
   const [speakingUids, setSpeakingUids] = useState<Set<string>>(() => new Set())
-  const [expanded, setExpanded] = useState(false)
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
   const [recipientPickerOpen, setRecipientPickerOpen] = useState(false)
   const [reactionSearch, setReactionSearch] = useState('')
@@ -159,7 +162,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       await refreshRoster(incoming.groupCallId)
       await connectToGroup(incoming.groupCallId)
       setIncoming(null)
-      setExpanded(true)
+      setCallStartedAt(Date.now())
     } catch (error) {
       await fetch(`/api/group-calls/${incoming.groupCallId}/leave`, { method: 'POST' }).catch(() => undefined)
       await cleanupMedia()
@@ -199,7 +202,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       setActiveCallId(null)
       setRoster([])
       setMuted(false); setHeld(false); setSpeakerOn(false); setSpeakingUids(new Set())
-      setExpanded(false)
+      setCallStartedAt(null)
       setBusy(false)
     }
   }, [busy, cleanupMedia])
@@ -227,7 +230,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       await connectToGroup(data.groupCallId)
       setPickerOpen(false)
       setSelected([])
-      setExpanded(true)
+      setCallStartedAt(Date.now())
     } catch (error) {
       if (activeCallIdRef.current) await fetch(`/api/group-calls/${activeCallIdRef.current}/leave`, { method: 'POST' }).catch(() => undefined)
       await cleanupMedia()
@@ -274,6 +277,17 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   }, [userId, supabase, loadIncoming, cleanupMedia])
 
   useEffect(() => {
+    if (!activeCallId || !callStartedAt) {
+      setElapsedSeconds(0)
+      return
+    }
+    const update = () => setElapsedSeconds(Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000)))
+    update()
+    const timer = window.setInterval(update, 1000)
+    return () => window.clearInterval(timer)
+  }, [activeCallId, callStartedAt])
+
+  useEffect(() => {
     if (!activeCallId) return
     let alive = true
     void refreshRoster(activeCallId)
@@ -285,7 +299,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
           activeCallIdRef.current = null
           setActiveCallId(null)
           setRoster([])
-          setExpanded(false)
+          setCallStartedAt(null)
           onError('The group call has ended.')
         }
       })
@@ -409,28 +423,19 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   return (
     <>
       {incoming && !activeCallId && (
-        <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/80 p-4 text-white">
-          <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#17171b] p-6 shadow-2xl">
-            <div className="text-center">
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-pink-500/15"><Users className="h-7 w-7 text-pink-400" /></div>
-              <p className="text-sm font-semibold text-pink-300">Incoming Group Voice Call</p>
-              <h2 className="mt-1 text-xl font-bold">Group Call</h2>
-              <p className="mt-1 text-sm text-white/55">{incoming.participants.length} participant{incoming.participants.length === 1 ? '' : 's'} in the call</p>
-            </div>
-            <div className="my-5 flex flex-wrap justify-center gap-3">
-              {incoming.participants.map((person) => (
-                <div key={person.id} className="flex w-20 flex-col items-center gap-1">
-                  <Avatar className="h-14 w-14 ring-2 ring-pink-400/40"><AvatarImage src={person.avatarUrl || undefined} /><AvatarFallback>{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback></Avatar>
-                  <span className="max-w-full truncate text-xs text-white/80">{person.fullName || person.username}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-center gap-8">
-              <button disabled={busy} onClick={() => void declineInvitation()} className="flex flex-col items-center gap-2 text-xs text-white/70"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600"><PhoneOff /></span>Decline</button>
-              <button disabled={busy || disabled} onClick={() => void acceptInvitation()} className="flex flex-col items-center gap-2 text-xs text-white/70"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600"><Phone /></span>{busy ? 'Joining…' : 'Join'}</button>
-            </div>
-          </div>
-        </div>
+        <IncomingCallModal
+          callerName="Group Call"
+          callerAvatar=""
+          type="audio"
+          isGroupCall
+          groupParticipants={incoming.participants}
+          ringtoneId={undefined}
+          ringtoneVolume={undefined}
+          onAccept={() => void acceptInvitation()}
+          onReject={() => void declineInvitation()}
+          busy={busy || disabled}
+          acceptLabel={busy ? 'Joining…' : 'Join Group Call'}
+        />
       )}
 
       {pickerOpen && !activeCallId && (
@@ -459,42 +464,60 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       )}
 
       {activeCallId && (
-        <div className={`fixed z-[210] ${expanded ? 'inset-0 overflow-y-auto bg-[#101014] px-3 pb-8 pt-[max(1rem,env(safe-area-inset-top))]' : 'bottom-4 right-4 w-[min(92vw,390px)] rounded-2xl bg-[#19191f]'} border border-white/10 p-4 text-white shadow-2xl`}>
-          <div className="flex items-center justify-between">
-            <div><p className="text-xs font-semibold uppercase tracking-wider text-pink-300">Group Call</p><p className="text-sm text-white/60">{roster.filter(p => p.status === 'joined').length}/10 participants</p></div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setExpanded((v) => !v)} className="rounded-full p-2 hover:bg-white/10">{expanded ? <X className="h-4 w-4" /> : <Users className="h-4 w-4" />}</button>
-            </div>
+        <div className="fixed inset-0 z-[210] flex min-h-[100dvh] flex-col items-center justify-between overflow-y-auto bg-black px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-white">
+          <div className="flex w-full items-center justify-center gap-2 text-xs text-white/65">
+            <ShieldCheck className="h-4 w-4" />
+            <span>SociaLens secure call</span>
+            <span className="ml-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-[10px] font-semibold text-emerald-300">Group Call</span>
           </div>
-          <div className={`my-5 grid grid-cols-2 gap-3 sm:grid-cols-3 ${expanded ? 'mx-auto max-w-5xl md:grid-cols-4 lg:grid-cols-5' : ''}`}>
-            {roster.filter(p => p.status === 'joined').map((person) => {
-              const speaking = speakingUids.has(String(groupAgoraUid(person.id)))
-              return (
-                <div key={person.id} className={`flex min-w-0 flex-col items-center gap-2 rounded-xl border p-3 transition-colors ${speaking ? 'border-emerald-400/80 bg-emerald-400/10 shadow-[0_0_22px_rgba(52,211,153,0.14)]' : 'border-white/5 bg-white/5'}`}>
-                  <div className="relative">
-                    <Avatar className={`h-14 w-14 sm:h-16 sm:w-16 ring-2 ${speaking ? 'ring-emerald-400' : 'ring-white/15'}`}><AvatarImage src={person.avatarUrl || undefined} /><AvatarFallback>{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback></Avatar>
-                    {speaking && <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[#101014]"><Signal className="h-3 w-3 text-white" /></span>}
+
+          <div className="flex w-full flex-1 flex-col items-center justify-center gap-4 py-8">
+            <div className="flex max-w-[min(90vw,520px)] flex-wrap items-center justify-center gap-3">
+              {roster.filter(person => person.status === 'joined').map((person) => {
+                const speaking = speakingUids.has(String(groupAgoraUid(person.id)))
+                return (
+                  <div key={person.id} className="flex w-[min(26vw,112px)] flex-col items-center gap-2">
+                    <div className="relative">
+                      <Avatar className={`h-[min(22vw,88px)] w-[min(22vw,88px)] ring-2 ${speaking ? 'ring-emerald-400 shadow-[0_0_24px_rgba(52,211,153,0.3)]' : 'ring-white/15'}`}>
+                        <AvatarImage src={person.avatarUrl || undefined} />
+                        <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-xl">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      {speaking && <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-black"><Signal className="h-3 w-3 text-white" /></span>}
+                    </div>
+                    <span className="max-w-full truncate text-xs font-medium">{person.id === userId ? 'You' : person.fullName || person.username}</span>
                   </div>
-                  <span className="max-w-full truncate text-xs">{person.id === userId ? 'You' : person.fullName || person.username}</span>
-                  <span className={`text-[10px] ${speaking ? 'text-emerald-300' : 'text-white/40'}`}>{speaking ? 'Speaking' : person.id === userId && muted ? 'Mic off' : person.id === userId && held ? 'On hold' : 'Connected'}</span>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">Group Call</h1>
+            <p className="text-sm tabular-nums text-white/55">{Math.floor(elapsedSeconds / 60).toString().padStart(2,'0')}:{(elapsedSeconds % 60).toString().padStart(2,'0')}</p>
+            <p className="text-xs text-white/40">{roster.filter(person => person.status === 'joined').length}/10 participants connected</p>
           </div>
-          {roster.some(p => ['invited','ringing'].includes(p.status)) && (
-            <div className="mx-auto mb-4 flex max-w-5xl flex-wrap justify-center gap-2">
-              {roster.filter(p => ['invited','ringing'].includes(p.status)).map(p => <span key={p.id} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/60">{p.fullName || p.username} · {p.status === 'ringing' ? 'Ringing' : 'Invited'}</span>)}
+
+          {roster.some(person => ['invited','ringing'].includes(person.status)) && (
+            <div className="mb-4 flex max-w-lg flex-wrap justify-center gap-2">
+              {roster.filter(person => ['invited','ringing'].includes(person.status)).map(person => (
+                <span key={person.id} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/60">{person.fullName || person.username} · {person.status === 'ringing' ? 'Ringing' : 'Invited'}</span>
+              ))}
             </div>
           )}
-          <div className="mx-auto flex w-full max-w-xl items-center justify-center gap-3 sm:gap-5">
-            <button type="button" aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} onClick={() => setMuted((v) => !v)} className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors ${muted ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/20'}`}>{muted ? <MicOff /> : <Mic />}</button>
-            <button type="button" aria-label={speakerOn ? 'Turn speaker mode off' : 'Turn speaker mode on'} aria-pressed={speakerOn} onClick={() => setSpeakerOn((v) => !v)} className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors ${speakerOn ? 'bg-pink-600 text-white' : 'bg-white/10 hover:bg-white/20'}`}><Volume2 /></button>
-            <button type="button" aria-label={held ? 'Resume group call' : 'Put group call on hold'} aria-pressed={held} onClick={toggleHold} className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors ${held ? 'bg-amber-400 text-black' : 'bg-white/10 hover:bg-white/20'}`}>{held ? <Play /> : <Pause />}</button>
-            <button type="button" aria-label="Invite participants" onClick={async () => { try { await loadContacts(); setSelected([]); setPickerOpen(true) } catch (error) { onError(error instanceof Error ? error.message : 'Could not load contacts') } }} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"><Plus /></button>
-            <button type="button" aria-label="Send reaction" title="Send reaction" onClick={openReactionPicker} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"><SmilePlus /></button>
-            <button type="button" aria-label="Leave group call" onClick={() => void leaveCall()} disabled={busy} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-600 disabled:opacity-50"><PhoneOff /></button>
+
+          <div className="relative mb-2 flex items-center justify-center gap-4">
+            <div className="relative">
+              <button type="button" aria-label="More group call options" aria-expanded={moreMenuOpen} onClick={() => setMoreMenuOpen(value => !value)} className={`flex h-14 w-14 items-center justify-center rounded-full border ${moreMenuOpen ? 'border-pink-400/40 bg-pink-500/15' : 'border-white/10 bg-white/10 hover:bg-white/15'}`}><MoreHorizontal /></button>
+              {moreMenuOpen && (
+                <div className="absolute bottom-16 left-1/2 z-[230] w-56 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#19191f] p-2 shadow-2xl">
+                  <button type="button" onClick={async () => { setMoreMenuOpen(false); try { await loadContacts(); setSelected([]); setPickerOpen(true) } catch (error) { onError(error instanceof Error ? error.message : 'Could not load contacts') } }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/10"><Plus className="h-4 w-4" />Invite people</button>
+                  <button type="button" onClick={() => { setMoreMenuOpen(false); openReactionPicker() }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/10"><SmilePlus className="h-4 w-4" />Call reaction</button>
+                </div>
+              )}
+            </div>
+            <button type="button" aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} onClick={() => setMuted(value => !value)} className={`flex h-14 w-14 items-center justify-center rounded-full ${muted ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/20'}`}>{muted ? <MicOff /> : <Mic />}</button>
+            <button type="button" aria-label={speakerOn ? 'Turn speaker mode off' : 'Turn speaker mode on'} aria-pressed={speakerOn} onClick={() => setSpeakerOn(value => !value)} className={`flex h-14 w-14 items-center justify-center rounded-full ${speakerOn ? 'bg-pink-600 text-white' : 'bg-white/10 hover:bg-white/20'}`}><Volume2 /></button>
+            <button type="button" aria-label={held ? 'Resume group call' : 'Put group call on hold'} aria-pressed={held} onClick={toggleHold} className={`flex h-14 w-14 items-center justify-center rounded-full ${held ? 'bg-amber-400 text-black' : 'bg-white/10 hover:bg-white/20'}`}>{held ? <Play /> : <Pause />}</button>
+            <button type="button" aria-label="Leave group call" onClick={() => void leaveCall()} disabled={busy} className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 shadow-lg shadow-red-600/20 disabled:opacity-50"><PhoneOff /></button>
           </div>
-          <p className="mt-3 text-center text-[10px] text-white/35">Speaker mode adjusts call playback level. Device output routing follows your system audio settings.</p>
+          <p className="mt-3 text-center text-[10px] text-white/35">Speaker mode adjusts playback level. Device output follows your audio settings.</p>
         </div>
       )}
       {pickerOpen && activeCallId && (
