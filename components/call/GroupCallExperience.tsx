@@ -483,32 +483,27 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
             <span className="ml-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-[10px] font-semibold text-emerald-300">Group Call</span>
           </div>
 
-          <div className="flex w-full flex-1 flex-col items-center justify-center gap-4 py-8">
-            {(() => {
-              const joined = roster.filter(person => person.status === 'joined')
-              const featured = joined.find(person => person.id !== userId) || joined[0]
-              const speaking = featured ? speakingUids.has(String(groupAgoraUid(featured.id))) : false
-              return featured ? (
-                <Avatar className={`h-36 w-36 ring-4 ${speaking ? 'ring-emerald-400 shadow-[0_0_30px_rgba(52,211,153,0.25)]' : 'ring-pink-500/30 shadow-2xl shadow-pink-500/10'}`}>
-                  <AvatarImage src={featured.avatarUrl || undefined} />
-                  <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-4xl">{(featured.fullName || featured.username).slice(0,1).toUpperCase()}</AvatarFallback>
-                </Avatar>
-              ) : null
-            })()}
-            <h1 className="text-2xl font-bold tracking-tight">Group Call</h1>
-            <div className="flex max-w-[min(90vw,420px)] items-center justify-center -space-x-2">
-              {roster.filter(person => person.status === 'joined').slice(0,10).map((person) => {
+          <div className="flex w-full flex-1 flex-col items-start justify-start gap-5 py-5">
+            <div className="w-full">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-pink-300">Group Call</p>
+              <p className="mt-1 text-sm text-white/60">{roster.filter(person => person.status === 'joined').length}/10 participants</p>
+            </div>
+            <div className="grid w-full max-w-6xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {roster.filter(person => person.status === 'joined').map((person) => {
                 const speaking = speakingUids.has(String(groupAgoraUid(person.id)))
+                const isYou = person.id === userId
                 return (
-                  <Avatar key={person.id} className={`h-10 w-10 border-2 border-black ring-1 ${speaking ? 'ring-emerald-400' : 'ring-white/15'}`}>
-                    <AvatarImage src={person.avatarUrl || undefined} />
-                    <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-xs">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
-                  </Avatar>
+                  <div key={person.id} className={`flex min-h-[142px] flex-col items-center justify-center gap-2 rounded-xl border px-3 py-4 text-center transition-colors ${speaking ? 'border-emerald-400/70 bg-emerald-400/10 shadow-[0_0_22px_rgba(52,211,153,0.12)]' : 'border-white/10 bg-white/[0.045]'}`}>
+                    <Avatar className={`h-16 w-16 ring-2 ${speaking ? 'ring-emerald-400' : 'ring-white/15'}`}>
+                      <AvatarImage src={person.avatarUrl || undefined} />
+                      <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-xl">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <span className="max-w-full truncate text-sm font-semibold">{isYou ? 'You' : person.fullName || person.username}</span>
+                    <span className={`text-[11px] ${speaking ? 'text-emerald-300' : 'text-white/45'}`}>{speaking ? 'Speaking' : 'Connected'}</span>
+                  </div>
                 )
               })}
             </div>
-            <p className="text-sm tabular-nums text-white/55">{Math.floor(elapsedSeconds / 60).toString().padStart(2,'0')}:{(elapsedSeconds % 60).toString().padStart(2,'0')}</p>
-            <p className="text-xs text-white/40">{roster.filter(person => person.status === 'joined').length}/10 participants connected</p>
           </div>
 
           {roster.some(person => ['invited','ringing'].includes(person.status)) && (
