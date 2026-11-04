@@ -246,10 +246,10 @@ export function useCallEngine(currentUserId?: string) {
     return playback
   }, [])
 
-  const reportUsageAndCleanupTransport = useCallback(async () => {
+  const reportUsageAndCleanupTransport = useCallback(async (reportUsage = true) => {
     const activeCall = callRef.current
     const provider = providerRef.current
-    if (activeCall && provider && startedAtMsRef.current) {
+    if (reportUsage && activeCall && provider && startedAtMsRef.current) {
       const seconds = Math.round((Date.now() - startedAtMsRef.current) / 1000)
       try {
         await fetch('/api/calls/end', {
@@ -379,7 +379,7 @@ export function useCallEngine(currentUserId?: string) {
   // Full teardown - stops media, tears down whichever provider is active,
   // and resets every piece of state back to idle. Used whenever a call
   // ends for ANY reason (hangup, reject, cancel, timeout, error).
-  const cleanup = useCallback((logStatus?: CallStatus) => {
+  const cleanup = useCallback((logStatus?: CallStatus, preserveGroupSession = false) => {
     transportCleanupRef.current = true
     const callToLog = callRef.current
     if (callToLog) {
@@ -399,7 +399,7 @@ export function useCallEngine(currentUserId?: string) {
     // reportUsageAndCleanupTransport captures the active row synchronously;
     // clear the ref immediately afterwards so stale callbacks cannot act on
     // a call that has already been torn down.
-    void reportUsageAndCleanupTransport()
+    void reportUsageAndCleanupTransport(!preserveGroupSession)
     callRef.current = null
 
     localStreamObjRef.current.getTracks().forEach((t) => { t.stop(); localStreamObjRef.current.removeTrack(t) })
@@ -1139,13 +1139,25 @@ export function useCallEngine(currentUserId?: string) {
 
   const endCall = useCallback(async (finalStatus: CallStatus = 'ended') => {
     const current = callRef.current
+    if (current?.group_call_id) {
+      try {
+        const response = await fetch(`/api/group-calls/${current.group_call_id}/leave`, { method: 'POST' })
+        if (!response.ok) console.warn('[Group Call] could not persist participant leave', await response.text())
+      } catch (leaveError) {
+        console.warn('[Group Call] leave request failed', leaveError)
+      }
+      // A converted call is now governed by group_call_participants. Do not
+      // end the original calls row or disconnect the remaining participants.
+      cleanup(undefined, true)
+      return
+    }
     if (current) {
       const endedAt = new Date().toISOString()
       await updateCallStatus(current.id, { status: finalStatus, ended_at: endedAt, ended_by: currentUserId ?? null })
       callRef.current = { ...current, status: finalStatus, ended_at: endedAt, ended_by: currentUserId ?? null }
     }
     cleanup(finalStatus)
-  }, [cleanup, currentUserId])
+  }, [cleanup, currentUserId, updateCallStatus])
 
   const toggleMute = useCallback(() => {
     const next = !isMuted
