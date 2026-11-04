@@ -292,7 +292,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
         </div>
       )}
 
-      {pickerOpen && (
+      {pickerOpen && !activeCallId && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-background shadow-2xl">
             <div className="flex items-center justify-between border-b border-border p-4">
