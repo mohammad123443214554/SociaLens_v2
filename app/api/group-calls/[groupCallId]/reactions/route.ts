@@ -69,7 +69,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const eventId = crypto.randomUUID()
   const senderName = senderProfile?.full_name || senderProfile?.username || 'Participant'
   const deliveries = await Promise.all(recipientIds.map(async (recipientId) => {
-    const topic = `group-call-reactions:${recipientId}`
+    const topic = `group-call-reactions:${groupCallId}:${recipientId}`
     try {
       const response = await fetch(
         `${adminConfig.url}/realtime/v1/api/broadcast/${encodeURIComponent(topic)}/events/call-reaction?private=true`,
