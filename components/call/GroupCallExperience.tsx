@@ -144,7 +144,6 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       if (!response.ok) throw new Error(result.error || 'Could not join group call')
       activeCallIdRef.current = incoming.groupCallId
       setMuted(false); setHeld(false); setSpeakerOn(false)
-      activeCallIdRef.current = incoming.groupCallId
       setActiveCallId(incoming.groupCallId)
       await refreshRoster(incoming.groupCallId)
       await connectToGroup(incoming.groupCallId)
