@@ -5,12 +5,18 @@ import AgoraRTC from 'agora-rtc-sdk-ng'
 import type { IAgoraRTCClient, ILocalAudioTrack } from 'agora-rtc-sdk-ng'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Phone, PhoneOff, Users, X, Plus, Check, Mic, MicOff } from 'lucide-react'
+import { Phone, PhoneOff, Users, X, Plus, Check, Mic, MicOff, Volume2, Pause, Play, Signal } from 'lucide-react'
 
 type Person = { id: string; username: string; fullName: string | null; avatarUrl: string | null }
 type Invitation = { groupCallId: string; invitedBy: string; participants: Person[] }
 type Contact = Person
-type RosterPerson = Person & { status: 'joined' | 'invited' | 'ringing' | 'left' | 'declined' | 'missed' }
+type RosterPerson = Person & { status: 'joined' | 'invited' | 'ringing' | 'left' | 'declined' | 'missed'; isSpeaking?: boolean }
+
+function groupAgoraUid(userId: string) {
+  let hash = 0
+  for (const ch of userId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+  return (hash % 900_000_000) + 1
+}
 
 type Props = { userId: string; disabled?: boolean; onError: (message: string) => void }
 
@@ -24,7 +30,12 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   const [pickerOpen, setPickerOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [muted, setMuted] = useState(false)
+  const [held, setHeld] = useState(false)
+  const [speakerOn, setSpeakerOn] = useState(false)
+  const [speakingUids, setSpeakingUids] = useState<Set<string>>(() => new Set())
   const [expanded, setExpanded] = useState(false)
+  const heldRef = useRef(false)
+  const speakerRef = useRef(false)
   const clientRef = useRef<IAgoraRTCClient | null>(null)
   const localTrackRef = useRef<ILocalAudioTrack | null>(null)
   const remoteUsersRef = useRef<Map<string | number, any>>(new Map())
@@ -94,7 +105,10 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       try {
         await client.subscribe(remoteUser, mediaType)
         remoteUsersRef.current.set(remoteUser.uid, remoteUser)
-        if (mediaType === 'audio') remoteUser.audioTrack?.play()
+        if (mediaType === 'audio') {
+          remoteUser.audioTrack?.setVolume(heldRef.current ? 0 : speakerRef.current ? 100 : 55)
+          remoteUser.audioTrack?.play()
+        }
         if (mountedRef.current) setExpanded(true)
       } catch (error) {
         console.error('[Group Call] remote participant subscription failed', error)
@@ -105,8 +119,14 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
     })
     client.on('user-left', (remoteUser) => {
       remoteUsersRef.current.delete(remoteUser.uid)
+      setSpeakingUids((current) => { const next = new Set(current); next.delete(String(remoteUser.uid)); return next })
+    })
+    client.on('volume-indicator', (volumes: Array<{ uid: string | number; level: number }>) => {
+      const active = new Set(volumes.filter((item) => item.level >= 8).map((item) => String(item.uid)))
+      if (mountedRef.current) setSpeakingUids(active)
     })
     await client.join(connection.appId, connection.channel, connection.token, connection.uid)
+    client.enableAudioVolumeIndicator()
     const track = await AgoraRTC.createMicrophoneAudioTrack()
     localTrackRef.current = track
     await client.publish([track])
@@ -129,6 +149,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       setIncoming(null)
       setExpanded(true)
     } catch (error) {
+      await fetch(`/api/group-calls/${incoming.groupCallId}/leave`, { method: 'POST' }).catch(() => undefined)
       await cleanupMedia()
       activeCallIdRef.current = null
       setActiveCallId(null)
@@ -194,6 +215,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       setSelected([])
       setExpanded(true)
     } catch (error) {
+      if (activeCallIdRef.current) await fetch(`/api/group-calls/${activeCallIdRef.current}/leave`, { method: 'POST' }).catch(() => undefined)
       await cleanupMedia()
       activeCallIdRef.current = null
       setActiveCallId(null)
@@ -239,17 +261,34 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
 
   useEffect(() => {
     if (!activeCallId) return
+    let alive = true
     void refreshRoster(activeCallId)
     const channel = supabase.channel(`group-call-roster:${activeCallId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_call_participants', filter: `group_call_id=eq.${activeCallId}` }, () => void refreshRoster(activeCallId))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_calls', filter: `id=eq.${activeCallId}` }, (payload) => {
+        if (payload.new?.status === 'ended' && alive) {
+          void cleanupMedia()
+          activeCallIdRef.current = null
+          setActiveCallId(null)
+          setRoster([])
+          setExpanded(false)
+          onError('The group call has ended.')
+        }
+      })
       .subscribe()
-    return () => { void supabase.removeChannel(channel) }
-  }, [activeCallId, supabase, refreshRoster])
+    const recovery = window.setInterval(() => { if (alive) void refreshRoster(activeCallId) }, 12000)
+    return () => { alive = false; window.clearInterval(recovery); void supabase.removeChannel(channel) }
+  }, [activeCallId, supabase, refreshRoster, cleanupMedia, onError])
 
   useEffect(() => {
-    if (!localTrackRef.current) return
-    void localTrackRef.current.setEnabled(!muted)
-  }, [muted])
+    heldRef.current = held
+    void localTrackRef.current?.setEnabled(!muted && !held)
+    for (const remote of remoteUsersRef.current.values()) {
+      remote.audioTrack?.setVolume(held ? 0 : speakerOn ? 100 : 55)
+    }
+  }, [muted, held, speakerOn])
+
+  const toggleHold = () => setHeld((current) => !current)
 
   const toggleContact = (id: string) => setSelected((current) =>
     current.includes(id) ? current.filter((item) => item !== id) : current.length < 9 ? [...current, id] : current
@@ -319,26 +358,41 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       )}
 
       {activeCallId && (
-        <div className={`fixed z-[210] ${expanded ? 'inset-0 bg-[#101014]' : 'bottom-4 right-4 w-[min(92vw,390px)] rounded-2xl bg-[#19191f]'} border border-white/10 p-4 text-white shadow-2xl`}>
+        <div className={`fixed z-[210] ${expanded ? 'inset-0 overflow-y-auto bg-[#101014] px-3 pb-8 pt-[max(1rem,env(safe-area-inset-top))]' : 'bottom-4 right-4 w-[min(92vw,390px)] rounded-2xl bg-[#19191f]'} border border-white/10 p-4 text-white shadow-2xl`}>
           <div className="flex items-center justify-between">
             <div><p className="text-xs font-semibold uppercase tracking-wider text-pink-300">Group Call</p><p className="text-sm text-white/60">{roster.filter(p => p.status === 'joined').length}/10 participants</p></div>
             <div className="flex items-center gap-2">
               <button onClick={() => setExpanded((v) => !v)} className="rounded-full p-2 hover:bg-white/10">{expanded ? <X className="h-4 w-4" /> : <Users className="h-4 w-4" />}</button>
             </div>
           </div>
-          <div className={`my-5 grid grid-cols-2 gap-3 ${expanded ? 'mx-auto max-w-3xl sm:grid-cols-3 md:grid-cols-4' : ''}`}>
-            {roster.filter(p => p.status === 'joined').map((person) => (
-              <div key={person.id} className="flex flex-col items-center gap-2 rounded-xl bg-white/5 p-3">
-                <Avatar className="h-16 w-16 ring-2 ring-emerald-400/50"><AvatarImage src={person.avatarUrl || undefined} /><AvatarFallback>{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback></Avatar>
-                <span className="max-w-full truncate text-xs">{person.id === userId ? 'You' : person.fullName || person.username}</span>
-              </div>
-            ))}
+          <div className={`my-5 grid grid-cols-2 gap-3 sm:grid-cols-3 ${expanded ? 'mx-auto max-w-5xl md:grid-cols-4 lg:grid-cols-5' : ''}`}>
+            {roster.filter(p => p.status === 'joined').map((person) => {
+              const speaking = speakingUids.has(String(groupAgoraUid(person.id)))
+              return (
+                <div key={person.id} className={`flex min-w-0 flex-col items-center gap-2 rounded-xl border p-3 transition-colors ${speaking ? 'border-emerald-400/80 bg-emerald-400/10 shadow-[0_0_22px_rgba(52,211,153,0.14)]' : 'border-white/5 bg-white/5'}`}>
+                  <div className="relative">
+                    <Avatar className={`h-14 w-14 sm:h-16 sm:w-16 ring-2 ${speaking ? 'ring-emerald-400' : 'ring-white/15'}`}><AvatarImage src={person.avatarUrl || undefined} /><AvatarFallback>{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback></Avatar>
+                    {speaking && <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[#101014]"><Signal className="h-3 w-3 text-white" /></span>}
+                  </div>
+                  <span className="max-w-full truncate text-xs">{person.id === userId ? 'You' : person.fullName || person.username}</span>
+                  <span className={`text-[10px] ${speaking ? 'text-emerald-300' : 'text-white/40'}`}>{speaking ? 'Speaking' : person.id === userId && muted ? 'Mic off' : person.id === userId && held ? 'On hold' : 'Connected'}</span>
+                </div>
+              )
+            })}
           </div>
-          <div className="flex items-center justify-center gap-4">
-            <button onClick={() => setMuted((v) => !v)} className={`flex h-12 w-12 items-center justify-center rounded-full ${muted ? 'bg-white text-black' : 'bg-white/10'}`}>{muted ? <MicOff /> : <Mic />}</button>
-            <button onClick={async () => { try { await loadContacts(); setSelected([]); setPickerOpen(true) } catch (error) { onError(error instanceof Error ? error.message : 'Could not load contacts') } }} className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10"><Plus /></button>
-            <button onClick={() => void leaveCall()} disabled={busy} className="flex h-12 w-12 items-center justify-center rounded-full bg-red-600"><PhoneOff /></button>
+          {roster.some(p => ['invited','ringing'].includes(p.status)) && (
+            <div className="mx-auto mb-4 flex max-w-5xl flex-wrap justify-center gap-2">
+              {roster.filter(p => ['invited','ringing'].includes(p.status)).map(p => <span key={p.id} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/60">{p.fullName || p.username} · {p.status === 'ringing' ? 'Ringing' : 'Invited'}</span>)}
+            </div>
+          )}
+          <div className="mx-auto flex w-full max-w-xl items-center justify-center gap-3 sm:gap-5">
+            <button type="button" aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} onClick={() => setMuted((v) => !v)} className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors ${muted ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/20'}`}>{muted ? <MicOff /> : <Mic />}</button>
+            <button type="button" aria-label={speakerOn ? 'Turn speaker mode off' : 'Turn speaker mode on'} aria-pressed={speakerOn} onClick={() => setSpeakerOn((v) => !v)} className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors ${speakerOn ? 'bg-pink-600 text-white' : 'bg-white/10 hover:bg-white/20'}`}><Volume2 /></button>
+            <button type="button" aria-label={held ? 'Resume group call' : 'Put group call on hold'} aria-pressed={held} onClick={toggleHold} className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors ${held ? 'bg-amber-400 text-black' : 'bg-white/10 hover:bg-white/20'}`}>{held ? <Play /> : <Pause />}</button>
+            <button type="button" aria-label="Invite participants" onClick={async () => { try { await loadContacts(); setSelected([]); setPickerOpen(true) } catch (error) { onError(error instanceof Error ? error.message : 'Could not load contacts') } }} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"><Plus /></button>
+            <button type="button" aria-label="Leave group call" onClick={() => void leaveCall()} disabled={busy} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-600 disabled:opacity-50"><PhoneOff /></button>
           </div>
+          <p className="mt-3 text-center text-[10px] text-white/35">Speaker mode adjusts call playback level. Device output routing follows your system audio settings.</p>
         </div>
       )}
       {pickerOpen && activeCallId && (
