@@ -531,7 +531,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
                 </button>
               ))}
             </div>
-            <div className="mt-3 flex justify-end"><button disabled={!selected.length || busy} onClick={() => void inviteMore()} className="rounded-full bg-pink-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? 'Sending…' : 'Send invitations'}</button></div>
+            <div className="mt-3 flex justify-end"><button disabled={!selected.length || busy} onClick={() => void inviteMore(selected)} className="rounded-full bg-pink-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? 'Sending…' : 'Send invitations'}</button></div>
           </div>
         </div>
       )}
