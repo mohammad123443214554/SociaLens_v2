@@ -422,7 +422,7 @@ export function CallScreen({
           {!isMini && !showRemoteVideo && (
             <div className="absolute inset-x-3 top-5 z-10 hidden flex-col items-center gap-3 text-center md:flex">
               <Avatar className="h-28 w-28 ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/20">
-                <AvatarImage src={peerAvatar} alt={peerName} />
+                <AvatarImage src={groupCallId ? "/images/socialens-logo.png" : peerAvatar} alt={groupCallId ? "SociaLens" : peerName} />
                 <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-4xl">{peerName[0]?.toUpperCase()}</AvatarFallback>
               </Avatar>
               <h2 className="text-xl font-bold drop-shadow-lg">{peerName}</h2>
@@ -541,6 +541,7 @@ export function CallScreen({
         <div className="flex items-center gap-1.5 text-xs text-white/70">
           {isMini ? <Move className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
           <span>{isMini ? peerName : "SociaLens secure call"}</span>
+          {!isMini && groupCallId && phase === 'in-call' && <span className="ml-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">Group Call</span>}
           {!isMini && phase === 'in-call' && (
             <span className={`ml-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
               networkQuality === 'excellent' ? 'border-emerald-400/30 bg-emerald-500/15 text-emerald-300' :
@@ -568,35 +569,7 @@ export function CallScreen({
       {/* Audio calls keep the centered profile layout. On phones the existing
           full-screen video-call profile placement is retained; desktop video
           calls render the profile inside the portrait video stage above. */}
-      {groupCallId && !isMini && phase === 'in-call' && type === 'audio' && (
-        <div className="absolute inset-x-0 top-20 bottom-28 z-10 overflow-y-auto px-4 pb-4 sm:px-6 md:px-8">
-          <div className="mb-5">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-pink-300">Group Call</p>
-            <p className="mt-1 text-sm text-white/60">{groupParticipants.filter(person => person.status === 'joined').length}/10 participants</p>
-          </div>
-          <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {groupParticipants.filter(person => person.status === 'joined').map((person) => {
-              const isYou = person.id === userId
-              return (
-                <div key={person.id} className="flex min-h-[142px] flex-col items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 py-4 text-center">
-                  <Avatar className="h-16 w-16 ring-2 ring-emerald-400/70">
-                    <AvatarImage src={person.avatarUrl || undefined} />
-                    <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-xl">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <span className="max-w-full truncate text-sm font-semibold">{isYou ? 'You' : person.fullName || person.username}</span>
-                  <span className="text-[11px] text-emerald-300">Connected</span>
-                </div>
-              )
-            })}
-          </div>
-          {groupParticipants.some(person => ['invited','ringing'].includes(person.status)) && (
-            <p className="mx-auto mt-4 max-w-6xl text-xs text-white/45">
-              {groupParticipants.filter(person => ['invited','ringing'].includes(person.status)).map(person => person.fullName || person.username).join(' · ')} · Invited
-            </p>
-          )}
-        </div>
-      )}
-      {(!isVideoCall || showRemoteVideo || isMini || (isVideoCall && !showRemoteVideo)) && !groupCallId && (
+      {(!isVideoCall || showRemoteVideo || isMini || (isVideoCall && !showRemoteVideo)) && (!groupCallId || phase === 'in-call') && (
         <div className={`relative z-10 flex flex-col items-center gap-3 transition-all duration-300 ${
           showRemoteVideo ? (isMini ? 'pt-1' : 'pt-6') : 'flex-1 justify-center'
         } ${isVideoCall && !showRemoteVideo ? 'md:hidden' : ''}`}>
@@ -608,7 +581,7 @@ export function CallScreen({
           )}
           <h2 className={`font-bold ${isMini ? 'text-sm' : showRemoteVideo ? 'text-lg drop-shadow-lg' : 'text-2xl'}`}>{groupCallId ? 'Group Call' : peerName}</h2>
           {groupCallId && <div className="flex max-w-[min(90vw,420px)] items-center justify-center -space-x-2">
-            {groupParticipants.filter((person) => ['joined','invited','ringing'].includes(person.status)).slice(0,10).map((person) => (
+            {groupParticipants.filter((person) => person.status === 'joined').slice(0,10).map((person) => (
               <Avatar key={person.id} className="h-8 w-8 border-2 border-neutral-950">
                 <AvatarImage src={person.avatarUrl || undefined} />
                 <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-[10px]">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
