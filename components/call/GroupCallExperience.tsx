@@ -14,7 +14,7 @@ import { CALL_REACTION_ALL_IDS, CALL_REACTION_CATEGORIES, CALL_REACTION_CUSTOM_O
 type Person = { id: string; username: string; fullName: string | null; avatarUrl: string | null }
 type Invitation = { groupCallId: string; invitedBy: string; participants: Person[] }
 type Contact = Person
-type RosterPerson = Person & { status: 'joined' | 'invited' | 'ringing' | 'left' | 'declined' | 'missed'; isSpeaking?: boolean }
+type RosterPerson = Person & { status: 'joined' | 'invited' | 'ringing' | 'left' | 'declined' | 'missed'; invitedBy: string | null; inviterAvatarUrl: string | null; isSpeaking?: boolean }
 type IncomingGroupReaction = { id: string; reaction: CallReactionId; senderName: string }
 
 function groupAgoraUid(userId: string) {
@@ -71,14 +71,14 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   const refreshRoster = useCallback(async (groupCallId: string) => {
     const { data, error } = await supabase
       .from('group_call_participants')
-      .select('user_id,status')
+      .select('user_id,status,invited_by')
       .eq('group_call_id', groupCallId)
       .in('status', ['joined','invited','ringing','left','declined','missed'])
     if (error) {
       console.error('[Group Call] roster refresh failed', error)
       return
     }
-    const ids = [...new Set((data || []).map((row) => row.user_id))]
+    const ids = [...new Set((data || []).flatMap((row) => [row.user_id, row.invited_by].filter((id): id is string => Boolean(id))))]
     const { data: profiles } = ids.length
       ? await supabase.from('profiles').select('id,username,full_name,avatar_url').in('id', ids)
       : { data: [] }
@@ -92,6 +92,8 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
         fullName: profile?.full_name || null,
         avatarUrl: profile?.avatar_url || null,
         status: row.status,
+        invitedBy: row.invited_by || null,
+        inviterAvatarUrl: row.invited_by ? map.get(row.invited_by)?.avatar_url || null : null,
       } as RosterPerson
     }))
   }, [supabase])
@@ -484,7 +486,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
           type="audio"
           peerName="Group Call"
           peerId={null}
-          peerAvatar="/images/socialens-logo.png"
+          peerAvatar={(() => { const self = roster.find((person) => person.id === userId); const inviter = self?.invitedBy && self.invitedBy !== userId ? self.inviterAvatarUrl : null; const otherJoined = roster.find((person) => person.status === 'joined' && person.id !== userId); return inviter || otherJoined?.avatarUrl || '' })()}
           onSendCallReaction={async () => undefined}
           groupCallId={activeCallId}
           groupParticipants={roster.map((person) => ({
