@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { sendPushToUser } from '@/lib/server/push'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -25,5 +26,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const status = error.code === '42501' ? 403 : error.code === '22023' ? 409 : error.code === 'P0002' ? 404 : 500
     return NextResponse.json({ error: error.message || 'Could not invite participants' }, { status })
   }
+  // Deliver a distinct group-call invitation to every newly requested user.
+  // Push delivery is best-effort: it must never roll back a successfully
+  // persisted invitation or interrupt the active call.
+  const { data: callerProfile } = await supabase
+    .from('profiles')
+    .select('username, full_name')
+    .eq('id', user.id)
+    .maybeSingle()
+  const callerName = callerProfile?.full_name || callerProfile?.username || 'Someone'
+  const inviteTargets = [...new Set(userIds.filter((id): id is string => typeof id === 'string'))]
+  await Promise.all(inviteTargets.map(async (inviteeId) => {
+    try {
+      await sendPushToUser(inviteeId, {
+        title: 'Incoming Group Voice Call',
+        body: `${callerName} invited you to join a group voice call`,
+        url: '/chat',
+        kind: 'call',
+        tag: `group-call-${groupCallId}`,
+        callId: groupCallId,
+      })
+    } catch (pushError) {
+      console.error('[group-calls/invite] push delivery failed', inviteeId, pushError)
+    }
+  }))
+
   return NextResponse.json({ ok: true, invitedCount })
 }
