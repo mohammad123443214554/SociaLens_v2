@@ -208,6 +208,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         .select('group_call_id').eq('id', callId).maybeSingle()
       if (!alive || callError) return
       const groupId = callRow?.group_call_id || null
+      engine.setGroupCallId(groupId)
       setActiveGroupCallId(groupId)
       if (!groupId) { setGroupParticipants([]); return }
       const { data: members, error: memberError } = await supabase.from('group_call_participants')
@@ -234,7 +235,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     void refresh()
     const timer = window.setInterval(() => void refresh(), 1800)
     return () => { alive = false; window.clearInterval(timer) }
-  }, [engine.call?.id, engine.phase, supabase])
+  }, [engine.call?.id, engine.phase, engine.setGroupCallId, supabase])
 
   const startCall = async (peer: StartCallPeer, chatId: string | null, type: CallType) => {
     console.log('[SociaLens Call] startCall requested', { peer, chatId, type, phase: engine.phase })
