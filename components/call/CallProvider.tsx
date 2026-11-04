@@ -13,6 +13,8 @@ import { GroupCallExperience } from './GroupCallExperience'
 import { PermissionGate } from './PermissionGate'
 import { isCallReactionId, type CallReactionId } from '@/lib/call-reactions'
 
+type GroupCallMember = { id: string; username: string; fullName: string | null; avatarUrl: string | null; status: string }
+
 interface StartCallPeer {
   id: string
   username: string
@@ -55,6 +57,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [supabase] = useState(() => createClient())
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const [incomingReaction, setIncomingReaction] = useState<{ id: string; reaction: CallReactionId; callId: string } | null>(null)
+  const [activeGroupCallId, setActiveGroupCallId] = useState<string | null>(null)
+  const [groupParticipants, setGroupParticipants] = useState<GroupCallMember[]>([])
 
   // Tapping "Accept" on the OS call notification lands here with
   // ?incomingCall=<id> in the URL - from public/sw.js on the web, and from
@@ -175,6 +179,63 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const addPeopleToActiveCall = async (userIds: string[]) => {
+    const callId = engine.call?.id
+    if (!callId) throw new Error('There is no active call to expand.')
+    const endpoint = activeGroupCallId
+      ? `/api/group-calls/${activeGroupCallId}/invite`
+      : `/api/calls/${callId}/group`
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userIds }),
+    })
+    const result = await response.json()
+    if (!response.ok) throw new Error(result.error || 'Could not add people to the group call')
+    if (result.groupCallId) setActiveGroupCallId(result.groupCallId)
+  }
+
+  useEffect(() => {
+    const callId = engine.call?.id
+    if (!callId || engine.phase !== 'in-call') {
+      setActiveGroupCallId(null)
+      setGroupParticipants([])
+      return
+    }
+    let alive = true
+    const refresh = async () => {
+      const { data: callRow, error: callError } = await supabase.from('calls')
+        .select('group_call_id').eq('id', callId).maybeSingle()
+      if (!alive || callError) return
+      const groupId = callRow?.group_call_id || null
+      setActiveGroupCallId(groupId)
+      if (!groupId) { setGroupParticipants([]); return }
+      const { data: members, error: memberError } = await supabase.from('group_call_participants')
+        .select('user_id,status').eq('group_call_id', groupId)
+        .in('status', ['joined','invited','ringing'])
+      if (!alive || memberError) return
+      const ids = [...new Set((members || []).map((item) => item.user_id))]
+      const { data: profiles } = ids.length
+        ? await supabase.from('profiles').select('id,username,full_name,avatar_url').in('id', ids)
+        : { data: [] }
+      if (!alive) return
+      const byId = new Map((profiles || []).map((profile) => [profile.id, profile]))
+      setGroupParticipants((members || []).map((member) => {
+        const profile = byId.get(member.user_id)
+        return {
+          id: member.user_id,
+          username: profile?.username || 'user',
+          fullName: profile?.full_name || null,
+          avatarUrl: profile?.avatar_url || null,
+          status: member.status,
+        }
+      }))
+    }
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), 1800)
+    return () => { alive = false; window.clearInterval(timer) }
+  }, [engine.call?.id, engine.phase, supabase])
+
   const startCall = async (peer: StartCallPeer, chatId: string | null, type: CallType) => {
     console.log('[SociaLens Call] startCall requested', { peer, chatId, type, phase: engine.phase })
     if (engine.phase !== 'idle') {
@@ -239,6 +300,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           peerName={peerName}
           peerAvatar={peerAvatarUrl}
           onSendCallReaction={sendCallReaction}
+          groupCallId={activeGroupCallId}
+          groupParticipants={groupParticipants}
+          onAddPeopleToGroup={addPeopleToActiveCall}
           incomingReaction={incomingReaction?.callId === engine.call.id ? incomingReaction : null}
           localStream={engine.localStream}
           remoteStream={engine.remoteStream}
