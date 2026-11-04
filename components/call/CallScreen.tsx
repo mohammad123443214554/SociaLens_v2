@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, Sparkles, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock, MoreHorizontal } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, Sparkles, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock, MoreHorizontal, SmilePlus } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
@@ -694,7 +694,7 @@ export function CallScreen({
                 <Lock className="h-4 w-4" /><span className="flex-1">Lock screen</span>
               </button>
               <button type="button" onClick={() => { setReactionPickerOpen(true); setMoreMenuOpen(false) }} disabled={phase !== 'in-call' || isOnHold} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07] disabled:opacity-40">
-                <span className="text-lg leading-none" aria-hidden="true">💗</span><span className="flex-1">Call reaction</span><span className="text-pink-100/45">›</span>
+                <SmilePlus className="h-4 w-4" aria-hidden="true" /><span className="flex-1">Call reaction</span><span className="text-pink-100/45">›</span>
               </button>
               {isVideoCall && (
                 <button type="button" onClick={() => { setEffectsMenuOpen(true); setMoreMenuOpen(false) }} disabled={isCameraOff || isOnHold || phase !== 'in-call'} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07] disabled:opacity-40">
