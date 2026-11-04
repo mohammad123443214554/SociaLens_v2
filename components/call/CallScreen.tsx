@@ -577,7 +577,7 @@ export function CallScreen({
         } ${isVideoCall && !showRemoteVideo ? 'md:hidden' : ''}`}>
           {!showRemoteVideo && (
             <Avatar className={`${isMini ? "h-16 w-16" : "h-32 w-32"} ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/10 ${isVideoCall && !isMini ? 'md:hidden' : ''}`}>
-              <AvatarImage src={groupCallId ? "/images/socialens-logo.png" : peerAvatar} alt={groupCallId ? "SociaLens" : peerName} />
+              <AvatarImage src={peerAvatar || undefined} alt={peerName} />
               <AvatarFallback className="text-4xl bg-gradient-to-br from-pink-500 to-purple-600">{peerName?.[0]?.toUpperCase() || 'S'}</AvatarFallback>
             </Avatar>
           )}
