@@ -22,12 +22,13 @@ interface IncomingCallModalProps {
 
 
 function SwipeCallAction({
-  kind, type, onAction, disabled = false,
+  kind, type, onAction, disabled = false, acceptLabel,
 }: {
   kind: 'accept' | 'decline'
   type: CallType
   onAction: () => void
   disabled?: boolean
+  acceptLabel?: string
 }) {
   const startY = useRef(0)
   const activePointer = useRef<number | null>(null)
@@ -135,7 +136,7 @@ export function IncomingCallModal({ callerName, callerAvatar, type, ringtoneId, 
 
       <div className="flex items-start gap-10 md:gap-16">
         <SwipeCallAction kind="decline" type={type} onAction={onReject} disabled={busy} />
-        <SwipeCallAction kind="accept" type={type} onAction={onAccept} disabled={busy} />
+        <SwipeCallAction kind="accept" type={type} onAction={onAccept} disabled={busy} acceptLabel={acceptLabel} />
       </div>
       <p className="absolute bottom-7 left-0 right-0 text-center text-[11px] text-white/40 md:hidden">
         Swipe a button upward to answer or decline
