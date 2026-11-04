@@ -59,6 +59,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [incomingReaction, setIncomingReaction] = useState<{ id: string; reaction: CallReactionId; callId: string } | null>(null)
   const [activeGroupCallId, setActiveGroupCallId] = useState<string | null>(null)
   const [groupParticipants, setGroupParticipants] = useState<GroupCallMember[]>([])
+  const hangupRef = useRef(engine.hangup)
+  hangupRef.current = engine.hangup
 
   // Tapping "Accept" on the OS call notification lands here with
   // ?incomingCall=<id> in the URL - from public/sw.js on the web, and from
@@ -208,6 +210,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         .select('group_call_id').eq('id', callId).maybeSingle()
       if (!alive || callError) return
       const groupId = callRow?.group_call_id || null
+      if (groupId) {
+        const { data: groupSession, error: groupStatusError } = await supabase
+          .from('group_calls').select('status').eq('id', groupId).maybeSingle()
+        if (alive && !groupStatusError && groupSession?.status === 'ended') {
+          void hangupRef.current()
+          return
+        }
+      }
       engine.setGroupCallId(groupId)
       setActiveGroupCallId(groupId)
       if (!groupId) { setGroupParticipants([]); return }
