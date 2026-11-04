@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, Sparkles, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock, MoreHorizontal, SmilePlus } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, Sparkles, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock, MoreHorizontal, SmilePlus, Users, Search, Check } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
 import { CALL_EFFECT_CATEGORIES, PART_TWO_FACE_PRESETS, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS } from '@/lib/call-effects'
 import { CallReactionLottie } from './CallReactionLottie'
 import { CALL_REACTION_ALL_IDS, CALL_REACTION_CATEGORIES, CALL_REACTION_CUSTOM_OPTIONS, getCallReactionCategory, getCallReactionLabel, isCallReactionId, type CallReactionAssetId, type CallReactionCategoryId, type CallReactionId } from '@/lib/call-reactions'
+
+type GroupCallMember = { id: string; username: string; fullName: string | null; avatarUrl: string | null; status: string }
 
 interface CallScreenProps {
   userId: string
@@ -16,6 +18,9 @@ interface CallScreenProps {
   peerName: string
   peerAvatar: string
   onSendCallReaction: (reaction: CallReactionId) => Promise<void>
+  groupCallId?: string | null
+  groupParticipants?: GroupCallMember[]
+  onAddPeopleToGroup?: (userIds: string[]) => Promise<void>
   incomingReaction: { id: string; reaction: CallReactionId } | null
   localStream: MediaStream | null
   remoteStream: MediaStream | null
@@ -49,6 +54,7 @@ function formatDuration(sec: number) {
 
 export function CallScreen({
   userId, phase, type, peerName, peerAvatar, localStream, remoteStream, onSendCallReaction, incomingReaction,
+  groupCallId = null, groupParticipants = [], onAddPeopleToGroup,
   isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume,
   onEnd, onToggleMute, onToggleCamera, onSwitchCamera, onToggleHold,
   backgroundBlurEnabled, backgroundBlurIntensity, onSetBackgroundBlur,
@@ -64,6 +70,12 @@ export function CallScreen({
   const [isSpeakerOn, setIsSpeakerOn] = useState(false)
   const [isScreenLocked, setIsScreenLocked] = useState(false)
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+  const [addPeopleOpen, setAddPeopleOpen] = useState(false)
+  const [messageContacts, setMessageContacts] = useState<Array<{id:string;username:string;fullName:string|null;avatarUrl:string|null}>>([])
+  const [selectedInvitees, setSelectedInvitees] = useState<string[]>([])
+  const [loadingContacts, setLoadingContacts] = useState(false)
+  const [sendingInvites, setSendingInvites] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
   const [heartReactionId, setHeartReactionId] = useState(0)
   const [heartBurstId, setHeartBurstId] = useState(0)
@@ -538,7 +550,15 @@ export function CallScreen({
               <AvatarFallback className="text-4xl bg-gradient-to-br from-pink-500 to-purple-600">{peerName?.[0]?.toUpperCase() || 'S'}</AvatarFallback>
             </Avatar>
           )}
-          <h2 className={`font-bold ${isMini ? 'text-sm' : showRemoteVideo ? 'text-lg drop-shadow-lg' : 'text-2xl'}`}>{peerName}</h2>
+          <h2 className={`font-bold ${isMini ? 'text-sm' : showRemoteVideo ? 'text-lg drop-shadow-lg' : 'text-2xl'}`}>{groupCallId ? 'Group Call' : peerName}</h2>
+          {groupCallId && <div className="flex max-w-[min(90vw,420px)] items-center justify-center -space-x-2">
+            {groupParticipants.filter((person) => ['joined','invited','ringing'].includes(person.status)).slice(0,10).map((person) => (
+              <Avatar key={person.id} className="h-8 w-8 border-2 border-neutral-950">
+                <AvatarImage src={person.avatarUrl || undefined} />
+                <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-[10px]">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
+              </Avatar>
+            ))}
+          </div>}
           <p className={`text-sm ${error ? 'text-red-400' : 'text-white/60'}`}>{statusText}</p>
         </div>
       )}
@@ -573,6 +593,28 @@ export function CallScreen({
               <button type="button" onClick={() => { setIsScreenLocked(true); setMoreMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                 <Lock className="h-4 w-4" /><span className="flex-1">Lock screen</span>
               </button>
+              {phase === 'in-call' && type === 'audio' && (
+                <button type="button" onClick={async () => {
+                  setMoreMenuOpen(false)
+                  setInviteError(null)
+                  setSelectedInvitees([])
+                  setLoadingContacts(true)
+                  try {
+                    const response = await fetch('/api/group-calls/contacts', { cache: 'no-store' })
+                    const data = await response.json()
+                    if (!response.ok) throw new Error(data.error || 'Could not load message contacts')
+                    setMessageContacts((data.contacts || []).filter((person: {id:string}) => !groupParticipants.some((member) => member.id === person.id && ['joined','invited','ringing'].includes(member.status))))
+                    setAddPeopleOpen(true)
+                  } catch (error) {
+                    setInviteError(error instanceof Error ? error.message : 'Could not load message contacts')
+                    setAddPeopleOpen(true)
+                  } finally {
+                    setLoadingContacts(false)
+                  }
+                }} disabled={loadingContacts} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07] disabled:opacity-50">
+                  <Users className="h-4 w-4" /><span className="flex-1">{groupCallId ? 'Add more people' : 'Add people to group call'}</span><span className="text-pink-100/45">›</span>
+                </button>
+              )}
               <button type="button" onClick={() => { setReactionPickerOpen(true); setMoreMenuOpen(false) }} disabled={phase !== 'in-call' || isOnHold} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07] disabled:opacity-40">
                 <SmilePlus className="h-4 w-4" aria-hidden="true" /><span className="flex-1">Call reaction</span><span className="text-pink-100/45">›</span>
               </button>
@@ -744,6 +786,42 @@ export function CallScreen({
             <div className="mt-6 flex gap-2">
               {backgroundBlurEnabled && <button type="button" disabled={blurSaving} onClick={async () => { setBlurSaving(true); setBlurError(null); try { await onSetBackgroundBlur(false, blurDraft); setBlurPopupOpen(false) } catch (error) { setBlurError(error instanceof Error ? error.message : 'Could not turn off Background Blur.') } finally { setBlurSaving(false) } }} className="rounded-xl border border-pink-100/[0.18] bg-white/[0.025] px-4 py-3 text-sm font-medium text-pink-50/90 backdrop-blur-xl transition-colors hover:bg-pink-200/[0.07] disabled:opacity-50">Turn off</button>}
               <button type="button" disabled={blurSaving} onClick={async () => { setBlurSaving(true); setBlurError(null); try { await onSetBackgroundBlur(true, blurDraft); setBlurPopupOpen(false) } catch (error) { setBlurError(error instanceof Error ? error.message : 'Could not apply Background Blur.') } finally { setBlurSaving(false) } }} className="flex-1 rounded-xl border border-pink-200/[0.22] bg-pink-300/[0.10] px-4 py-3 text-sm font-semibold text-pink-50 shadow-[0_4px_18px_rgba(255,105,180,0.08)] backdrop-blur-xl transition-colors hover:bg-pink-300/[0.14] disabled:opacity-50">{blurSaving ? 'Applying…' : 'Done'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {addPeopleOpen && (
+        <div className="absolute inset-0 z-[150] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Add people to group call">
+          <div className="flex max-h-[min(82dvh,680px)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#17171b] text-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 p-4">
+              <div><h3 className="font-semibold">{groupCallId ? 'Add people to group call' : 'Turn this into a group call'}</h3><p className="mt-1 text-xs text-white/55">Choose people from your Messages contacts</p></div>
+              <button type="button" onClick={() => setAddPeopleOpen(false)} aria-label="Close" className="rounded-full p-2 hover:bg-white/10">✕</button>
+            </div>
+            <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
+              <Search className="h-4 w-4 text-white/45" />
+              <span className="text-xs text-white/55">Your message contacts</span>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+              {messageContacts.map((person) => (
+                <button key={person.id} type="button" onClick={() => setSelectedInvitees((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : current.length < (groupCallId ? 9 : 8) ? [...current, person.id] : current)} className="flex w-full items-center gap-3 rounded-xl p-3 text-left hover:bg-white/5">
+                  <Avatar className="h-10 w-10"><AvatarImage src={person.avatarUrl || undefined} /><AvatarFallback>{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback></Avatar>
+                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{person.fullName || person.username}</span><span className="block truncate text-xs text-white/45">@{person.username}</span></span>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${selectedInvitees.includes(person.id) ? 'border-pink-500 bg-pink-600 text-white' : 'border-white/30'}`}>{selectedInvitees.includes(person.id) && <Check className="h-3 w-3" />}</span>
+                </button>
+              ))}
+              {!messageContacts.length && !loadingContacts && <p className="p-8 text-center text-sm text-white/50">No available message contacts found.</p>}
+              {inviteError && <p className="mx-2 mt-2 rounded-xl bg-red-500/10 p-3 text-xs text-red-200">{inviteError}</p>}
+            </div>
+            <div className="flex items-center justify-between border-t border-white/10 p-4">
+              <span className="text-xs text-white/55">{selectedInvitees.length} selected · {groupCallId ? 'up to 9 more' : 'up to 8 more'}</span>
+              <button type="button" disabled={!selectedInvitees.length || sendingInvites || !onAddPeopleToGroup} onClick={async () => {
+                if (!onAddPeopleToGroup) return
+                setSendingInvites(true); setInviteError(null)
+                try { await onAddPeopleToGroup(selectedInvitees); setAddPeopleOpen(false); setSelectedInvitees([]) }
+                catch (error) { setInviteError(error instanceof Error ? error.message : 'Could not add people') }
+                finally { setSendingInvites(false) }
+              }} className="rounded-full bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{sendingInvites ? 'Adding…' : 'Done'}</button>
             </div>
           </div>
         </div>
