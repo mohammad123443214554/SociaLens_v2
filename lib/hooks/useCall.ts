@@ -1760,6 +1760,7 @@ export function useCallEngine(currentUserId?: string) {
     phase,
     call,
     peer,
+    transportProvider: providerRef.current,
     localStream,
     remoteStream,
     isMuted,
