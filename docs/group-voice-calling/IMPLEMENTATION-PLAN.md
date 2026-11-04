@@ -158,3 +158,12 @@ The creator is inserted as the first joined participant. The 10-person capacity 
 - Applied the Realtime authorization migrations and saved their SQL files in `supabase/migrations/`.
 - Vercel production build passed for commit `b0770adbce78ed8f10a60f42edacb3ee6e6ef69a` and the deployment is `READY`. Remaining verification: private-topic subscription from two or more authenticated accounts, prove unselected participants do not receive the payload, confirm joined recipients receive it, confirm left/non-member users are denied, and regress existing one-to-one reactions. Real multi-device verification is still required before claiming full production acceptance.
 
+
+
+## Group-call screen consistency and automatic final-participant shutdown
+
+- Replaced the separate compact/expanded group-call participant-grid page with a single full-screen group voice-call experience using the same centered call identity, Group Call title, participant avatar stack, elapsed timer, and bottom call-control hierarchy as the normal one-to-one call page.
+- Reused the standard full-screen incoming-call modal for group invitations. It clearly labels **Incoming Group Call** and **Group Call**, displays all currently joined participant profiles, and provides the same accept/decline interaction style.
+- Updated `leave_group_voice_call` transactionally: after a participant leaves, if zero or one joined participant remains, the final participant is marked left, the group call is marked ended, and pending invitations are marked missed. The parent-row lock prevents concurrent leave operations from leaving a one-person room active.
+- Added migration `20261105123000_end_group_call_when_one_participant_remains.sql` and applied it to the production Supabase project.
+- Build and live multi-device UI verification remain pending; the migration itself was applied successfully.
