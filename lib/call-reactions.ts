@@ -1,9 +1,8 @@
-export const CALL_REACTION_CUSTOM_IDS = ['flying-heart', 'heart-burst', 'love-face'] as const
+export const CALL_REACTION_CUSTOM_IDS = ['flying-heart', 'heart-burst'] as const
 
 export const CALL_REACTION_CUSTOM_OPTIONS = [
   { id: 'flying-heart', label: 'Flying heart', emoji: '💗', description: 'A little love in the call' },
   { id: 'heart-burst', label: 'Heart burst', emoji: '💞', description: 'A heart-filled surprise' },
-  { id: 'love-face', label: 'Love face', emoji: '🥰', description: 'A smiling face surrounded by hearts' },
 ] as const
 
 export const CALL_REACTION_ASSET_IDS = [
