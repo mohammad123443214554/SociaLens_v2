@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const { data: call, error: callError } = await supabase
-    .from('calls').select('id,caller_id,callee_id,type,status,provider,group_call_id')
+    .from('calls').select('id,caller_id,callee_id,type,status,provider,room_name,group_call_id')
     .eq('id', callId).maybeSingle()
   if (callError || !call) return NextResponse.json({ error: 'Call not found' }, { status: 404 })
   if (user.id !== call.caller_id && user.id !== call.callee_id) return NextResponse.json({ error: 'You are not part of this call' }, { status: 403 })
