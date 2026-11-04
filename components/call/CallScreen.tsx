@@ -424,7 +424,7 @@ export function CallScreen({
           {!isMini && !showRemoteVideo && (
             <div className="absolute inset-x-3 top-5 z-10 hidden flex-col items-center gap-3 text-center md:flex">
               <Avatar className="h-28 w-28 ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/20">
-                <AvatarImage src={groupCallId ? "/images/socialens-logo.png" : peerAvatar} alt={groupCallId ? "SociaLens" : peerName} />
+                <AvatarImage src={peerAvatar || undefined} alt={groupCallId ? "Group call participant" : peerName} />
                 <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-4xl">{peerName[0]?.toUpperCase()}</AvatarFallback>
               </Avatar>
               <h2 className="text-xl font-bold drop-shadow-lg">{peerName}</h2>
