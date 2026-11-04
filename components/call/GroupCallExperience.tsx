@@ -303,7 +303,20 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
         }
       })
       .subscribe()
-    const recovery = window.setInterval(() => { if (alive) void refreshRoster(activeCallId) }, 12000)
+    const recovery = window.setInterval(async () => {
+      if (!alive) return
+      await refreshRoster(activeCallId)
+      const { data: currentCall, error: statusError } = await supabase
+        .from('group_calls').select('status').eq('id', activeCallId).maybeSingle()
+      if (alive && !statusError && currentCall?.status === 'ended') {
+        await cleanupMedia()
+        activeCallIdRef.current = null
+        setActiveCallId(null)
+        setRoster([])
+        setCallStartedAt(null)
+        onError('The group call has ended.')
+      }
+    }, 3000)
     return () => { alive = false; window.clearInterval(recovery); void supabase.removeChannel(channel) }
   }, [activeCallId, supabase, refreshRoster, cleanupMedia, onError])
 
