@@ -1,11 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import AgoraRTC from 'agora-rtc-sdk-ng'
 import type { IAgoraRTCClient, IAgoraRTCRemoteUser, ILocalAudioTrack } from 'agora-rtc-sdk-ng'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Phone, PhoneOff, Users, X, Plus, Check, Mic, MicOff, Volume2 } from 'lucide-react'
+import { Phone, PhoneOff, Users, X, Plus, Check, Mic, MicOff } from 'lucide-react'
 
 type Person = { id: string; username: string; fullName: string | null; avatarUrl: string | null }
 type Invitation = { groupCallId: string; invitedBy: string; participants: Person[] }
@@ -15,7 +15,7 @@ type RosterPerson = Person & { status: 'joined' | 'invited' | 'ringing' | 'left'
 type Props = { userId: string; disabled?: boolean; onError: (message: string) => void }
 
 export function GroupCallExperience({ userId, disabled = false, onError }: Props) {
-  const supabase = useRef(createClient()).current
+  const [supabase] = useState(() => createClient())
   const [incoming, setIncoming] = useState<Invitation | null>(null)
   const [activeCallId, setActiveCallId] = useState<string | null>(null)
   const [roster, setRoster] = useState<RosterPerson[]>([])
@@ -27,7 +27,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   const [expanded, setExpanded] = useState(false)
   const clientRef = useRef<IAgoraRTCClient | null>(null)
   const localTrackRef = useRef<ILocalAudioTrack | null>(null)
-  const remoteUsersRef = useRef<Map<number, IAgoraRTCRemoteUser>>(new Map())
+  const remoteUsersRef = useRef<Map<string | number, IAgoraRTCRemoteUser>>(new Map())
   const mountedRef = useRef(true)
   const activeCallIdRef = useRef<string | null>(null)
 
