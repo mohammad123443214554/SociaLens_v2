@@ -21,6 +21,8 @@ interface CallScreenProps {
   onSendCallReaction: (reaction: CallReactionId) => Promise<void>
   groupCallId?: string | null
   groupParticipants?: GroupCallMember[]
+  speakerMode?: boolean
+  onToggleSpeakerMode?: () => void
   onAddPeopleToGroup?: (userIds: string[]) => Promise<void>
   incomingReaction: { id: string; reaction: CallReactionId } | null
   localStream: MediaStream | null
@@ -55,7 +57,7 @@ function formatDuration(sec: number) {
 
 export function CallScreen({
   userId, phase, type, peerName, peerId = null, peerAvatar, localStream, remoteStream, onSendCallReaction, incomingReaction,
-  groupCallId = null, groupParticipants = [], onAddPeopleToGroup,
+  groupCallId = null, groupParticipants = [], speakerMode, onToggleSpeakerMode, onAddPeopleToGroup,
   isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume,
   onEnd, onToggleMute, onToggleCamera, onSwitchCamera, onToggleHold,
   backgroundBlurEnabled, backgroundBlurIntensity, onSetBackgroundBlur,
@@ -575,7 +577,7 @@ export function CallScreen({
         } ${isVideoCall && !showRemoteVideo ? 'md:hidden' : ''}`}>
           {!showRemoteVideo && (
             <Avatar className={`${isMini ? "h-16 w-16" : "h-32 w-32"} ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/10 ${isVideoCall && !isMini ? 'md:hidden' : ''}`}>
-              <AvatarImage src={peerAvatar} alt={peerName} />
+              <AvatarImage src={groupCallId ? "/images/socialens-logo.png" : peerAvatar} alt={groupCallId ? "SociaLens" : peerName} />
               <AvatarFallback className="text-4xl bg-gradient-to-br from-pink-500 to-purple-600">{peerName?.[0]?.toUpperCase() || 'S'}</AvatarFallback>
             </Avatar>
           )}
@@ -607,11 +609,11 @@ export function CallScreen({
           {moreMenuOpen && (
             <div className="absolute bottom-[calc(100%+14rem)] left-0 z-[110] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-16">
               <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Call controls</p>
-              {!groupCallId && <button type="button" onClick={onToggleMute} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
+              <button type="button" onClick={onToggleMute} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                 {isMuted ? <MicOff className="h-4 w-4 text-pink-200" /> : <Mic className="h-4 w-4" />}
                 <span className="flex-1">{isMuted ? 'Turn microphone on' : 'Turn microphone off'}</span>
                 <span className={`h-2 w-2 rounded-full ${isMuted ? 'bg-pink-300' : 'bg-white/25'}`} />
-              </button>}
+              </button>
               {isVideoCall && (
                 <button type="button" onClick={onToggleCamera} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                   {isCameraOff ? <VideoOff className="h-4 w-4 text-pink-200" /> : <Video className="h-4 w-4" />}
@@ -619,9 +621,9 @@ export function CallScreen({
                   <span className={`h-2 w-2 rounded-full ${isCameraOff ? 'bg-pink-300' : 'bg-white/25'}`} />
                 </button>
               )}
-              {!groupCallId && <button type="button" onClick={() => { setIsScreenLocked(true); setMoreMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
+              <button type="button" onClick={() => { setIsScreenLocked(true); setMoreMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                 <Lock className="h-4 w-4" /><span className="flex-1">Lock screen</span>
-              </button>}
+              </button>
               {phase === 'in-call' && type === 'audio' && (
                 <button type="button" onClick={async () => {
                   setMoreMenuOpen(false)
@@ -679,8 +681,8 @@ export function CallScreen({
           {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
         </button>}
 
-        <button type="button" onClick={() => setIsSpeakerOn((current) => !current)} aria-label={isSpeakerOn ? 'Speaker on' : 'Speaker off'} aria-pressed={isSpeakerOn} title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}>
-          {isSpeakerOn ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
+        <button type="button" onClick={() => setIsSpeakerOn((current) => !current)} aria-label={(speakerMode ?? isSpeakerOn) ? 'Speaker on' : 'Speaker off'} aria-pressed={speakerMode ?? isSpeakerOn} title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}>
+          {(speakerMode ?? isSpeakerOn) ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
         </button>
 
 
