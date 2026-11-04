@@ -127,26 +127,25 @@ export async function POST(request: NextRequest) {
     // beat us here, this update just affects zero rows and we fall
     // through to re-reading below, so both sides end up agreeing on the
     // SAME provider/room no matter who got there first.
-    const { data: persisted, error: persistError } = await admin.from('calls')
+    const { error: persistError } = await admin.from('calls')
       .update({ provider, room_name: roomName })
       .eq('id', call.id)
       .is('provider', null)
-      .select('provider, room_name')
-      .maybeSingle()
 
     if (persistError) {
-      console.error('[calls/connect] failed to persist provider metadata', persistError)
-      return NextResponse.json({ error: 'Could not save the call connection details. Please retry.' }, { status: 500 })
+      // Keep the one-to-one call working even if this optional metadata
+      // write fails. The active transport details remain in this request;
+      // the group-conversion endpoint can repair the row after the client
+      // confirms the live Agora transport.
+      console.warn('[calls/connect] could not persist optional provider metadata', persistError)
+    } else {
+      const { data: refreshed, error: refreshError } = await supabase.from('calls')
+        .select('provider, room_name').eq('id', call.id).single()
+      if (!refreshError && refreshed?.provider && refreshed?.room_name) {
+        provider = refreshed.provider as CallProviderName
+        roomName = refreshed.room_name
+      }
     }
-
-    const { data: refreshed, error: refreshError } = await supabase.from('calls')
-      .select('provider, room_name').eq('id', call.id).single()
-    if (refreshError || !refreshed?.provider || !refreshed?.room_name) {
-      console.error('[calls/connect] provider metadata missing after persistence', { callId: call.id, persistError, persisted, refreshError, refreshed })
-      return NextResponse.json({ error: 'Call connection details were not saved. Please retry the call.' }, { status: 500 })
-    }
-    provider = refreshed.provider as CallProviderName
-    roomName = refreshed.room_name
   }
 
   try {
