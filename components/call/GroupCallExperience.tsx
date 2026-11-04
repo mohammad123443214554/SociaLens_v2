@@ -114,6 +114,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
 
   const acceptInvitation = useCallback(async () => {
     if (!incoming || busy) return
+    if (disabled) { onError('You are already on another call. End that call before joining a group voice call.'); return }
     setBusy(true)
     try {
       const response = await fetch(`/api/group-calls/${incoming.groupCallId}/respond`, {
@@ -135,7 +136,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
     } finally {
       setBusy(false)
     }
-  }, [incoming, busy, refreshRoster, connectToGroup, cleanupMedia, onError])
+  }, [incoming, busy, disabled, refreshRoster, connectToGroup, cleanupMedia, onError])
 
   const declineInvitation = useCallback(async () => {
     if (!incoming || busy) return
@@ -286,7 +287,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
             </div>
             <div className="flex justify-center gap-8">
               <button disabled={busy} onClick={() => void declineInvitation()} className="flex flex-col items-center gap-2 text-xs text-white/70"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600"><PhoneOff /></span>Decline</button>
-              <button disabled={busy} onClick={() => void acceptInvitation()} className="flex flex-col items-center gap-2 text-xs text-white/70"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600"><Phone /></span>{busy ? 'Joining…' : 'Join'}</button>
+              <button disabled={busy || disabled} onClick={() => void acceptInvitation()} className="flex flex-col items-center gap-2 text-xs text-white/70"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600"><Phone /></span>{busy ? 'Joining…' : 'Join'}</button>
             </div>
           </div>
         </div>
