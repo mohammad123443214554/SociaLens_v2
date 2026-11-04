@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendPushToUser } from '@/lib/server/push'
+import { canAccessByPrivacy } from '@/lib/utils/privacyAccess'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -35,8 +36,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { data: profiles, error: profileError } = await supabase
     .from('profiles').select('id,call_privacy').in('id', userIds)
   if (profileError) return NextResponse.json({ error: 'Could not verify invite permissions' }, { status: 500 })
-  const allowedIds = new Set((profiles || []).filter((profile) => profile.call_privacy !== 'none').map((profile) => profile.id))
-  if (userIds.some((id) => !allowedIds.has(id))) return NextResponse.json({ error: 'One or more selected people are not accepting calls' }, { status: 403 })
+  const privacyById = new Map((profiles || []).map((profile) => [profile.id, profile.call_privacy]))
+  for (const inviteeId of userIds) {
+    if (!privacyById.has(inviteeId) || !(await canAccessByPrivacy(supabase, user.id, inviteeId, privacyById.get(inviteeId), 'call'))) {
+      return NextResponse.json({ error: 'One or more selected people are not accepting calls' }, { status: 403 })
+    }
+  }
 
   const { data: groupCallId, error } = await supabase.rpc('convert_active_voice_call_to_group', {
     p_call_id: callId,
