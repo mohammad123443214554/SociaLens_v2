@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { sendPushToUser } from '@/lib/server/push'
 import { canAccessByPrivacy } from '@/lib/utils/privacyAccess'
 
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { callId } = await params
   if (!UUID_RE.test(callId)) return NextResponse.json({ error: 'Invalid call ID' }, { status: 400 })
 
-  let body: { userIds?: unknown }
+  let body: { userIds?: unknown; provider?: unknown; roomName?: unknown }
   try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }) }
   if (!Array.isArray(body.userIds) || body.userIds.length < 1 || body.userIds.length > 8 ||
       body.userIds.some((id) => typeof id !== 'string' || !UUID_RE.test(id))) {
@@ -31,7 +32,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (user.id !== call.caller_id && user.id !== call.callee_id) return NextResponse.json({ error: 'You are not part of this call' }, { status: 403 })
   if (call.type !== 'audio' || call.status !== 'accepted') return NextResponse.json({ error: 'Only an active voice call can become a group call' }, { status: 409 })
   if (call.group_call_id) return NextResponse.json({ error: 'This call is already a group call' }, { status: 409 })
-  if (call.provider !== 'agora') return NextResponse.json({ error: 'This call is using a provider that cannot be expanded without interrupting the conversation. Please try again on an Agora voice call.' }, { status: 409 })
+  const requestedRoomName = `socialens-call-${call.id}`
+  const clientConfirmsAgora = body.provider === 'agora' && body.roomName === requestedRoomName
+  if (call.provider !== 'agora' && !(call.provider == null && clientConfirmsAgora)) {
+    return NextResponse.json({ error: 'This call is using a provider that cannot be expanded without interrupting the conversation. Please try again on an Agora voice call.' }, { status: 409 })
+  }
+  if (call.provider == null) {
+    const admin = createAdminClient()
+    const { error: metadataError } = await admin.from('calls')
+      .update({ provider: 'agora', room_name: requestedRoomName })
+      .eq('id', call.id).is('provider', null)
+    if (metadataError) {
+      console.error('[calls/group] failed to repair active Agora call metadata', metadataError)
+      return NextResponse.json({ error: 'Could not prepare this active call for group conversion. Please retry.' }, { status: 500 })
+    }
+  }
 
   const { data: profiles, error: profileError } = await supabase
     .from('profiles').select('id,call_privacy').in('id', userIds)
