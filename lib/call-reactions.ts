@@ -323,7 +323,7 @@ export const CALL_REACTION_CATEGORIES: { id: CallReactionCategoryId; label: stri
 
 export const CALL_REACTION_ALL_IDS: CallReactionId[] = [...CALL_REACTION_CUSTOM_IDS, ...CALL_REACTION_ASSET_IDS]
 
-const CATEGORY_PREFIXES: Record<Exclude<CallReactionCategoryId, 'recent'>, string[]> = {
+const CATEGORY_PREFIXES: Record<Exclude<CallReactionCategoryId, 'recent' | 'all'>, string[]> = {
   love: ['green-heart', 'grey-heart', 'light-blue-heart', 'orange-heart', 'pink-heart', 'purple-heart', 'red-heart', 'white-heart', 'yellow-heart', 'heart', 'love', 'kiss', 'kissing', 'cupid', 'hug', 'flying-heart', 'revolving-hearts', 'two-hearts'],
   gestures: ['crossed-fingers', 'ear', 'fist', 'folded-hands', 'foot', 'hand', 'head-nod', 'head-shake', 'index-finger', 'leg', 'middle-finger', 'muscle', 'nail-care', 'nose', 'ok', 'open-hands', 'palms-up', 'pinch', 'point', 'raised-fist', 'raising-hands', 'salute', 'selfie', 'thumbs', 'victory', 'wave', 'writing-hand'],
   animals: ['cow-face', 'crocodile', 'ghost', 'hatching-chick', 'hear-no-evil-monkey', 'see-no-evil-monkey', 'speak-no-evil-monkey', 'microbe', 'globe-showing', 't-rex', 'dinosaur', 'dog', 'donkey', 'dragon', 'eagle', 'frog', 'gorilla', 'monkey', 'kangaroo', 'lizard', 'orangutan', 'otter', 'owl', 'ox', 'phoenix', 'pig', 'rabbit', 'racehorse', 'rat', 'rooster', 'snake', 'tiger', 'turtle', 'unicorn', 'fallen-leaf', 'leafless-tree', 'leaves', 'plant', 'rose', 'wilted-flower', 'ocean', 'rainbow', 'rain-cloud', 'snowflake', 'snowman', 'sunrise', 'sun-with-face', 'tornado', 'volcano', 'wind-face', 'fire', 'electricity', 'droplet', 'comet'],
