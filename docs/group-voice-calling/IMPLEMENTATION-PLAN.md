@@ -107,3 +107,16 @@ The creator is inserted as the first joined participant. The 10-person capacity 
 - Existing call endpoints, push path, incoming modal, global provider, call engine, and reaction broadcast path inspected.
 - No production database schema or existing call behavior was changed in Part 1.
 - No claim of end-to-end group-call functionality is made yet. The actual feature starts in Part 2 after this compatibility design is locked.
+
+
+## Part 3 — Group Agora connection and invitation experience (implemented; verification pending)
+
+- Added an authenticated group-call Agora credential endpoint. It verifies the current user is a joined participant, requires an active group session, persists one stable Agora room name, and mints a server-side UID/token pair. The existing one-to-one credential endpoint and room sizing remain untouched.
+- Added an incoming-invitation lookup endpoint that returns only active invitations visible to the authenticated invitee, together with the profiles of already-joined participants.
+- Added a global group-call experience mounted alongside (not inside) the existing one-to-one engine. It polls as a recovery fallback and subscribes to participant-row Realtime changes for incoming invitations and roster updates.
+- Added an incoming invitation screen labelled **Incoming Group Voice Call**, with profile photos/names of all participants already joined and Join/Decline actions.
+- Added a group-call creation picker based on the authenticated user's message-list contacts, with a maximum of 9 invitees plus the creator. A joined participant can invite more contacts during the session; server-side capacity checks remain authoritative.
+- Added an Agora audio-only room join/publish/subscribe path with participant-scoped leave/cleanup. Leaving calls the group-specific RPC and does not end the room while other joined participants remain.
+- Existing one-to-one call engine, calls table, and existing connect endpoint were not modified.
+- Current Part 3 verification is limited to repository/deployment build verification. Real two-device/multi-device audio, background notification wake-up, reconnect, and 10-user concurrency testing remain required before production acceptance.
+- The first iteration exposes a dedicated Group call launcher while no one-to-one call is active. The richer in-call 3-dot integration, polished multi-participant roster/speaking indicators, and recipient-targeted reactions remain follow-up work in Parts 4–5.
