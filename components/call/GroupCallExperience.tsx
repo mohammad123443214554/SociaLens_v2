@@ -143,6 +143,8 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Could not join group call')
       activeCallIdRef.current = incoming.groupCallId
+      setMuted(false); setHeld(false); setSpeakerOn(false)
+      activeCallIdRef.current = incoming.groupCallId
       setActiveCallId(incoming.groupCallId)
       await refreshRoster(incoming.groupCallId)
       await connectToGroup(incoming.groupCallId)
@@ -186,6 +188,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       activeCallIdRef.current = null
       setActiveCallId(null)
       setRoster([])
+      setMuted(false); setHeld(false); setSpeakerOn(false); setSpeakingUids(new Set())
       setExpanded(false)
       setBusy(false)
     }
@@ -208,6 +211,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Could not start group call')
       activeCallIdRef.current = data.groupCallId
+      setMuted(false); setHeld(false); setSpeakerOn(false)
       setActiveCallId(data.groupCallId)
       await refreshRoster(data.groupCallId)
       await connectToGroup(data.groupCallId)
@@ -282,6 +286,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
 
   useEffect(() => {
     heldRef.current = held
+    speakerRef.current = speakerOn
     void localTrackRef.current?.setEnabled(!muted && !held)
     for (const remote of remoteUsersRef.current.values()) {
       remote.audioTrack?.setVolume(held ? 0 : speakerOn ? 100 : 55)
