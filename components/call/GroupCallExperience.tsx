@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Phone, PhoneOff, Users, X, Plus, Check, Mic, MicOff, Volume2, Pause, Play, Signal, SmilePlus, Search, MoreHorizontal, ShieldCheck } from 'lucide-react'
 import { IncomingCallModal } from './IncomingCallModal'
+import { CallScreen } from './CallScreen'
 import { CallReactionLottie } from './CallReactionLottie'
 import { CALL_REACTION_ALL_IDS, CALL_REACTION_CATEGORIES, CALL_REACTION_CUSTOM_OPTIONS, getCallReactionCategory, getCallReactionLabel, isCallReactionId, type CallReactionCategoryId, type CallReactionId } from '@/lib/call-reactions'
 
@@ -241,12 +242,12 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
     }
   }, [busy, selected, refreshRoster, connectToGroup, cleanupMedia, onError])
 
-  const inviteMore = useCallback(async () => {
-    if (!activeCallId || !selected.length || busy) return
+  const inviteMore = useCallback(async (userIds: string[]) => {
+    if (!activeCallId || !userIds.length || busy) return
     setBusy(true)
     try {
       const response = await fetch(`/api/group-calls/${activeCallId}/invite`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userIds: selected }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userIds }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Could not invite participants')
@@ -258,7 +259,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
     } finally {
       setBusy(false)
     }
-  }, [activeCallId, selected, busy, refreshRoster, onError])
+  }, [activeCallId, busy, refreshRoster, onError])
 
   useEffect(() => {
     mountedRef.current = true
@@ -476,55 +477,46 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       )}
 
       {activeCallId && (
-        <div className="fixed inset-0 z-[210] flex min-h-[100dvh] flex-col overflow-hidden bg-[#101014] px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-white">
-          <div className="absolute left-5 top-[max(2rem,env(safe-area-inset-top))] z-20">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-pink-300">Group Call</p>
-            <p className="mt-1 text-sm text-white/60">{roster.filter(person => person.status === 'joined').length}/10 participants</p>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col items-start justify-start overflow-y-auto pt-16 pb-5">
-            <div className="grid w-full max-w-6xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {roster.filter(person => person.status === 'joined').map((person) => {
-                const speaking = speakingUids.has(String(groupAgoraUid(person.id)))
-                const isYou = person.id === userId
-                return (
-                  <div key={person.id} className={`flex min-h-[142px] flex-col items-center justify-center gap-2 rounded-xl border px-3 py-4 text-center transition-colors ${speaking ? 'border-emerald-400/70 bg-emerald-400/10 shadow-[0_0_22px_rgba(52,211,153,0.12)]' : 'border-white/10 bg-white/[0.045]'}`}>
-                    <Avatar className={`h-16 w-16 ring-2 ${speaking ? 'ring-emerald-400' : 'ring-white/15'}`}>
-                      <AvatarImage src={person.avatarUrl || undefined} />
-                      <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-xl">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <span className="max-w-full truncate text-sm font-semibold">{isYou ? 'You' : person.fullName || person.username}</span>
-                    <span className={`text-[11px] ${speaking ? 'text-emerald-300' : 'text-white/45'}`}>{speaking ? 'Speaking' : 'Connected'}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {roster.some(person => ['invited','ringing'].includes(person.status)) && (
-            <div className="mb-4 flex max-w-lg flex-wrap justify-center gap-2">
-              {roster.filter(person => ['invited','ringing'].includes(person.status)).map(person => (
-                <span key={person.id} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/60">{person.fullName || person.username} · {person.status === 'ringing' ? 'Ringing' : 'Invited'}</span>
-              ))}
-            </div>
-          )}
-
-          <div className="relative z-30 mb-2 mt-auto flex w-full items-center justify-center gap-4 bg-gradient-to-t from-black/50 to-transparent pb-1 pt-6">
-            <div className="relative">
-              <button type="button" aria-label="More group call options" aria-expanded={moreMenuOpen} onClick={() => setMoreMenuOpen(value => !value)} className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center border transition-all ${moreMenuOpen ? 'border-pink-200/30 bg-pink-300/[0.12] text-pink-50 shadow-[0_0_18px_rgba(255,105,180,0.08)]' : 'border-white/10 bg-white/10 hover:bg-white/15'}`}><MoreHorizontal /></button>
-              {moreMenuOpen && (
-                <div className="absolute bottom-16 left-0 z-[230] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px]">
-                  <button type="button" onClick={async () => { setMoreMenuOpen(false); try { await loadContacts(); setSelected([]); setPickerOpen(true) } catch (error) { onError(error instanceof Error ? error.message : 'Could not load contacts') } }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/10"><Plus className="h-4 w-4" />Invite people</button>
-                  <button type="button" onClick={() => { setMoreMenuOpen(false); openReactionPicker() }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/10"><SmilePlus className="h-4 w-4" />Call reaction</button>
-                </div>
-              )}
-            </div>
-            <button type="button" aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} onClick={() => setMuted(value => !value)} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${muted ? 'bg-white text-neutral-900' : 'bg-white/15 hover:bg-white/25'}`}>{muted ? <MicOff /> : <Mic />}</button>
-            <button type="button" aria-label={speakerOn ? 'Turn speaker mode off' : 'Turn speaker mode on'} aria-pressed={speakerOn} onClick={() => setSpeakerOn(value => !value)} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${speakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}><Volume2 /></button>
-            <button type="button" aria-label={held ? 'Resume group call' : 'Put group call on hold'} aria-pressed={held} onClick={toggleHold} className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25`}>{held ? <Play /> : <Pause />}</button>
-            <button type="button" aria-label="Leave group call" onClick={() => void leaveCall()} disabled={busy} className="h-11 w-11 sm:h-16 sm:w-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors disabled:opacity-50"><PhoneOff /></button>
-          </div>
-          <p className="mt-3 text-center text-[10px] text-white/35">Speaker mode adjusts playback level. Device output follows your audio settings.</p>
-        </div>
+        <CallScreen
+          key={activeCallId}
+          userId={userId}
+          phase="in-call"
+          type="audio"
+          peerName="Group Call"
+          peerId={null}
+          peerAvatar="/images/socialens-logo.png"
+          onSendCallReaction={async () => undefined}
+          groupCallId={activeCallId}
+          groupParticipants={roster.map((person) => ({
+            id: person.id,
+            username: person.username,
+            fullName: person.fullName,
+            avatarUrl: person.avatarUrl,
+            status: person.status,
+          }))}
+          onAddPeopleToGroup={inviteMore}
+          incomingReaction={null}
+          localStream={null}
+          remoteStream={null}
+          isMuted={muted}
+          isCameraOff={true}
+          isOnHold={held}
+          canSwitchCamera={false}
+          callDurationSec={elapsedSeconds}
+          error={null}
+          networkQuality="unknown"
+          onEnd={() => void leaveCall()}
+          onToggleMute={() => setMuted((value) => !value)}
+          onToggleCamera={() => undefined}
+          onSwitchCamera={() => undefined}
+          onToggleHold={() => setHeld((value) => !value)}
+          backgroundBlurEnabled={false}
+          backgroundBlurIntensity={0}
+          onSetBackgroundBlur={async () => undefined}
+          selectedCallEffectId={null}
+          callEffectIntensity={0}
+          onSetCallEffect={async () => undefined}
+        />
       )}
       {pickerOpen && activeCallId && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/70 p-4">
