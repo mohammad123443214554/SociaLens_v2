@@ -5,12 +5,15 @@ import AgoraRTC from 'agora-rtc-sdk-ng'
 import type { IAgoraRTCClient, ILocalAudioTrack } from 'agora-rtc-sdk-ng'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Phone, PhoneOff, Users, X, Plus, Check, Mic, MicOff, Volume2, Pause, Play, Signal } from 'lucide-react'
+import { Phone, PhoneOff, Users, X, Plus, Check, Mic, MicOff, Volume2, Pause, Play, Signal, SmilePlus, Search } from 'lucide-react'
+import { CallReactionLottie } from './CallReactionLottie'
+import { CALL_REACTION_ALL_IDS, CALL_REACTION_CATEGORIES, CALL_REACTION_CUSTOM_OPTIONS, getCallReactionCategory, getCallReactionLabel, isCallReactionId, type CallReactionCategoryId, type CallReactionId } from '@/lib/call-reactions'
 
 type Person = { id: string; username: string; fullName: string | null; avatarUrl: string | null }
 type Invitation = { groupCallId: string; invitedBy: string; participants: Person[] }
 type Contact = Person
 type RosterPerson = Person & { status: 'joined' | 'invited' | 'ringing' | 'left' | 'declined' | 'missed'; isSpeaking?: boolean }
+type IncomingGroupReaction = { id: string; reaction: CallReactionId; senderName: string }
 
 function groupAgoraUid(userId: string) {
   let hash = 0
@@ -34,6 +37,14 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   const [speakerOn, setSpeakerOn] = useState(false)
   const [speakingUids, setSpeakingUids] = useState<Set<string>>(() => new Set())
   const [expanded, setExpanded] = useState(false)
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
+  const [recipientPickerOpen, setRecipientPickerOpen] = useState(false)
+  const [reactionSearch, setReactionSearch] = useState('')
+  const [reactionCategory, setReactionCategory] = useState<CallReactionCategoryId>('all')
+  const [pendingReaction, setPendingReaction] = useState<CallReactionId | null>(null)
+  const [selectedReactionRecipients, setSelectedReactionRecipients] = useState<string[]>([])
+  const [sendingReaction, setSendingReaction] = useState(false)
+  const [incomingGroupReaction, setIncomingGroupReaction] = useState<IncomingGroupReaction | null>(null)
   const heldRef = useRef(false)
   const speakerRef = useRef(false)
   const clientRef = useRef<IAgoraRTCClient | null>(null)
@@ -284,6 +295,44 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   }, [activeCallId, supabase, refreshRoster, cleanupMedia, onError])
 
   useEffect(() => {
+    if (!activeCallId) {
+      setIncomingGroupReaction(null)
+      return
+    }
+    let alive = true
+    const channel = supabase.channel(`group-call-reactions:${userId}`, {
+      config: { private: true, broadcast: { self: false, ack: false } },
+    })
+      .on('broadcast', { event: 'call-reaction' }, ({ payload }) => {
+        if (!alive || !payload || payload.callId !== activeCallId || payload.recipientId !== userId) return
+        if (payload.senderId === userId || typeof payload.id !== 'string' || !isCallReactionId(payload.reaction)) return
+        setIncomingGroupReaction({
+          id: payload.id,
+          reaction: payload.reaction,
+          senderName: typeof payload.senderName === 'string' ? payload.senderName : 'Participant',
+        })
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[Group Call] private reaction channel unavailable:', status)
+        }
+      })
+    return () => {
+      alive = false
+      void supabase.removeChannel(channel)
+    }
+  }, [activeCallId, userId, supabase])
+
+  useEffect(() => {
+    if (!incomingGroupReaction) return
+    const id = incomingGroupReaction.id
+    const timer = window.setTimeout(() => {
+      setIncomingGroupReaction((current) => current?.id === id ? null : current)
+    }, 5600)
+    return () => window.clearTimeout(timer)
+  }, [incomingGroupReaction?.id])
+
+  useEffect(() => {
     heldRef.current = held
     speakerRef.current = speakerOn
     void localTrackRef.current?.setEnabled(!muted && !held)
@@ -293,6 +342,63 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   }, [muted, held, speakerOn])
 
   const toggleHold = () => setHeld((current) => !current)
+  const joinedReactionRecipients = roster.filter((person) => person.status === 'joined' && person.id !== userId)
+
+  const openReactionPicker = () => {
+    if (!activeCallId || joinedReactionRecipients.length === 0) {
+      onError('At least one other participant must be connected to receive a reaction.')
+      return
+    }
+    setReactionSearch('')
+    setReactionCategory('all')
+    setReactionPickerOpen(true)
+  }
+
+  const chooseGroupReaction = (reaction: CallReactionId) => {
+    const recipients = joinedReactionRecipients.map((person) => person.id)
+    if (!recipients.length) {
+      onError('No other joined participants are available to receive this reaction.')
+      return
+    }
+    setPendingReaction(reaction)
+    setSelectedReactionRecipients(recipients)
+    setReactionPickerOpen(false)
+    setRecipientPickerOpen(true)
+  }
+
+  const toggleReactionRecipient = (id: string) => {
+    setSelectedReactionRecipients((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : current.length < 9 ? [...current, id] : current
+    )
+  }
+
+  const sendGroupReaction = async () => {
+    if (!activeCallId || !pendingReaction || selectedReactionRecipients.length === 0 || sendingReaction) return
+    setSendingReaction(true)
+    try {
+      const response = await fetch(`/api/group-calls/${activeCallId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reaction: pendingReaction, recipientIds: selectedReactionRecipients }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Could not send reaction')
+      setRecipientPickerOpen(false)
+      setPendingReaction(null)
+      setSelectedReactionRecipients([])
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'Could not send reaction')
+    } finally {
+      setSendingReaction(false)
+    }
+  }
+
+  const visibleReactionIds = CALL_REACTION_ALL_IDS.filter((reaction) => {
+    const categoryMatches = reactionCategory === 'all' || getCallReactionCategory(reaction) === reactionCategory
+    const searchMatches = getCallReactionLabel(reaction).toLowerCase().includes(reactionSearch.trim().toLowerCase())
+    return categoryMatches && searchMatches
+  })
+
 
   const toggleContact = (id: string) => setSelected((current) =>
     current.includes(id) ? current.filter((item) => item !== id) : current.length < 9 ? [...current, id] : current
@@ -394,6 +500,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
             <button type="button" aria-label={speakerOn ? 'Turn speaker mode off' : 'Turn speaker mode on'} aria-pressed={speakerOn} onClick={() => setSpeakerOn((v) => !v)} className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors ${speakerOn ? 'bg-pink-600 text-white' : 'bg-white/10 hover:bg-white/20'}`}><Volume2 /></button>
             <button type="button" aria-label={held ? 'Resume group call' : 'Put group call on hold'} aria-pressed={held} onClick={toggleHold} className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors ${held ? 'bg-amber-400 text-black' : 'bg-white/10 hover:bg-white/20'}`}>{held ? <Play /> : <Pause />}</button>
             <button type="button" aria-label="Invite participants" onClick={async () => { try { await loadContacts(); setSelected([]); setPickerOpen(true) } catch (error) { onError(error instanceof Error ? error.message : 'Could not load contacts') } }} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"><Plus /></button>
+            <button type="button" aria-label="Send reaction" title="Send reaction" onClick={openReactionPicker} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"><SmilePlus /></button>
             <button type="button" aria-label="Leave group call" onClick={() => void leaveCall()} disabled={busy} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-600 disabled:opacity-50"><PhoneOff /></button>
           </div>
           <p className="mt-3 text-center text-[10px] text-white/35">Speaker mode adjusts call playback level. Device output routing follows your system audio settings.</p>
@@ -411,6 +518,85 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
               ))}
             </div>
             <div className="mt-3 flex justify-end"><button disabled={!selected.length || busy} onClick={() => void inviteMore()} className="rounded-full bg-pink-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? 'Sending…' : 'Send invitations'}</button></div>
+          </div>
+        </div>
+      )}
+
+      {incomingGroupReaction && activeCallId && (
+        <div key={incomingGroupReaction.id} className="pointer-events-none fixed inset-0 z-[280] flex flex-col items-center justify-center overflow-hidden bg-black/10" aria-live="polite">
+          <div className="rounded-full border border-white/15 bg-black/45 px-4 py-1.5 text-xs font-medium text-white/90 backdrop-blur-md">{incomingGroupReaction.senderName} sent a reaction</div>
+          {incomingGroupReaction.reaction === 'flying-heart' || incomingGroupReaction.reaction === 'heart-burst' ? (
+            <div className="mt-3 animate-bounce text-[min(38vw,190px)] leading-none drop-shadow-[0_10px_35px_rgba(255,70,145,0.55)]">
+              {incomingGroupReaction.reaction === 'flying-heart' ? '💗' : '💞'}
+            </div>
+          ) : (
+            <CallReactionLottie
+              reaction={incomingGroupReaction.reaction as Exclude<CallReactionId, 'flying-heart' | 'heart-burst'>}
+              loop
+              className="mt-2 h-[min(72vw,460px)] w-[min(72vw,460px)] drop-shadow-[0_12px_30px_rgba(255,105,180,0.28)]"
+            />
+          )}
+        </div>
+      )}
+
+      {reactionPickerOpen && activeCallId && (
+        <div className="fixed inset-0 z-[270] flex items-center justify-center bg-black/75 p-3">
+          <div className="flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#19191f] text-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 p-4">
+              <div><h2 className="font-semibold">Choose a reaction</h2><p className="text-xs text-white/55">You will choose who receives it next</p></div>
+              <button type="button" onClick={() => setReactionPickerOpen(false)} aria-label="Close reactions" className="rounded-full p-2 hover:bg-white/10"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="flex items-center gap-2 border-b border-white/10 p-3">
+              <Search className="h-4 w-4 shrink-0 text-white/50" />
+              <input value={reactionSearch} onChange={(event) => setReactionSearch(event.target.value)} placeholder="Search reactions" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-white/40" />
+            </div>
+            <div className="flex gap-1 overflow-x-auto border-b border-white/10 p-2">
+              {CALL_REACTION_CATEGORIES.filter((category) => category.id !== 'recent').map((category) => (
+                <button key={category.id} type="button" onClick={() => setReactionCategory(category.id)} className={`shrink-0 rounded-full px-3 py-2 text-xs font-medium ${reactionCategory === category.id ? 'bg-pink-600 text-white' : 'bg-white/5 text-white/65 hover:bg-white/10'}`}>{category.label}</button>
+              ))}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                {visibleReactionIds.map((reaction) => {
+                  const custom = CALL_REACTION_CUSTOM_OPTIONS.find((option) => option.id === reaction)
+                  return (
+                    <button key={reaction} type="button" onClick={() => chooseGroupReaction(reaction)} className="flex min-h-16 items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-3 text-left text-xs hover:border-pink-400/50 hover:bg-pink-500/10">
+                      <span className="text-2xl">{custom?.emoji || '✨'}</span>
+                      <span className="min-w-0 flex-1 truncate">{getCallReactionLabel(reaction)}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              {!visibleReactionIds.length && <p className="p-8 text-center text-sm text-white/50">No reactions found.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {recipientPickerOpen && activeCallId && pendingReaction && (
+        <div className="fixed inset-0 z-[275] flex items-center justify-center bg-black/75 p-3">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#19191f] text-white shadow-2xl">
+            <div className="border-b border-white/10 p-4">
+              <div className="flex items-center justify-between">
+                <div><h2 className="font-semibold">Who should receive this reaction?</h2><p className="mt-1 text-xs text-white/55">Only selected participants will receive it.</p></div>
+                <button type="button" onClick={() => { setRecipientPickerOpen(false); setPendingReaction(null); setSelectedReactionRecipients([]) }} aria-label="Cancel reaction" className="rounded-full p-2 hover:bg-white/10"><X className="h-4 w-4" /></button>
+              </div>
+              <p className="mt-3 rounded-xl bg-white/5 px-3 py-2 text-sm text-pink-200">{CALL_REACTION_CUSTOM_OPTIONS.find((option) => option.id === pendingReaction)?.emoji || '✨'} {getCallReactionLabel(pendingReaction)}</p>
+            </div>
+            <div className="max-h-[52dvh] overflow-y-auto p-2">
+              {joinedReactionRecipients.map((person) => (
+                <button key={person.id} type="button" onClick={() => toggleReactionRecipient(person.id)} className="flex w-full items-center gap-3 rounded-xl p-3 text-left hover:bg-white/5">
+                  <Avatar className="h-10 w-10"><AvatarImage src={person.avatarUrl || undefined} /><AvatarFallback>{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback></Avatar>
+                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{person.fullName || person.username}</span><span className="block truncate text-xs text-white/45">@{person.username}</span></span>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${selectedReactionRecipients.includes(person.id) ? 'border-pink-500 bg-pink-600 text-white' : 'border-white/30'}`}>{selectedReactionRecipients.includes(person.id) && <Check className="h-3 w-3" />}</span>
+                </button>
+              ))}
+              {!joinedReactionRecipients.length && <p className="p-8 text-center text-sm text-white/50">No other participants are currently connected.</p>}
+            </div>
+            <div className="flex items-center justify-between border-t border-white/10 p-4">
+              <span className="text-xs text-white/55">{selectedReactionRecipients.length} selected · defaults to everyone</span>
+              <button type="button" disabled={!selectedReactionRecipients.length || sendingReaction || joinedReactionRecipients.length === 0} onClick={() => void sendGroupReaction()} className="rounded-full bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{sendingReaction ? 'Sending…' : 'Done'}</button>
+            </div>
           </div>
         </div>
       )}
