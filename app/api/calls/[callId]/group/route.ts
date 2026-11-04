@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { sendPushToUser } from '@/lib/server/push'
 import { canAccessByPrivacy } from '@/lib/utils/privacyAccess'
 
@@ -37,14 +36,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (call.provider !== 'agora' && !(call.provider == null && clientConfirmsAgora)) {
     return NextResponse.json({ error: 'This call is using a provider that cannot be expanded without interrupting the conversation. Please try again on an Agora voice call.' }, { status: 409 })
   }
-  if (call.provider == null) {
-    const admin = createAdminClient()
-    const { error: metadataError } = await admin.from('calls')
-      .update({ provider: 'agora', room_name: requestedRoomName })
-      .eq('id', call.id).is('provider', null)
+  if (call.provider == null || !call.room_name) {
+    // Use a narrowly scoped SECURITY DEFINER RPC tied to auth.uid().
+    // Do not use createAdminClient here: that helper requires the optional
+    // SUPABASE_SERVICE_ROLE_KEY and can throw before returning a DB error.
+    const { error: metadataError } = await supabase.rpc('ensure_active_voice_call_agora_transport', {
+      p_call_id: call.id,
+      p_room_name: requestedRoomName,
+    })
     if (metadataError) {
-      console.error('[calls/group] failed to repair active Agora call metadata', metadataError)
-      return NextResponse.json({ error: 'Could not prepare this active call for group conversion. Please retry.' }, { status: 500 })
+      console.error('[calls/group] failed to repair active Agora call metadata', {
+        code: metadataError.code,
+        message: metadataError.message,
+        details: metadataError.details,
+        hint: metadataError.hint,
+      })
+      const status = metadataError.code === '42501' ? 403 : metadataError.code === '22023' ? 409 : 500
+      return NextResponse.json({ error: metadataError.message || 'Could not prepare this active call for group conversion. Please retry.' }, { status })
     }
   }
 
