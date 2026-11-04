@@ -541,7 +541,35 @@ export function CallScreen({
       {/* Audio calls keep the centered profile layout. On phones the existing
           full-screen video-call profile placement is retained; desktop video
           calls render the profile inside the portrait video stage above. */}
-      {(!isVideoCall || showRemoteVideo || isMini || (isVideoCall && !showRemoteVideo)) && (
+      {groupCallId && !isMini && phase === 'in-call' && type === 'audio' && (
+        <div className="absolute inset-x-0 top-20 bottom-28 z-10 overflow-y-auto px-4 pb-4 sm:px-6 md:px-8">
+          <div className="mb-5">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-pink-300">Group Call</p>
+            <p className="mt-1 text-sm text-white/60">{groupParticipants.filter(person => person.status === 'joined').length}/10 participants</p>
+          </div>
+          <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {groupParticipants.filter(person => person.status === 'joined').map((person) => {
+              const isYou = person.id === userId
+              return (
+                <div key={person.id} className="flex min-h-[142px] flex-col items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 py-4 text-center">
+                  <Avatar className="h-16 w-16 ring-2 ring-emerald-400/70">
+                    <AvatarImage src={person.avatarUrl || undefined} />
+                    <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-xl">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <span className="max-w-full truncate text-sm font-semibold">{isYou ? 'You' : person.fullName || person.username}</span>
+                  <span className="text-[11px] text-emerald-300">Connected</span>
+                </div>
+              )
+            })}
+          </div>
+          {groupParticipants.some(person => ['invited','ringing'].includes(person.status)) && (
+            <p className="mx-auto mt-4 max-w-6xl text-xs text-white/45">
+              {groupParticipants.filter(person => ['invited','ringing'].includes(person.status)).map(person => person.fullName || person.username).join(' · ')} · Invited
+            </p>
+          )}
+        </div>
+      )}
+      {(!isVideoCall || showRemoteVideo || isMini || (isVideoCall && !showRemoteVideo)) && !groupCallId && (
         <div className={`relative z-10 flex flex-col items-center gap-3 transition-all duration-300 ${
           showRemoteVideo ? (isMini ? 'pt-1' : 'pt-6') : 'flex-1 justify-center'
         } ${isVideoCall && !showRemoteVideo ? 'md:hidden' : ''}`}>
