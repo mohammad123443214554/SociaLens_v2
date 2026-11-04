@@ -133,7 +133,7 @@ The creator is inserted as the first joined participant. The 10-person capacity 
 - Reset mute/hold/speaker/speaking state between sessions so controls from a previous call cannot leak into the next call.
 - Existing one-to-one CallScreen and useCall engine remain unchanged.
 - Speaker mode changes the Agora playback level; actual physical output-device routing remains governed by the browser/OS because browser audio output routing is not consistently exposed across desktop, mobile and Capacitor WebViews.
-- Verification still required: Vercel production build, at least two authenticated devices speaking/listening simultaneously, hold/resume, mute, speaker level, participant join/leave, last-participant call end, reconnect, and mobile/Capacitor layout. No claim of complete real-device verification is made until those checks pass.
+- Vercel production build passed on the Part 4 production deployment. Remaining verification: at least two authenticated devices speaking/listening simultaneously, hold/resume, mute, speaker level, participant join/leave, last-participant call end, reconnect, and mobile/Capacitor layout. No claim of complete real-device verification is made until those checks pass.
 
 ## Part 5 — Targeted group-call reactions (implemented; multi-device verification pending)
 
@@ -144,5 +144,5 @@ The creator is inserted as the first joined participant. The 10-person capacity 
 - Added Supabase Realtime authorization on `realtime.messages`. A user can read only their own private reaction topic, and only while the user is a joined participant in the corresponding active group call. Clients have no INSERT policy for these reaction topics; delivery is server-side after API validation.
 - Added a group-call reaction control, searchable reaction catalogue/category filters, recipient-selection modal, and incoming reaction animation with sender label. Existing one-to-one CallProvider/CallScreen reaction broadcasts remain unchanged.
 - Applied the Realtime authorization migrations and saved their SQL files in `supabase/migrations/`.
-- Remaining verification: production build, private-topic subscription from two or more authenticated accounts, prove unselected participants do not receive the payload, confirm joined recipients receive it, confirm left/non-member users are denied, and regress existing one-to-one reactions. Real multi-device verification is still required before claiming full production acceptance.
+- Vercel production build passed for commit `b0770adbce78ed8f10a60f42edacb3ee6e6ef69a` and the deployment is `READY`. Remaining verification: private-topic subscription from two or more authenticated accounts, prove unselected participants do not receive the payload, confirm joined recipients receive it, confirm left/non-member users are denied, and regress existing one-to-one reactions. Real multi-device verification is still required before claiming full production acceptance.
 
