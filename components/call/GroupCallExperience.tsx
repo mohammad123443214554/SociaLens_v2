@@ -18,7 +18,7 @@ type IncomingGroupReaction = { id: string; reaction: CallReactionId; senderName:
 function groupAgoraUid(userId: string) {
   let hash = 0
   for (const ch of userId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
-  return (hash % 900_000_000) + 1
+  return (hash % 1_000_000_000) + 1
 }
 
 type Props = { userId: string; disabled?: boolean; onError: (message: string) => void }
@@ -408,15 +408,6 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
 
   return (
     <>
-      {!activeCallId && !incoming && !disabled && (
-        <button onClick={async () => {
-          try { await loadContacts(); setSelected([]); setPickerOpen(true) }
-          catch (error) { onError(error instanceof Error ? error.message : 'Could not load contacts') }
-        }} className="fixed bottom-24 right-5 z-[190] flex items-center gap-2 rounded-full bg-pink-600 px-4 py-3 text-sm font-semibold text-white shadow-xl hover:bg-pink-700">
-          <Users className="h-4 w-4" /> Group call
-        </button>
-      )}
-
       {incoming && !activeCallId && (
         <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/80 p-4 text-white">
           <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#17171b] p-6 shadow-2xl">
