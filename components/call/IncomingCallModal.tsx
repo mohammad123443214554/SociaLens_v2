@@ -14,15 +14,20 @@ interface IncomingCallModalProps {
   ringtoneVolume?: number
   onAccept: () => void
   onReject: () => void
+  isGroupCall?: boolean
+  groupParticipants?: { id: string; username: string; fullName: string | null; avatarUrl: string | null }[]
+  busy?: boolean
+  acceptLabel?: string
 }
 
 
 function SwipeCallAction({
-  kind, type, onAction,
+  kind, type, onAction, disabled = false,
 }: {
   kind: 'accept' | 'decline'
   type: CallType
   onAction: () => void
+  disabled?: boolean
 }) {
   const startY = useRef(0)
   const activePointer = useRef<number | null>(null)
@@ -64,6 +69,7 @@ function SwipeCallAction({
         </div>
         <button
           type="button"
+          disabled={disabled}
           aria-label={isAccept ? 'Swipe up to accept call' : 'Swipe up to decline call'}
           onClick={handleClick}
           onPointerDown={handlePointerDown}
@@ -86,13 +92,13 @@ function SwipeCallAction({
           {isAccept ? (type === 'video' ? <Video className="h-7 w-7" /> : <Phone className="h-7 w-7" />) : <PhoneOff className="h-7 w-7" />}
         </button>
       </div>
-      <span className="text-xs font-semibold text-white/80">{isAccept ? 'Accept' : 'Decline'}</span>
+      <span className="text-xs font-semibold text-white/80">{isAccept ? (acceptLabel || 'Accept') : 'Decline'}</span>
       <span className="text-[10px] text-white/45 md:hidden">Swipe up</span>
     </div>
   )
 }
 
-export function IncomingCallModal({ callerName, callerAvatar, type, ringtoneId, ringtoneVolume, onAccept, onReject }: IncomingCallModalProps) {
+export function IncomingCallModal({ callerName, callerAvatar, type, ringtoneId, ringtoneVolume, onAccept, onReject, isGroupCall = false, groupParticipants = [], busy = false, acceptLabel }: IncomingCallModalProps) {
   useEffect(() => {
     startRingtone(ringtoneId, ringtoneVolume)
     if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400])
@@ -104,18 +110,32 @@ export function IncomingCallModal({ callerName, callerAvatar, type, ringtoneId, 
       <div />
 
       <div className="flex flex-col items-center gap-4">
-        <p className="text-sm text-white/60">Incoming {type === 'video' ? 'video' : 'voice'} call</p>
-        <Avatar className="h-28 w-28 ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/10 animate-pulse">
-          <AvatarImage src={callerAvatar} alt={callerName} />
-          <AvatarFallback className="text-3xl">{callerName[0]?.toUpperCase()}</AvatarFallback>
-        </Avatar>
-        <h2 className="text-2xl font-bold">{callerName}</h2>
-        <p className="text-white/50 text-sm">is calling you on SociaLens...</p>
+        <p className="text-sm font-semibold text-pink-300">{isGroupCall ? 'Incoming Group Call' : `Incoming ${type === 'video' ? 'video' : 'voice'} call`}</p>
+        {isGroupCall ? (
+          <div className="flex max-w-[min(90vw,520px)] flex-wrap justify-center gap-3">
+            {groupParticipants.map((person) => (
+              <div key={person.id} className="flex w-20 flex-col items-center gap-2">
+                <Avatar className="h-16 w-16 ring-4 ring-pink-500/30 shadow-xl shadow-pink-500/10">
+                  <AvatarImage src={person.avatarUrl || undefined} />
+                  <AvatarFallback className="text-xl">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <span className="max-w-full truncate text-xs text-white/75">{person.fullName || person.username}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Avatar className="h-28 w-28 ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/10 animate-pulse">
+            <AvatarImage src={callerAvatar} alt={callerName} />
+            <AvatarFallback className="text-3xl">{callerName[0]?.toUpperCase()}</AvatarFallback>
+          </Avatar>
+        )}
+        <h2 className="text-2xl font-bold">{isGroupCall ? 'Group Call' : callerName}</h2>
+        <p className="text-white/50 text-sm">{isGroupCall ? `${groupParticipants.length} people are in this call` : 'is calling you on SociaLens...'}</p>
       </div>
 
       <div className="flex items-start gap-10 md:gap-16">
-        <SwipeCallAction kind="decline" type={type} onAction={onReject} />
-        <SwipeCallAction kind="accept" type={type} onAction={onAccept} />
+        <SwipeCallAction kind="decline" type={type} onAction={onReject} disabled={busy} />
+        <SwipeCallAction kind="accept" type={type} onAction={onAccept} disabled={busy} />
       </div>
       <p className="absolute bottom-7 left-0 right-0 text-center text-[11px] text-white/40 md:hidden">
         Swipe a button upward to answer or decline
