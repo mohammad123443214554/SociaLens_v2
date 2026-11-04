@@ -122,17 +122,6 @@ The creator is inserted as the first joined participant. The 10-person capacity 
 - The first iteration exposes a dedicated Group call launcher while no one-to-one call is active. The richer in-call 3-dot integration, polished multi-participant roster/speaking indicators, and recipient-targeted reactions remain follow-up work in Parts 4–5.
 
 
-## Part 5 — Targeted group-call reactions (implemented; multi-device verification pending)
-
-- Added the existing SociaLens call-reaction catalogue to the group-call screen without changing the one-to-one reaction flow.
-- Every group reaction requires two explicit steps: choose a reaction, then confirm one or more recipients in a dedicated recipient picker. The recipient picker defaults to all other currently joined participants and allows the sender to narrow the audience before pressing **Done**.
-- Added an authenticated group reaction API. It validates the reaction ID, requires the sender to be joined in an active group call, rejects duplicate/self/invalid recipient IDs, and verifies that every selected recipient is still joined in the same call.
-- Reactions are ephemeral and are not inserted into chat history or group-call tables. The API publishes each event to a distinct private topic scoped to both the group-call ID and recipient user ID; the payload is sent only to that recipient's topic.
-- Added Supabase Realtime authorization on `realtime.messages`. A user can read only their own private reaction topic, and only while the user is a joined participant in the corresponding active group call. Clients have no INSERT policy for these reaction topics; delivery is server-side after API validation.
-- Added a group-call reaction control, searchable reaction catalogue/category filters, recipient-selection modal, and incoming reaction animation with sender label. Existing one-to-one CallProvider/CallScreen reaction broadcasts remain unchanged.
-- Applied the Realtime authorization migrations and saved their SQL files in `supabase/migrations/`.
-- Remaining verification: production build, private-topic subscription from two or more authenticated accounts, prove unselected participants do not receive the payload, confirm joined recipients receive it, confirm left/non-member users are denied, and regress existing one-to-one reactions. Real multi-device verification is still required before claiming full production acceptance.
-
 ## Part 4 — Group call screen and controls (implemented; live-device verification pending)
 
 - Reworked the group call's expanded view into a responsive participant grid, with a compact floating view retained for minimized use.
@@ -145,3 +134,15 @@ The creator is inserted as the first joined participant. The 10-person capacity 
 - Existing one-to-one CallScreen and useCall engine remain unchanged.
 - Speaker mode changes the Agora playback level; actual physical output-device routing remains governed by the browser/OS because browser audio output routing is not consistently exposed across desktop, mobile and Capacitor WebViews.
 - Verification still required: Vercel production build, at least two authenticated devices speaking/listening simultaneously, hold/resume, mute, speaker level, participant join/leave, last-participant call end, reconnect, and mobile/Capacitor layout. No claim of complete real-device verification is made until those checks pass.
+
+## Part 5 — Targeted group-call reactions (implemented; multi-device verification pending)
+
+- Added the existing SociaLens call-reaction catalogue to the group-call screen without changing the one-to-one reaction flow.
+- Every group reaction requires two explicit steps: choose a reaction, then confirm one or more recipients in a dedicated recipient picker. The recipient picker defaults to all other currently joined participants and allows the sender to narrow the audience before pressing **Done**.
+- Added an authenticated group reaction API. It validates the reaction ID, requires the sender to be joined in an active group call, rejects duplicate/self/invalid recipient IDs, and verifies that every selected recipient is still joined in the same call.
+- Reactions are ephemeral and are not inserted into chat history or group-call tables. The API publishes each event to a distinct private topic scoped to both the group-call ID and recipient user ID; the payload is sent only to that recipient's topic.
+- Added Supabase Realtime authorization on `realtime.messages`. A user can read only their own private reaction topic, and only while the user is a joined participant in the corresponding active group call. Clients have no INSERT policy for these reaction topics; delivery is server-side after API validation.
+- Added a group-call reaction control, searchable reaction catalogue/category filters, recipient-selection modal, and incoming reaction animation with sender label. Existing one-to-one CallProvider/CallScreen reaction broadcasts remain unchanged.
+- Applied the Realtime authorization migrations and saved their SQL files in `supabase/migrations/`.
+- Remaining verification: production build, private-topic subscription from two or more authenticated accounts, prove unselected participants do not receive the payload, confirm joined recipients receive it, confirm left/non-member users are denied, and regress existing one-to-one reactions. Real multi-device verification is still required before claiming full production acceptance.
+
