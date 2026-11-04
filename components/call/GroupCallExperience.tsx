@@ -556,13 +556,13 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
               ))}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              <div className="grid grid-cols-4 auto-rows-[92px] items-stretch gap-2 sm:grid-cols-5">
                 {visibleReactionIds.map((reaction) => {
                   const custom = CALL_REACTION_CUSTOM_OPTIONS.find((option) => option.id === reaction)
                   return (
-                    <button key={reaction} type="button" onClick={() => chooseGroupReaction(reaction)} className="flex min-h-16 items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-3 text-left text-xs hover:border-pink-400/50 hover:bg-pink-500/10">
-                      <span className="text-2xl">{custom?.emoji || '✨'}</span>
-                      <span className="min-w-0 flex-1 truncate">{getCallReactionLabel(reaction)}</span>
+                    <button key={reaction} type="button" onClick={() => chooseGroupReaction(reaction)} title={getCallReactionLabel(reaction)} aria-label={getCallReactionLabel(reaction)} className="flex h-[92px] min-h-[92px] min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-white/10 bg-white/5 px-1.5 py-2 text-center text-xs hover:border-pink-400/50 hover:bg-pink-500/10">
+                      {custom ? <span className="flex h-10 w-10 shrink-0 items-center justify-center text-[30px] leading-none" aria-hidden="true">{custom.emoji}</span> : <CallReactionLottie reaction={reaction as Exclude<CallReactionId, 'flying-heart' | 'heart-burst'>} loop className="h-10 w-10 shrink-0" />}
+                      <span className="line-clamp-2 h-6 w-full overflow-hidden text-[10px] leading-3 text-white/90">{getCallReactionLabel(reaction)}</span>
                     </button>
                   )
                 })}
