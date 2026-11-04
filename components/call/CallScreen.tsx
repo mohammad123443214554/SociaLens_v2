@@ -794,7 +794,7 @@ export function CallScreen({
                 ) : <p className="px-3 py-10 text-center text-sm text-pink-100/55">{reactionCategory === "recent" && !query ? "Your recently sent reactions will appear here." : "No reactions found in this category."}</p>
               })()}
             </div>
-            <p className="mt-3 shrink-0 border-t border-pink-100/[0.10] pt-3 text-center text-[10px] text-pink-100/45">285 animated reactions + 3 custom</p>
+            <p className="mt-3 shrink-0 border-t border-pink-100/[0.10] pt-3 text-center text-[10px] text-pink-100/45">287 animated reactions</p>
           </div>
         </div>
       )}
