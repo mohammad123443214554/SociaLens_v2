@@ -195,19 +195,23 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
     if (!id || busy) return
     setBusy(true)
     try {
-      await fetch(`/api/group-calls/${id}/leave`, { method: 'POST' })
-    } catch (error) {
-      console.warn('[Group Call] leave request failed', error)
-    } finally {
+      const response = await fetch(`/api/group-calls/${id}/leave`, { method: 'POST' })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || 'Could not leave group call')
+
       await cleanupMedia()
       activeCallIdRef.current = null
       setActiveCallId(null)
       setRoster([])
       setMuted(false); setHeld(false); setSpeakerOn(false); setSpeakingUids(new Set())
       setCallStartedAt(null)
+    } catch (error) {
+      console.error('[Group Call] leave request failed', error)
+      onError(error instanceof Error ? error.message : 'Could not leave group call. Please try again.')
+    } finally {
       setBusy(false)
     }
-  }, [busy, cleanupMedia])
+  }, [busy, cleanupMedia, onError])
 
   const loadContacts = useCallback(async () => {
     const response = await fetch('/api/group-calls/contacts', { cache: 'no-store' })
@@ -309,15 +313,20 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
     const recovery = window.setInterval(async () => {
       if (!alive) return
       await refreshRoster(activeCallId)
-      const { data: currentCall, error: statusError } = await supabase
-        .from('group_calls').select('status').eq('id', activeCallId).maybeSingle()
-      if (alive && !statusError && currentCall?.status === 'ended') {
+      const [{ data: currentCall, error: statusError }, { data: ownMembership, error: membershipError }] = await Promise.all([
+        supabase.from('group_calls').select('status').eq('id', activeCallId).maybeSingle(),
+        supabase.from('group_call_participants').select('status')
+          .eq('group_call_id', activeCallId).eq('user_id', userId).maybeSingle(),
+      ])
+      const callEnded = !statusError && currentCall?.status === 'ended'
+      const membershipEnded = !membershipError && (!ownMembership || ownMembership.status !== 'joined')
+      if (alive && (callEnded || membershipEnded)) {
         await cleanupMedia()
         activeCallIdRef.current = null
         setActiveCallId(null)
         setRoster([])
         setCallStartedAt(null)
-        onError('The group call has ended.')
+        onError(callEnded ? 'The group call has ended.' : 'You are no longer in this group call.')
       }
     }, 3000)
     return () => { alive = false; window.clearInterval(recovery); void supabase.removeChannel(channel) }
@@ -486,7 +495,14 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
           type="audio"
           peerName="Group Call"
           peerId={null}
-          peerAvatar={(() => { const self = roster.find((person) => person.id === userId); const inviter = self?.invitedBy && self.invitedBy !== userId ? self.inviterAvatarUrl : null; const otherJoined = roster.find((person) => person.status === 'joined' && person.id !== userId); return inviter || otherJoined?.avatarUrl || '' })()}
+          peerAvatar={(() => {
+            const self = roster.find((person) => person.id === userId)
+            const inviter = self?.invitedBy && self.invitedBy !== userId
+              ? roster.find((person) => person.id === self.invitedBy && person.status === 'joined')
+              : null
+            const otherJoined = roster.find((person) => person.status === 'joined' && person.id !== userId)
+            return inviter?.avatarUrl || otherJoined?.avatarUrl || ''
+          })()}
           onSendCallReaction={async () => undefined}
           groupCallId={activeCallId}
           groupParticipants={roster.map((person) => ({
