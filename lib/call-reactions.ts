@@ -308,9 +308,10 @@ export function isCallReactionId(value: unknown): value is CallReactionId {
 }
 
 
-export type CallReactionCategoryId = 'recent' | 'faces' | 'love' | 'gestures' | 'animals' | 'celebrations' | 'symbols'
+export type CallReactionCategoryId = 'all' | 'recent' | 'faces' | 'love' | 'gestures' | 'animals' | 'celebrations' | 'symbols'
 
 export const CALL_REACTION_CATEGORIES: { id: CallReactionCategoryId; label: string }[] = [
+  { id: 'all', label: 'All' },
   { id: 'recent', label: 'Recently Used' },
   { id: 'faces', label: 'Faces & Feelings' },
   { id: 'love', label: 'Love & Hearts' },
