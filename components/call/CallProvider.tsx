@@ -188,7 +188,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userIds }),
+      body: JSON.stringify({ userIds, provider: engine.transportProvider, roomName: `socialens-call-${callId}` }),
     })
     const result = await response.json()
     if (!response.ok) throw new Error(result.error || 'Could not add people to the group call')
@@ -299,6 +299,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           phase={engine.phase}
           type={engine.call.type}
           peerName={peerName}
+          peerId={engine.peer?.id ?? null}
           peerAvatar={peerAvatarUrl}
           onSendCallReaction={sendCallReaction}
           groupCallId={activeGroupCallId}
