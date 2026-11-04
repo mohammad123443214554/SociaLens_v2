@@ -434,6 +434,14 @@ export function useCallEngine(currentUserId?: string) {
     await supabase.from('calls').update(patch).eq('id', callId)
   }, [])
 
+  const setGroupCallId = useCallback((groupCallId: string | null) => {
+    const current = callRef.current
+    if (!current) return
+    const updated = { ...current, group_call_id: groupCallId }
+    callRef.current = updated
+    setCall((existing) => existing?.id === current.id ? updated : existing)
+  }, [])
+
   // Warm signed provider credentials and SDK while the call is ringing.
   // No microphone or camera is opened until the user accepts.
   const prepareConnection = useCallback((activeCall: CallRow, attempt = 0) => {
@@ -1780,6 +1788,7 @@ export function useCallEngine(currentUserId?: string) {
     toggleCamera,
     switchCamera,
     toggleHold,
+    setGroupCallId,
     confirmPermissionAndConnect,
     recheckPermission,
   }
