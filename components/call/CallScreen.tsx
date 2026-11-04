@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, Sparkles, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock, MoreHorizontal, SmilePlus, Users, Search, Check } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, Sparkles, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock, MoreHorizontal, SmilePlus, Users, Search, Check, Loader2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
@@ -79,6 +79,8 @@ export function CallScreen({
   const [loadingContacts, setLoadingContacts] = useState(false)
   const [sendingInvites, setSendingInvites] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const contactsLoadedRef = useRef(false)
+  const contactsRequestRef = useRef<Promise<void> | null>(null)
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
   const [recipientPickerOpen, setRecipientPickerOpen] = useState(false)
   const [pendingGroupReaction, setPendingGroupReaction] = useState<CallReactionId | null>(null)
@@ -92,6 +94,41 @@ export function CallScreen({
   const [recentReactionIds, setRecentReactionIds] = useState<CallReactionId[]>([])
   const reactionScrollRef = useRef<HTMLDivElement>(null)
   const recentStorageKey = `socialens:call-reactions:recent:${userId}`
+
+  const loadMessageContacts = useCallback(async () => {
+    if (contactsLoadedRef.current) return
+    if (contactsRequestRef.current) return contactsRequestRef.current
+
+    setLoadingContacts(true)
+    setInviteError(null)
+    const request = (async () => {
+      try {
+        const response = await fetch('/api/group-calls/contacts', { cache: 'no-store' })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || 'Could not load message contacts')
+        setMessageContacts((data.contacts || []).filter((person: { id: string }) =>
+          person.id !== userId &&
+          person.id !== peerId &&
+          !groupParticipants.some((member) => member.id === person.id && ['joined', 'invited', 'ringing'].includes(member.status))
+        ))
+        contactsLoadedRef.current = true
+      } catch (error) {
+        setInviteError(error instanceof Error ? error.message : 'Could not load message contacts')
+      } finally {
+        setLoadingContacts(false)
+        contactsRequestRef.current = null
+      }
+    })()
+    contactsRequestRef.current = request
+    return request
+  }, [userId, peerId, groupParticipants])
+
+  // Warm the contact list as soon as an audio call is connected so opening
+  // the invite dialog never has to wait for the network round-trip.
+  useEffect(() => {
+    if (phase === 'in-call' && type === 'audio') void loadMessageContacts()
+  }, [phase, type, loadMessageContacts])
+
 
   useEffect(() => {
     try {
@@ -585,8 +622,8 @@ export function CallScreen({
           {groupCallId && <div className="flex max-w-[min(90vw,420px)] items-center justify-center -space-x-2">
             {groupParticipants.filter((person) => person.status === 'joined').slice(0,10).map((person) => (
               <Avatar key={person.id} className="h-8 w-8 border-2 border-neutral-950">
-                <AvatarImage src={person.avatarUrl || undefined} />
-                <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-[10px]">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
+                <AvatarImage src={person.avatarUrl || '/images/default-avatar.svg'} />
+                <AvatarFallback className="bg-transparent"><img src="/images/default-avatar.svg" alt="" className="h-full w-full object-cover" /></AvatarFallback>
               </Avatar>
             ))}
           </div>}
@@ -625,28 +662,13 @@ export function CallScreen({
                 <Lock className="h-4 w-4" /><span className="flex-1">Lock screen</span>
               </button>
               {phase === 'in-call' && type === 'audio' && (
-                <button type="button" onClick={async () => {
+                <button type="button" onClick={() => {
                   setMoreMenuOpen(false)
                   setInviteError(null)
                   setSelectedInvitees([])
-                  setLoadingContacts(true)
-                  try {
-                    const response = await fetch('/api/group-calls/contacts', { cache: 'no-store' })
-                    const data = await response.json()
-                    if (!response.ok) throw new Error(data.error || 'Could not load message contacts')
-                    setMessageContacts((data.contacts || []).filter((person: {id:string}) =>
-                      person.id !== userId &&
-                      person.id !== peerId &&
-                      !groupParticipants.some((member) => member.id === person.id && ['joined','invited','ringing'].includes(member.status))
-                    ))
-                    setAddPeopleOpen(true)
-                  } catch (error) {
-                    setInviteError(error instanceof Error ? error.message : 'Could not load message contacts')
-                    setAddPeopleOpen(true)
-                  } finally {
-                    setLoadingContacts(false)
-                  }
-                }} disabled={loadingContacts} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07] disabled:opacity-50">
+                  setAddPeopleOpen(true)
+                  void loadMessageContacts()
+                }} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                   <Users className="h-4 w-4" /><span className="flex-1">{groupCallId ? 'Add more people' : 'Add people to group call'}</span><span className="text-pink-100/45">›</span>
                 </button>
               )}
@@ -841,36 +863,37 @@ export function CallScreen({
       )}
 
       {addPeopleOpen && (
-        <div className="absolute inset-0 z-[150] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Add people to group call">
-          <div className="flex max-h-[min(82dvh,680px)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#17171b] text-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 p-4">
-              <div><h3 className="font-semibold">{groupCallId ? 'Add people to group call' : 'Turn this into a group call'}</h3><p className="mt-1 text-xs text-white/55">Choose people from your Messages contacts</p></div>
-              <button type="button" onClick={() => setAddPeopleOpen(false)} aria-label="Close" className="rounded-full p-2 hover:bg-white/10">✕</button>
+        <div className="absolute inset-0 z-[150] flex items-center justify-center bg-black/[0.16] p-4 backdrop-blur-[3px]" role="dialog" aria-modal="true" aria-label="Add people to group call">
+          <div className="flex max-h-[min(82dvh,680px)] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-pink-100/[0.18] bg-white/[0.035] p-5 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035]">
+            <div className="mb-4 flex items-center justify-between">
+              <div><h3 className="text-base font-semibold tracking-wide text-pink-50/95">{groupCallId ? 'Add people to group call' : 'Turn this into a group call'}</h3><p className="mt-1 text-xs text-pink-100/70">Choose people from your Messages contacts</p></div>
+              <button type="button" onClick={() => setAddPeopleOpen(false)} aria-label="Close" className="rounded-full border border-pink-100/[0.12] bg-pink-300/[0.05] p-2 text-pink-50/80 transition-colors hover:bg-pink-300/[0.09]">✕</button>
             </div>
-            <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
-              <Search className="h-4 w-4 text-white/45" />
-              <span className="text-xs text-white/55">Your message contacts</span>
+            <div className="mb-2 flex items-center gap-2 rounded-xl border border-pink-100/[0.12] bg-white/[0.025] px-3 py-2.5 text-pink-100/70 backdrop-blur-xl">
+              <Search className="h-4 w-4" />
+              <span className="text-xs">Your message contacts</span>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {loadingContacts && !messageContacts.length && <div className="flex items-center justify-center gap-2 py-10 text-sm text-pink-100/70"><Loader2 className="h-4 w-4 animate-spin" />Loading contacts…</div>}
               {messageContacts.map((person) => (
-                <button key={person.id} type="button" onClick={() => setSelectedInvitees((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : current.length < (groupCallId ? 9 : 8) ? [...current, person.id] : current)} className="flex w-full items-center gap-3 rounded-xl p-3 text-left hover:bg-white/5">
-                  <Avatar className="h-10 w-10"><AvatarImage src={person.avatarUrl || undefined} /><AvatarFallback>{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback></Avatar>
-                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{person.fullName || person.username}</span><span className="block truncate text-xs text-white/45">@{person.username}</span></span>
-                  <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${selectedInvitees.includes(person.id) ? 'border-pink-500 bg-pink-600 text-white' : 'border-white/30'}`}>{selectedInvitees.includes(person.id) && <Check className="h-3 w-3" />}</span>
+                <button key={person.id} type="button" onClick={() => setSelectedInvitees((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : current.length < (groupCallId ? 9 : 8) ? [...current, person.id] : current)} className="flex w-full items-center gap-3 rounded-xl border border-transparent p-3 text-left transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
+                  <Avatar className="h-10 w-10 border border-pink-100/[0.16]"><AvatarImage src={person.avatarUrl || '/images/default-avatar.svg'} /><AvatarFallback className="bg-transparent"><img src="/images/default-avatar.svg" alt="" className="h-full w-full object-cover" /></AvatarFallback></Avatar>
+                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-pink-50/95">{person.fullName || person.username}</span><span className="block truncate text-xs text-pink-100/55">@{person.username}</span></span>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${selectedInvitees.includes(person.id) ? 'border-pink-200 bg-pink-400/30 text-pink-50' : 'border-pink-100/30'}`}>{selectedInvitees.includes(person.id) && <Check className="h-3 w-3" />}</span>
                 </button>
               ))}
-              {!messageContacts.length && !loadingContacts && <p className="p-8 text-center text-sm text-white/50">No available message contacts found.</p>}
-              {inviteError && <p className="mx-2 mt-2 rounded-xl bg-red-500/10 p-3 text-xs text-red-200">{inviteError}</p>}
+              {!messageContacts.length && !loadingContacts && !inviteError && <p className="p-8 text-center text-sm text-pink-100/60">No available message contacts found.</p>}
+              {inviteError && <p className="mx-1 mt-2 rounded-xl border border-red-300/20 bg-red-400/[0.08] p-3 text-xs text-red-200">{inviteError}</p>}
             </div>
-            <div className="flex items-center justify-between border-t border-white/10 p-4">
-              <span className="text-xs text-white/55">{selectedInvitees.length} selected · {groupCallId ? 'up to 9 more' : 'up to 8 more'}</span>
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-pink-100/[0.12] pt-4">
+              <span className="text-xs text-pink-100/65">{selectedInvitees.length} selected · {groupCallId ? 'up to 9 more' : 'up to 8 more'}</span>
               <button type="button" disabled={!selectedInvitees.length || sendingInvites || !onAddPeopleToGroup} onClick={async () => {
                 if (!onAddPeopleToGroup) return
                 setSendingInvites(true); setInviteError(null)
                 try { await onAddPeopleToGroup(selectedInvitees); setAddPeopleOpen(false); setSelectedInvitees([]) }
                 catch (error) { setInviteError(error instanceof Error ? error.message : 'Could not add people') }
                 finally { setSendingInvites(false) }
-              }} className="rounded-full bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{sendingInvites ? 'Adding…' : 'Done'}</button>
+              }} className="rounded-xl border border-pink-200/[0.22] bg-pink-300/[0.10] px-5 py-3 text-sm font-semibold text-pink-50 shadow-[0_4px_18px_rgba(255,105,180,0.08)] backdrop-blur-xl transition-colors hover:bg-pink-300/[0.14] disabled:opacity-40">{sendingInvites ? 'Adding…' : 'Done'}</button>
             </div>
           </div>
         </div>
