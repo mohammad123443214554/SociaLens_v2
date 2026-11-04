@@ -123,7 +123,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
           remoteUser.audioTrack?.setVolume(heldRef.current ? 0 : speakerRef.current ? 100 : 55)
           remoteUser.audioTrack?.play()
         }
-        if (mountedRef.current) setExpanded(true)
+        if (mountedRef.current) setSpeakingUids((current) => new Set(current))
       } catch (error) {
         console.error('[Group Call] remote participant subscription failed', error)
       }
