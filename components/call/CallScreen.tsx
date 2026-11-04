@@ -681,7 +681,7 @@ export function CallScreen({
           {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
         </button>}
 
-        <button type="button" onClick={() => setIsSpeakerOn((current) => !current)} aria-label={(speakerMode ?? isSpeakerOn) ? 'Speaker on' : 'Speaker off'} aria-pressed={speakerMode ?? isSpeakerOn} title={isSpeakerOn ? 'Speaker on · louder audio' : 'Speaker off · normal audio'} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}>
+        <button type="button" onClick={() => onToggleSpeakerMode ? onToggleSpeakerMode() : setIsSpeakerOn((current) => !current)} aria-label={(speakerMode ?? isSpeakerOn) ? 'Speaker on' : 'Speaker off'} aria-pressed={speakerMode ?? isSpeakerOn} title={(speakerMode ?? isSpeakerOn) ? 'Speaker on · louder audio' : 'Speaker off · normal audio'} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${(speakerMode ?? isSpeakerOn) ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}>
           {(speakerMode ?? isSpeakerOn) ? <Volume2 className="h-6 w-6" /> : <Volume1 className="h-6 w-6" />}
         </button>
 
