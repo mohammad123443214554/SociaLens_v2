@@ -16,6 +16,7 @@ interface CallScreenProps {
   phase: CallPhase
   type: CallType
   peerName: string
+  peerId?: string | null
   peerAvatar: string
   onSendCallReaction: (reaction: CallReactionId) => Promise<void>
   groupCallId?: string | null
@@ -53,7 +54,7 @@ function formatDuration(sec: number) {
 }
 
 export function CallScreen({
-  userId, phase, type, peerName, peerAvatar, localStream, remoteStream, onSendCallReaction, incomingReaction,
+  userId, phase, type, peerName, peerId = null, peerAvatar, localStream, remoteStream, onSendCallReaction, incomingReaction,
   groupCallId = null, groupParticipants = [], onAddPeopleToGroup,
   isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume,
   onEnd, onToggleMute, onToggleCamera, onSwitchCamera, onToggleHold,
@@ -603,7 +604,11 @@ export function CallScreen({
                     const response = await fetch('/api/group-calls/contacts', { cache: 'no-store' })
                     const data = await response.json()
                     if (!response.ok) throw new Error(data.error || 'Could not load message contacts')
-                    setMessageContacts((data.contacts || []).filter((person: {id:string}) => !groupParticipants.some((member) => member.id === person.id && ['joined','invited','ringing'].includes(member.status))))
+                    setMessageContacts((data.contacts || []).filter((person: {id:string}) =>
+                      person.id !== userId &&
+                      person.id !== peerId &&
+                      !groupParticipants.some((member) => member.id === person.id && ['joined','invited','ringing'].includes(member.status))
+                    ))
                     setAddPeopleOpen(true)
                   } catch (error) {
                     setInviteError(error instanceof Error ? error.message : 'Could not load message contacts')
