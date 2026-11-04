@@ -476,18 +476,12 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       )}
 
       {activeCallId && (
-        <div className="fixed inset-0 z-[210] flex min-h-[100dvh] flex-col items-center justify-between overflow-y-auto bg-black px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-white">
-          <div className="flex w-full items-center justify-center gap-2 text-xs text-white/65">
-            <ShieldCheck className="h-4 w-4" />
-            <span>SociaLens secure call</span>
-            <span className="ml-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-[10px] font-semibold text-emerald-300">Group Call</span>
+        <div className="fixed inset-0 z-[210] flex min-h-[100dvh] flex-col overflow-hidden bg-[#101014] px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-white">
+          <div className="absolute left-5 top-[max(2rem,env(safe-area-inset-top))] z-20">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-pink-300">Group Call</p>
+            <p className="mt-1 text-sm text-white/60">{roster.filter(person => person.status === 'joined').length}/10 participants</p>
           </div>
-
-          <div className="flex w-full flex-1 flex-col items-start justify-start gap-5 py-5">
-            <div className="w-full">
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-pink-300">Group Call</p>
-              <p className="mt-1 text-sm text-white/60">{roster.filter(person => person.status === 'joined').length}/10 participants</p>
-            </div>
+          <div className="flex min-h-0 flex-1 flex-col items-start justify-start overflow-y-auto pt-16 pb-5">
             <div className="grid w-full max-w-6xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {roster.filter(person => person.status === 'joined').map((person) => {
                 const speaking = speakingUids.has(String(groupAgoraUid(person.id)))
@@ -514,20 +508,20 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
             </div>
           )}
 
-          <div className="relative mb-2 flex items-center justify-center gap-4">
+          <div className="relative z-30 mb-2 mt-auto flex w-full items-center justify-center gap-4 bg-gradient-to-t from-black/50 to-transparent pb-1 pt-6">
             <div className="relative">
-              <button type="button" aria-label="More group call options" aria-expanded={moreMenuOpen} onClick={() => setMoreMenuOpen(value => !value)} className={`flex h-14 w-14 items-center justify-center rounded-full border ${moreMenuOpen ? 'border-pink-400/40 bg-pink-500/15' : 'border-white/10 bg-white/10 hover:bg-white/15'}`}><MoreHorizontal /></button>
+              <button type="button" aria-label="More group call options" aria-expanded={moreMenuOpen} onClick={() => setMoreMenuOpen(value => !value)} className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center border transition-all ${moreMenuOpen ? 'border-pink-200/30 bg-pink-300/[0.12] text-pink-50 shadow-[0_0_18px_rgba(255,105,180,0.08)]' : 'border-white/10 bg-white/10 hover:bg-white/15'}`}><MoreHorizontal /></button>
               {moreMenuOpen && (
-                <div className="absolute bottom-16 left-1/2 z-[230] w-56 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#19191f] p-2 shadow-2xl">
+                <div className="absolute bottom-16 left-0 z-[230] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px]">
                   <button type="button" onClick={async () => { setMoreMenuOpen(false); try { await loadContacts(); setSelected([]); setPickerOpen(true) } catch (error) { onError(error instanceof Error ? error.message : 'Could not load contacts') } }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/10"><Plus className="h-4 w-4" />Invite people</button>
                   <button type="button" onClick={() => { setMoreMenuOpen(false); openReactionPicker() }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/10"><SmilePlus className="h-4 w-4" />Call reaction</button>
                 </div>
               )}
             </div>
-            <button type="button" aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} onClick={() => setMuted(value => !value)} className={`flex h-14 w-14 items-center justify-center rounded-full ${muted ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/20'}`}>{muted ? <MicOff /> : <Mic />}</button>
-            <button type="button" aria-label={speakerOn ? 'Turn speaker mode off' : 'Turn speaker mode on'} aria-pressed={speakerOn} onClick={() => setSpeakerOn(value => !value)} className={`flex h-14 w-14 items-center justify-center rounded-full ${speakerOn ? 'bg-pink-600 text-white' : 'bg-white/10 hover:bg-white/20'}`}><Volume2 /></button>
-            <button type="button" aria-label={held ? 'Resume group call' : 'Put group call on hold'} aria-pressed={held} onClick={toggleHold} className={`flex h-14 w-14 items-center justify-center rounded-full ${held ? 'bg-amber-400 text-black' : 'bg-white/10 hover:bg-white/20'}`}>{held ? <Play /> : <Pause />}</button>
-            <button type="button" aria-label="Leave group call" onClick={() => void leaveCall()} disabled={busy} className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 shadow-lg shadow-red-600/20 disabled:opacity-50"><PhoneOff /></button>
+            <button type="button" aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} onClick={() => setMuted(value => !value)} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${muted ? 'bg-white text-neutral-900' : 'bg-white/15 hover:bg-white/25'}`}>{muted ? <MicOff /> : <Mic />}</button>
+            <button type="button" aria-label={speakerOn ? 'Turn speaker mode off' : 'Turn speaker mode on'} aria-pressed={speakerOn} onClick={() => setSpeakerOn(value => !value)} className={`h-10 w-10 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors ${speakerOn ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 hover:bg-white/25'}`}><Volume2 /></button>
+            <button type="button" aria-label={held ? 'Resume group call' : 'Put group call on hold'} aria-pressed={held} onClick={toggleHold} className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-colors bg-white/15 hover:bg-white/25`}>{held ? <Play /> : <Pause />}</button>
+            <button type="button" aria-label="Leave group call" onClick={() => void leaveCall()} disabled={busy} className="h-11 w-11 sm:h-16 sm:w-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors disabled:opacity-50"><PhoneOff /></button>
           </div>
           <p className="mt-3 text-center text-[10px] text-white/35">Speaker mode adjusts playback level. Device output follows your audio settings.</p>
         </div>
