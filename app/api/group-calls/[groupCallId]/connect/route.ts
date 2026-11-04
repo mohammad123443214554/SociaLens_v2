@@ -9,7 +9,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 function buildUid(userId: string, attempt: unknown) {
   let hash = 0
   for (const ch of userId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
-  const base = (hash % 900_000_000) + 1
+  const base = (hash % 1_000_000_000) + 1
   const retry = Math.min(Math.max(Math.trunc(Number(attempt)) || 0, 0), 3)
   return base + retry * 1_000_000_000
 }
