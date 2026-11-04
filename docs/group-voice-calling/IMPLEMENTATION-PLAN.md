@@ -135,6 +135,18 @@ The creator is inserted as the first joined participant. The 10-person capacity 
 - Speaker mode changes the Agora playback level; actual physical output-device routing remains governed by the browser/OS because browser audio output routing is not consistently exposed across desktop, mobile and Capacitor WebViews.
 - Vercel production build passed on the Part 4 production deployment. Remaining verification: at least two authenticated devices speaking/listening simultaneously, hold/resume, mute, speaker level, participant join/leave, last-participant call end, reconnect, and mobile/Capacitor layout. No claim of complete real-device verification is made until those checks pass.
 
+## Convert an active one-to-one voice call into a group call
+
+- Removed the separate floating **Group call** launcher from the Messages/chat overlay.
+- Added **Add people to group call** to the active audio call's three-dot menu. The popup loads the existing Messages contacts, supports selecting multiple people, and uses **Done** to convert/invite.
+- Added a guarded conversion RPC/API. It accepts only an active Agora audio call, verifies the caller is one of the two call participants, enforces message-list relationships, bilateral blocks, call privacy, and the 10-person group cap.
+- The conversion reuses the existing one-to-one Agora room. Both original call participants are recorded as already joined; only newly selected contacts receive invitations. The existing one-to-one session is not ended or restarted.
+- Updated the one-to-one Agora receiver to retain separate remote audio tracks for multiple participants instead of replacing the previous participant's audio. A single group member leaving no longer removes every other remote audio track.
+- Original call participants can leave through the group-call participant RPC without marking the shared one-to-one calls row ended. Existing group invitees continue in the shared room.
+- The call screen displays **Group Call** and the current/pending participant avatars after conversion. The existing one-to-one call controls remain in place.
+- Conversion is intentionally limited to active Agora voice calls; Daily fallback calls and video calls are rejected with a clear message rather than being silently disconnected or incorrectly moved into an incompatible room.
+- Remaining verification: test with 3+ real accounts/devices, including original caller and callee, invite acceptance, simultaneous audio in both directions, participant leave, last participant leave, max capacity, blocked users, call privacy restrictions, and mobile/Capacitor behavior. Production build verification is required before acceptance.
+
 ## Part 5 — Targeted group-call reactions (implemented; multi-device verification pending)
 
 - Added the existing SociaLens call-reaction catalogue to the group-call screen without changing the one-to-one reaction flow.
