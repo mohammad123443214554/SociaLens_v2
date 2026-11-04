@@ -570,7 +570,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
             <div className="max-h-[50vh] overflow-y-auto">
               {contacts.filter(p => !roster.some(r => r.id === p.id && ['joined','invited','ringing'].includes(r.status))).map((person) => (
                 <button key={person.id} onClick={() => toggleContact(person.id)} className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-muted">
-                  <Avatar className="h-9 w-9"><AvatarImage src={person.avatarUrl || undefined} /><AvatarFallback>{person.username.slice(0,1).toUpperCase()}</AvatarFallback></Avatar><span className="flex-1 text-sm">{person.fullName || person.username}</span>{selected.includes(person.id) && <Check className="h-4 w-4 text-pink-600" />}
+                  <Avatar className="h-9 w-9"><AvatarImage src={person.avatarUrl || '/images/default-avatar.svg'} /><AvatarFallback className="bg-transparent"><img src="/images/default-avatar.svg" alt="" className="h-full w-full object-cover" /></AvatarFallback></Avatar><span className="flex-1 text-sm">{person.fullName || person.username}</span>{selected.includes(person.id) && <Check className="h-4 w-4 text-pink-600" />}
                 </button>
               ))}
             </div>
