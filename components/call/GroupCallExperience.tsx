@@ -495,6 +495,8 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
             status: person.status,
           }))}
           onAddPeopleToGroup={inviteMore}
+          speakerMode={speakerOn}
+          onToggleSpeakerMode={() => setSpeakerOn((value) => !value)}
           incomingReaction={null}
           localStream={null}
           remoteStream={null}
