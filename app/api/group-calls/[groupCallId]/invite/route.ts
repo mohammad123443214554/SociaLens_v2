@@ -42,9 +42,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         title: 'Incoming Group Voice Call',
         body: `${callerName} invited you to join a group voice call`,
         url: '/chat',
-        kind: 'call',
+        kind: 'generic',
         tag: `group-call-${groupCallId}`,
-        callId: groupCallId,
       })
     } catch (pushError) {
       console.error('[group-calls/invite] push delivery failed', inviteeId, pushError)
