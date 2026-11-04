@@ -9,6 +9,7 @@ import { usePushSubscription } from '@/lib/hooks/usePushSubscription'
 import { useNativePush } from '@/lib/hooks/useNativePush'
 import { IncomingCallModal } from './IncomingCallModal'
 import { CallScreen } from './CallScreen'
+import { GroupCallExperience } from './GroupCallExperience'
 import { PermissionGate } from './PermissionGate'
 import { isCallReactionId, type CallReactionId } from '@/lib/call-reactions'
 
@@ -191,6 +192,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   return (
     <CallContext.Provider value={value}>
       {children}
+
+      {user?.id && (
+        <GroupCallExperience
+          userId={user.id}
+          disabled={engine.phase !== 'idle'}
+          onError={reportBlocked}
+        />
+      )}
 
       {bannerError && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[300] max-w-[92vw] flex items-center gap-3 bg-red-600 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-2xl">
