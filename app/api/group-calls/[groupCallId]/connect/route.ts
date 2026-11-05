@@ -42,12 +42,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const { data: call, error: callError } = await supabase
     .from('group_calls')
-    .select('id,status,provider,room_name')
+    .select('id,status,type,provider,room_name')
     .eq('id', groupCallId)
     .maybeSingle()
 
   if (callError || !call) return NextResponse.json({ error: 'Group call not found' }, { status: 404 })
   if (call.status !== 'active') return NextResponse.json({ error: 'This group call is no longer active' }, { status: 409 })
+  if (call.type !== 'audio' && call.type !== 'video') return NextResponse.json({ error: 'Unsupported group call media type' }, { status: 409 })
 
   const appId = process.env.AGORA_APP_ID
   const appCertificate = process.env.AGORA_APP_CERTIFICATE
@@ -81,5 +82,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     token,
     uid,
     expiresAt,
+    type: call.type,
   }, { headers: { 'Cache-Control': 'no-store' } })
 }
