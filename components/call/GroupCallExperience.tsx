@@ -13,7 +13,7 @@ import { CALL_REACTION_ALL_IDS, CALL_REACTION_CATEGORIES, CALL_REACTION_CUSTOM_O
 import { pauseRingtone, resumeRingtone } from '@/lib/utils/ringtone'
 
 type Person = { id: string; username: string; fullName: string | null; avatarUrl: string | null }
-type Invitation = { groupCallId: string; invitedBy: string; participants: Person[] }
+type Invitation = { groupCallId: string; invitedBy: string; type: 'audio' | 'video'; participants: Person[] }
 type Contact = Person
 type RosterPerson = Person & { status: 'joined' | 'invited' | 'ringing' | 'left' | 'declined' | 'missed'; invitedBy: string | null; inviterAvatarUrl: string | null; isOnHold: boolean; holdInitiatedBy: string | null; isSpeaking?: boolean }
 type IncomingGroupReaction = { id: string; reaction: CallReactionId; senderName: string }
@@ -585,7 +585,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
         <IncomingCallModal
           callerName="Group Call"
           callerAvatar=""
-          type="audio"
+          type={incoming.type}
           isGroupCall
           groupParticipants={incoming.participants}
           ringtoneId={undefined}
