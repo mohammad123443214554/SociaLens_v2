@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AgoraRTC from 'agora-rtc-sdk-ng'
-import type { IAgoraRTCClient, ILocalAudioTrack, ILocalVideoTrack } from 'agora-rtc-sdk-ng'
+import type { IAgoraRTCClient, ICameraVideoTrack, ILocalAudioTrack } from 'agora-rtc-sdk-ng'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Phone, PhoneOff, Users, X, Plus, Check, Mic, MicOff, Volume2, Pause, Play, Signal, SmilePlus, Search, MoreHorizontal, ShieldCheck } from 'lucide-react'
@@ -81,7 +81,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   const speakerRef = useRef(false)
   const clientRef = useRef<IAgoraRTCClient | null>(null)
   const localTrackRef = useRef<ILocalAudioTrack | null>(null)
-  const localVideoTrackRef = useRef<ILocalVideoTrack | null>(null)
+  const localVideoTrackRef = useRef<ICameraVideoTrack | null>(null)
   const remoteUsersRef = useRef<Map<string | number, any>>(new Map())
   const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map())
   const mountedRef = useRef(true)
@@ -169,7 +169,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
     })
     localTrackRef.current = audioTrack
 
-    let videoTrack: ILocalVideoTrack | null = null
+    let videoTrack: ICameraVideoTrack | null = null
     if (requestedType === 'video') {
       try {
         videoTrack = await AgoraRTC.createCameraVideoTrack({ encoderConfig: '720p_1' })
