@@ -565,26 +565,38 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       return
     }
     let alive = true
-    const channel = supabase.channel(`group-call-reactions:${activeCallId}:${userId}`, {
-      config: { private: true, broadcast: { self: false, ack: false } },
-    })
-      .on('broadcast', { event: 'call-reaction' }, ({ payload }) => {
-        if (!alive || !payload || payload.callId !== activeCallId || payload.recipientId !== userId) return
-        if (payload.senderId === userId || typeof payload.id !== 'string' || !isCallReactionId(payload.reaction)) return
-        setIncomingGroupReaction({
-          id: payload.id,
-          reaction: payload.reaction,
-          senderName: typeof payload.senderName === 'string' ? payload.senderName : 'Participant',
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    const subscribeToRecipientReactions = async () => {
+      try {
+        // Private Realtime topics require the current user's JWT to be installed
+        // before joining; without it the server-side targeted broadcasts are dropped.
+        await supabase.realtime.setAuth()
+        if (!alive) return
+        channel = supabase.channel(`group-call-reactions:${activeCallId}:${userId}`, {
+          config: { private: true, broadcast: { self: false, ack: true } },
         })
-      })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('[Group Call] private reaction channel unavailable:', status)
-        }
-      })
+          .on('broadcast', { event: 'call-reaction' }, ({ payload }) => {
+            if (!alive || !payload || payload.callId !== activeCallId || payload.recipientId !== userId) return
+            if (payload.senderId === userId || typeof payload.id !== 'string' || !isCallReactionId(payload.reaction)) return
+            setIncomingGroupReaction({
+              id: payload.id,
+              reaction: payload.reaction,
+              senderName: typeof payload.senderName === 'string' ? payload.senderName : 'Participant',
+            })
+          })
+          .subscribe((status) => {
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              console.warn('[Group Call] private reaction channel unavailable:', status)
+            }
+          })
+      } catch (error) {
+        console.error('[Group Call] could not authenticate private reaction channel:', error)
+      }
+    }
+    void subscribeToRecipientReactions()
     return () => {
       alive = false
-      void supabase.removeChannel(channel)
+      if (channel) void supabase.removeChannel(channel)
     }
   }, [activeCallId, userId, supabase])
 
