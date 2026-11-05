@@ -27,6 +27,7 @@ interface CallScreenProps {
   incomingReaction: { id: string; reaction: CallReactionId } | null
   localStream: MediaStream | null
   remoteStream: MediaStream | null
+  groupRemoteStreams?: Array<{ uid: string; stream: MediaStream }>
   isMuted: boolean
   isCameraOff: boolean
   isOnHold: boolean
