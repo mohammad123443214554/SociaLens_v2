@@ -518,7 +518,7 @@ export function CallScreen({
               <p className="text-xs tabular-nums text-white/65 md:text-sm">{groupParticipants.filter((person) => person.status === 'joined').length + 1} connected · {statusText}</p>
             </div>
           )}
-          <div className={`mx-auto grid w-full max-w-[1600px] grid-flow-row content-start items-start gap-2 pb-3 sm:gap-3 md:gap-4 ${groupParticipants.filter((person) => person.status === 'joined').length + 1 <= 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          <div className="mx-auto grid w-full max-w-[1600px] grid-cols-3 grid-flow-row content-start items-start gap-2 pb-3 sm:gap-3 md:gap-4">
             <GroupVideoTile name="You" stream={localStream} isLocal cameraOff={isCameraOff} held={isOnHold} />
             {groupParticipants.filter((person) => person.status === 'joined' && person.id !== userId).map((person) => {
               const remote = groupRemoteStreams.find((item) => item.uid === groupVideoUid(person.id))
