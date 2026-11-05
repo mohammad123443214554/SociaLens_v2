@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, Sparkles, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock, MoreHorizontal, SmilePlus, Users, Search, Check, Loader2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { createClient } from '@/lib/supabase/client'
 import { startRingtone, stopRingtone, pauseRingtone, resumeRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
 import { CALL_EFFECT_CATEGORIES, PART_TWO_FACE_PRESETS, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS } from '@/lib/call-effects'
@@ -116,6 +117,7 @@ export function CallScreen({
   backgroundBlurEnabled, backgroundBlurIntensity, onSetBackgroundBlur,
   selectedCallEffectId, callEffectIntensity, onSetCallEffect,
 }: CallScreenProps) {
+  const [supabase] = useState(() => createClient())
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
@@ -257,6 +259,55 @@ export function CallScreen({
     })
   }
 
+
+  // Both group-call implementations render this shared CallScreen. Subscribe
+  // here so group voice and group video receive the exact same targeted events.
+  useEffect(() => {
+    if (!groupCallId || phase !== 'in-call' || !userId) return
+    let alive = true
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    const subscribeToGroupReactions = async () => {
+      try {
+        await supabase.realtime.setAuth()
+        if (!alive) return
+
+        const topic = `group-call-reactions:${groupCallId}:${userId}`
+        channel = supabase.channel(topic, {
+          config: { private: true, broadcast: { self: false, ack: true } },
+        })
+          .on('broadcast', { event: 'call-reaction' }, ({ payload }) => {
+            if (!alive || !payload) return
+            if (payload.callId !== groupCallId || payload.recipientId !== userId) return
+            if (payload.senderId === userId || typeof payload.id !== 'string') return
+            if (!isCallReactionId(payload.reaction)) return
+
+            console.info('[CallScreen] targeted group reaction received', {
+              callId: groupCallId,
+              senderId: payload.senderId,
+              recipientId: payload.recipientId,
+              eventId: payload.id,
+            })
+            playCallReactionLocally(payload.reaction)
+          })
+          .subscribe((status, error) => {
+            if (status === 'SUBSCRIBED') {
+              console.info('[CallScreen] group reaction channel subscribed', topic)
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+              console.error('[CallScreen] group reaction channel subscription failed', topic, status, error)
+            }
+          })
+      } catch (error) {
+        console.error('[CallScreen] group reaction channel setup failed', error)
+      }
+    }
+
+    void subscribeToGroupReactions()
+    return () => {
+      alive = false
+      if (channel) void supabase.removeChannel(channel)
+    }
+  }, [groupCallId, phase, userId, supabase])
   const triggerCallReaction = (reaction: CallReactionId) => {
     if (groupCallId && phase === 'in-call') {
       if (!joinedGroupReactionRecipients.length) return
