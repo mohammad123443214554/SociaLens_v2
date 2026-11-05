@@ -447,6 +447,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           incomingReaction={incomingReaction?.callId === engine.call.id ? incomingReaction : null}
           localStream={engine.localStream}
           remoteStream={engine.remoteStream}
+          groupRemoteStreams={engine.groupRemoteStreams}
           isMuted={engine.isMuted}
           isCameraOff={engine.isCameraOff}
           isOnHold={engine.isOnHold}
