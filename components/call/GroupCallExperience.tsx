@@ -736,6 +736,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
           incomingReaction={null}
           localStream={localMediaStream}
           remoteStream={remoteMediaStreams.length ? new MediaStream(remoteMediaStreams.flatMap((item) => item.stream.getTracks())) : null}
+          groupRemoteStreams={remoteMediaStreams}
           isMuted={muted}
           isCameraOff={cameraOff || !localVideoTrackRef.current}
           isOnHold={held}
