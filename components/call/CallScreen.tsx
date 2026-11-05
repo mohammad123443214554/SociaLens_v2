@@ -505,7 +505,7 @@ export function CallScreen({
       {isVideoCall && groupCallId && (
         <div className={`absolute inset-0 overflow-y-auto overscroll-contain bg-neutral-950 px-2 pb-32 pt-20 sm:px-4 md:px-6 md:pb-36 md:pt-24 ${isMini ? 'pt-12 pb-3' : ''}`}>
           {!isMini && (
-            <div className="mx-auto mb-3 flex w-full max-w-6xl flex-col items-center gap-1.5 text-center md:mb-5">
+            <div className="mx-auto mb-3 flex w-full max-w-[1600px] flex-col items-center gap-1.5 text-center md:mb-5">
               <h2 className="text-base font-bold leading-tight text-white drop-shadow-lg md:text-xl">Group Call</h2>
               <div className="flex items-center justify-center -space-x-2">
                 {groupParticipants.filter((person) => person.status === 'joined').slice(0, 10).map((person) => (
@@ -518,7 +518,7 @@ export function CallScreen({
               <p className="text-xs tabular-nums text-white/65 md:text-sm">{groupParticipants.filter((person) => person.status === 'joined').length + 1} connected · {statusText}</p>
             </div>
           )}
-          <div className={`mx-auto grid w-full max-w-6xl grid-flow-row content-start items-start gap-2 pb-3 sm:gap-3 md:gap-4 ${groupParticipants.filter((person) => person.status === 'joined').length + 1 <= 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          <div className={`mx-auto grid w-full max-w-[1600px] grid-flow-row content-start items-start gap-2 pb-3 sm:gap-3 md:gap-4 ${groupParticipants.filter((person) => person.status === 'joined').length + 1 <= 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
             <GroupVideoTile name="You" stream={localStream} isLocal cameraOff={isCameraOff} held={isOnHold} />
             {groupParticipants.filter((person) => person.status === 'joined' && person.id !== userId).map((person) => {
               const remote = groupRemoteStreams.find((item) => item.uid === groupVideoUid(person.id))
