@@ -1425,14 +1425,30 @@ export function useCallEngine(currentUserId?: string) {
   // Hold suspends this participant's outgoing media without leaving the
   // RTC room. The remote peer and call session stay connected; Resume
   // restores only the devices that were not already muted/disabled.
-  const toggleHold = useCallback(() => {
+  const toggleHold = useCallback(async () => {
     const next = !isOnHold
     setIsOnHold(next)
     if (next && backgroundBlurEnabled) {
       void setBackgroundBlur(false, backgroundBlurIntensity).catch((blurError) => console.warn('[Call] could not disable background blur on hold', blurError))
     }
     const activeCall = callRef.current
-    if (activeCall) void updateCallStatus(activeCall.id, { is_on_hold: next, hold_initiated_by: currentUserId })
+    if (activeCall) {
+      void updateCallStatus(activeCall.id, { is_on_hold: next, hold_initiated_by: currentUserId })
+      // A 1-to-1 call can be promoted into a group call without replacing its
+      // original CallScreen. Mirror hold changes into the group participant
+      // row so every other member receives the same hold/resume announcement.
+      if (activeCall.group_call_id) {
+        const { error } = await supabase.rpc('set_group_voice_call_hold', {
+          p_group_call_id: activeCall.group_call_id,
+          p_is_on_hold: next,
+        })
+        if (error) {
+          console.error('[Call] could not sync hold state to group call:', error)
+          setIsOnHold(!next)
+          return
+        }
+      }
+    }
     const audioEnabled = !next && !isMuted
     const videoEnabled = !next && !isCameraOff
     if (agoraRef.current?.audioTrack) void agoraRef.current.audioTrack.setEnabled(audioEnabled)
@@ -1449,7 +1465,7 @@ export function useCallEngine(currentUserId?: string) {
       void dailyRef.current.setLocalAudio(audioEnabled)
       void dailyRef.current.setLocalVideo(videoEnabled)
     }
-  }, [isOnHold, isMuted, isCameraOff, currentUserId, updateCallStatus, backgroundBlurEnabled, backgroundBlurIntensity, setBackgroundBlur])
+  }, [isOnHold, isMuted, isCameraOff, currentUserId, updateCallStatus, backgroundBlurEnabled, backgroundBlurIntensity, setBackgroundBlur, supabase])
 
   const switchCamera = useCallback(async () => {
     if (!canSwitchCamera || isCameraOff || isOnHold) return
