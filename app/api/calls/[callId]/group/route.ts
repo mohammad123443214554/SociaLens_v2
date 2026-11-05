@@ -29,12 +29,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .eq('id', callId).maybeSingle()
   if (callError || !call) return NextResponse.json({ error: 'Call not found' }, { status: 404 })
   if (user.id !== call.caller_id && user.id !== call.callee_id) return NextResponse.json({ error: 'You are not part of this call' }, { status: 403 })
-  if (call.type !== 'audio' || call.status !== 'accepted') return NextResponse.json({ error: 'Only an active voice call can become a group call' }, { status: 409 })
+  if (!['audio', 'video'].includes(call.type) || call.status !== 'accepted') return NextResponse.json({ error: 'Only an active audio or video call can become a group call' }, { status: 409 })
   if (call.group_call_id) return NextResponse.json({ error: 'This call is already a group call' }, { status: 409 })
   const requestedRoomName = `socialens-call-${call.id}`
   const clientConfirmsAgora = body.provider === 'agora' && body.roomName === requestedRoomName
   if (call.provider !== 'agora' && !(call.provider == null && clientConfirmsAgora)) {
-    return NextResponse.json({ error: 'This call is using a provider that cannot be expanded without interrupting the conversation. Please try again on an Agora voice call.' }, { status: 409 })
+    return NextResponse.json({ error: 'This call is using a provider that cannot be expanded without interrupting the conversation. Please try again on an active Agora call.' }, { status: 409 })
   }
   if (call.provider == null || !call.room_name) {
     // Use a narrowly scoped SECURITY DEFINER RPC tied to auth.uid().
@@ -81,8 +81,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   await Promise.all(userIds.map(async (inviteeId) => {
     try {
       await sendPushToUser(inviteeId, {
-        title: 'Incoming Group Voice Call',
-        body: `${callerName} added you to an ongoing group voice call`,
+        title: call.type === 'video' ? 'Incoming Group Video Call' : 'Incoming Group Voice Call',
+        body: `${callerName} added you to an ongoing group ${call.type === 'video' ? 'video' : 'voice'} call`,
         url: '/chat',
         kind: 'generic',
         tag: `group-call-${groupCallId}`,
