@@ -22,7 +22,7 @@ export async function GET() {
 
   const callIds = [...new Set(invitations.map((item) => item.group_call_id))]
   const [{ data: calls, error: callsError }, { data: joined, error: joinedError }] = await Promise.all([
-    supabase.from('group_calls').select('id,status,created_at').in('id', callIds).eq('status', 'active'),
+    supabase.from('group_calls').select('id,status,type,created_at').in('id', callIds).eq('status', 'active'),
     supabase.from('group_call_participants')
       .select('group_call_id,user_id,status')
       .in('group_call_id', callIds)
@@ -49,6 +49,7 @@ export async function GET() {
   const invitationsWithDetails = filteredInvites.map((invite) => ({
     groupCallId: invite.group_call_id,
     invitedBy: invite.invited_by,
+    type: callMap.get(invite.group_call_id)?.type === 'video' ? 'video' : 'audio',
     createdAt: callMap.get(invite.group_call_id)?.created_at,
     participants: (joined || [])
       .filter((item) => item.group_call_id === invite.group_call_id)
