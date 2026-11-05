@@ -863,13 +863,13 @@ export function CallScreen({
       {/* Video and PiP are rendered together inside the responsive portrait stage above. */}
 
       {/* Controls */}
-      <div className={`relative z-10 ${isMini ? "flex flex-wrap items-center justify-center gap-1 px-1 pb-2 pt-1" : "mx-auto mt-auto flex w-full max-w-[360px] flex-nowrap items-center justify-center gap-2 px-2 pb-12 pt-6 [&>*]:shrink-0 md:mx-0 md:w-auto md:max-w-none md:gap-4 md:px-4"} bg-gradient-to-t from-black/50 to-transparent`}>
+      <div className={`relative z-[230] ${isMini ? "flex flex-wrap items-center justify-center gap-1 px-1 pb-2 pt-1" : "mx-auto mt-auto flex w-full max-w-[360px] flex-nowrap items-center justify-center gap-2 px-2 pb-12 pt-6 [&>*]:shrink-0 md:mx-0 md:w-auto md:max-w-none md:gap-4 md:px-4"} bg-gradient-to-t from-black/50 to-transparent`}>
         <div className="relative">
           <button type="button" onClick={() => { setMoreMenuOpen((open) => !open); setEffectsMenuOpen(false) }} aria-label="More call controls" aria-expanded={moreMenuOpen} title="More options" className={`h-11 w-11 sm:h-14 sm:w-14 rounded-full flex items-center justify-center border transition-all ${moreMenuOpen ? 'border-pink-200/30 bg-pink-300/[0.12] text-pink-50 shadow-[0_0_18px_rgba(255,105,180,0.08)]' : 'border-white/10 bg-white/10 hover:bg-white/15'}`}>
             <MoreHorizontal className="h-6 w-6" />
           </button>
           {moreMenuOpen && (
-            <div className="absolute bottom-[calc(100%+0.75rem)] left-0 z-[110] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-[calc(100%+1rem)]">
+            <div className="absolute bottom-[calc(100%+0.75rem)] left-0 z-[240] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-[calc(100%+1rem)]">
               <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Call controls</p>
               <button type="button" onClick={onToggleMute} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                 {isMuted ? <MicOff className="h-4 w-4 text-pink-200" /> : <Mic className="h-4 w-4" />}
@@ -908,7 +908,7 @@ export function CallScreen({
             </div>
           )}
           {isVideoCall && effectsMenuOpen && (
-            <div className="absolute bottom-[calc(100%+0.75rem)] left-0 z-[110] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-[calc(100%+1rem)]">
+            <div className="absolute bottom-[calc(100%+0.75rem)] left-0 z-[240] w-[min(250px,calc(100vw-28px))] rounded-2xl border border-pink-100/[0.18] bg-white/[0.035] p-2 text-pink-50/95 shadow-[0_18px_55px_rgba(255,105,180,0.055)] backdrop-blur-[32px] supports-[backdrop-filter]:bg-white/[0.035] md:bottom-[calc(100%+1rem)]">
               <div className="flex items-center justify-between px-3 pb-2 pt-1">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-pink-100/55">Effects</p>
                 <button type="button" onClick={() => setEffectsMenuOpen(false)} className="rounded-full px-2 py-1 text-xs text-pink-50/65 hover:bg-pink-300/[0.08]" aria-label="Close effects menu">✕</button>
