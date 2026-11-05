@@ -88,9 +88,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [incomingReaction, setIncomingReaction] = useState<{ id: string; reaction: CallReactionId; callId: string } | null>(null)
   const [activeGroupCallId, setActiveGroupCallId] = useState<string | null>(null)
   const [groupParticipants, setGroupParticipants] = useState<GroupCallMember[]>([])
-  const groupRosterSnapshotRef = useRef<Map<string, { status: string; isOnHold: boolean }>>(new Map())
   const groupAnnouncementQueueRef = useRef<Promise<void>>(Promise.resolve())
-  const groupAnnouncementKeysRef = useRef<Set<string>>(new Set())
   const hangupRef = useRef(engine.hangup)
   hangupRef.current = engine.hangup
 
@@ -279,96 +277,86 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     return () => { alive = false; window.clearInterval(timer) }
   }, [engine.call?.id, engine.phase, engine.setGroupCallId, supabase])
 
-  // The two people who started the original 1-to-1 call keep this CallScreen
-  // after a third person is invited. GroupCallExperience is intentionally
-  // disabled for them, so it cannot be the only listener for participant
-  // hold/resume/leave announcements. Watch the group roster here as well.
+  // The original 1-to-1 participants keep their CallScreen after the call is
+  // promoted. Consume the same durable event stream as invited participants;
+  // GroupCallExperience is intentionally disabled while this engine call lives.
   useEffect(() => {
     const groupId = activeGroupCallId
-    if (!groupId || !user?.id || engine.phase !== 'in-call') {
-      groupRosterSnapshotRef.current.clear()
-      groupAnnouncementKeysRef.current.clear()
-      return
-    }
+    if (!groupId || !user?.id || engine.phase !== 'in-call') return
 
     let alive = true
-    let refreshing = false
-    let refreshAgain = false
-    const refreshRosterEvents = async () => {
-      if (refreshing) {
-        refreshAgain = true
+    let polling = false
+    let pollAgain = false
+    let lastEventId = 0
+    const startedAt = new Date().toISOString()
+    const seen = new Set<number>()
+
+    const pollEvents = async () => {
+      if (polling) {
+        pollAgain = true
         return
       }
-      refreshing = true
+      polling = true
       try {
         do {
-          refreshAgain = false
+          pollAgain = false
           const { data, error } = await supabase
-            .from('group_call_participants')
-            .select('user_id,status,is_on_hold,hold_initiated_by')
+            .from('group_call_events')
+            .select('id,actor_user_id,event_type,created_at')
             .eq('group_call_id', groupId)
-          if (!alive || error || !data) {
-            if (error) console.warn('[SociaLens Group Call] event roster refresh failed:', error)
+            .gt('id', lastEventId)
+            .gte('created_at', startedAt)
+            .order('id', { ascending: true })
+            .limit(100)
+          if (!alive) return
+          if (error) {
+            console.warn('[SociaLens Group Call] durable event poll failed:', error)
             continue
           }
-
-          const previous = groupRosterSnapshotRef.current
-          const next = new Map<string, { status: string; isOnHold: boolean }>()
-          for (const row of data) {
-            const status = String(row.status)
-            const isOnHold = Boolean(row.is_on_hold)
-            next.set(row.user_id, { status, isOnHold })
-            if (row.user_id === user.id) continue
-
-            const before = previous.get(row.user_id)
-            if (!before) continue // Establish a baseline; do not announce old events on mount.
-
-            let fileName: string | null = null
-            if (before.status === 'joined' && status === 'left') {
-              fileName = 'group-call-leave.mp3'
-            } else if (before.status === 'joined' && status === 'joined' && before.isOnHold !== isOnHold) {
-              fileName = isOnHold ? 'call-on-hold.mp3' : 'call-resumed.mp3'
-            }
-
+          for (const event of data || []) {
+            const eventId = Number(event.id)
+            if (!Number.isFinite(eventId) || seen.has(eventId)) continue
+            seen.add(eventId)
+            lastEventId = Math.max(lastEventId, eventId)
+            if (event.actor_user_id === user.id) continue
+            const fileName = event.event_type === 'hold'
+              ? 'call-on-hold.mp3'
+              : event.event_type === 'resumed'
+                ? 'call-resumed.mp3'
+                : event.event_type === 'left'
+                  ? 'group-call-leave.mp3'
+                  : null
             if (fileName) {
-              const transitionKey = groupId + ':' + row.user_id + ':' + before.status + ':' + status + ':' + before.isOnHold + ':' + isOnHold
-              if (!groupAnnouncementKeysRef.current.has(transitionKey)) {
-                groupAnnouncementKeysRef.current.add(transitionKey)
-                groupAnnouncementQueueRef.current = groupAnnouncementQueueRef.current
-                  .then(() => playGroupParticipantAnnouncement(fileName!))
-                  .catch((playbackError) => console.warn('[SociaLens Group Call] announcement queue failed:', playbackError))
-              }
+              groupAnnouncementQueueRef.current = groupAnnouncementQueueRef.current
+                .then(() => playGroupParticipantAnnouncement(fileName))
+                .catch((playbackError) => console.warn('[SociaLens Group Call] announcement queue failed:', playbackError))
             }
           }
-          groupRosterSnapshotRef.current = next
-        } while (alive && refreshAgain)
+        } while (alive && pollAgain)
       } finally {
-        refreshing = false
+        polling = false
       }
     }
 
-    void refreshRosterEvents()
-    const channel = supabase.channel('group-call-events:' + groupId + ':' + user.id)
+    void pollEvents()
+    const channel = supabase.channel('group-call-events-audio:' + groupId + ':' + user.id)
       .on('postgres_changes', {
-        event: '*',
+        event: 'INSERT',
         schema: 'public',
-        table: 'group_call_participants',
+        table: 'group_call_events',
         filter: 'group_call_id=eq.' + groupId,
-      }, () => {
-        void refreshRosterEvents()
-      })
+      }, () => void pollEvents())
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('[SociaLens Group Call] roster event subscription unavailable:', status)
+          console.warn('[SociaLens Group Call] event audio subscription unavailable:', status)
         }
       })
-    const recovery = window.setInterval(() => void refreshRosterEvents(), 700)
+    const recovery = window.setInterval(() => void pollEvents(), 700)
 
     return () => {
       alive = false
       window.clearInterval(recovery)
       void supabase.removeChannel(channel)
-      groupRosterSnapshotRef.current.clear()
     }
   }, [activeGroupCallId, engine.phase, user?.id, supabase])
 
