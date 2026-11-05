@@ -79,10 +79,6 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   const remoteUsersRef = useRef<Map<string | number, any>>(new Map())
   const mountedRef = useRef(true)
   const activeCallIdRef = useRef<string | null>(null)
-  const rosterStatusRef = useRef<Map<string, { status: RosterPerson['status']; isOnHold: boolean }>>(new Map())
-  const announcedDeparturesRef = useRef<Set<string>>(new Set())
-  const announcedHoldChangesRef = useRef<Set<string>>(new Set())
-  const knownJoinedParticipantsRef = useRef<Set<string>>(new Set())
   const announcementQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   const loadIncoming = useCallback(async () => {
@@ -127,33 +123,6 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       } as RosterPerson
     })
 
-    // Remember everyone seen joined so overlapping realtime/poll refreshes
-    // cannot erase the transition before the leave announcement is handled.
-    for (const person of nextRoster) {
-      if (person.status === 'joined') knownJoinedParticipantsRef.current.add(person.id)
-      if (person.status === 'left' && person.id !== userId && knownJoinedParticipantsRef.current.has(person.id)) {
-        const departureKey = groupCallId + ':' + person.id
-        if (!announcedDeparturesRef.current.has(departureKey)) {
-          announcedDeparturesRef.current.add(departureKey)
-          knownJoinedParticipantsRef.current.delete(person.id)
-          announcementQueueRef.current = announcementQueueRef.current
-            .then(() => playGroupCallAnnouncement('group-call-leave.mp3'))
-            .catch((playbackError) => console.warn('[Group Call] departure announcement queue failed', playbackError))
-        }
-      }
-      const previous = rosterStatusRef.current.get(person.id)
-      if (person.id !== userId && person.status === 'joined' && previous?.status === 'joined' && previous.isOnHold !== person.isOnHold) {
-        const holdKey = groupCallId + ':' + person.id + ':' + (person.isOnHold ? 'hold' : 'resume')
-        if (!announcedHoldChangesRef.current.has(holdKey)) {
-          announcedHoldChangesRef.current.add(holdKey)
-          const fileName = person.isOnHold ? 'call-on-hold.mp3' : 'call-resumed.mp3'
-          announcementQueueRef.current = announcementQueueRef.current
-            .then(() => playGroupCallAnnouncement(fileName))
-            .catch((playbackError) => console.warn('[Group Call] hold announcement queue failed', playbackError))
-        }
-      }
-    }
-    rosterStatusRef.current = new Map(nextRoster.map((person) => [person.id, { status: person.status, isOnHold: person.isOnHold }]))
     setRoster(nextRoster)
   }, [supabase])
 
@@ -351,6 +320,86 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
     const timer = window.setInterval(update, 1000)
     return () => window.clearInterval(timer)
   }, [activeCallId, callStartedAt])
+
+  // Consume durable group-call events rather than inferring voice cues from
+  // roster snapshots. This avoids missed transitions when realtime refreshes
+  // race or a participant leaves between two polling snapshots.
+  useEffect(() => {
+    if (!activeCallId) return
+    let alive = true
+    let polling = false
+    let pollAgain = false
+    let lastEventId = 0
+    const startedAt = new Date().toISOString()
+    const seen = new Set<number>()
+
+    const pollEvents = async () => {
+      if (polling) {
+        pollAgain = true
+        return
+      }
+      polling = true
+      try {
+        do {
+          pollAgain = false
+          const { data, error } = await supabase
+            .from('group_call_events')
+            .select('id,actor_user_id,event_type,created_at')
+            .eq('group_call_id', activeCallId)
+            .gt('id', lastEventId)
+            .gte('created_at', startedAt)
+            .order('id', { ascending: true })
+            .limit(100)
+          if (!alive) return
+          if (error) {
+            console.warn('[Group Call] durable event poll failed:', error)
+            continue
+          }
+          for (const event of data || []) {
+            const eventId = Number(event.id)
+            if (!Number.isFinite(eventId) || seen.has(eventId)) continue
+            seen.add(eventId)
+            lastEventId = Math.max(lastEventId, eventId)
+            if (event.actor_user_id === userId) continue
+            const fileName = event.event_type === 'hold'
+              ? 'call-on-hold.mp3'
+              : event.event_type === 'resumed'
+                ? 'call-resumed.mp3'
+                : event.event_type === 'left'
+                  ? 'group-call-leave.mp3'
+                  : null
+            if (fileName) {
+              announcementQueueRef.current = announcementQueueRef.current
+                .then(() => playGroupCallAnnouncement(fileName))
+                .catch((playbackError) => console.warn('[Group Call] event announcement queue failed', playbackError))
+            }
+          }
+        } while (alive && pollAgain)
+      } finally {
+        polling = false
+      }
+    }
+
+    void pollEvents()
+    const channel = supabase.channel('group-call-events-audio:' + activeCallId + ':' + userId)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'group_call_events',
+        filter: 'group_call_id=eq.' + activeCallId,
+      }, () => void pollEvents())
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[Group Call] event audio subscription unavailable:', status)
+        }
+      })
+    const recovery = window.setInterval(() => void pollEvents(), 700)
+    return () => {
+      alive = false
+      window.clearInterval(recovery)
+      void supabase.removeChannel(channel)
+    }
+  }, [activeCallId, userId, supabase])
 
   useEffect(() => {
     if (!activeCallId) return
