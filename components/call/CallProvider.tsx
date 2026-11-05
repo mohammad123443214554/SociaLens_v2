@@ -288,7 +288,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     let polling = false
     let pollAgain = false
     let lastEventId = 0
-    const startedAt = new Date().toISOString()
+    let joinedAt = new Date().toISOString()
     const seen = new Set<number>()
 
     const pollEvents = async () => {
@@ -305,7 +305,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             .select('id,actor_user_id,event_type,created_at')
             .eq('group_call_id', groupId)
             .gt('id', lastEventId)
-            .gte('created_at', startedAt)
+            .gte('created_at', joinedAt)
             .order('id', { ascending: true })
             .limit(100)
           if (!alive) return
@@ -338,25 +338,41 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    void pollEvents()
-    const channel = supabase.channel('group-call-events-audio:' + groupId + ':' + user.id)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'group_call_events',
-        filter: 'group_call_id=eq.' + groupId,
-      }, () => void pollEvents())
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('[SociaLens Group Call] event audio subscription unavailable:', status)
-        }
-      })
-    const recovery = window.setInterval(() => void pollEvents(), 700)
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    let recovery: ReturnType<typeof window.setInterval> | null = null
+    const startEventListener = async () => {
+      // Use the database's joined_at as the lower bound. This avoids replaying
+      // events from before this member joined and avoids device-clock skew.
+      const { data: membership, error: membershipError } = await supabase
+        .from('group_call_participants')
+        .select('joined_at')
+        .eq('group_call_id', groupId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (!alive) return
+      if (!membershipError && membership?.joined_at) joinedAt = membership.joined_at
+
+      channel = supabase.channel('group-call-events-audio:' + groupId + ':' + user.id)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'group_call_events',
+          filter: 'group_call_id=eq.' + groupId,
+        }, () => void pollEvents())
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn('[SociaLens Group Call] event audio subscription unavailable:', status)
+          }
+        })
+      await pollEvents()
+      if (alive) recovery = window.setInterval(() => void pollEvents(), 700)
+    }
+    void startEventListener()
 
     return () => {
       alive = false
-      window.clearInterval(recovery)
-      void supabase.removeChannel(channel)
+      if (recovery !== null) window.clearInterval(recovery)
+      if (channel) void supabase.removeChannel(channel)
     }
   }, [activeGroupCallId, engine.phase, user?.id, supabase])
 
