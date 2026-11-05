@@ -12,6 +12,9 @@ create table if not exists public.group_call_events (
 create index if not exists group_call_events_group_call_id_id_idx
   on public.group_call_events (group_call_id, id);
 
+create index if not exists group_call_events_actor_user_id_idx
+  on public.group_call_events (actor_user_id);
+
 alter table public.group_call_events enable row level security;
 revoke all on public.group_call_events from public, anon;
 grant select on public.group_call_events to authenticated;
