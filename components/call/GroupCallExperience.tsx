@@ -158,58 +158,17 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
     const connection = await response.json()
     if (!response.ok) throw new Error(connection.error || 'Could not prepare group call media')
     if (connection.type !== requestedType) throw new Error('The invitation media type does not match this group call. Please reopen the invitation.')
-    const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' })
-    clientRef.current = client
-    client.on('user-published', async (remoteUser, mediaType) => {
-      try {
-        await client.subscribe(remoteUser, mediaType)
-        remoteUsersRef.current.set(remoteUser.uid, remoteUser)
-        const key = String(remoteUser.uid)
-        const stream = remoteStreamsRef.current.get(key) || new MediaStream()
-        if (mediaType === 'audio' && remoteUser.audioTrack) {
-          const mediaTrack = remoteUser.audioTrack.getMediaStreamTrack()
-          if (!stream.getTracks().includes(mediaTrack)) stream.addTrack(mediaTrack)
-          remoteUser.audioTrack.setVolume(heldRef.current ? 0 : speakerRef.current ? 100 : 55)
-          remoteUser.audioTrack.play()
-        }
-        if (mediaType === 'video' && remoteUser.videoTrack) {
-          const mediaTrack = remoteUser.videoTrack.getMediaStreamTrack()
-          stream.getVideoTracks().forEach((track) => { stream.removeTrack(track) })
-          stream.addTrack(mediaTrack)
-          remoteUser.videoTrack.play()
-        }
-        remoteStreamsRef.current.set(key, stream)
-        if (mountedRef.current) setRemoteMediaStreams(Array.from(remoteStreamsRef.current, ([uid, media]) => ({ uid, stream: new MediaStream(media.getTracks()) })))
-      } catch (error) {
-        console.error('[Group Call] remote participant subscription failed', error)
-      }
+
+    // Acquire permission-backed media BEFORE joining Agora. If the browser
+    // blocks the microphone, no ghost participant is left in the room.
+    const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+      encoderConfig: 'high_quality',
+      AEC: true,
+      ANS: true,
+      AGC: true,
     })
-    client.on('user-unpublished', (remoteUser) => {
-      if (remoteUser.audioTrack) remoteUser.audioTrack.stop()
-      if (remoteUser.videoTrack) remoteUser.videoTrack.stop()
-      const key = String(remoteUser.uid)
-      const stream = remoteStreamsRef.current.get(key)
-      if (stream) {
-        if (mediaType === 'audio') stream.getAudioTracks().forEach((track) => stream.removeTrack(track))
-        if (mediaType === 'video') stream.getVideoTracks().forEach((track) => stream.removeTrack(track))
-        if (!stream.getTracks().length) remoteStreamsRef.current.delete(key)
-        if (mountedRef.current) setRemoteMediaStreams(Array.from(remoteStreamsRef.current, ([uid, media]) => ({ uid, stream: new MediaStream(media.getTracks()) })))
-      }
-    })
-    client.on('user-left', (remoteUser) => {
-      remoteUsersRef.current.delete(remoteUser.uid)
-      remoteStreamsRef.current.delete(String(remoteUser.uid))
-      setRemoteMediaStreams(Array.from(remoteStreamsRef.current, ([uid, media]) => ({ uid, stream: new MediaStream(media.getTracks()) })))
-      setSpeakingUids((current) => { const next = new Set(current); next.delete(String(remoteUser.uid)); return next })
-    })
-    client.on('volume-indicator', (volumes: Array<{ uid: string | number; level: number }>) => {
-      const active = new Set(volumes.filter((item) => item.level >= 8).map((item) => String(item.uid)))
-      if (mountedRef.current) setSpeakingUids(active)
-    })
-    await client.join(connection.appId, connection.channel, connection.token, connection.uid)
-    client.enableAudioVolumeIndicator()
-    const track = await AgoraRTC.createMicrophoneAudioTrack({ encoderConfig: 'high_quality', AEC: true, ANS: true, AGC: true })
-    localTrackRef.current = track
+    localTrackRef.current = audioTrack
+
     let videoTrack: ILocalVideoTrack | null = null
     if (requestedType === 'video') {
       try {
@@ -217,13 +176,83 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
         localVideoTrackRef.current = videoTrack
         const cameras = await AgoraRTC.getCameras()
         setCanSwitchCamera(cameras.length > 1)
+        setCameraOff(false)
       } catch (cameraError) {
-        console.warn('[Group Call] camera unavailable; joining with audio while keeping video call active', cameraError)
+        console.warn('[Group Call] camera unavailable; joining video call with audio only', cameraError)
         setCameraOff(true)
+        setCanSwitchCamera(false)
       }
     }
-    const tracks = [track, ...(videoTrack ? [videoTrack] : [])]
-    setLocalMediaStream(new MediaStream(tracks.map((item) => item.getMediaStreamTrack())))
+
+    const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' })
+    clientRef.current = client
+    client.on('user-published', async (remoteUser, mediaType) => {
+      try {
+        await client.subscribe(remoteUser, mediaType)
+        remoteUsersRef.current.set(remoteUser.uid, remoteUser)
+        if (mediaType === 'audio') {
+          remoteUser.audioTrack?.setVolume(heldRef.current ? 0 : speakerRef.current ? 100 : 55)
+          remoteUser.audioTrack?.play()
+        }
+        if (mediaType === 'video' && remoteUser.videoTrack) {
+          const key = String(remoteUser.uid)
+          const stream = remoteStreamsRef.current.get(key) || new MediaStream()
+          const mediaTrack = remoteUser.videoTrack.getMediaStreamTrack()
+          stream.getVideoTracks().forEach((track) => stream.removeTrack(track))
+          stream.addTrack(mediaTrack)
+          remoteStreamsRef.current.set(key, stream)
+          if (mountedRef.current) {
+            setRemoteMediaStreams(Array.from(remoteStreamsRef.current, ([uid, media]) => ({
+              uid,
+              stream: new MediaStream(media.getTracks()),
+            })))
+          }
+        }
+      } catch (error) {
+        console.error('[Group Call] remote participant subscription failed', error)
+      }
+    })
+    client.on('user-unpublished', (remoteUser, mediaType) => {
+      if (mediaType === 'audio') remoteUser.audioTrack?.stop()
+      if (mediaType === 'video') {
+        const key = String(remoteUser.uid)
+        const stream = remoteStreamsRef.current.get(key)
+        if (stream) {
+          stream.getVideoTracks().forEach((track) => stream.removeTrack(track))
+          if (!stream.getTracks().length) remoteStreamsRef.current.delete(key)
+          if (mountedRef.current) {
+            setRemoteMediaStreams(Array.from(remoteStreamsRef.current, ([uid, media]) => ({
+              uid,
+              stream: new MediaStream(media.getTracks()),
+            })))
+          }
+        }
+      }
+    })
+    client.on('user-left', (remoteUser) => {
+      remoteUsersRef.current.delete(remoteUser.uid)
+      remoteStreamsRef.current.delete(String(remoteUser.uid))
+      if (mountedRef.current) {
+        setRemoteMediaStreams(Array.from(remoteStreamsRef.current, ([uid, media]) => ({
+          uid,
+          stream: new MediaStream(media.getTracks()),
+        })))
+        setSpeakingUids((current) => {
+          const next = new Set(current)
+          next.delete(String(remoteUser.uid))
+          return next
+        })
+      }
+    })
+    client.on('volume-indicator', (volumes: Array<{ uid: string | number; level: number }>) => {
+      const active = new Set(volumes.filter((item) => item.level >= 8).map((item) => String(item.uid)))
+      if (mountedRef.current) setSpeakingUids(active)
+    })
+
+    await client.join(connection.appId, connection.channel, connection.token, connection.uid)
+    client.enableAudioVolumeIndicator()
+    const tracks = [audioTrack, ...(videoTrack ? [videoTrack] : [])]
+    setLocalMediaStream(new MediaStream(tracks.map((track) => track.getMediaStreamTrack())))
     await client.publish(tracks)
   }, [])
 
