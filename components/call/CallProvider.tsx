@@ -12,8 +12,37 @@ import { CallScreen } from './CallScreen'
 import { GroupCallExperience } from './GroupCallExperience'
 import { PermissionGate } from './PermissionGate'
 import { isCallReactionId, type CallReactionId } from '@/lib/call-reactions'
+import { pauseRingtone, resumeRingtone } from '@/lib/utils/ringtone'
 
 type GroupCallMember = { id: string; username: string; fullName: string | null; avatarUrl: string | null; status: string }
+
+function playGroupParticipantAnnouncement(fileName: string): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve()
+  pauseRingtone()
+  return new Promise((resolve) => {
+    const audio = new Audio('/audio/calls/' + fileName)
+    audio.preload = 'auto'
+    audio.volume = 1
+    let finished = false
+    const finish = () => {
+      if (finished) return
+      finished = true
+      audio.onended = null
+      audio.onerror = null
+      resumeRingtone()
+      resolve()
+    }
+    audio.onended = finish
+    audio.onerror = () => {
+      console.warn('[SociaLens Group Call] announcement audio unavailable:', fileName)
+      finish()
+    }
+    void audio.play().catch((error) => {
+      console.warn('[SociaLens Group Call] announcement playback failed:', fileName, error)
+      finish()
+    })
+  })
+}
 
 interface StartCallPeer {
   id: string
@@ -59,6 +88,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [incomingReaction, setIncomingReaction] = useState<{ id: string; reaction: CallReactionId; callId: string } | null>(null)
   const [activeGroupCallId, setActiveGroupCallId] = useState<string | null>(null)
   const [groupParticipants, setGroupParticipants] = useState<GroupCallMember[]>([])
+  const groupRosterSnapshotRef = useRef<Map<string, { status: string; isOnHold: boolean }>>(new Map())
+  const groupAnnouncementQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const groupAnnouncementKeysRef = useRef<Set<string>>(new Set())
   const hangupRef = useRef(engine.hangup)
   hangupRef.current = engine.hangup
 
@@ -246,6 +278,99 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     const timer = window.setInterval(() => void refresh(), 1800)
     return () => { alive = false; window.clearInterval(timer) }
   }, [engine.call?.id, engine.phase, engine.setGroupCallId, supabase])
+
+  // The two people who started the original 1-to-1 call keep this CallScreen
+  // after a third person is invited. GroupCallExperience is intentionally
+  // disabled for them, so it cannot be the only listener for participant
+  // hold/resume/leave announcements. Watch the group roster here as well.
+  useEffect(() => {
+    const groupId = activeGroupCallId
+    if (!groupId || !user?.id || engine.phase !== 'in-call') {
+      groupRosterSnapshotRef.current.clear()
+      groupAnnouncementKeysRef.current.clear()
+      return
+    }
+
+    let alive = true
+    let refreshing = false
+    let refreshAgain = false
+    const refreshRosterEvents = async () => {
+      if (refreshing) {
+        refreshAgain = true
+        return
+      }
+      refreshing = true
+      try {
+        do {
+          refreshAgain = false
+          const { data, error } = await supabase
+            .from('group_call_participants')
+            .select('user_id,status,is_on_hold,hold_initiated_by')
+            .eq('group_call_id', groupId)
+          if (!alive || error || !data) {
+            if (error) console.warn('[SociaLens Group Call] event roster refresh failed:', error)
+            continue
+          }
+
+          const previous = groupRosterSnapshotRef.current
+          const next = new Map<string, { status: string; isOnHold: boolean }>()
+          for (const row of data) {
+            const status = String(row.status)
+            const isOnHold = Boolean(row.is_on_hold)
+            next.set(row.user_id, { status, isOnHold })
+            if (row.user_id === user.id) continue
+
+            const before = previous.get(row.user_id)
+            if (!before) continue // Establish a baseline; do not announce old events on mount.
+
+            let fileName: string | null = null
+            if (before.status === 'joined' && status === 'left') {
+              fileName = 'group-call-leave.mp3'
+            } else if (before.status === 'joined' && status === 'joined' && before.isOnHold !== isOnHold) {
+              fileName = isOnHold ? 'call-on-hold.mp3' : 'call-resumed.mp3'
+            }
+
+            if (fileName) {
+              const transitionKey = groupId + ':' + row.user_id + ':' + before.status + ':' + status + ':' + before.isOnHold + ':' + isOnHold
+              if (!groupAnnouncementKeysRef.current.has(transitionKey)) {
+                groupAnnouncementKeysRef.current.add(transitionKey)
+                groupAnnouncementQueueRef.current = groupAnnouncementQueueRef.current
+                  .then(() => playGroupParticipantAnnouncement(fileName!))
+                  .catch((playbackError) => console.warn('[SociaLens Group Call] announcement queue failed:', playbackError))
+              }
+            }
+          }
+          groupRosterSnapshotRef.current = next
+        } while (alive && refreshAgain)
+      } finally {
+        refreshing = false
+      }
+    }
+
+    void refreshRosterEvents()
+    const channel = supabase.channel('group-call-events:' + groupId + ':' + user.id)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'group_call_participants',
+        filter: 'group_call_id=eq.' + groupId,
+      }, () => {
+        void refreshRosterEvents()
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[SociaLens Group Call] roster event subscription unavailable:', status)
+        }
+      })
+    const recovery = window.setInterval(() => void refreshRosterEvents(), 700)
+
+    return () => {
+      alive = false
+      window.clearInterval(recovery)
+      void supabase.removeChannel(channel)
+      groupRosterSnapshotRef.current.clear()
+    }
+  }, [activeGroupCallId, engine.phase, user?.id, supabase])
 
   const startCall = async (peer: StartCallPeer, chatId: string | null, type: CallType) => {
     console.log('[SociaLens Call] startCall requested', { peer, chatId, type, phase: engine.phase })
