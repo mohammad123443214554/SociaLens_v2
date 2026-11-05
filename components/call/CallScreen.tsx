@@ -235,16 +235,7 @@ export function CallScreen({
 
   const joinedGroupReactionRecipients = groupParticipants.filter((person) => person.status === 'joined' && person.id !== userId)
 
-  const triggerCallReaction = (reaction: CallReactionId) => {
-    if (groupCallId && phase === 'in-call') {
-      if (!joinedGroupReactionRecipients.length) return
-      setPendingGroupReaction(reaction)
-      setSelectedGroupReactionRecipients(joinedGroupReactionRecipients.map((person) => person.id))
-      setReactionPickerOpen(false)
-      setReactionSearch('')
-      setRecipientPickerOpen(true)
-      return
-    }
+  const playCallReactionLocally = (reaction: CallReactionId) => {
     switch (reaction) {
       case 'flying-heart':
         setHeartReactionId((value) => value + 1)
@@ -264,6 +255,19 @@ export function CallScreen({
       try { window.localStorage.setItem(recentStorageKey, JSON.stringify(next)) } catch {}
       return next
     })
+  }
+
+  const triggerCallReaction = (reaction: CallReactionId) => {
+    if (groupCallId && phase === 'in-call') {
+      if (!joinedGroupReactionRecipients.length) return
+      setPendingGroupReaction(reaction)
+      setSelectedGroupReactionRecipients(joinedGroupReactionRecipients.map((person) => person.id))
+      setReactionPickerOpen(false)
+      setReactionSearch('')
+      setRecipientPickerOpen(true)
+      return
+    }
+    playCallReactionLocally(reaction)
     void onSendCallReaction(reaction)
     setReactionPickerOpen(false)
     setReactionSearch('')
@@ -271,14 +275,27 @@ export function CallScreen({
 
   const sendGroupReaction = async () => {
     if (!groupCallId || !pendingGroupReaction || !selectedGroupReactionRecipients.length || sendingGroupReaction) return
+    const reaction = pendingGroupReaction
     setSendingGroupReaction(true)
     try {
-      const response = await fetch(`/api/group-calls/${groupCallId}/reactions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reaction: pendingGroupReaction, recipientIds: selectedGroupReactionRecipients }) })
+      const response = await fetch(`/api/group-calls/${groupCallId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reaction, recipientIds: selectedGroupReactionRecipients }),
+      })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Could not send reaction')
-      setRecipientPickerOpen(false); setPendingGroupReaction(null); setSelectedGroupReactionRecipients([])
-    } catch (error) { console.error('[CallScreen] group reaction delivery failed', error) }
-    finally { setSendingGroupReaction(false) }
+      // The server targets only the selected remote users. Render the same
+      // reaction locally after successful delivery so the sender sees it too.
+      playCallReactionLocally(reaction)
+      setRecipientPickerOpen(false)
+      setPendingGroupReaction(null)
+      setSelectedGroupReactionRecipients([])
+    } catch (error) {
+      console.error('[CallScreen] group reaction delivery failed', error)
+    } finally {
+      setSendingGroupReaction(false)
+    }
   }
 
   const allCallEffects = [...PART_TWO_FACE_PRESETS, ...PART_FOUR_LIGHTING_PRESETS, ...PART_FOUR_CREATIVE_PRESETS]
