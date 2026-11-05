@@ -11,6 +11,58 @@ import { CALL_REACTION_ALL_IDS, CALL_REACTION_CATEGORIES, CALL_REACTION_CUSTOM_O
 
 type GroupCallMember = { id: string; username: string; fullName: string | null; avatarUrl: string | null; status: string }
 
+function groupVideoUid(userId: string) {
+  let hash = 0
+  for (const ch of userId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+  return String((hash % 1_000_000_000) + 1)
+}
+
+function GroupVideoTile({
+  name, username, avatarUrl, stream, isLocal = false, cameraOff = false, held = false, speaking = false,
+}: {
+  name: string
+  username?: string
+  avatarUrl?: string | null
+  stream: MediaStream | null
+  isLocal?: boolean
+  cameraOff?: boolean
+  held?: boolean
+  speaking?: boolean
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const hasVideo = Boolean(!cameraOff && !held && stream?.getVideoTracks().some((track) => track.readyState === 'live' && track.enabled))
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    video.srcObject = hasVideo ? stream : null
+    if (hasVideo) void video.play().catch(() => undefined)
+    return () => { if (video.srcObject === stream) video.srcObject = null }
+  }, [stream, hasVideo])
+  const initial = name.trim().charAt(0).toUpperCase() || '?'
+  return (
+    <div className={`relative min-h-0 min-w-0 overflow-hidden rounded-2xl border bg-neutral-900 shadow-lg ${speaking ? 'border-emerald-400/80 ring-2 ring-emerald-400/30' : 'border-white/10'}`}>
+      {hasVideo ? (
+        <video ref={videoRef} autoPlay playsInline muted={isLocal} className={`absolute inset-0 h-full w-full object-cover ${isLocal ? 'scale-x-[-1]' : ''}`} />
+      ) : (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-neutral-800 to-neutral-950 p-3 text-center">
+          <Avatar className="h-16 w-16 border border-white/15 sm:h-20 sm:w-20">
+            <AvatarImage src={avatarUrl || undefined} alt={name} />
+            <AvatarFallback className="bg-neutral-700 text-xl font-semibold text-white">{initial}</AvatarFallback>
+          </Avatar>
+          <span className="max-w-full truncate text-xs text-white/65">{held ? 'On hold' : cameraOff ? 'Camera off' : 'Waiting for video'}</span>
+        </div>
+      )}
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 via-black/35 to-transparent px-3 pb-2 pt-7">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold text-white">{isLocal ? 'You' : name}</p>
+          {username && <p className="truncate text-[10px] text-white/55">@{username}</p>}
+        </div>
+        {held && <span className="shrink-0 rounded-full bg-amber-500/20 px-2 py-1 text-[10px] font-medium text-amber-200">On hold</span>}
+      </div>
+    </div>
+  )
+}
+
 interface CallScreenProps {
   userId: string
   phase: CallPhase
@@ -57,7 +109,7 @@ function formatDuration(sec: number) {
 }
 
 export function CallScreen({
-  userId, phase, type, peerName, peerId = null, peerAvatar, localStream, remoteStream, onSendCallReaction, incomingReaction,
+  userId, phase, type, peerName, peerId = null, peerAvatar, localStream, remoteStream, groupRemoteStreams = [], onSendCallReaction, incomingReaction,
   groupCallId = null, groupParticipants = [], speakerMode, onToggleSpeakerMode, onAddPeopleToGroup,
   isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume,
   onEnd, onToggleMute, onToggleCamera, onSwitchCamera, onToggleHold,
@@ -448,8 +500,36 @@ export function CallScreen({
       onPointerUp={endMiniGesture}
       onPointerCancel={endMiniGesture}
     >
-      {/* Portrait video stage: full-screen on phones, phone-shaped and centered on laptops. */}
-      {isVideoCall && (
+      {/* Group video uses a responsive participant grid; one-to-one keeps its existing portrait stage. */}
+      {isVideoCall && groupCallId && (
+        <div className={`absolute inset-0 overflow-y-auto bg-neutral-950 px-3 pb-40 pt-20 sm:px-5 sm:pb-36 md:px-8 md:pb-32 ${isMini ? 'pt-12 pb-3' : ''}`}>
+          <div className={`mx-auto grid h-full min-h-0 max-w-6xl content-center gap-2 sm:gap-3 ${groupParticipants.filter((person) => person.status === 'joined').length + 1 <= 2 ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3'}`}>
+            <GroupVideoTile name="You" stream={localStream} isLocal cameraOff={isCameraOff} held={isOnHold} />
+            {groupParticipants.filter((person) => person.status === 'joined' && person.id !== userId).map((person) => {
+              const remote = groupRemoteStreams.find((item) => item.uid === groupVideoUid(person.id))
+              return (
+                <GroupVideoTile
+                  key={person.id}
+                  name={person.fullName || person.username}
+                  username={person.username}
+                  avatarUrl={person.avatarUrl}
+                  stream={remote?.stream || null}
+                  cameraOff={!remote?.stream?.getVideoTracks().some((track) => track.readyState === 'live' && track.enabled)}
+                  held={false}
+                />
+              )
+            })}
+          </div>
+          {!isMini && (
+            <div className="pointer-events-none absolute left-0 right-0 top-20 flex justify-center">
+              <div className="rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-xs text-white/75 backdrop-blur-md">
+                {groupParticipants.filter((person) => person.status === 'joined').length} connected · {statusText}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {isVideoCall && !groupCallId && (
         <div className={`absolute overflow-hidden bg-black ${isMini
           ? 'inset-0'
           : 'inset-0 md:inset-auto md:top-[44%] md:left-1/2 md:right-auto md:bottom-auto md:w-[min(34vw,420px,39.375vh)] md:aspect-[9/16] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:ring-1 md:ring-white/20 md:shadow-2xl'}`}>
