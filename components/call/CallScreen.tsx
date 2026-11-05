@@ -48,7 +48,7 @@ function GroupVideoTile({
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-neutral-800 to-neutral-950 p-3 text-center">
           <Avatar className="h-16 w-16 border border-white/15 sm:h-20 sm:w-20">
             <AvatarImage src={avatarUrl || undefined} alt={name} />
-            <AvatarFallback className="bg-neutral-700 text-xl font-semibold text-white">{initial}</AvatarFallback>
+            <AvatarFallback className="bg-neutral-900"><img src="/images/default-avatar.svg" alt="" className="h-full w-full object-cover" /></AvatarFallback>
           </Avatar>
           <span className="max-w-full truncate text-xs text-white/65">{held ? 'On hold' : cameraOff ? 'Camera off' : 'Waiting for video'}</span>
         </div>
@@ -578,12 +578,12 @@ export function CallScreen({
               <div className="flex items-center justify-center -space-x-2">
                 {groupParticipants.filter((person) => person.status === 'joined').slice(0, 10).map((person) => (
                   <Avatar key={person.id} className="h-7 w-7 border-2 border-neutral-950 md:h-8 md:w-8">
-                    <AvatarImage src={person.avatarUrl || '/images/default-avatar.svg'} alt={person.fullName || person.username} />
-                    <AvatarFallback className="bg-neutral-800 text-[10px] text-white">{(person.fullName || person.username).slice(0, 1).toUpperCase()}</AvatarFallback>
+                    <AvatarImage src={person.avatarUrl || undefined} alt={person.fullName || person.username} />
+                    <AvatarFallback className="bg-neutral-900"><img src="/images/default-avatar.svg" alt="" className="h-full w-full object-cover" /></AvatarFallback>
                   </Avatar>
                 ))}
               </div>
-              <p className="text-xs tabular-nums text-white/65 md:text-sm">{groupParticipants.filter((person) => person.status === 'joined').length + 1} connected · {statusText}</p>
+              <p className="text-xs tabular-nums text-white/65 md:text-sm">{new Set(groupParticipants.filter((person) => person.status === 'joined').map((person) => person.id)).size} connected · {statusText}</p>
             </div>
           )}
           <div className="mx-auto grid w-full max-w-[1600px] grid-cols-3 grid-flow-row content-start items-start gap-2 pb-3 sm:gap-3 md:gap-4">
@@ -806,6 +806,33 @@ export function CallScreen({
       {/* Audio calls keep the centered profile layout. On phones the existing
           full-screen video-call profile placement is retained; desktop video
           calls render the profile inside the portrait video stage above. */}
+      {/* Group voice calls keep the original centered participant presentation. */}
+      {!isVideoCall && groupCallId && phase === 'in-call' && (
+        <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-4 px-4 pb-8 text-center">
+          <h2 className="text-2xl font-bold drop-shadow-lg">Group Call</h2>
+          <div className="flex items-center justify-center -space-x-3">
+            {groupParticipants.filter((person) => person.status === 'joined').slice(0, 10).map((person) => (
+              <Avatar key={person.id} className="h-14 w-14 border-2 border-neutral-950 shadow-lg">
+                <AvatarImage src={person.avatarUrl || undefined} alt={person.fullName || person.username} />
+                <AvatarFallback className="bg-neutral-900">
+                  <img src="/images/default-avatar.svg" alt="" className="h-full w-full object-cover" />
+                </AvatarFallback>
+              </Avatar>
+            ))}
+          </div>
+          <p className="text-sm tabular-nums text-white/70">
+            {new Set(groupParticipants.filter((person) => person.status === 'joined').map((person) => person.id)).size} connected · {statusText}
+          </p>
+          <div className="flex max-w-md flex-wrap items-center justify-center gap-x-3 gap-y-1">
+            {groupParticipants.filter((person) => person.status === 'joined').map((person) => (
+              <span key={person.id} className="text-xs text-white/55">
+                {person.id === userId ? 'You' : (person.fullName || person.username)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {(!isVideoCall || showRemoteVideo || isMini || (isVideoCall && !showRemoteVideo)) && !groupCallId && (
         <div className={`relative z-10 flex flex-col items-center gap-3 transition-all duration-300 ${
           showRemoteVideo ? (isMini ? 'pt-1' : 'pt-6') : 'flex-1 justify-center'
@@ -829,7 +856,7 @@ export function CallScreen({
         </div>
       )}
 
-      {!showRemoteVideo && (!isVideoCall || isMini) && <div className="flex-1" />}
+      {!showRemoteVideo && (!isVideoCall || isMini) && !groupCallId && <div className="flex-1" />}
 
 
 
