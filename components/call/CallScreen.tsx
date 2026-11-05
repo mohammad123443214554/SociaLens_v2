@@ -40,7 +40,7 @@ function GroupVideoTile({
   }, [stream, hasVideo])
   const initial = name.trim().charAt(0).toUpperCase() || '?'
   return (
-    <div className={`relative aspect-video min-h-[180px] w-full min-w-0 overflow-hidden rounded-2xl border bg-neutral-900 shadow-lg sm:min-h-[220px] ${speaking ? 'border-emerald-400/80 ring-2 ring-emerald-400/30' : 'border-white/10'}`}>
+    <div className={`relative aspect-[9/16] min-h-0 w-full min-w-0 overflow-hidden rounded-xl border bg-neutral-900 shadow-lg md:aspect-video md:min-h-[180px] md:rounded-2xl lg:min-h-[220px] ${speaking ? 'border-emerald-400/80 ring-2 ring-emerald-400/30' : 'border-white/10'}`}>
       {hasVideo ? (
         <video ref={videoRef} autoPlay playsInline muted={isLocal} className={`absolute inset-0 h-full w-full object-cover ${isLocal ? 'scale-x-[-1]' : ''}`} />
       ) : (
@@ -500,10 +500,25 @@ export function CallScreen({
       onPointerUp={endMiniGesture}
       onPointerCancel={endMiniGesture}
     >
-      {/* Group video uses a responsive participant grid; one-to-one keeps its existing portrait stage. */}
+      {/* Group video layout: portrait participant tiles on phones, landscape tiles on desktop.
+          The header and controls reserve their own space so neither can cover a participant. */}
       {isVideoCall && groupCallId && (
-        <div className={`absolute inset-0 overflow-y-auto bg-neutral-950 px-3 pb-40 pt-20 sm:px-5 sm:pb-36 md:px-8 md:pb-32 ${isMini ? 'pt-12 pb-3' : ''}`}>
-          <div className={`mx-auto grid w-full max-w-6xl grid-flow-row content-start items-start gap-3 pb-4 sm:gap-4 ${groupParticipants.filter((person) => person.status === 'joined').length + 1 <= 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+        <div className={`absolute inset-0 overflow-y-auto overscroll-contain bg-neutral-950 px-2 pb-32 pt-20 sm:px-4 md:px-6 md:pb-36 md:pt-24 ${isMini ? 'pt-12 pb-3' : ''}`}>
+          {!isMini && (
+            <div className="mx-auto mb-3 flex w-full max-w-6xl flex-col items-center gap-1.5 text-center md:mb-5">
+              <h2 className="text-base font-bold leading-tight text-white drop-shadow-lg md:text-xl">Group Call</h2>
+              <div className="flex items-center justify-center -space-x-2">
+                {groupParticipants.filter((person) => person.status === 'joined').slice(0, 10).map((person) => (
+                  <Avatar key={person.id} className="h-7 w-7 border-2 border-neutral-950 md:h-8 md:w-8">
+                    <AvatarImage src={person.avatarUrl || '/images/default-avatar.svg'} alt={person.fullName || person.username} />
+                    <AvatarFallback className="bg-neutral-800 text-[10px] text-white">{(person.fullName || person.username).slice(0, 1).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                ))}
+              </div>
+              <p className="text-xs tabular-nums text-white/65 md:text-sm">{groupParticipants.filter((person) => person.status === 'joined').length + 1} connected · {statusText}</p>
+            </div>
+          )}
+          <div className={`mx-auto grid w-full max-w-6xl grid-flow-row content-start items-start gap-2 pb-3 sm:gap-3 md:gap-4 ${groupParticipants.filter((person) => person.status === 'joined').length + 1 <= 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
             <GroupVideoTile name="You" stream={localStream} isLocal cameraOff={isCameraOff} held={isOnHold} />
             {groupParticipants.filter((person) => person.status === 'joined' && person.id !== userId).map((person) => {
               const remote = groupRemoteStreams.find((item) => item.uid === groupVideoUid(person.id))
@@ -723,7 +738,7 @@ export function CallScreen({
       {/* Audio calls keep the centered profile layout. On phones the existing
           full-screen video-call profile placement is retained; desktop video
           calls render the profile inside the portrait video stage above. */}
-      {(!isVideoCall || showRemoteVideo || isMini || (isVideoCall && !showRemoteVideo)) && (!groupCallId || phase === 'in-call') && (
+      {(!isVideoCall || showRemoteVideo || isMini || (isVideoCall && !showRemoteVideo)) && !groupCallId && (
         <div className={`relative z-10 flex flex-col items-center gap-3 transition-all duration-300 ${
           showRemoteVideo ? (isMini ? 'pt-1' : 'pt-6') : 'flex-1 justify-center'
         } ${isVideoCall && !showRemoteVideo ? 'md:hidden' : ''}`}>
