@@ -783,7 +783,7 @@ export function CallScreen({
               <button type="button" onClick={() => { setIsScreenLocked(true); setMoreMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                 <Lock className="h-4 w-4" /><span className="flex-1">Lock screen</span>
               </button>
-              {phase === 'in-call' && type === 'audio' && (
+              {phase === 'in-call' && (type === 'audio' || type === 'video') && (
                 <button type="button" onClick={() => {
                   setMoreMenuOpen(false)
                   setInviteError(null)
@@ -791,7 +791,7 @@ export function CallScreen({
                   setAddPeopleOpen(true)
                   void loadMessageContacts()
                 }} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
-                  <Users className="h-4 w-4" /><span className="flex-1">{groupCallId ? 'Add more people' : 'Add people to group call'}</span><span className="text-pink-100/45">›</span>
+                  <Users className="h-4 w-4" /><span className="flex-1">{groupCallId ? 'Add more people' : (type === 'video' ? 'Add people to group video call' : 'Add people to group voice call')}</span><span className="text-pink-100/45">›</span>
                 </button>
               )}
               <button type="button" onClick={() => { setReactionPickerOpen(true); setMoreMenuOpen(false) }} disabled={phase !== 'in-call' || isOnHold} className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07] disabled:opacity-40">
@@ -998,7 +998,7 @@ export function CallScreen({
             <div className="min-h-0 flex-1 overflow-y-auto">
               {loadingContacts && !messageContacts.length && <div className="flex items-center justify-center gap-2 py-10 text-sm text-pink-100/70"><Loader2 className="h-4 w-4 animate-spin" />Loading contacts…</div>}
               {messageContacts.map((person) => (
-                <button key={person.id} type="button" onClick={() => setSelectedInvitees((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : current.length < (groupCallId ? 9 : 8) ? [...current, person.id] : current)} className="flex w-full items-center gap-3 rounded-xl border border-transparent p-3 text-left transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
+                <button key={person.id} type="button" onClick={() => setSelectedInvitees((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : current.length < Math.max(0, 10 - (groupCallId ? groupParticipants.filter((member) => ['joined', 'invited', 'ringing'].includes(member.status)).length : 2)) ? [...current, person.id] : current)} className="flex w-full items-center gap-3 rounded-xl border border-transparent p-3 text-left transition-colors hover:border-pink-100/[0.12] hover:bg-pink-300/[0.07]">
                   <Avatar className="h-10 w-10 border border-pink-100/[0.16]"><AvatarImage src={person.avatarUrl || '/images/default-avatar.svg'} /><AvatarFallback className="bg-transparent"><img src="/images/default-avatar.svg" alt="" className="h-full w-full object-cover" /></AvatarFallback></Avatar>
                   <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-pink-50/95">{person.fullName || person.username}</span><span className="block truncate text-xs text-pink-100/55">@{person.username}</span></span>
                   <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${selectedInvitees.includes(person.id) ? 'border-pink-200 bg-pink-400/30 text-pink-50' : 'border-pink-100/30'}`}>{selectedInvitees.includes(person.id) && <Check className="h-3 w-3" />}</span>
