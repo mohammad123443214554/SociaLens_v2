@@ -178,10 +178,10 @@ export function CallScreen({
     return request
   }, [userId, peerId, groupParticipants])
 
-  // Warm the contact list as soon as an audio call is connected so opening
-  // the invite dialog never has to wait for the network round-trip.
+  // Warm the contact list as soon as either call type is connected so
+  // adding people to a video call does not wait for a network round-trip.
   useEffect(() => {
-    if (phase === 'in-call' && type === 'audio') void loadMessageContacts()
+    if (phase === 'in-call' && (type === 'audio' || type === 'video')) void loadMessageContacts()
   }, [phase, type, loadMessageContacts])
 
 
