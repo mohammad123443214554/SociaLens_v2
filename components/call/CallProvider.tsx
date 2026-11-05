@@ -223,7 +223,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       if (!groupId) { setGroupParticipants([]); return }
       const { data: members, error: memberError } = await supabase.from('group_call_participants')
         .select('user_id,status').eq('group_call_id', groupId)
-        .in('status', ['joined','invited','ringing'])
+        .in('status', ['joined','invited','ringing','declined','missed','busy'])
       if (!alive || memberError) return
       const ids = [...new Set((members || []).map((item) => item.user_id))]
       const { data: profiles } = ids.length
