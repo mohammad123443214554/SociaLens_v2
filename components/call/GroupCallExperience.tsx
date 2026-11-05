@@ -253,7 +253,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
         return
       }
       const worst = Math.max(...values)
-      if (mountedRef.current) setNetworkQuality(worst <= 2 ? 'excellent' : worst <= 4 ? 'good' : 'weak')
+      if (mountedRef.current) setNetworkQuality(worst <= 1 ? 'excellent' : worst <= 2 ? 'good' : 'weak')
     })
     client.on('connection-state-change', (currentState, previousState, reason) => {
       console.info('[Group Call] Agora connection state:', previousState, '→', currentState, reason)
