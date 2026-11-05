@@ -40,7 +40,7 @@ function GroupVideoTile({
   }, [stream, hasVideo])
   const initial = name.trim().charAt(0).toUpperCase() || '?'
   return (
-    <div className={`relative min-h-0 min-w-0 overflow-hidden rounded-2xl border bg-neutral-900 shadow-lg ${speaking ? 'border-emerald-400/80 ring-2 ring-emerald-400/30' : 'border-white/10'}`}>
+    <div className={`relative aspect-video min-h-[180px] w-full min-w-0 overflow-hidden rounded-2xl border bg-neutral-900 shadow-lg sm:min-h-[220px] ${speaking ? 'border-emerald-400/80 ring-2 ring-emerald-400/30' : 'border-white/10'}`}>
       {hasVideo ? (
         <video ref={videoRef} autoPlay playsInline muted={isLocal} className={`absolute inset-0 h-full w-full object-cover ${isLocal ? 'scale-x-[-1]' : ''}`} />
       ) : (
@@ -503,7 +503,7 @@ export function CallScreen({
       {/* Group video uses a responsive participant grid; one-to-one keeps its existing portrait stage. */}
       {isVideoCall && groupCallId && (
         <div className={`absolute inset-0 overflow-y-auto bg-neutral-950 px-3 pb-40 pt-20 sm:px-5 sm:pb-36 md:px-8 md:pb-32 ${isMini ? 'pt-12 pb-3' : ''}`}>
-          <div className={`mx-auto grid h-full min-h-0 max-w-6xl content-center gap-2 sm:gap-3 ${groupParticipants.filter((person) => person.status === 'joined').length + 1 <= 2 ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3'}`}>
+          <div className={`mx-auto grid w-full max-w-6xl grid-flow-row content-start items-start gap-3 pb-4 sm:gap-4 ${groupParticipants.filter((person) => person.status === 'joined').length + 1 <= 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
             <GroupVideoTile name="You" stream={localStream} isLocal cameraOff={isCameraOff} held={isOnHold} />
             {groupParticipants.filter((person) => person.status === 'joined' && person.id !== userId).map((person) => {
               const remote = groupRemoteStreams.find((item) => item.uid === groupVideoUid(person.id))
@@ -520,13 +520,6 @@ export function CallScreen({
               )
             })}
           </div>
-          {!isMini && (
-            <div className="pointer-events-none absolute left-0 right-0 top-20 flex justify-center">
-              <div className="rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-xs text-white/75 backdrop-blur-md">
-                {groupParticipants.filter((person) => person.status === 'joined').length} connected · {statusText}
-              </div>
-            </div>
-          )}
         </div>
       )}
       {isVideoCall && !groupCallId && (
