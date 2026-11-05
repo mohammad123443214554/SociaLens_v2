@@ -247,7 +247,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
     })
     client.on('network-quality', (stats) => {
       const values = [stats?.uplinkNetworkQuality, stats?.downlinkNetworkQuality]
-        .filter((value): value is number => typeof value === 'number' && value > 0)
+        .filter((value) => value > 0)
       if (!values.length) {
         if (mountedRef.current) setNetworkQuality('unknown')
         return
