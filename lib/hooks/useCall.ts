@@ -174,6 +174,7 @@ export function useCallEngine(currentUserId?: string) {
   const [peer, setPeer] = useState<PeerProfile | null>(null)
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
+  const [groupRemoteStreams, setGroupRemoteStreams] = useState<Array<{ uid: string; stream: MediaStream }>>([])
   const [isMuted, setIsMuted] = useState(false)
   const [isCameraOff, setIsCameraOff] = useState(false)
   const [isOnHold, setIsOnHold] = useState(false)
@@ -190,6 +191,7 @@ export function useCallEngine(currentUserId?: string) {
   const localStreamObjRef = useRef<MediaStream>(new MediaStream())
   const remoteStreamObjRef = useRef<MediaStream>(new MediaStream())
   const remoteAgoraAudioTracksRef = useRef<Map<string, MediaStreamTrack>>(new Map())
+  const remoteAgoraVideoTracksRef = useRef<Map<string, MediaStreamTrack>>(new Map())
   const agoraRef = useRef<{ client: any; audioTrack: any; videoTrack: any } | null>(null)
   const dailyRef = useRef<any>(null)
   const backgroundBlurProcessorRef = useRef<{ processor: CallBackgroundBlurProcessor; rawTrack: MediaStreamTrack; processedTrack: MediaStreamTrack; sourceTrack?: MediaStreamTrack; originalTrack?: MediaStreamTrack } | null>(null)
@@ -405,6 +407,8 @@ export function useCallEngine(currentUserId?: string) {
     localStreamObjRef.current.getTracks().forEach((t) => { t.stop(); localStreamObjRef.current.removeTrack(t) })
     remoteStreamObjRef.current.getTracks().forEach((t) => remoteStreamObjRef.current.removeTrack(t))
     remoteAgoraAudioTracksRef.current.clear()
+    remoteAgoraVideoTracksRef.current.clear()
+    setGroupRemoteStreams([])
 
     roleRef.current = null
     pendingCallRef.current = null
@@ -546,7 +550,15 @@ export function useCallEngine(currentUserId?: string) {
                 remoteAgoraAudioTracksRef.current.set(uid, mediaTrack)
                 if (!remoteStreamObjRef.current.getTracks().includes(mediaTrack)) remoteStreamObjRef.current.addTrack(mediaTrack)
               } else {
-                upsertTrack(remoteStreamObjRef.current, mediaTrack)
+                const uid = String(remoteUser.uid)
+                remoteAgoraVideoTracksRef.current.set(uid, mediaTrack)
+                if (!callRef.current?.group_call_id || remoteStreamObjRef.current.getVideoTracks().length === 0) {
+                  upsertTrack(remoteStreamObjRef.current, mediaTrack)
+                }
+                setGroupRemoteStreams(Array.from(remoteAgoraVideoTracksRef.current, ([participantUid, video]) => ({
+                  uid: participantUid,
+                  stream: new MediaStream([video]),
+                })))
               }
               setRemoteStream(new MediaStream(remoteStreamObjRef.current.getTracks()))
               setPhase('in-call')
@@ -565,7 +577,20 @@ export function useCallEngine(currentUserId?: string) {
             if (previous) remoteStreamObjRef.current.removeTrack(previous)
             remoteAgoraAudioTracksRef.current.delete(uid)
           } else {
-            removeTracksOfKind(remoteStreamObjRef.current, 'video')
+            const uid = String(remoteUser.uid)
+            const previous = remoteAgoraVideoTracksRef.current.get(uid)
+            if (previous) remoteAgoraVideoTracksRef.current.delete(uid)
+            if (previous && remoteStreamObjRef.current.getVideoTracks().includes(previous)) {
+              remoteStreamObjRef.current.removeTrack(previous)
+              if (callRef.current?.group_call_id) {
+                const replacement = remoteAgoraVideoTracksRef.current.values().next().value as MediaStreamTrack | undefined
+                if (replacement) remoteStreamObjRef.current.addTrack(replacement)
+              }
+            }
+            setGroupRemoteStreams(Array.from(remoteAgoraVideoTracksRef.current, ([participantUid, video]) => ({
+              uid: participantUid,
+              stream: new MediaStream([video]),
+            })))
           }
           setRemoteStream(new MediaStream(remoteStreamObjRef.current.getTracks()))
         })
@@ -580,6 +605,21 @@ export function useCallEngine(currentUserId?: string) {
           const departedAudioTrack = remoteAgoraAudioTracksRef.current.get(uid)
           if (departedAudioTrack) remoteStreamObjRef.current.removeTrack(departedAudioTrack)
           remoteAgoraAudioTracksRef.current.delete(uid)
+          const departedVideoTrack = remoteAgoraVideoTracksRef.current.get(uid)
+          if (departedVideoTrack) {
+            remoteAgoraVideoTracksRef.current.delete(uid)
+            if (remoteStreamObjRef.current.getVideoTracks().includes(departedVideoTrack)) {
+              remoteStreamObjRef.current.removeTrack(departedVideoTrack)
+              if (callRef.current?.group_call_id) {
+                const replacement = remoteAgoraVideoTracksRef.current.values().next().value as MediaStreamTrack | undefined
+                if (replacement) remoteStreamObjRef.current.addTrack(replacement)
+              }
+            }
+          }
+          setGroupRemoteStreams(Array.from(remoteAgoraVideoTracksRef.current, ([participantUid, video]) => ({
+            uid: participantUid,
+            stream: new MediaStream([video]),
+          })))
           // A group call can have several remote audio publishers. A single
           // participant leaving must never silence the other participants.
           if (!callRef.current?.group_call_id) {
@@ -1779,6 +1819,7 @@ export function useCallEngine(currentUserId?: string) {
     transportProvider: providerRef.current,
     localStream,
     remoteStream,
+    groupRemoteStreams,
     isMuted,
     isCameraOff,
     isOnHold,
