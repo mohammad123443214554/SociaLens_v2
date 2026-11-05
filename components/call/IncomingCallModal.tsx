@@ -118,7 +118,7 @@ export function IncomingCallModal({ callerName, callerAvatar, type, ringtoneId, 
               <div key={person.id} className="flex w-20 flex-col items-center gap-2">
                 <Avatar className="h-16 w-16 ring-4 ring-pink-500/30 shadow-xl shadow-pink-500/10">
                   <AvatarImage src={person.avatarUrl || undefined} />
-                  <AvatarFallback className="text-xl">{(person.fullName || person.username).slice(0,1).toUpperCase()}</AvatarFallback>
+                  <AvatarFallback className="bg-neutral-900"><img src="/images/default-avatar.svg" alt="" className="h-full w-full object-cover" /></AvatarFallback>
                 </Avatar>
                 <span className="max-w-full truncate text-xs text-white/75">{person.fullName || person.username}</span>
               </div>
@@ -127,7 +127,7 @@ export function IncomingCallModal({ callerName, callerAvatar, type, ringtoneId, 
         ) : (
           <Avatar className="h-28 w-28 ring-4 ring-pink-500/30 shadow-2xl shadow-pink-500/10 animate-pulse">
             <AvatarImage src={callerAvatar} alt={callerName} />
-            <AvatarFallback className="text-3xl">{callerName[0]?.toUpperCase()}</AvatarFallback>
+            <AvatarFallback className="bg-neutral-900"><img src="/images/default-avatar.svg" alt="" className="h-full w-full object-cover" /></AvatarFallback>
           </Avatar>
         )}
         <h2 className="text-2xl font-bold">{isGroupCall ? 'Group Call' : callerName}</h2>
