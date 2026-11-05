@@ -16,7 +16,6 @@ type Person = { id: string; username: string; fullName: string | null; avatarUrl
 type Invitation = { groupCallId: string; invitedBy: string; type: 'audio' | 'video'; participants: Person[] }
 type Contact = Person
 type RosterPerson = Person & { status: 'joined' | 'invited' | 'ringing' | 'left' | 'declined' | 'missed'; invitedBy: string | null; inviterAvatarUrl: string | null; isOnHold: boolean; holdInitiatedBy: string | null; isSpeaking?: boolean }
-type IncomingGroupReaction = { id: string; reaction: CallReactionId; senderName: string }
 
 async function playGroupCallAnnouncement(fileName: string) {
   if (typeof window === 'undefined') return
@@ -77,7 +76,6 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   const [pendingReaction, setPendingReaction] = useState<CallReactionId | null>(null)
   const [selectedReactionRecipients, setSelectedReactionRecipients] = useState<string[]>([])
   const [sendingReaction, setSendingReaction] = useState(false)
-  const [incomingGroupReaction, setIncomingGroupReaction] = useState<IncomingGroupReaction | null>(null)
   const heldRef = useRef(false)
   const speakerRef = useRef(false)
   const clientRef = useRef<IAgoraRTCClient | null>(null)
@@ -560,56 +558,6 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   }, [activeCallId, userId, supabase, refreshRoster, cleanupMedia, onError])
 
   useEffect(() => {
-    if (!activeCallId) {
-      setIncomingGroupReaction(null)
-      return
-    }
-    let alive = true
-    let channel: ReturnType<typeof supabase.channel> | null = null
-    const subscribeToRecipientReactions = async () => {
-      try {
-        // Private Realtime topics require the current user's JWT to be installed
-        // before joining; without it the server-side targeted broadcasts are dropped.
-        await supabase.realtime.setAuth()
-        if (!alive) return
-        channel = supabase.channel(`group-call-reactions:${activeCallId}:${userId}`, {
-          config: { private: true, broadcast: { self: false, ack: true } },
-        })
-          .on('broadcast', { event: 'call-reaction' }, ({ payload }) => {
-            if (!alive || !payload || payload.callId !== activeCallId || payload.recipientId !== userId) return
-            if (payload.senderId === userId || typeof payload.id !== 'string' || !isCallReactionId(payload.reaction)) return
-            setIncomingGroupReaction({
-              id: payload.id,
-              reaction: payload.reaction,
-              senderName: typeof payload.senderName === 'string' ? payload.senderName : 'Participant',
-            })
-          })
-          .subscribe((status) => {
-            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              console.warn('[Group Call] private reaction channel unavailable:', status)
-            }
-          })
-      } catch (error) {
-        console.error('[Group Call] could not authenticate private reaction channel:', error)
-      }
-    }
-    void subscribeToRecipientReactions()
-    return () => {
-      alive = false
-      if (channel) void supabase.removeChannel(channel)
-    }
-  }, [activeCallId, userId, supabase])
-
-  useEffect(() => {
-    if (!incomingGroupReaction) return
-    const id = incomingGroupReaction.id
-    const timer = window.setTimeout(() => {
-      setIncomingGroupReaction((current) => current?.id === id ? null : current)
-    }, 5600)
-    return () => window.clearTimeout(timer)
-  }, [incomingGroupReaction?.id])
-
-  useEffect(() => {
     heldRef.current = held
     speakerRef.current = speakerOn
     void localTrackRef.current?.setEnabled(!muted && !held)
@@ -802,23 +750,6 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
             </div>
             <div className="mt-3 flex justify-end"><button disabled={!selected.length || busy} onClick={() => void inviteMore(selected)} className="rounded-full bg-pink-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? 'Sending…' : 'Send invitations'}</button></div>
           </div>
-        </div>
-      )}
-
-      {incomingGroupReaction && activeCallId && (
-        <div key={incomingGroupReaction.id} className="pointer-events-none fixed inset-0 z-[280] flex flex-col items-center justify-center overflow-hidden bg-black/10" aria-live="polite">
-          <div className="rounded-full border border-white/15 bg-black/45 px-4 py-1.5 text-xs font-medium text-white/90 backdrop-blur-md">{incomingGroupReaction.senderName} sent a reaction</div>
-          {incomingGroupReaction.reaction === 'flying-heart' || incomingGroupReaction.reaction === 'heart-burst' ? (
-            <div className="mt-3 animate-bounce text-[min(38vw,190px)] leading-none drop-shadow-[0_10px_35px_rgba(255,70,145,0.55)]">
-              {incomingGroupReaction.reaction === 'flying-heart' ? '💗' : '💞'}
-            </div>
-          ) : (
-            <CallReactionLottie
-              reaction={incomingGroupReaction.reaction as Exclude<CallReactionId, 'flying-heart' | 'heart-burst'>}
-              loop
-              className="mt-2 h-[min(72vw,460px)] w-[min(72vw,460px)] drop-shadow-[0_12px_30px_rgba(255,105,180,0.28)]"
-            />
-          )}
         </div>
       )}
 
