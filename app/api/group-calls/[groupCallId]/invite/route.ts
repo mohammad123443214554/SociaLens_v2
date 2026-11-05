@@ -19,6 +19,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Choose between 1 and 9 valid users' }, { status: 400 })
   }
 
+  const { data: groupCall, error: groupCallError } = await supabase
+    .from('group_calls').select('type,status').eq('id', groupCallId).maybeSingle()
+  if (groupCallError || !groupCall) return NextResponse.json({ error: 'Group call not found' }, { status: 404 })
+  if (groupCall.status !== 'active') return NextResponse.json({ error: 'This group call has ended' }, { status: 409 })
+
   const { data: inviteProfiles, error: inviteProfilesError } = await supabase
     .from('profiles').select('id,call_privacy').in('id', [...new Set(userIds as string[])])
   if (inviteProfilesError) return NextResponse.json({ error: 'Could not verify invite permissions' }, { status: 500 })
@@ -50,8 +55,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   await Promise.all(inviteTargets.map(async (inviteeId) => {
     try {
       await sendPushToUser(inviteeId, {
-        title: 'Incoming Group Voice Call',
-        body: `${callerName} invited you to join a group voice call`,
+        title: groupCall.type === 'video' ? 'Incoming Group Video Call' : 'Incoming Group Voice Call',
+        body: `${callerName} invited you to join a group ${groupCall.type === 'video' ? 'video' : 'voice'} call`,
         url: '/chat',
         kind: 'generic',
         tag: `group-call-${groupCallId}`,
