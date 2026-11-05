@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Mic, MicOff, Video, VideoOff, PhoneOff, ShieldCheck, Sparkles, ArrowLeftRight, RefreshCw, PauseCircle, PlayCircle, Volume1, Volume2, Minimize2, Maximize2, Move, Lock, Unlock, MoreHorizontal, SmilePlus, Users, Search, Check, Loader2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { startRingtone, stopRingtone } from '@/lib/utils/ringtone'
+import { startRingtone, stopRingtone, pauseRingtone, resumeRingtone } from '@/lib/utils/ringtone'
 import type { CallPhase, CallType } from '@/lib/hooks/useCall'
 import { CALL_EFFECT_CATEGORIES, PART_TWO_FACE_PRESETS, PART_FOUR_LIGHTING_PRESETS, PART_FOUR_CREATIVE_PRESETS } from '@/lib/call-effects'
 import { CallReactionLottie } from './CallReactionLottie'
@@ -410,13 +410,23 @@ export function CallScreen({
         if (!announcedInviteStatusesRef.current.has(key)) {
           announcedInviteStatusesRef.current.add(key)
           const file = member.status === 'busy' ? 'call-user-busy.mp3' : member.status === 'missed' ? 'call-unanswered.mp3' : 'call-rejected.mp3'
+          pauseRingtone()
           const audio = new Audio(`/audio/calls/${file}`)
           audio.volume = 1
-          void audio.play().catch((playbackError) => console.warn('[Call] group invite announcement playback failed', playbackError))
+          const resume = () => resumeRingtone()
+          audio.addEventListener('ended', resume, { once: true })
+          audio.addEventListener('error', resume, { once: true })
+          void audio.play().catch((playbackError) => {
+            console.warn('[Call] group invite announcement playback failed', playbackError)
+            resume()
+          })
         }
       }
     }
-    setRingingInviteeIds((current) => current.filter((id) => remaining.includes(id)))
+    setRingingInviteeIds((current) => {
+      const nextIds = current.filter((id) => remaining.includes(id))
+      return nextIds.length === current.length && nextIds.every((id, index) => id === current[index]) ? current : nextIds
+    })
   }, [groupParticipants, ringingInviteeIds, groupCallId])
 
   const statusText =
