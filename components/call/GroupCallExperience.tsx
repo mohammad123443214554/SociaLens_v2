@@ -62,6 +62,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   const [canSwitchCamera, setCanSwitchCamera] = useState(false)
   const [held, setHeld] = useState(false)
   const [speakerOn, setSpeakerOn] = useState(false)
+  const [networkQuality, setNetworkQuality] = useState<'excellent' | 'good' | 'weak' | 'unknown'>('unknown')
   const [groupCallType, setGroupCallType] = useState<'audio' | 'video'>('audio')
   const [localMediaStream, setLocalMediaStream] = useState<MediaStream | null>(null)
   const [remoteMediaStreams, setRemoteMediaStreams] = useState<Array<{ uid: string; stream: MediaStream }>>([])
@@ -244,6 +245,25 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
         })
       }
     })
+    client.on('network-quality', (stats) => {
+      const values = [stats?.uplinkNetworkQuality, stats?.downlinkNetworkQuality]
+        .filter((value): value is number => typeof value === 'number' && value > 0)
+      if (!values.length) {
+        if (mountedRef.current) setNetworkQuality('unknown')
+        return
+      }
+      const worst = Math.max(...values)
+      if (mountedRef.current) setNetworkQuality(worst <= 2 ? 'excellent' : worst <= 4 ? 'good' : 'weak')
+    })
+    client.on('connection-state-change', (currentState, previousState, reason) => {
+      console.info('[Group Call] Agora connection state:', previousState, '→', currentState, reason)
+      if (!mountedRef.current) return
+      if (currentState === 'RECONNECTING' || currentState === 'DISCONNECTED') {
+        setNetworkQuality('weak')
+      } else if (currentState === 'CONNECTED') {
+        setNetworkQuality('unknown')
+      }
+    })
     client.on('volume-indicator', (volumes: Array<{ uid: string | number; level: number }>) => {
       const active = new Set(volumes.filter((item) => item.level >= 8).map((item) => String(item.uid)))
       if (mountedRef.current) setSpeakingUids(active)
@@ -268,7 +288,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       if (!response.ok) throw new Error(result.error || 'Could not join group call')
       activeCallIdRef.current = incoming.groupCallId
       setGroupCallType(incoming.type)
-      setMuted(false); setCameraOff(false); setHeld(false); setSpeakerOn(false)
+      setMuted(false); setCameraOff(false); setHeld(false); setSpeakerOn(false); setNetworkQuality('unknown')
       setActiveCallId(incoming.groupCallId)
       await refreshRoster(incoming.groupCallId)
       await connectToGroup(incoming.groupCallId, incoming.type)
@@ -312,7 +332,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       activeCallIdRef.current = null
       setActiveCallId(null)
       setRoster([])
-      setMuted(false); setHeld(false); setSpeakerOn(false); setSpeakingUids(new Set())
+      setMuted(false); setCameraOff(false); setHeld(false); setSpeakerOn(false); setNetworkQuality('unknown'); setSpeakingUids(new Set())
       setCallStartedAt(null)
     } catch (error) {
       console.error('[Group Call] leave request failed', error)
@@ -340,7 +360,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       if (!response.ok) throw new Error(data.error || 'Could not start group call')
       activeCallIdRef.current = data.groupCallId
       setGroupCallType('audio')
-      setMuted(false); setCameraOff(false); setHeld(false); setSpeakerOn(false)
+      setMuted(false); setCameraOff(false); setHeld(false); setSpeakerOn(false); setNetworkQuality('unknown')
       setActiveCallId(data.groupCallId)
       await refreshRoster(data.groupCallId)
       await connectToGroup(data.groupCallId, 'audio')
@@ -743,7 +763,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
           canSwitchCamera={canSwitchCamera}
           callDurationSec={elapsedSeconds}
           error={null}
-          networkQuality="unknown"
+          networkQuality={networkQuality}
           onEnd={() => void leaveCall()}
           onToggleMute={() => setMuted((value) => !value)}
           onToggleCamera={() => { if (!localVideoTrackRef.current) return; const next = !cameraOff; setCameraOff(next); void localVideoTrackRef.current.setEnabled(!next && !held) }}
