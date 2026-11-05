@@ -258,7 +258,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
 
   const acceptInvitation = useCallback(async () => {
     if (!incoming || busy) return
-    if (disabled) { onError('You are already on another call. End that call before joining a group voice call.'); return }
+    if (disabled) { onError('You are already on another call. End that call before joining a group call.'); return }
     setBusy(true)
     try {
       const response = await fetch(`/api/group-calls/${incoming.groupCallId}/respond`, {
@@ -279,7 +279,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       await cleanupMedia()
       activeCallIdRef.current = null
       setActiveCallId(null)
-      onError(error instanceof Error ? error.message : 'Could not join group voice call')
+      onError(error instanceof Error ? error.message : 'Could not join group call')
     } finally {
       setBusy(false)
     }
@@ -352,7 +352,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       await cleanupMedia()
       activeCallIdRef.current = null
       setActiveCallId(null)
-      onError(error instanceof Error ? error.message : 'Could not start group voice call')
+      onError(error instanceof Error ? error.message : 'Could not start group call')
     } finally {
       setBusy(false)
     }
