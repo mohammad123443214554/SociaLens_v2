@@ -70,8 +70,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const deliveries = await Promise.all(recipientIds.map(async (recipientId) => {
     const topic = `group-call-reactions:${groupCallId}:${recipientId}`
     try {
+      // Private channels require the REST endpoint's private=true flag.
+      // The batch endpoint does not expose that flag, so it silently sends
+      // a public broadcast that private subscribers will never receive.
       const response = await fetch(
-        `${adminConfig.url}/realtime/v1/api/broadcast`,
+        `${adminConfig.url}/realtime/v1/api/broadcast/${encodeURIComponent(topic)}/events/call-reaction?private=true`,
         {
           method: 'POST',
           cache: 'no-store',
@@ -81,19 +84,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            messages: [{
-              topic,
-              event: 'call-reaction',
-              payload: {
-                id: eventId,
-                callId: groupCallId,
-                reaction: body.reaction,
-                senderId: user.id,
-                senderName,
-                senderAvatar: senderProfile?.avatar_url || null,
-                recipientId,
-              },
-            }],
+            id: eventId,
+            callId: groupCallId,
+            reaction: body.reaction,
+            senderId: user.id,
+            senderName,
+            senderAvatar: senderProfile?.avatar_url || null,
+            recipientId,
           }),
         },
       )
