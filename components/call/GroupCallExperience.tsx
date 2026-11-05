@@ -10,12 +10,35 @@ import { IncomingCallModal } from './IncomingCallModal'
 import { CallScreen } from './CallScreen'
 import { CallReactionLottie } from './CallReactionLottie'
 import { CALL_REACTION_ALL_IDS, CALL_REACTION_CATEGORIES, CALL_REACTION_CUSTOM_OPTIONS, getCallReactionCategory, getCallReactionLabel, isCallReactionId, type CallReactionCategoryId, type CallReactionId } from '@/lib/call-reactions'
+import { pauseRingtone, resumeRingtone } from '@/lib/utils/ringtone'
 
 type Person = { id: string; username: string; fullName: string | null; avatarUrl: string | null }
 type Invitation = { groupCallId: string; invitedBy: string; participants: Person[] }
 type Contact = Person
-type RosterPerson = Person & { status: 'joined' | 'invited' | 'ringing' | 'left' | 'declined' | 'missed'; invitedBy: string | null; inviterAvatarUrl: string | null; isSpeaking?: boolean }
+type RosterPerson = Person & { status: 'joined' | 'invited' | 'ringing' | 'left' | 'declined' | 'missed'; invitedBy: string | null; inviterAvatarUrl: string | null; isOnHold: boolean; holdInitiatedBy: string | null; isSpeaking?: boolean }
 type IncomingGroupReaction = { id: string; reaction: CallReactionId; senderName: string }
+
+async function playGroupCallAnnouncement(fileName: string) {
+  if (typeof window === 'undefined') return
+  pauseRingtone()
+  await new Promise<void>((resolve) => {
+    const audio = new Audio('/audio/calls/' + fileName)
+    audio.preload = 'auto'
+    audio.volume = 1
+    let finished = false
+    const finish = () => {
+      if (finished) return
+      finished = true
+      audio.removeEventListener('ended', finish)
+      audio.removeEventListener('error', finish)
+      resumeRingtone()
+      resolve()
+    }
+    audio.addEventListener('ended', finish, { once: true })
+    audio.addEventListener('error', finish, { once: true })
+    void audio.play().catch((error) => { console.warn('[Group Call] announcement playback failed:', fileName, error); finish() })
+  })
+}
 
 function groupAgoraUid(userId: string) {
   let hash = 0
@@ -58,6 +81,9 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   const activeCallIdRef = useRef<string | null>(null)
   const rosterStatusRef = useRef<Map<string, RosterPerson['status']>>(new Map())
   const announcedDeparturesRef = useRef<Set<string>>(new Set())
+  const announcedHoldChangesRef = useRef<Set<string>>(new Set())
+  const knownJoinedParticipantsRef = useRef<Set<string>>(new Set())
+  const announcementQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   const loadIncoming = useCallback(async () => {
     try {
@@ -73,7 +99,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
   const refreshRoster = useCallback(async (groupCallId: string) => {
     const { data, error } = await supabase
       .from('group_call_participants')
-      .select('user_id,status,invited_by')
+      .select('user_id,status,invited_by,is_on_hold,hold_initiated_by')
       .eq('group_call_id', groupCallId)
       .in('status', ['joined','invited','ringing','left','declined','missed'])
     if (error) {
@@ -96,30 +122,38 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
         status: row.status,
         invitedBy: row.invited_by || null,
         inviterAvatarUrl: row.invited_by ? map.get(row.invited_by)?.avatar_url || null : null,
+        isOnHold: Boolean(row.is_on_hold),
+        holdInitiatedBy: row.hold_initiated_by || null,
       } as RosterPerson
     })
 
-    // Announce each remote participant departure once to the people who remain
-    // in the group. The user who leaves should not hear their own departure cue.
-    const previousStatuses = rosterStatusRef.current
+    // Remember everyone seen joined so overlapping realtime/poll refreshes
+    // cannot erase the transition before the leave announcement is handled.
     for (const person of nextRoster) {
-      const departureKey = `${groupCallId}:${person.id}`
-      if (
-        person.id !== userId &&
-        person.status === 'left' &&
-        previousStatuses.get(person.id) === 'joined' &&
-        !announcedDeparturesRef.current.has(departureKey)
-      ) {
-        announcedDeparturesRef.current.add(departureKey)
-        const audio = new Audio('/audio/calls/group-call-leave.mp3')
-        audio.preload = 'auto'
-        audio.volume = 1
-        void audio.play().catch((playbackError) => {
-          console.warn('[Group Call] participant-leave announcement playback failed', playbackError)
-        })
+      if (person.status === 'joined') knownJoinedParticipantsRef.current.add(person.id)
+      if (person.status === 'left' && person.id !== userId && knownJoinedParticipantsRef.current.has(person.id)) {
+        const departureKey = groupCallId + ':' + person.id
+        if (!announcedDeparturesRef.current.has(departureKey)) {
+          announcedDeparturesRef.current.add(departureKey)
+          knownJoinedParticipantsRef.current.delete(person.id)
+          announcementQueueRef.current = announcementQueueRef.current
+            .then(() => playGroupCallAnnouncement('group-call-leave.mp3'))
+            .catch((playbackError) => console.warn('[Group Call] departure announcement queue failed', playbackError))
+        }
+      }
+      const previous = rosterStatusRef.current.get(person.id)
+      if (person.id !== userId && person.status === 'joined' && previous?.status === 'joined' && previous.isOnHold !== person.isOnHold) {
+        const holdKey = groupCallId + ':' + person.id + ':' + (person.isOnHold ? 'hold' : 'resume')
+        if (!announcedHoldChangesRef.current.has(holdKey)) {
+          announcedHoldChangesRef.current.add(holdKey)
+          const fileName = person.isOnHold ? 'call-on-hold.mp3' : 'call-resumed.mp3'
+          announcementQueueRef.current = announcementQueueRef.current
+            .then(() => playGroupCallAnnouncement(fileName))
+            .catch((playbackError) => console.warn('[Group Call] hold announcement queue failed', playbackError))
+        }
       }
     }
-    rosterStatusRef.current = new Map(nextRoster.map((person) => [person.id, person.status]))
+    rosterStatusRef.current = new Map(nextRoster.map((person) => [person.id, { status: person.status, isOnHold: person.isOnHold }]))
     setRoster(nextRoster)
   }, [supabase])
 
@@ -353,7 +387,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
         setCallStartedAt(null)
         onError(callEnded ? 'The group call has ended.' : 'You are no longer in this group call.')
       }
-    }, 3000)
+    }, 1000)
     return () => { alive = false; window.clearInterval(recovery); void supabase.removeChannel(channel) }
   }, [activeCallId, userId, supabase, refreshRoster, cleanupMedia, onError])
 
@@ -404,7 +438,17 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
     }
   }, [muted, held, speakerOn])
 
-  const toggleHold = () => setHeld((current) => !current)
+  const toggleHold = useCallback(async () => {
+    if (!activeCallId || busy) return
+    const next = !held
+    setHeld(next)
+    const { error } = await supabase.rpc('set_group_voice_call_hold', { p_group_call_id: activeCallId, p_is_on_hold: next })
+    if (error) {
+      setHeld(!next)
+      onError('Could not update your group-call hold status. Please try again.')
+      console.error('[Group Call] hold status update failed', error)
+    }
+  }, [activeCallId, busy, held, supabase, onError])
   const joinedReactionRecipients = roster.filter((person) => person.status === 'joined' && person.id !== userId)
 
   const openReactionPicker = () => {
@@ -554,7 +598,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
           onToggleMute={() => setMuted((value) => !value)}
           onToggleCamera={() => undefined}
           onSwitchCamera={() => undefined}
-          onToggleHold={() => setHeld((value) => !value)}
+          onToggleHold={() => void toggleHold()}
           backgroundBlurEnabled={false}
           backgroundBlurIntensity={0}
           onSetBackgroundBlur={async () => undefined}
