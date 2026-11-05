@@ -339,7 +339,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
 
     let channel: ReturnType<typeof supabase.channel> | null = null
-    let recovery: ReturnType<typeof window.setInterval> | null = null
+    let recovery: number | null = null
     const startEventListener = async () => {
       // Use the database's joined_at as the lower bound. This avoids replaying
       // events from before this member joined and avoids device-clock skew.
