@@ -745,7 +745,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
           networkQuality="unknown"
           onEnd={() => void leaveCall()}
           onToggleMute={() => setMuted((value) => !value)}
-          onToggleCamera={() => { const next = !cameraOff; setCameraOff(next); void localVideoTrackRef.current?.setEnabled(!next && !held) }}
+          onToggleCamera={() => { if (!localVideoTrackRef.current) return; const next = !cameraOff; setCameraOff(next); void localVideoTrackRef.current.setEnabled(!next && !held) }}
           onSwitchCamera={() => { void (async () => { try { const Agora = (await import('agora-rtc-sdk-ng')).default; const cameras = await Agora.getCameras(); const current = localVideoTrackRef.current; if (!current || cameras.length < 2) return; const currentId = current.getMediaStreamTrack().getSettings().deviceId; const index = cameras.findIndex((camera) => camera.deviceId === currentId); await current.setDevice(cameras[(index + 1) % cameras.length].deviceId) } catch (error) { console.warn('[Group Call] camera switch failed', error) } })() }}
           onToggleHold={() => void toggleHold()}
           backgroundBlurEnabled={false}
