@@ -78,6 +78,8 @@ export function CallScreen({
   const [selectedInvitees, setSelectedInvitees] = useState<string[]>([])
   const [loadingContacts, setLoadingContacts] = useState(false)
   const [sendingInvites, setSendingInvites] = useState(false)
+  const [ringingInviteeIds, setRingingInviteeIds] = useState<string[]>([])
+  const announcedInviteStatusesRef = useRef<Set<string>>(new Set())
   const [inviteError, setInviteError] = useState<string | null>(null)
   const contactsLoadedRef = useRef(false)
   const contactsRequestRef = useRef<Promise<void> | null>(null)
@@ -388,11 +390,40 @@ export function CallScreen({
     }
   }, [phase, ringtoneId, ringtoneVolume])
 
+  useEffect(() => {
+    if (!ringingInviteeIds.length) return
+    startRingtone(ringtoneId, ringtoneVolume)
+    return () => stopRingtone()
+  }, [ringingInviteeIds.length, ringtoneId, ringtoneVolume])
+
+  useEffect(() => {
+    if (!ringingInviteeIds.length || !groupParticipants.length) return
+    const remaining: string[] = []
+    for (const inviteeId of ringingInviteeIds) {
+      const member = groupParticipants.find((person) => person.id === inviteeId)
+      if (!member || member.status === 'invited' || member.status === 'ringing') {
+        remaining.push(inviteeId)
+        continue
+      }
+      if (member.status === 'declined' || member.status === 'missed' || member.status === 'busy') {
+        const key = `${groupCallId || 'pending'}:${inviteeId}:${member.status}`
+        if (!announcedInviteStatusesRef.current.has(key)) {
+          announcedInviteStatusesRef.current.add(key)
+          const file = member.status === 'busy' ? 'call-user-busy.mp3' : member.status === 'missed' ? 'call-unanswered.mp3' : 'call-rejected.mp3'
+          const audio = new Audio(`/audio/calls/${file}`)
+          audio.volume = 1
+          void audio.play().catch((playbackError) => console.warn('[Call] group invite announcement playback failed', playbackError))
+        }
+      }
+    }
+    setRingingInviteeIds((current) => current.filter((id) => remaining.includes(id)))
+  }, [groupParticipants, ringingInviteeIds, groupCallId])
+
   const statusText =
     error ? error :
     phase === 'outgoing-ringing' ? 'Ringing...' :
     phase === 'connecting' ? 'Connecting...' :
-    phase === 'in-call' ? (isOnHold ? `On hold · ${formatDuration(callDurationSec)}` : formatDuration(callDurationSec)) : ''
+    phase === 'in-call' ? (ringingInviteeIds.length ? 'Ringing...' : isOnHold ? `On hold · ${formatDuration(callDurationSec)}` : formatDuration(callDurationSec)) : ''
 
   const isVideoCall = type === 'video'
   const showRemoteVideo = isVideoCall && remoteVideoAvailable && phase === 'in-call'
@@ -886,14 +917,20 @@ export function CallScreen({
               {inviteError && <p className="mx-1 mt-2 rounded-xl border border-red-300/20 bg-red-400/[0.08] p-3 text-xs text-red-200">{inviteError}</p>}
             </div>
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-pink-100/[0.12] pt-4">
-              <span className="text-xs text-pink-100/65">{selectedInvitees.length} selected · {groupCallId ? 'up to 9 more' : 'up to 8 more'}</span>
+              <span />
               <button type="button" disabled={!selectedInvitees.length || sendingInvites || !onAddPeopleToGroup} onClick={async () => {
                 if (!onAddPeopleToGroup) return
                 setSendingInvites(true); setInviteError(null)
-                try { await onAddPeopleToGroup(selectedInvitees); setAddPeopleOpen(false); setSelectedInvitees([]) }
+                try {
+                  const inviteeIds = [...selectedInvitees]
+                  await onAddPeopleToGroup(inviteeIds)
+                  setRingingInviteeIds((current) => [...new Set([...current, ...inviteeIds])])
+                  setAddPeopleOpen(false)
+                  setSelectedInvitees([])
+                }
                 catch (error) { setInviteError(error instanceof Error ? error.message : 'Could not add people') }
                 finally { setSendingInvites(false) }
-              }} className="rounded-xl border border-pink-200/[0.22] bg-pink-300/[0.10] px-5 py-3 text-sm font-semibold text-pink-50 shadow-[0_4px_18px_rgba(255,105,180,0.08)] backdrop-blur-xl transition-colors hover:bg-pink-300/[0.14] disabled:opacity-40">{sendingInvites ? 'Adding…' : 'Done'}</button>
+              }} className="rounded-xl border border-pink-200/[0.22] bg-pink-300/[0.10] px-5 py-3 text-sm font-semibold text-pink-50 shadow-[0_4px_18px_rgba(255,105,180,0.08)] backdrop-blur-xl transition-colors hover:bg-pink-300/[0.14] disabled:opacity-40">{sendingInvites ? 'Joining…' : 'Join'}</button>
             </div>
           </div>
         </div>
