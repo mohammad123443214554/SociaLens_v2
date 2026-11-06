@@ -256,7 +256,7 @@ export function WallpaperModal({ onDone, onClose, saving, initialImageUrl, initi
   }
 
   return (
-    <div className="fixed inset-0 z-[140] flex flex-col bg-background text-foreground">
+    <div className="absolute inset-0 z-[140] flex flex-col bg-background text-foreground">
       {/* Hidden native file input - this is what opens the device's photo picker */}
       <input
         ref={fileInputRef}
