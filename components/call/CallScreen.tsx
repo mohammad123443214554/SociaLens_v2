@@ -470,7 +470,7 @@ export function CallScreen({
         console.warn('[Call] Web Audio routing unavailable; using native audio playback', audioError)
         if (remoteAudioRef.current) {
           remoteAudioRef.current.muted = false
-          remoteAudioRef.current.volume = isSpeakerOn ? 1 : 0.55
+          remoteAudioRef.current.volume = Math.min(1, (isSpeakerOn ? 1 : 0.55) * (outputVolume / 100))
         }
       }
     }
@@ -487,7 +487,7 @@ export function CallScreen({
 
   useEffect(() => {
     if (audioGainRef.current) audioGainRef.current.gain.setTargetAtTime((isSpeakerOn ? 2.2 : 0.55) * (outputVolume / 100), audioContextRef.current?.currentTime ?? 0, 0.08)
-    if (!audioGainRef.current && remoteAudioRef.current) remoteAudioRef.current.volume = isSpeakerOn ? 1 : 0.55
+    if (!audioGainRef.current && remoteAudioRef.current) remoteAudioRef.current.volume = Math.min(1, (isSpeakerOn ? 1 : 0.55) * (outputVolume / 100))
     const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
     if (audioSession) {
       try { audioSession.type = isSpeakerOn ? 'playback' : 'play-and-record' } catch {}
