@@ -145,7 +145,7 @@ export default function ChatWallpaperRoutePage() {
         initialImageUrl={editExisting ? currentWallpaper?.wallpaper_url : undefined}
         initialPosition={editExisting ? { x: currentWallpaper?.position_x ?? 50, y: currentWallpaper?.position_y ?? 50 } : undefined}
         saveLabel={editExisting ? 'Save changes' : 'Apply wallpaper'}
-        onClose={() => router.replace(`/chat/${chatId}/settings`)}
+        onClose={() => router.replace(`/chat/${chatId}/settings/wallpaper`)}
         saving={saving}
   />
   )
