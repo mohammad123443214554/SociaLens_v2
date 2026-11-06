@@ -50,9 +50,8 @@ export default function ChatCallSettingsRoutePage() {
   return (
     <div className="min-h-[100dvh] w-full bg-background">
       <CallSettingsPage
+        userId={user.id}
         onBack={() => router.replace(`/chat/${chatId}/settings`)}
-        onOpenVolume={() => router.push(`/chat/${chatId}/settings/call/volume`)}
-        onOpenRingtone={() => router.push(`/chat/${chatId}/settings/call/ringtone`)}
       />
     </div>
   )
