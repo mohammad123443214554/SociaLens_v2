@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import AgoraRTC from 'agora-rtc-sdk-ng'
 import type { IAgoraRTCClient, ICameraVideoTrack, ILocalAudioTrack } from 'agora-rtc-sdk-ng'
 import { createClient } from '@/lib/supabase/client'
+import { useCallSettings } from '@/lib/hooks/useChatSettings'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Phone, PhoneOff, Users, X, Plus, Check, Mic, MicOff, Volume2, Pause, Play, Signal, SmilePlus, Search, MoreHorizontal, ShieldCheck } from 'lucide-react'
 import { IncomingCallModal } from './IncomingCallModal'
@@ -45,10 +46,15 @@ function groupAgoraUid(userId: string) {
   return (hash % 1_000_000_000) + 1
 }
 
-type Props = { userId: string; disabled?: boolean; onError: (message: string) => void }
+type Props = { userId: string; disabled?: boolean; onError: (message: string) => void; ringtoneId?: string; ringtoneVolume?: number }
 
-export function GroupCallExperience({ userId, disabled = false, onError }: Props) {
+export function GroupCallExperience({ userId, disabled = false, onError, ringtoneId, ringtoneVolume }: Props) {
   const [supabase] = useState(() => createClient())
+  const { data: callSettings } = useCallSettings(userId)
+  const outputVolumeRef = useRef(100)
+  const inputVolumeRef = useRef(100)
+  outputVolumeRef.current = callSettings?.outputVolume ?? 100
+  inputVolumeRef.current = callSettings?.inputVolume ?? 100
   const [incoming, setIncoming] = useState<Invitation | null>(null)
   const [activeCallId, setActiveCallId] = useState<string | null>(null)
   const [roster, setRoster] = useState<RosterPerson[]>([])
@@ -166,6 +172,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
       ANS: true,
       AGC: true,
     })
+    try { audioTrack.setVolume(inputVolumeRef.current) } catch {}
     localTrackRef.current = audioTrack
 
     let videoTrack: ICameraVideoTrack | null = null
@@ -190,7 +197,7 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
         await client.subscribe(remoteUser, mediaType)
         remoteUsersRef.current.set(remoteUser.uid, remoteUser)
         if (mediaType === 'audio') {
-          remoteUser.audioTrack?.setVolume(heldRef.current ? 0 : speakerRef.current ? 100 : 55)
+          remoteUser.audioTrack?.setVolume(heldRef.current ? 0 : Math.round((speakerRef.current ? 100 : 55) * outputVolumeRef.current / 100))
           remoteUser.audioTrack?.play()
         }
         if (mediaType === 'video' && remoteUser.videoTrack) {
@@ -562,10 +569,10 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
     speakerRef.current = speakerOn
     void localTrackRef.current?.setEnabled(!muted && !held)
     for (const remote of remoteUsersRef.current.values()) {
-      remote.audioTrack?.setVolume(held ? 0 : speakerOn ? 100 : 55)
+      remote.audioTrack?.setVolume(held ? 0 : Math.round((speakerOn ? 100 : 55) * outputVolumeRef.current / 100))
     }
     void localVideoTrackRef.current?.setEnabled(!held && !cameraOff)
-  }, [muted, held, speakerOn, cameraOff])
+  }, [muted, held, speakerOn, cameraOff, callSettings?.outputVolume, callSettings?.inputVolume])
 
   const toggleHold = useCallback(async () => {
     if (!activeCallId || busy) return
@@ -651,8 +658,8 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
           type={incoming.type}
           isGroupCall
           groupParticipants={incoming.participants}
-          ringtoneId={undefined}
-          ringtoneVolume={undefined}
+          ringtoneId={ringtoneId}
+          ringtoneVolume={ringtoneVolume}
           onAccept={() => void acceptInvitation()}
           onReject={() => void declineInvitation()}
           busy={busy || disabled}
@@ -724,6 +731,9 @@ export function GroupCallExperience({ userId, disabled = false, onError }: Props
           callDurationSec={elapsedSeconds}
           error={null}
           networkQuality={networkQuality}
+          ringtoneId={ringtoneId}
+          ringtoneVolume={ringtoneVolume}
+          outputVolume={callSettings?.outputVolume ?? 100}
           onEnd={() => void leaveCall()}
           onToggleMute={() => setMuted((value) => !value)}
           onToggleCamera={() => { if (!localVideoTrackRef.current) return; const next = !cameraOff; setCameraOff(next); void localVideoTrackRef.current.setEnabled(!next && !held) }}
