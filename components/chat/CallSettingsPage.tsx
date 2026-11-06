@@ -86,6 +86,7 @@ export function CallSettingsPage({ userId, onBack }: CallSettingsPageProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto w-full max-w-xl mx-auto p-4">
+        <div className="space-y-4">
         <div className="rounded-2xl border bg-card divide-y overflow-hidden">
           <div className="px-4 py-3 bg-muted/20">
             <div className="flex items-center gap-2"><Volume2 className="h-4 w-4 text-muted-foreground" /><h2 className="text-sm font-semibold">Volume</h2></div>
@@ -95,6 +96,8 @@ export function CallSettingsPage({ userId, onBack }: CallSettingsPageProps) {
           <VolumeSlider label="Input Volume" description="Controls the microphone level sent to other people in all call types." value={inputVolume} max={200} icon={Mic} onChange={(value) => { setInputVolume(value); save({ inputVolume: value }) }} />
           <VolumeSlider label="Ringtone Volume" description="Controls ringtone loudness for incoming calls and outgoing ringing." value={ringtoneVolume} icon={Music2} onChange={(value) => { setRingtoneVolume(value); save({ volume: value / 100 }); if (previewing) previewRingtone(previewing, value / 100) }} />
 
+        </div>
+        <div className="rounded-2xl border bg-card divide-y overflow-hidden">
           <div className="px-4 py-3 bg-muted/20">
             <div className="flex items-center gap-2"><Music2 className="h-4 w-4 text-muted-foreground" /><h2 className="text-sm font-semibold">Ringtones</h2><span className="ml-auto text-xs text-muted-foreground">50 tones</span></div>
             <p className="mt-1 text-xs text-muted-foreground">Choose your ringtone. Tap the play icon to preview it.</p>
@@ -116,6 +119,7 @@ export function CallSettingsPage({ userId, onBack }: CallSettingsPageProps) {
             )
           })}
           <p className="px-4 py-3 text-xs text-muted-foreground">Your selected ringtone and volume preferences are saved to your account and apply across normal voice, group voice, normal video and group video calls. Previews repeat continuously until stopped or you leave this page.</p>
+        </div>
         </div>
       </div>
     </div>
