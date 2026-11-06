@@ -229,7 +229,7 @@ export function useCallEngine(currentUserId?: string) {
   const reconnectAttemptsRef = useRef(0)
   const reconnectActiveCallRef = useRef<((activeCall: CallRow) => void) | null>(null)
 
-  const disposeDailyInputGain = () => {
+  const disposeDailyInputGain = useCallback(() => {
     const current = dailyInputGainRef.current
     if (!current) return
     dailyInputGainRef.current = null
@@ -237,7 +237,7 @@ export function useCallEngine(currentUserId?: string) {
     try { current.gain.disconnect() } catch {}
     try { current.processedTrack.stop() } catch {}
     if (current.context.state !== 'closed') void current.context.close().catch(() => {})
-  }
+  }, [])
 
   useEffect(() => {
     const volume = Math.max(0, Math.min(200, callSettings?.inputVolume ?? 100))
@@ -317,7 +317,7 @@ export function useCallEngine(currentUserId?: string) {
     }
     providerRef.current = null
     startedAtMsRef.current = null
-  }, [])
+  }, [disposeDailyInputGain])
 
   /**
    * Tears the transport down WITHOUT reporting usage or logging anything -
@@ -358,7 +358,7 @@ export function useCallEngine(currentUserId?: string) {
       dailyRef.current = null
     }
     providerRef.current = null
-  }, [])
+  }, [disposeDailyInputGain])
 
   // Logs a finished call into the chat as a message, like a normal phone
   // app does ("Voice call - 2:14", "Missed call", etc). Only the caller's
