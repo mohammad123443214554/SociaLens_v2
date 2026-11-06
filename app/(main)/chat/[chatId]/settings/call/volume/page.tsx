@@ -1,7 +1,5 @@
-'use client'
+import { redirect } from 'next/navigation'
 
-import { CallSettingsSubpage } from '@/components/chat/CallSettingsSubpage'
-
-export default function VolumeSettingsRoutePage() {
-  return <CallSettingsSubpage page="volume" />
+export default function LegacyCallVolumeSettingsRoute() {
+  redirect('../')
 }
