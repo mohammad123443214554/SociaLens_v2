@@ -268,7 +268,7 @@ export function WallpaperModal({ onDone, onClose, saving, initialImageUrl, initi
 
       {!previewUrl ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-          <div className="rounded-2xl border border-border bg-muted/50 p-5"><ZoomIn className="h-8 w-8 text-muted-foreground" /></div>
+          <img src="/images/wallpaper/Glossy%20Neon%20Add%20Image%20Icon.png" alt="Add wallpaper photo" width="240" height="160" className="h-36 w-52 object-contain" />
           <div><p className="font-semibold">{initialImageLoading ? 'Loading current wallpaper…' : 'Choose a wallpaper photo'}</p><p className="mt-1 text-sm text-muted-foreground">Select a photo to open the wallpaper editor.</p></div>
           <button type="button" onClick={() => fileInputRef.current?.click()} disabled={initialImageLoading} className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-6 py-3 font-medium text-white disabled:opacity-50">Choose photo</button>
           <button type="button" onClick={onClose} className="rounded-xl px-6 py-2 text-sm text-muted-foreground hover:bg-muted">Cancel</button>
