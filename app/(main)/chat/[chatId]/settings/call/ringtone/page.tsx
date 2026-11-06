@@ -1,7 +1,5 @@
-'use client'
+import { redirect } from 'next/navigation'
 
-import { CallSettingsSubpage } from '@/components/chat/CallSettingsSubpage'
-
-export default function RingtoneSettingsRoutePage() {
-  return <CallSettingsSubpage page="ringtone" />
+export default function LegacyCallRingtoneSettingsRoute() {
+  redirect('../')
 }
