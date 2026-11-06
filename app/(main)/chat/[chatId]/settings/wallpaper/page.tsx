@@ -140,15 +140,13 @@ export default function ChatWallpaperRoutePage() {
   }
 
   return (
-    <div className="relative mx-auto my-4 min-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-hidden bg-background">
-      <WallpaperModal
+    <WallpaperModal
         onDone={handleSave}
         initialImageUrl={editExisting ? currentWallpaper?.wallpaper_url : undefined}
         initialPosition={editExisting ? { x: currentWallpaper?.position_x ?? 50, y: currentWallpaper?.position_y ?? 50 } : undefined}
         saveLabel={editExisting ? 'Save changes' : 'Apply wallpaper'}
         onClose={() => router.replace(`/chat/${chatId}/settings`)}
         saving={saving}
-      />
-    </div>
+  />
   )
 }
