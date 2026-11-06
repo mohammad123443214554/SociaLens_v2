@@ -567,6 +567,7 @@ export function GroupCallExperience({ userId, disabled = false, onError, rington
   useEffect(() => {
     heldRef.current = held
     speakerRef.current = speakerOn
+    try { localTrackRef.current?.setVolume(inputVolumeRef.current) } catch {}
     void localTrackRef.current?.setEnabled(!muted && !held)
     for (const remote of remoteUsersRef.current.values()) {
       remote.audioTrack?.setVolume(held ? 0 : Math.round((speakerOn ? 100 : 55) * outputVolumeRef.current / 100))
