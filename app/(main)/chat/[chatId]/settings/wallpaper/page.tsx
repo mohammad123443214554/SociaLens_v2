@@ -140,7 +140,7 @@ export default function ChatWallpaperRoutePage() {
   }
 
   return (
-    <div className="relative mx-auto my-4 min-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
+    <div className="relative mx-auto my-4 min-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-hidden bg-background">
       <WallpaperModal
         onDone={handleSave}
         initialImageUrl={editExisting ? currentWallpaper?.wallpaper_url : undefined}
