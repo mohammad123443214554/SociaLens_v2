@@ -399,6 +399,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           userId={user.id}
           disabled={engine.phase !== 'idle'}
           onError={reportBlocked}
+          ringtoneId={callSettings?.ringtone}
+          ringtoneVolume={callSettings?.volume}
         />
       )}
 
@@ -463,6 +465,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           onSetCallEffect={engine.setCallEffect}
           ringtoneId={callSettings?.ringtone}
           ringtoneVolume={callSettings?.volume}
+          outputVolume={callSettings?.outputVolume}
           onEnd={engine.phase === 'outgoing-ringing' ? engine.cancelOutgoing : engine.hangup}
           onToggleMute={engine.toggleMute}
           onToggleCamera={engine.toggleCamera}
