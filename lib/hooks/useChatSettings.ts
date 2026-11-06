@@ -16,15 +16,17 @@ export function useCallSettings(userId?: string) {
   return useQuery({
     queryKey: ['call-settings', userId],
     queryFn: async () => {
-      if (!userId) return { ringtone: DEFAULT_RINGTONE_ID, volume: DEFAULT_RINGTONE_VOLUME }
+      if (!userId) return { ringtone: DEFAULT_RINGTONE_ID, volume: DEFAULT_RINGTONE_VOLUME, outputVolume: 100, inputVolume: 100 }
       const { data } = await supabase
         .from('profiles')
-        .select('call_ringtone, call_ringtone_volume')
+        .select('call_ringtone, call_ringtone_volume, call_output_volume, call_input_volume')
         .eq('id', userId)
         .maybeSingle()
       return {
         ringtone: data?.call_ringtone || DEFAULT_RINGTONE_ID,
         volume: data?.call_ringtone_volume ?? DEFAULT_RINGTONE_VOLUME,
+        outputVolume: data?.call_output_volume ?? 100,
+        inputVolume: data?.call_input_volume ?? 100,
       }
     },
     enabled: !!userId,
@@ -36,10 +38,12 @@ export function useUpdateCallSettings() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ userId, ringtone, volume }: { userId: string; ringtone?: string; volume?: number }) => {
+    mutationFn: async ({ userId, ringtone, volume, outputVolume, inputVolume }: { userId: string; ringtone?: string; volume?: number; outputVolume?: number; inputVolume?: number }) => {
       const patch: Record<string, any> = {}
       if (ringtone !== undefined) patch.call_ringtone = ringtone
       if (volume !== undefined) patch.call_ringtone_volume = volume
+      if (outputVolume !== undefined) patch.call_output_volume = Math.max(0, Math.min(100, Math.round(outputVolume)))
+      if (inputVolume !== undefined) patch.call_input_volume = Math.max(0, Math.min(200, Math.round(inputVolume)))
       const { error } = await supabase.from('profiles').update(patch).eq('id', userId)
       if (error) throw error
     },
