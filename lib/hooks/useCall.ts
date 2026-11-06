@@ -750,7 +750,7 @@ export function useCallEngine(currentUserId?: string) {
         })
         dailyRef.current = call
 
-        call.on('track-started', (ev: any) => {
+        call.on('track-started', async (ev: any) => {
           if (!ev?.track) return
           const targetStream = ev.participant?.local ? localStreamObjRef.current : remoteStreamObjRef.current
           if (ev.participant?.local && ev.track.kind === 'audio' && dailyInputGainRef.current?.processedTrack !== ev.track) {
