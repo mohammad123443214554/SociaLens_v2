@@ -33,7 +33,6 @@ export function getRingtoneById(id?: string | null): RingtoneOption {
 let audioContext: AudioContext | null = null
 let activeSource: AudioBufferSourceNode | null = null
 let activeGain: GainNode | null = null
-let activeBuffer: AudioBuffer | null = null
 let activeRingtoneId = DEFAULT_RINGTONE_ID
 let activeVolume = DEFAULT_RINGTONE_VOLUME
 let shouldPlay = false
@@ -61,7 +60,6 @@ function stopSource() {
     try { activeGain.disconnect() } catch {}
     activeGain = null
   }
-  activeBuffer = null
 }
 
 function stopPlaybackState() {
@@ -96,7 +94,6 @@ async function beginPlayback() {
       gain.gain.value = Math.max(0, Math.min(1, activeVolume))
       source.connect(gain)
       gain.connect(context.destination)
-      activeBuffer = buffer
       activeSource = source
       activeGain = gain
       source.onended = () => {
