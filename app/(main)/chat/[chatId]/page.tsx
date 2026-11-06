@@ -10,7 +10,6 @@ import { MessageInput } from '@/components/chat/MessageInput'
 import { NicknameModal } from '@/components/chat/NicknameModal'
 import { WallpaperModal } from '@/components/chat/WallpaperModal'
 import { ChatSettingsPage } from '@/components/chat/ChatSettingsPage'
-import { CallSettingsPage } from '@/components/chat/CallSettingsPage'
 import { useUser } from '@/lib/hooks/useUser'
 import { useRealtimeMessages } from '@/lib/hooks/useRealtimeMessages'
 import { useActiveStories } from '@/lib/hooks/useStories'
@@ -43,7 +42,6 @@ export default function ChatRoomPage() {
   const [showNicknameModal, setShowNicknameModal] = useState(false)
   const [showWallpaperModal, setShowWallpaperModal] = useState(false)
   const [showSettingsPage, setShowSettingsPage] = useState(false)
-  const [showCallSettings, setShowCallSettings] = useState(false)
   const [savingWallpaper, setSavingWallpaper] = useState(false)
   const [showRestrictionPopup, setShowRestrictionPopup] = useState(false)
   const router = useRouter()
@@ -502,13 +500,7 @@ export default function ChatRoomPage() {
           onRemoveWallpaper={handleRemoveWallpaper}
           onToggleBlock={handleToggleBlock}
           onDeleteChat={handleDeleteChat}
-          onOpenCallSettings={() => setShowCallSettings(true)}
-        />
-      )}
-      {showCallSettings && (
-        <CallSettingsPage
-          userId={user.id}
-          onBack={() => setShowCallSettings(false)}
+          onOpenCallSettings={() => router.push(`/chat/${chatId}/settings/call`)}
         />
       )}
       {(showWallpaperModal || isWallpaperRoute) && (
