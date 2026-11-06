@@ -90,6 +90,7 @@ interface CallScreenProps {
   networkQuality: 'excellent' | 'good' | 'weak' | 'unknown'
   ringtoneId?: string
   ringtoneVolume?: number
+  outputVolume?: number
   onEnd: () => void
   onToggleMute: () => void
   onToggleCamera: () => void
@@ -112,7 +113,7 @@ function formatDuration(sec: number) {
 export function CallScreen({
   userId, phase, type, peerName, peerId = null, peerAvatar, localStream, remoteStream, groupRemoteStreams = [], onSendCallReaction, incomingReaction,
   groupCallId = null, groupParticipants = [], speakerMode, onToggleSpeakerMode, onAddPeopleToGroup,
-  isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume,
+  isMuted, isCameraOff, isOnHold, canSwitchCamera, callDurationSec, error, networkQuality, ringtoneId, ringtoneVolume, outputVolume = 100,
   onEnd, onToggleMute, onToggleCamera, onSwitchCamera, onToggleHold,
   backgroundBlurEnabled, backgroundBlurIntensity, onSetBackgroundBlur,
   selectedCallEffectId, callEffectIntensity, onSetCallEffect,
@@ -445,7 +446,7 @@ export function CallScreen({
         context = new AudioContextClass()
         source = context.createMediaStreamSource(remoteStream)
         const gain = context.createGain()
-        gain.gain.value = isSpeakerOn ? 2.2 : 0.55
+        gain.gain.value = (isSpeakerOn ? 2.2 : 0.55) * (outputVolume / 100)
         source.connect(gain)
         gain.connect(context.destination)
         audioContextRef.current = context
@@ -460,7 +461,7 @@ export function CallScreen({
           audioGainRef.current = null
           if (remoteAudioRef.current) {
             remoteAudioRef.current.muted = false
-            remoteAudioRef.current.volume = isSpeakerOn ? 1 : 0.55
+            remoteAudioRef.current.volume = Math.min(1, (isSpeakerOn ? 1 : 0.55) * (outputVolume / 100))
           }
           await context.close().catch(() => {})
           context = null
@@ -482,16 +483,16 @@ export function CallScreen({
       if (context && context.state !== 'closed') void context.close().catch(() => {})
       if (remoteAudioRef.current) remoteAudioRef.current.muted = false
     }
-  }, [remoteStream, type, isSpeakerOn])
+  }, [remoteStream, type, isSpeakerOn, outputVolume])
 
   useEffect(() => {
-    if (audioGainRef.current) audioGainRef.current.gain.setTargetAtTime(isSpeakerOn ? 2.2 : 0.55, audioContextRef.current?.currentTime ?? 0, 0.08)
+    if (audioGainRef.current) audioGainRef.current.gain.setTargetAtTime((isSpeakerOn ? 2.2 : 0.55) * (outputVolume / 100), audioContextRef.current?.currentTime ?? 0, 0.08)
     if (!audioGainRef.current && remoteAudioRef.current) remoteAudioRef.current.volume = isSpeakerOn ? 1 : 0.55
     const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
     if (audioSession) {
       try { audioSession.type = isSpeakerOn ? 'playback' : 'play-and-record' } catch {}
     }
-  }, [isSpeakerOn, remoteStream])
+  }, [isSpeakerOn, remoteStream, outputVolume])
 
   useLayoutEffect(() => {
     if (type !== 'video' || !pipVideoRef.current) return
