@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useCallSettings } from '@/lib/hooks/useChatSettings'
 import { RING_TIMEOUT_MS } from '@/lib/utils/webrtc'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { canAccessByPrivacy } from '@/lib/utils/privacyAccess'
@@ -168,6 +169,9 @@ function playCallAnnouncement(fileName: string): Promise<void> {
  */
 export function useCallEngine(currentUserId?: string) {
   const supabase = createClient()
+  const { data: callSettings } = useCallSettings(currentUserId)
+  const inputVolumeRef = useRef(100)
+  inputVolumeRef.current = callSettings?.inputVolume ?? 100
 
   const [phase, setPhase] = useState<CallPhase>('idle')
   const [call, setCall] = useState<CallRow | null>(null)
@@ -194,6 +198,7 @@ export function useCallEngine(currentUserId?: string) {
   const remoteAgoraVideoTracksRef = useRef<Map<string, MediaStreamTrack>>(new Map())
   const agoraRef = useRef<{ client: any; audioTrack: any; videoTrack: any } | null>(null)
   const dailyRef = useRef<any>(null)
+  const dailyInputGainRef = useRef<{ context: AudioContext; source: MediaStreamAudioSourceNode; gain: GainNode; processedTrack: MediaStreamTrack } | null>(null)
   const backgroundBlurProcessorRef = useRef<{ processor: CallBackgroundBlurProcessor; rawTrack: MediaStreamTrack; processedTrack: MediaStreamTrack; sourceTrack?: MediaStreamTrack; originalTrack?: MediaStreamTrack } | null>(null)
   const callEffectsEngineRef = useRef<CallVideoEffectsEngine | null>(null)
   const callEffectsAgoraTrackRef = useRef<any>(null)
@@ -223,6 +228,23 @@ export function useCallEngine(currentUserId?: string) {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptsRef = useRef(0)
   const reconnectActiveCallRef = useRef<((activeCall: CallRow) => void) | null>(null)
+
+  const disposeDailyInputGain = () => {
+    const current = dailyInputGainRef.current
+    if (!current) return
+    dailyInputGainRef.current = null
+    try { current.source.disconnect() } catch {}
+    try { current.gain.disconnect() } catch {}
+    try { current.processedTrack.stop() } catch {}
+    if (current.context.state !== 'closed') void current.context.close().catch(() => {})
+  }
+
+  useEffect(() => {
+    const volume = Math.max(0, Math.min(200, callSettings?.inputVolume ?? 100))
+    try { agoraRef.current?.audioTrack?.setVolume(volume) } catch {}
+    const dailyGain = dailyInputGainRef.current
+    if (dailyGain) dailyGain.gain.gain.setTargetAtTime(volume / 100, dailyGain.context.currentTime, 0.06)
+  }, [callSettings?.inputVolume])
 
   useEffect(() => { callRef.current = call }, [call])
   selectedCallEffectIdRef.current = selectedCallEffectId
@@ -287,6 +309,7 @@ export function useCallEngine(currentUserId?: string) {
       try { await client.leave() } catch {}
       agoraRef.current = null
     }
+    disposeDailyInputGain()
     if (dailyRef.current) {
       try { await dailyRef.current.leave() } catch {}
       try { dailyRef.current.destroy() } catch {}
@@ -328,6 +351,7 @@ export function useCallEngine(currentUserId?: string) {
       try { await client.leave() } catch {}
       agoraRef.current = null
     }
+    disposeDailyInputGain()
     if (dailyRef.current) {
       try { await dailyRef.current.leave() } catch {}
       try { dailyRef.current.destroy() } catch {}
@@ -519,6 +543,7 @@ export function useCallEngine(currentUserId?: string) {
             })
           : Promise.resolve(null)
         const [audioTrack, videoTrack] = await Promise.all([audioPromise, videoPromise])
+        try { audioTrack.setVolume(Math.max(0, Math.min(200, inputVolumeRef.current))) } catch {}
         if (videoTrack) {
           try {
             const cameras = await AgoraRTC.getCameras()
@@ -728,6 +753,29 @@ export function useCallEngine(currentUserId?: string) {
         call.on('track-started', (ev: any) => {
           if (!ev?.track) return
           const targetStream = ev.participant?.local ? localStreamObjRef.current : remoteStreamObjRef.current
+          if (ev.participant?.local && ev.track.kind === 'audio' && dailyInputGainRef.current?.processedTrack !== ev.track) {
+            try {
+              disposeDailyInputGain()
+              const context = new AudioContext()
+              const source = context.createMediaStreamSource(new MediaStream([ev.track]))
+              const gain = context.createGain()
+              const destination = context.createMediaStreamDestination()
+              gain.gain.value = inputVolumeRef.current / 100
+              source.connect(gain)
+              gain.connect(destination)
+              const processedTrack = destination.stream.getAudioTracks()[0]
+              if (processedTrack) {
+                dailyInputGainRef.current = { context, source, gain, processedTrack }
+                await context.resume()
+                await call.setInputDevicesAsync({ audioSource: processedTrack })
+              } else {
+                await context.close()
+              }
+            } catch (gainError) {
+              console.warn('[Daily] microphone input volume processing unavailable; using native input', gainError)
+              disposeDailyInputGain()
+            }
+          }
           upsertTrack(targetStream, ev.track)
           if (ev.participant?.local) setLocalStream(new MediaStream(localStreamObjRef.current.getTracks()))
           else {
