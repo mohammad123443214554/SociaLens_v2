@@ -84,7 +84,7 @@ export default function ArchivePage() {
     if (aperonixError) {
       console.error('Could not load archived Aperonix chats', aperonixError)
     } else {
-      setAperonixChats(archivedAperonix || [])
+      setAperonixChats([...(archivedAperonix || [])].sort((a: any, b: any) => Number(b.pinned) - Number(a.pinned) || new Date(b.archived_at || b.updated_at).getTime() - new Date(a.archived_at || a.updated_at).getTime()))
     }
 
     const { data: archivedVoice, error: voiceError } = await supabase
@@ -94,7 +94,7 @@ export default function ArchivePage() {
       .not('archived_at', 'is', null)
       .order('archived_at', { ascending: false })
     if (voiceError) console.error('Could not load archived voice conversations', voiceError)
-    else setVoiceConversations(archivedVoice || [])
+    else setVoiceConversations([...(archivedVoice || [])].sort((a: any, b: any) => Number(b.pinned) - Number(a.pinned) || new Date(b.archived_at || b.updated_at).getTime() - new Date(a.archived_at || a.updated_at).getTime()))
 
     // Archived chats are intentionally excluded from the unread badge
     // everywhere else, so this list doesn't show one either - it's a
@@ -119,6 +119,23 @@ export default function ArchivePage() {
 
   const getOther = (chat: ChatRow) =>
     chat.participant1_id === user.id ? chat.participant2 : chat.participant1
+
+  const handleUserChatPin = async (chat: ChatRow, nextPinned: boolean) => {
+    const current = chat.pinned_by || []
+    const next = nextPinned
+      ? [...new Set([...current, user.id])]
+      : current.filter((id: string) => id !== user.id)
+    setChats(prev => prev.map(item => item.id === chat.id ? { ...item, pinned_by: next } : item)
+      .sort((a, b) => Number(b.pinned_by?.includes(user.id)) - Number(a.pinned_by?.includes(user.id)) || new Date(b.last_message_time || 0).getTime() - new Date(a.last_message_time || 0).getTime()))
+    const { data, error } = await supabase.from('chats').update({ pinned_by: next }).eq('id', chat.id).select('id,pinned_by').single()
+    if (error || !data) {
+      setChats(prev => prev.map(item => item.id === chat.id ? { ...item, pinned_by: current } : item))
+      alert('Could not update this chat pin. Please try again.')
+      return
+    }
+    setChats(prev => prev.map(item => item.id === chat.id ? { ...item, pinned_by: data.pinned_by } : item)
+      .sort((a, b) => Number(b.pinned_by?.includes(user.id)) - Number(a.pinned_by?.includes(user.id)) || new Date(b.last_message_time || 0).getTime() - new Date(a.last_message_time || 0).getTime()))
+  }
 
   // First time ever opening Archive (from this page directly, no chat
   // pre-selected) - same 3-step wizard as archiving a chat from the list.
@@ -186,16 +203,19 @@ export default function ArchivePage() {
                     {openAperonixMenuId === conversation.id && <>
                       <button aria-label="Close conversation menu" className="fixed inset-0 z-30 cursor-default" onClick={() => setOpenAperonixMenuId(null)} />
                       <div className="absolute right-0 top-9 z-40 w-56 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xl">
-                        <button onClick={async () => {
+                        <button disabled={savingAperonixId === conversation.id} onClick={async () => {
+                          const nextPinned = !conversation.pinned
                           setSavingAperonixId(conversation.id)
-                          const { data, error } = await supabase.from('aperonix_conversations').select('pinned').eq('id', conversation.id).eq('user_id', user.id).single()
-                          if (!error) {
-                            const update = await supabase.from('aperonix_conversations').update({ pinned: !data.pinned, updated_at: new Date().toISOString() }).eq('id', conversation.id).eq('user_id', user.id)
-                            if (update.error) alert('Could not update the pin. Please try again.')
-                            else setAperonixChats(prev => prev.map(item => item.id === conversation.id ? { ...item, pinned: !data.pinned } : item))
-                          } else alert('Could not update the pin. Please try again.')
-                          setSavingAperonixId(null); setOpenAperonixMenuId(null)
-                        }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted"><Pin className="h-3.5 w-3.5" /> {conversation.pinned ? "Unpin" : "Pin"}</button>
+                          setOpenAperonixMenuId(null)
+                          const { data, error } = await supabase.from('aperonix_conversations')
+                            .update({ pinned: nextPinned })
+                            .eq('id', conversation.id).eq('user_id', user.id)
+                            .select('id,pinned').single()
+                          setSavingAperonixId(null)
+                          if (error || !data) { alert('Could not update the pin. Please try again.'); return }
+                          setAperonixChats(prev => prev.map(item => item.id === conversation.id ? { ...item, pinned: data.pinned } : item)
+                            .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()))
+                        }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"><Pin className="h-3.5 w-3.5" /> {conversation.pinned ? "Unpin" : "Pin"}</button>
                         <button onClick={() => { setRenameAperonixValue(conversation.title); setRenamingAperonixId(conversation.id); setOpenAperonixMenuId(null) }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted"><PencilLine className="h-3.5 w-3.5" /> Rename</button>
                         <ChatWallpaperControls conversationId={conversation.id} wallpaper={wallpaperChatId === conversation.id ? wallpaperValue : null} isActive={false} onWallpaperChange={value => { setWallpaperChatId(conversation.id); setWallpaperValue(value) }} />
 
@@ -239,7 +259,7 @@ export default function ArchivePage() {
                 <div className="relative shrink-0" onClick={event => event.stopPropagation()}>
                   <button onClick={() => setOpenVoiceMenuId(current => current === conversation.id ? null : conversation.id)} aria-label="Voice conversation options" aria-expanded={openVoiceMenuId === conversation.id} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"><MoreVertical className="h-4 w-4" /></button>
                   {openVoiceMenuId === conversation.id && <><button aria-label="Close voice conversation menu" className="fixed inset-0 z-30 cursor-default" onClick={() => setOpenVoiceMenuId(null)} /><div className="absolute right-0 top-9 z-40 w-60 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xl">
-                    <button disabled={voiceBusyId === conversation.id} onClick={async () => { setVoiceBusyId(conversation.id); const { error } = await supabase.from('aperonix_voice_conversations').update({ pinned: !conversation.pinned, updated_at: new Date().toISOString() }).eq('id', conversation.id).eq('user_id', user.id); setVoiceBusyId(null); setOpenVoiceMenuId(null); if (error) { alert('Could not update pin.'); return }; setVoiceConversations(prev => prev.map(item => item.id === conversation.id ? { ...item, pinned: !conversation.pinned } : item)) }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"><Pin className="h-3.5 w-3.5" />{conversation.pinned ? 'Unpin conversation' : 'Pin to top'}</button>
+                    <button disabled={voiceBusyId === conversation.id} onClick={async () => { const nextPinned = !conversation.pinned; setVoiceBusyId(conversation.id); setOpenVoiceMenuId(null); const { data, error } = await supabase.from('aperonix_voice_conversations').update({ pinned: nextPinned }).eq('id', conversation.id).eq('user_id', user.id).select('id,pinned').single(); setVoiceBusyId(null); if (error || !data) { alert('Could not update pin. Please try again.'); return }; setVoiceConversations(prev => prev.map(item => item.id === conversation.id ? { ...item, pinned: data.pinned } : item).sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.archived_at || b.updated_at).getTime() - new Date(a.archived_at || a.updated_at).getTime())) }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"><Pin className="h-3.5 w-3.5" />{conversation.pinned ? 'Unpin conversation' : 'Pin to top'}</button>
                     <button onClick={() => { setRenameVoiceValue(conversation.title); setRenamingVoiceId(conversation.id); setOpenVoiceMenuId(null) }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted"><PencilLine className="h-3.5 w-3.5" />Rename</button>
                     <ChatWallpaperControls conversationId={conversation.id} wallpaper={null} isActive={false} onWallpaperChange={() => {}} tableName="aperonix_voice_wallpapers" wallpaperLabel="voice conversation" />
                     <button disabled={voiceBusyId === conversation.id} onClick={async () => { setOpenVoiceMenuId(null); if (!window.confirm(`Create a copy of “${conversation.title}”?`)) return; setVoiceBusyId(conversation.id); const { data: { user: currentUser } } = await supabase.auth.getUser(); if (!currentUser) { setVoiceBusyId(null); return }; let copiedPath: string | null = null; if (conversation.storage_path) { copiedPath = currentUser.id + '/' + crypto.randomUUID() + '/recording-copy-' + Date.now() + '.' + (conversation.storage_path.split('.').pop() || 'webm'); const { error: copyError } = await supabase.storage.from('aperonix-voice-recordings').copy(conversation.storage_path, copiedPath); if (copyError) { setVoiceBusyId(null); alert('Could not copy the recording.'); return } }; const { data, error } = await supabase.from('aperonix_voice_conversations').insert({ user_id: currentUser.id, title: conversation.title + ' (copy)', storage_path: copiedPath, mime_type: conversation.mime_type, duration_ms: conversation.duration_ms, pinned: false, archived_at: new Date().toISOString() }).select('id,title,updated_at,archived_at,pinned,storage_path,mime_type,duration_ms').single(); setVoiceBusyId(null); if (error || !data) { if (copiedPath) await supabase.storage.from('aperonix-voice-recordings').remove([copiedPath]); alert('Could not duplicate conversation.'); return }; setVoiceConversations(prev => [data, ...prev]) }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"><Copy className="h-3.5 w-3.5" />Duplicate</button>
@@ -267,6 +287,7 @@ export default function ArchivePage() {
                 isArchived={true}
                 iBlockedThem={iBlockedThem}
                 onArchive={() => setUnarchiveConfirm({ kind: 'user', id: chat.id, title: other?.username ? 'Chat with ' + other.username : 'User chat' })}
+                onPin={nextPinned => void handleUserChatPin(chat, nextPinned)}
               />
             )
           })}
