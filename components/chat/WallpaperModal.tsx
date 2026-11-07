@@ -219,6 +219,29 @@ export function WallpaperModal({ onDone, onClose, saving, initialImageUrl, initi
     reader.readAsDataURL(prepared)
   }
 
+  const handleBuiltInWallpaperSelect = async (number: number) => {
+    try {
+      setError(null)
+      const filename = `wallpaper-${String(number).padStart(2, '0')}.jpg`
+      const response = await fetch(`/images/chat-wallpapers/${filename}`)
+      if (!response.ok) throw new Error('This wallpaper could not be loaded. Please try another one.')
+      const blob = await response.blob()
+      const selectedFile = new File([blob], filename, { type: blob.type || 'image/jpeg' })
+      setFile(selectedFile)
+      setPreviewUrl(URL.createObjectURL(selectedFile))
+      setPosition({ x: 50, y: 50 })
+      setZoom(100)
+      setRotation(0)
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (typeof reader.result === 'string') setDraftDataUrl(reader.result)
+      }
+      reader.readAsDataURL(selectedFile)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'This wallpaper could not be loaded.')
+    }
+  }
+
   const handleCancel = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setFile(null)
@@ -267,12 +290,46 @@ export function WallpaperModal({ onDone, onClose, saving, initialImageUrl, initi
       />
 
       {!previewUrl ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-          <img src="/images/wallpaper/Glossy%20Neon%20Add%20Image%20Icon.png" alt="Add wallpaper photo" width="240" height="160" className="h-36 w-52 object-contain" />
-          <div><p className="font-semibold">{initialImageLoading ? 'Loading current wallpaper…' : 'Choose a wallpaper photo'}</p><p className="mt-1 text-sm text-muted-foreground">Select a photo to open the wallpaper editor.</p></div>
-          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={initialImageLoading} className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-6 py-3 font-medium text-white disabled:opacity-50">Choose photo</button>
-          <button type="button" onClick={onClose} className="rounded-xl px-6 py-2 text-sm text-muted-foreground hover:bg-muted">Cancel</button>
-        </div>
+        <>
+          <div className="flex flex-col items-center justify-center gap-4 px-6 py-10 text-center">
+            <img src="/images/wallpaper/Glossy%20Neon%20Add%20Image%20Icon.png" alt="Add wallpaper photo" width="240" height="160" className="h-36 w-52 object-contain" />
+            <div><p className="font-semibold">{initialImageLoading ? 'Loading current wallpaper…' : 'Choose a wallpaper photo'}</p><p className="mt-1 text-sm text-muted-foreground">Select a photo to open the wallpaper editor.</p></div>
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={initialImageLoading} className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-6 py-3 font-medium text-white disabled:opacity-50">Choose photo</button>
+            <button type="button" onClick={onClose} className="rounded-xl px-6 py-2 text-sm text-muted-foreground hover:bg-muted">Cancel</button>
+          </div>
+          <section className="w-full border-t border-border px-4 py-6 sm:px-6">
+            <div className="mb-4 flex items-end justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">Choose from wallpapers</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Pick a wallpaper to preview and edit before applying.</p>
+              </div>
+              <span className="shrink-0 text-xs text-muted-foreground">309 wallpapers</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-5">
+              {Array.from({ length: 310 }, (_, index) => index + 1).filter(number => number !== 188).map(number => {
+                const filename = `wallpaper-${String(number).padStart(2, '0')}.jpg`
+                return (
+                  <button
+                    key={number}
+                    type="button"
+                    onClick={() => void handleBuiltInWallpaperSelect(number)}
+                    className="group relative aspect-[3/5] overflow-hidden rounded-xl border border-border bg-muted transition hover:border-pink-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+                    aria-label={`Use wallpaper ${number}`}
+                  >
+                    <img
+                      src={`/images/chat-wallpapers/${filename}`}
+                      alt={`Wallpaper ${number}`}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover transition duration-200 group-hover:scale-105"
+                    />
+                    <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-2 py-1 text-[11px] font-medium text-white backdrop-blur-sm">{String(number).padStart(3, '0')}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        </>
       ) : (
         <>
           <div className="flex items-center justify-between px-4 py-3">
