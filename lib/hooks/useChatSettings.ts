@@ -444,7 +444,7 @@ async function verifyPattern(pattern: string, stored: string): Promise<boolean> 
     return actual === parts[3]
   }
   // Compatibility with pattern hashes created by the first rollout.
-  return verifyPattern(pattern, stored)
+  return 'pattern:' + await hashPin(pattern) === stored
 }
 
 export function useArchiveLockStatus(userId?: string) {
