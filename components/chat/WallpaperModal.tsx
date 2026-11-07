@@ -304,7 +304,6 @@ export function WallpaperModal({ onDone, onClose, saving, initialImageUrl, initi
                 <h2 className="text-base font-semibold">Choose from wallpapers</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Pick a wallpaper to preview and edit before applying.</p>
               </div>
-              <span className="shrink-0 text-xs text-muted-foreground">310 wallpapers</span>
             </div>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-5">
               {Array.from({ length: 310 }, (_, index) => index + 1).map(number => {
