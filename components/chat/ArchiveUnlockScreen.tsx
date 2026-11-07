@@ -25,6 +25,7 @@ export function ArchiveUnlockScreen({ hint, lockType = 'password', onUnlock, tit
   const verify = useVerifyArchivePassword()
   const [password, setPassword] = useState('')
   const [patternError, setPatternError] = useState('')
+  const [legacyPatternGrid, setLegacyPatternGrid] = useState(false)
   const [error, setError] = useState('')
   const [showHint, setShowHint] = useState(false)
   const [showChangePassword, setShowChangePassword] = useState(false)
@@ -58,9 +59,11 @@ export function ArchiveUnlockScreen({ hint, lockType = 'password', onUnlock, tit
       {lockType === 'password' && <p className="mb-6 text-sm text-muted-foreground">Enter your password to continue.</p>}
       {lockType === 'pattern' ? (
         <div className="w-full">
-          <ArchivePatternLock key="archive-unlock-pattern" onComplete={handlePattern} disabled={verify.isPending} showIdleHint={false} />
+          <ArchivePatternLock key={`archive-unlock-pattern-${legacyPatternGrid ? 4 : 3}`} gridSize={legacyPatternGrid ? 4 : 3} onComplete={handlePattern} disabled={verify.isPending} showIdleHint={false} />
           {verify.isPending && <p className="mt-2 text-xs text-muted-foreground">Checking pattern…</p>}
           {patternError && <p role="alert" className="mt-2 text-xs text-red-500">{patternError}</p>}
+          {patternError && !legacyPatternGrid && <button type="button" onClick={() => { setLegacyPatternGrid(true); setPatternError('') }} className="mt-2 text-xs text-muted-foreground underline underline-offset-4">Use previous 4 × 4 pattern</button>}
+          {legacyPatternGrid && <button type="button" onClick={() => { setLegacyPatternGrid(false); setPatternError('') }} className="mt-2 text-xs text-muted-foreground underline underline-offset-4">Use 3 × 3 pattern</button>}
         </div>
       ) : (
         <>
