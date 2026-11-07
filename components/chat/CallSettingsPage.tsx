@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Check, ChevronRight, Headphones, Loader2, Mic, Music2, Pause, Play, Upload, Volume2, X } from 'lucide-react'
-import { CALL_RINGTONE_BUCKET, CUSTOM_RINGTONE_PREFIX, DEFAULT_RINGTONE_ID, RINGTONES, getCustomRingtonePath, isCustomRingtoneId, previewRingtone, stopRingtonePreview } from '@/lib/utils/ringtone'
+import { CALL_RINGTONE_BUCKET, CUSTOM_RINGTONE_PREFIX, DEFAULT_RINGTONE_ID, RINGTONES, getCustomRingtonePath, isCustomRingtoneId, preloadRingtone, previewRingtone, stopRingtonePreview } from '@/lib/utils/ringtone'
 import { useCallSettings, useUpdateCallSettings } from '@/lib/hooks/useChatSettings'
 import { createClient } from '@/lib/supabase/client'
 
@@ -205,6 +205,9 @@ export function CallSettingsPage({ userId, onBack }: CallSettingsPageProps) {
       }
 
       setRingtone(customRingtoneId)
+      // Decode the uploaded sound before closing the upload flow so the
+      // preview and the next call can start without a network wait.
+      await preloadRingtone(customRingtoneId)
       stopRingtonePreview()
       setPreviewing(customRingtoneId)
       previewRingtone(customRingtoneId, ringtoneVolume / 100)
