@@ -496,7 +496,7 @@ export function useVerifyArchivePassword() {
       const stored = data.archive_password_hash as string
       if (stored.startsWith('pattern:')) {
         if (!pattern) return false
-        return 'pattern:' + await hashPin(pattern) === stored
+        return await verifyPattern(pattern, stored)
       }
       if (!password) return false
       return await hashPin(password) === stored
