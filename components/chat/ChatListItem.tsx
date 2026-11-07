@@ -30,9 +30,10 @@ interface ChatListItemProps {
   /** When set, replaces the default in-place archive toggle - e.g. to run
    *  the first-time password wizard before actually archiving. */
   onArchive?: () => void
+  onPin?: (nextPinned: boolean) => void
 }
 
-export function ChatListItem({ chat, other, currentUserId, unread, isPinned, isArchived, iBlockedThem, onArchive }: ChatListItemProps) {
+export function ChatListItem({ chat, other, currentUserId, unread, isPinned, isArchived, iBlockedThem, onArchive, onPin }: ChatListItemProps) {
   const router = useRouter()
   const [showMenu, setShowMenu] = useState(false)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
@@ -52,7 +53,8 @@ export function ChatListItem({ chat, other, currentUserId, unread, isPinned, isA
 
   const handlePin = () => {
     setShowMenu(false)
-    togglePin.mutate({ chatId: chat.id, userId: currentUserId, pin: !isPinned })
+    if (onPin) onPin(!isPinned)
+    else togglePin.mutate({ chatId: chat.id, userId: currentUserId, pin: !isPinned })
   }
 
   const handleDelete = () => {
