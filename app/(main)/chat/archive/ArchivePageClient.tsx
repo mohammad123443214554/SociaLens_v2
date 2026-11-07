@@ -84,7 +84,7 @@ export default function ArchivePage() {
     if (aperonixError) {
       console.error('Could not load archived Aperonix chats', aperonixError)
     } else {
-      setAperonixChats([...(archivedAperonix || [])].sort((a: any, b: any) => Number(b.pinned) - Number(a.pinned) || new Date(b.archived_at || b.updated_at).getTime() - new Date(a.archived_at || a.updated_at).getTime()))
+      setAperonixChats([...(archivedAperonix || [])].sort((a: any, b: any) => Number(b.pinned) - Number(a.pinned) || new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()))
     }
 
     const { data: archivedVoice, error: voiceError } = await supabase
