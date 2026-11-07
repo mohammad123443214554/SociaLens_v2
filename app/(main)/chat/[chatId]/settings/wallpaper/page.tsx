@@ -86,7 +86,7 @@ export default function ChatWallpaperRoutePage() {
       return <ArchivePasswordWizard onClose={() => router.push('/chat')} onDone={() => setArchiveUnlocked(true)} />
     }
     if (archiveLock) {
-      return <ArchiveUnlockScreen hint={archiveLock.hint} onUnlock={() => setArchiveUnlocked(true)} title="Chat is locked" />
+      return <ArchiveUnlockScreen hint={archiveLock.hint} lockType={archiveLock.lockType} onUnlock={() => setArchiveUnlocked(true)} title="Chat is locked" />
     }
     return <PageLoader />
   }
