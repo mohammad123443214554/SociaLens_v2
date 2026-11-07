@@ -7,6 +7,7 @@ interface ArchivePatternLockProps {
   disabled?: boolean
   resetKey?: string | number
   size?: 'normal' | 'compact'
+  showIdleHint?: boolean
 }
 
 const GRID_SIZE = 4
@@ -33,7 +34,7 @@ function addPatternPoint(current: number[], next: number) {
   return [...current, ...additions, next]
 }
 
-export function ArchivePatternLock({ onComplete, disabled = false, resetKey, size = 'normal' }: ArchivePatternLockProps) {
+export function ArchivePatternLock({ onComplete, disabled = false, resetKey, size = 'normal', showIdleHint = true }: ArchivePatternLockProps) {
   const [path, setPath] = useState<number[]>([])
   const [drawing, setDrawing] = useState(false)
   const [error, setError] = useState('')
@@ -97,7 +98,7 @@ export function ArchivePatternLock({ onComplete, disabled = false, resetKey, siz
           })}
         </div>
       </div>
-      <p className={`mt-3 min-h-5 text-center text-xs ${error ? 'text-red-500' : 'text-muted-foreground'}`}>{error || 'Draw a pattern by connecting at least 4 dots.'}</p>
+      <p className={`mt-3 min-h-5 text-center text-xs ${error ? 'text-red-500' : 'text-muted-foreground'}`}>{error || (showIdleHint ? 'Draw a pattern by connecting at least 4 dots.' : '')}</p>
     </div>
   )
 }
