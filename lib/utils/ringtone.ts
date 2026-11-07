@@ -34,7 +34,7 @@ export function getCustomRingtonePath(id?: string | null): string | null {
   if (!id?.startsWith(CUSTOM_RINGTONE_PREFIX)) return null
   const path = id.slice(CUSTOM_RINGTONE_PREFIX.length)
   const segments = path.split('/')
-  if (!path || path.startsWith('/') || path.includes('..') || path.includes('\\\\') || segments.length !== 2 || !segments[0] || !segments[1]) return null
+  if (!path || path.startsWith('/') || path.includes('..') || path.includes(String.fromCharCode(92)) || segments.length !== 2 || !segments[0] || !segments[1]) return null
   return path
 }
 
