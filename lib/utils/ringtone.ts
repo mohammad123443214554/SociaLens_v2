@@ -6,6 +6,8 @@
  * A single shared player is used by previews and incoming/outgoing call screens.
  */
 
+import { createClient } from '@/lib/supabase/client'
+
 export interface RingtoneOption {
   id: string
   name: string
@@ -25,8 +27,25 @@ export const RINGTONES: RingtoneOption[] = Array.from({ length: 50 }, (_, index)
 
 export const DEFAULT_RINGTONE_ID = 'ringtone-01'
 export const DEFAULT_RINGTONE_VOLUME = 1
+export const CALL_RINGTONE_BUCKET = 'call-ringtones'
+export const CUSTOM_RINGTONE_PREFIX = 'custom:'
+
+export function getCustomRingtonePath(id?: string | null): string | null {
+  if (!id?.startsWith(CUSTOM_RINGTONE_PREFIX)) return null
+  const path = id.slice(CUSTOM_RINGTONE_PREFIX.length)
+  const segments = path.split('/')
+  if (!path || path.startsWith('/') || path.includes('..') || path.includes('\\\\') || segments.length !== 2 || !segments[0] || !segments[1]) return null
+  return path
+}
+
+export function isCustomRingtoneId(id?: string | null): boolean {
+  return getCustomRingtonePath(id) !== null
+}
 
 export function getRingtoneById(id?: string | null): RingtoneOption {
+  if (getCustomRingtonePath(id)) {
+    return { id: id!, name: 'Custom ringtone', src: '' }
+  }
   return RINGTONES.find((ringtone) => ringtone.id === id) || RINGTONES[0]
 }
 
@@ -71,7 +90,20 @@ function stopPlaybackState() {
 }
 
 async function loadBuffer(ringtone: RingtoneOption, context: AudioContext): Promise<AudioBuffer> {
-  const response = await fetch(ringtone.src, { cache: 'force-cache' })
+  let sourceUrl = ringtone.src
+  const customPath = getCustomRingtonePath(ringtone.id)
+  if (customPath) {
+    const supabase = createClient()
+    const { data, error } = await supabase.storage
+      .from(CALL_RINGTONE_BUCKET)
+      .createSignedUrl(customPath, 60 * 60)
+    if (error || !data?.signedUrl) {
+      throw new Error(error?.message || 'Could not access your uploaded ringtone.')
+    }
+    sourceUrl = data.signedUrl
+  }
+  if (!sourceUrl) throw new Error('This ringtone has no playable audio source.')
+  const response = await fetch(sourceUrl, { cache: customPath ? 'no-store' : 'force-cache' })
   if (!response.ok) throw new Error(`Could not load ${ringtone.name} (${response.status}).`)
   const bytes = await response.arrayBuffer()
   return context.decodeAudioData(bytes)
