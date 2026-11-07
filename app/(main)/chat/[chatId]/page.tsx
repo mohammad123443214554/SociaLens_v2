@@ -367,7 +367,13 @@ export default function ChatRoomPage() {
       )}
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-background/10 backdrop-blur-sm sticky top-0 lg:top-14 z-10">
-        <button onClick={() => router.back()} className="text-muted-foreground hover:text-foreground">
+        <button
+          type="button"
+          onClick={() => router.push('/chat')}
+          aria-label="Back to messages"
+          title="Back to messages"
+          className="text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <button
