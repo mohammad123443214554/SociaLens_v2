@@ -426,13 +426,34 @@ async function hashPin(pin: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+async function hashPattern(pattern: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pattern), 'PBKDF2', false, ['deriveBits'])
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 210000 }, key, 256)
+  const hex = (value: Uint8Array) => Array.from(value).map(byte => byte.toString(16).padStart(2, '0')).join('')
+  return `pattern:v2:${hex(salt)}:${hex(new Uint8Array(bits))}`
+}
+
+async function verifyPattern(pattern: string, stored: string): Promise<boolean> {
+  const parts = stored.split(':')
+  if (parts.length === 4 && parts[0] === 'pattern' && parts[1] === 'v2') {
+    const salt = new Uint8Array(parts[2].match(/.{2}/g)?.map(byte => parseInt(byte, 16)) || [])
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pattern), 'PBKDF2', false, ['deriveBits'])
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 210000 }, key, 256)
+    const actual = Array.from(new Uint8Array(bits)).map(byte => byte.toString(16).padStart(2, '0')).join('')
+    return actual === parts[3]
+  }
+  // Compatibility with pattern hashes created by the first rollout.
+  return verifyPattern(pattern, stored)
+}
+
 export function useArchiveLockStatus(userId?: string) {
   const supabase = createClient()
 
   return useQuery({
     queryKey: ['archive-lock-status', userId],
     queryFn: async () => {
-      if (!userId) return { hasPassword: false, hint: null as string | null }
+      if (!userId) return { hasPassword: false, hint: null as string | null, lockType: 'password' as const }
       const { data } = await supabase
         .from('profiles')
         .select('archive_password_hash, archive_password_hint')
@@ -452,7 +473,7 @@ export function useSetArchivePassword() {
     mutationFn: async ({ userId, password, pattern, lockType = 'password', hint }: { userId: string; password?: string; pattern?: string; lockType?: 'password' | 'pattern'; hint?: string }) => {
       const credential = lockType === 'pattern' ? pattern : password
       if (!credential) throw new Error('A lock credential is required.')
-      const hash = (lockType === 'pattern' ? 'pattern:' : '') + await hashPin(credential)
+      const hash = lockType === 'pattern' ? await hashPattern(credential) : await hashPin(credential)
       const { error } = await supabase
         .from('profiles')
         .update({ archive_password_hash: hash, archive_password_hint: hint?.trim() || null })
