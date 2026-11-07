@@ -1,9 +1,10 @@
 /**
- * SociaLens file-backed ringtone library.
+ * SociaLens shared ringtone player.
  *
- * All 50 bundled assets are played from /audio/ringtones. AudioBufferSourceNode
- * looping keeps the selected clip repeating for as long as the call is ringing.
- * A single shared player is used by previews and incoming/outgoing call screens.
+ * Ringtones use one persistent HTMLAudioElement so the browser can stream the
+ * selected file instead of waiting for a complete download + AudioContext
+ * decode before the first sound. Custom signed URLs are cached and warmed as
+ * soon as call settings load, keeping call setup off the audio critical path.
  */
 
 import { createClient } from '@/lib/supabase/client'
@@ -16,13 +17,8 @@ export interface RingtoneOption {
 
 export const RINGTONES: RingtoneOption[] = Array.from({ length: 50 }, (_, index) => {
   const number = String(index + 1).padStart(2, '0')
-  // The uploaded files numbered 04 and 11 are WAV files; keep their real paths.
   const extension = number === '04' || number === '11' ? 'wav' : 'mp3'
-  return {
-    id: `ringtone-${number}`,
-    name: `Ringtone ${number}`,
-    src: `/audio/ringtones/ringtone-${number}.${extension}`,
-  }
+  return { id: `ringtone-${number}`, name: `Ringtone ${number}`, src: `/audio/ringtones/ringtone-${number}.${extension}` }
 })
 
 export const DEFAULT_RINGTONE_ID = 'ringtone-01'
@@ -43,133 +39,161 @@ export function isCustomRingtoneId(id?: string | null): boolean {
 }
 
 export function getRingtoneById(id?: string | null): RingtoneOption {
-  if (getCustomRingtonePath(id)) {
-    return { id: id!, name: 'Custom ringtone', src: '' }
-  }
+  if (getCustomRingtonePath(id)) return { id: id!, name: 'Custom ringtone', src: '' }
   return RINGTONES.find((ringtone) => ringtone.id === id) || RINGTONES[0]
 }
 
-let audioContext: AudioContext | null = null
-let activeSource: AudioBufferSourceNode | null = null
-let activeGain: GainNode | null = null
+let player: HTMLAudioElement | null = null
 let activeRingtoneId = DEFAULT_RINGTONE_ID
 let activeVolume = DEFAULT_RINGTONE_VOLUME
 let shouldPlay = false
 let pauseCount = 0
 let generation = 0
-let loadPromise: Promise<void> | null = null
 let isPreview = false
+let gestureUnlockInstalled = false
+let activeSourceUrl: string | null = null
 
-// Keep decoded audio in memory so calls never wait on URL signing, download and decode.
-const decodedBufferCache = new Map<string, AudioBuffer>()
-const bufferLoadCache = new Map<string, Promise<AudioBuffer>>()
+// Signed URLs last 24 hours; refresh them slightly before expiry.
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>()
+const signedUrlPromises = new Map<string, Promise<string>>()
 
-function getAudioContext(): AudioContext {
-  if (!audioContext || audioContext.state === 'closed') {
-    const AudioContextConstructor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (!AudioContextConstructor) throw new Error('Audio playback is not supported by this browser.')
-    audioContext = new AudioContextConstructor()
+function getPlayer(): HTMLAudioElement {
+  if (!player) {
+    player = new Audio()
+    player.preload = 'auto'
+    player.loop = true
+    player.setAttribute('playsinline', 'true')
   }
-  return audioContext
+  return player
 }
 
-function stopSource() {
-  if (activeSource) {
-    try { activeSource.stop() } catch {}
-    try { activeSource.disconnect() } catch {}
-    activeSource = null
+/**
+ * Browsers require a user gesture before they allow page audio to autoplay.
+ * Unlock the persistent media element on the first real app interaction, so a
+ * later realtime call event can start ringing without waiting for a new tap.
+ */
+function installGestureUnlocker() {
+  if (typeof window === 'undefined' || gestureUnlockInstalled) return
+  gestureUnlockInstalled = true
+  const unlock = () => {
+    const audio = getPlayer()
+    const wasMuted = audio.muted
+    audio.muted = true
+    const attempt = audio.play()
+    if (attempt && typeof attempt.then === 'function') {
+      void attempt.then(() => {
+        audio.pause()
+        try { audio.currentTime = 0 } catch {}
+        audio.muted = wasMuted
+      }).catch(() => { audio.muted = wasMuted })
+    } else {
+      audio.pause()
+      audio.muted = wasMuted
+    }
+    window.removeEventListener('pointerdown', unlock, true)
+    window.removeEventListener('touchstart', unlock, true)
+    window.removeEventListener('keydown', unlock, true)
   }
-  if (activeGain) {
-    try { activeGain.disconnect() } catch {}
-    activeGain = null
-  }
+  window.addEventListener('pointerdown', unlock, { capture: true, once: true })
+  window.addEventListener('touchstart', unlock, { capture: true, once: true })
+  window.addEventListener('keydown', unlock, { capture: true, once: true })
 }
 
-function stopPlaybackState() {
-  shouldPlay = false
-  pauseCount = 0
-  generation += 1
-  loadPromise = null
-  stopSource()
-}
-
-async function loadBuffer(ringtone: RingtoneOption, context: AudioContext): Promise<AudioBuffer> {
-  const cached = decodedBufferCache.get(ringtone.id)
-  if (cached) return cached
-  const pending = bufferLoadCache.get(ringtone.id)
-  if (pending) return pending
-  const request = (async () => {
-  let sourceUrl = ringtone.src
+async function resolveRingtoneUrl(ringtone: RingtoneOption): Promise<string> {
   const customPath = getCustomRingtonePath(ringtone.id)
-  if (customPath) {
+  if (!customPath) return ringtone.src
+
+  const cached = signedUrlCache.get(ringtone.id)
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.url
+
+  const pending = signedUrlPromises.get(ringtone.id)
+  if (pending) return pending
+
+  const request = (async () => {
     const supabase = createClient()
     const { data, error } = await supabase.storage
       .from(CALL_RINGTONE_BUCKET)
       .createSignedUrl(customPath, 24 * 60 * 60)
-    if (error || !data?.signedUrl) {
-      throw new Error(error?.message || 'Could not access your uploaded ringtone.')
-    }
-    sourceUrl = data.signedUrl
-  }
-  if (!sourceUrl) throw new Error('This ringtone has no playable audio source.')
-  const response = await fetch(sourceUrl, { cache: 'force-cache' })
-  if (!response.ok) throw new Error(`Could not load ${ringtone.name} (${response.status}).`)
-  const bytes = await response.arrayBuffer()
-  const decoded = await context.decodeAudioData(bytes)
-  decodedBufferCache.set(ringtone.id, decoded)
-  return decoded
+    if (error || !data?.signedUrl) throw new Error(error?.message || 'Could not access your uploaded ringtone.')
+    signedUrlCache.set(ringtone.id, { url: data.signedUrl, expiresAt: Date.now() + 23 * 60 * 60 * 1000 })
+    return data.signedUrl
   })()
-  bufferLoadCache.set(ringtone.id, request)
-  try { return await request } finally { if (bufferLoadCache.get(ringtone.id) === request) bufferLoadCache.delete(ringtone.id) }
+
+  signedUrlPromises.set(ringtone.id, request)
+  try { return await request } finally {
+    if (signedUrlPromises.get(ringtone.id) === request) signedUrlPromises.delete(ringtone.id)
+  }
 }
 
-/** Load and decode the selected ringtone before a call arrives. */
+function applyPlayerVolume() {
+  if (!player) return
+  player.volume = Math.max(0, Math.min(1, activeVolume))
+}
+
+function playResolvedSource(sourceUrl: string, playbackGeneration: number) {
+  if (!shouldPlay || pauseCount > 0 || playbackGeneration !== generation) return
+  const audio = getPlayer()
+  applyPlayerVolume()
+  if (activeSourceUrl !== sourceUrl || audio.src !== new URL(sourceUrl, window.location.href).href) {
+    audio.pause()
+    audio.src = sourceUrl
+    audio.load()
+    activeSourceUrl = sourceUrl
+  }
+  // Calling play immediately after assigning the source lets the browser
+  // begin streaming; it does not wait for the complete file to download.
+  void audio.play().catch((error) => {
+    console.warn('[SociaLens ringtone] Browser blocked ringtone playback:', error)
+  })
+}
+
+async function playActiveRingtone(playbackGeneration: number) {
+  if (!shouldPlay || pauseCount > 0 || playbackGeneration !== generation) return
+  const ringtone = getRingtoneById(activeRingtoneId)
+
+  // If a custom URL is not yet warm (for example, a cold app launch), start
+  // the built-in default immediately. Replace it with the selected custom
+  // ringtone as soon as its signed URL is ready.
+  if (isCustomRingtoneId(ringtone.id) && !signedUrlCache.has(ringtone.id)) {
+    const fallback = getRingtoneById(DEFAULT_RINGTONE_ID)
+    playResolvedSource(fallback.src, playbackGeneration)
+  }
+
+  try {
+    const sourceUrl = await resolveRingtoneUrl(ringtone)
+    playResolvedSource(sourceUrl, playbackGeneration)
+  } catch (error) {
+    console.error('[SociaLens ringtone] Could not prepare ringtone:', error)
+    if (isCustomRingtoneId(ringtone.id) && playbackGeneration === generation && shouldPlay) {
+      playResolvedSource(getRingtoneById(DEFAULT_RINGTONE_ID).src, playbackGeneration)
+    }
+  }
+}
+
+/** Warm the signed URL and browser media pipeline while the app is idle. */
 export async function preloadRingtone(ringtoneId: string = DEFAULT_RINGTONE_ID): Promise<void> {
   if (typeof window === 'undefined') return
+  installGestureUnlocker()
   try {
-    await loadBuffer(getRingtoneById(ringtoneId), getAudioContext())
+    const ringtone = getRingtoneById(ringtoneId)
+    const sourceUrl = await resolveRingtoneUrl(ringtone)
+    const audio = getPlayer()
+    // Do not replace an actively playing ringtone while another call is live.
+    if (!shouldPlay || activeRingtoneId === ringtoneId) {
+      if (activeSourceUrl !== sourceUrl || audio.src !== new URL(sourceUrl, window.location.href).href) {
+        audio.src = sourceUrl
+        audio.load()
+        activeSourceUrl = sourceUrl
+      }
+    }
   } catch (error) {
     console.warn('[SociaLens ringtone] Preload failed; playback will retry on demand:', error)
   }
 }
 
-async function beginPlayback() {
-  if (!shouldPlay || pauseCount > 0 || activeSource || loadPromise) return
-  const playbackGeneration = generation
-  const ringtone = getRingtoneById(activeRingtoneId)
-  try {
-    const context = getAudioContext()
-    loadPromise = loadBuffer(ringtone, context).then(async (buffer) => {
-      if (!shouldPlay || pauseCount > 0 || playbackGeneration !== generation) return
-      await context.resume()
-      if (!shouldPlay || pauseCount > 0 || playbackGeneration !== generation) return
-      const source = context.createBufferSource()
-      const gain = context.createGain()
-      source.buffer = buffer
-      source.loop = true
-      gain.gain.value = Math.max(0, Math.min(1, activeVolume))
-      source.connect(gain)
-      gain.connect(context.destination)
-      activeSource = source
-      activeGain = gain
-      source.onended = () => {
-        if (activeSource === source) stopSource()
-      }
-      source.start(0)
-    }).catch((error) => {
-      console.error('[SociaLens ringtone] Playback failed:', error)
-    }).finally(() => {
-      loadPromise = null
-      if (shouldPlay && pauseCount === 0 && playbackGeneration !== generation && !activeSource) void beginPlayback()
-    })
-  } catch (error) {
-    loadPromise = null
-    console.error('[SociaLens ringtone] Audio initialization failed:', error)
-  }
-}
-
-/** Start the selected ringtone and loop its decoded audio buffer continuously. */
+/** Start the selected ringtone and stream it continuously until stopped. */
 export function startRingtone(ringtoneId: string = DEFAULT_RINGTONE_ID, volume: number = DEFAULT_RINGTONE_VOLUME) {
+  installGestureUnlocker()
   const next = getRingtoneById(ringtoneId)
   const changed = activeRingtoneId !== next.id
   activeRingtoneId = next.id
@@ -178,50 +202,49 @@ export function startRingtone(ringtoneId: string = DEFAULT_RINGTONE_ID, volume: 
   shouldPlay = true
   if (changed) {
     generation += 1
-    stopSource()
-    loadPromise = null
+    if (player) player.pause()
   }
-  if (activeGain) activeGain.gain.setTargetAtTime(activeVolume, audioContext?.currentTime ?? 0, 0.03)
-  void beginPlayback()
+  applyPlayerVolume()
+  if (pauseCount === 0) void playActiveRingtone(generation)
 }
 
 /** Pause ringing while a call announcement is speaking. */
 export function pauseRingtone() {
   if (!shouldPlay) return
   pauseCount += 1
-  if (audioContext && audioContext.state === 'running') void audioContext.suspend().catch(() => {})
+  if (pauseCount === 1 && player) player.pause()
 }
 
 /** Resume only after all overlapping announcements have finished. */
 export function resumeRingtone() {
   pauseCount = Math.max(0, pauseCount - 1)
-  if (shouldPlay && pauseCount === 0) {
-    if (audioContext?.state === 'suspended') void audioContext.resume().catch(() => {})
-    else void beginPlayback()
-  }
+  if (shouldPlay && pauseCount === 0) void playActiveRingtone(generation)
 }
 
 /** Stop ringing permanently when a call is answered, declined, cancelled or ended. */
 export function stopRingtone() {
-  stopPlaybackState()
+  shouldPlay = false
+  pauseCount = 0
+  generation += 1
   isPreview = false
-  if (audioContext?.state === 'running') void audioContext.suspend().catch(() => {})
+  if (player) {
+    player.pause()
+    try { player.currentTime = 0 } catch {}
+  }
 }
 
-/** Play a selected ringtone preview in a loop until another selection or page cleanup. */
+/** Play a selected ringtone preview in a loop until stopped or page cleanup. */
 export function previewRingtone(ringtoneId: string, volume: number) {
-  stopPlaybackState()
+  stopRingtone()
   activeRingtoneId = getRingtoneById(ringtoneId).id
   activeVolume = Math.max(0, Math.min(1, volume))
   shouldPlay = true
   isPreview = true
-  void beginPlayback()
+  void playActiveRingtone(generation)
 }
 
 /** Stop only a settings preview; never interrupts an actual call ringtone. */
 export function stopRingtonePreview() {
   if (!isPreview) return
-  stopPlaybackState()
-  isPreview = false
-  if (audioContext?.state === 'running') void audioContext.suspend().catch(() => {})
+  stopRingtone()
 }
