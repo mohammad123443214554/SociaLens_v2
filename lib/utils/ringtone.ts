@@ -60,6 +60,10 @@ let generation = 0
 let loadPromise: Promise<void> | null = null
 let isPreview = false
 
+// Keep decoded audio in memory so calls never wait on URL signing, download and decode.
+const decodedBufferCache = new Map<string, AudioBuffer>()
+const bufferLoadCache = new Map<string, Promise<AudioBuffer>>()
+
 function getAudioContext(): AudioContext {
   if (!audioContext || audioContext.state === 'closed') {
     const AudioContextConstructor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
@@ -90,23 +94,43 @@ function stopPlaybackState() {
 }
 
 async function loadBuffer(ringtone: RingtoneOption, context: AudioContext): Promise<AudioBuffer> {
+  const cached = decodedBufferCache.get(ringtone.id)
+  if (cached) return cached
+  const pending = bufferLoadCache.get(ringtone.id)
+  if (pending) return pending
+  const request = (async () => {
   let sourceUrl = ringtone.src
   const customPath = getCustomRingtonePath(ringtone.id)
   if (customPath) {
     const supabase = createClient()
     const { data, error } = await supabase.storage
       .from(CALL_RINGTONE_BUCKET)
-      .createSignedUrl(customPath, 60 * 60)
+      .createSignedUrl(customPath, 24 * 60 * 60)
     if (error || !data?.signedUrl) {
       throw new Error(error?.message || 'Could not access your uploaded ringtone.')
     }
     sourceUrl = data.signedUrl
   }
   if (!sourceUrl) throw new Error('This ringtone has no playable audio source.')
-  const response = await fetch(sourceUrl, { cache: customPath ? 'no-store' : 'force-cache' })
+  const response = await fetch(sourceUrl, { cache: 'force-cache' })
   if (!response.ok) throw new Error(`Could not load ${ringtone.name} (${response.status}).`)
   const bytes = await response.arrayBuffer()
-  return context.decodeAudioData(bytes)
+  const decoded = await context.decodeAudioData(bytes)
+  decodedBufferCache.set(ringtone.id, decoded)
+  return decoded
+  })()
+  bufferLoadCache.set(ringtone.id, request)
+  try { return await request } finally { if (bufferLoadCache.get(ringtone.id) === request) bufferLoadCache.delete(ringtone.id) }
+}
+
+/** Load and decode the selected ringtone before a call arrives. */
+export async function preloadRingtone(ringtoneId: string = DEFAULT_RINGTONE_ID): Promise<void> {
+  if (typeof window === 'undefined') return
+  try {
+    await loadBuffer(getRingtoneById(ringtoneId), getAudioContext())
+  } catch (error) {
+    console.warn('[SociaLens ringtone] Preload failed; playback will retry on demand:', error)
+  }
 }
 
 async function beginPlayback() {
