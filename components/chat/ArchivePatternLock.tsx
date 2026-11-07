@@ -11,8 +11,6 @@ interface ArchivePatternLockProps {
   gridSize?: 3 | 4
 }
 
-const GRID_SIZE = 3
-
 function addPatternPoint(current: number[], next: number, gridSize: number) {
   if (current.includes(next)) return current
   if (current.length === 0) return [next]
@@ -76,10 +74,10 @@ export function ArchivePatternLock({ onComplete, disabled = false, resetKey, siz
         style={{ touchAction: 'none' }}
       >
         <svg viewBox="0 0 100 100" className="pointer-events-none absolute inset-0 h-full w-full p-3 sm:p-4" aria-hidden="true">
-          {path.length > 1 && <polyline points={path.map(index => `${16.6667 + (index % 3) * 33.3333},${16.6667 + Math.floor(index / 3) * 33.3333}`).join(' ')} fill="none" stroke="url(#archivePatternGradient)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />}
+          {path.length > 1 && <polyline points={path.map(index => `${(100 / (gridSize * 2)) + (index % gridSize) * (100 / gridSize)},${(100 / (gridSize * 2)) + Math.floor(index / gridSize) * (100 / gridSize)}`).join(' ')} fill="none" stroke="url(#archivePatternGradient)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />}
           <defs><linearGradient id="archivePatternGradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#ec4899" /><stop offset="100%" stopColor="#a855f7" /></linearGradient></defs>
         </svg>
-        <div className="relative grid h-full w-full grid-cols-[repeat(var(--pattern-grid),minmax(0,1fr))] grid-rows-[repeat(var(--pattern-grid),minmax(0,1fr))]">
+        <div className="relative grid h-full w-full" style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${gridSize}, minmax(0, 1fr))` }}>
           {Array.from({ length: gridSize * gridSize }, (_, index) => {
             const selected = path.includes(index)
             return (
