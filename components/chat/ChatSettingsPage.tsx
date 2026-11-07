@@ -19,7 +19,7 @@ interface ChatSettingsPageProps {
   onOpenCallSettings: () => void
 }
 
-/** Personal settings for this conversation, ordered by everyday use. */
+/** Each chat preference is its own clearly separated row, in the requested order. */
 export function ChatSettingsPage({
   otherUsername,
   myNicknameForThem,
@@ -33,6 +33,8 @@ export function ChatSettingsPage({
   onDeleteChat,
   onOpenCallSettings,
 }: ChatSettingsPageProps) {
+  const rowClass = 'flex min-h-14 w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent'
+
   return (
     <div className="absolute inset-0 z-20 flex flex-col bg-background">
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background px-4 py-3">
@@ -45,55 +47,49 @@ export function ChatSettingsPage({
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-xl flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-3 overflow-y-auto p-4">
         {showNicknameOption && (
-          <div className="overflow-hidden rounded-2xl border bg-card">
-            <button type="button" onClick={onSetNickname} className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-accent">
-              <span className="flex min-w-0 items-center gap-3">
-                <PencilLine className="h-5 w-5 shrink-0 text-muted-foreground" />
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium">{myNicknameForThem ? 'Edit Nickname' : 'Set Nickname'}</span>
-                  {myNicknameForThem && <span className="block truncate text-xs text-muted-foreground">Currently "{myNicknameForThem}"</span>}
-                </span>
+          <section className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card">
+            <button type="button" onClick={onSetNickname} className={rowClass}>
+              <PencilLine className="h-5 w-5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{myNicknameForThem ? 'Edit Nickname' : 'Set Nickname'}</span>
+                {myNicknameForThem && <span className="block truncate text-xs text-muted-foreground">Currently "{myNicknameForThem}"</span>}
               </span>
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
             </button>
-          </div>
+          </section>
         )}
 
-        <div className="overflow-hidden rounded-2xl border bg-card">
-          <button type="button" onClick={onSetWallpaper} className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-accent">
-            <span className="flex items-center gap-3">
-              <ImageIcon className="h-5 w-5 text-muted-foreground" />
-              <span className="text-sm font-medium">Wallpaper settings</span>
-            </span>
+        <section className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card">
+          <button type="button" onClick={onSetWallpaper} className={rowClass}>
+            <ImageIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 text-sm font-medium">Wallpaper settings</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           </button>
-        </div>
+        </section>
 
-        <div className="overflow-hidden rounded-2xl border bg-card">
-          <button type="button" onClick={onOpenCallSettings} className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-accent">
-            <span className="flex items-center gap-3">
-              <Phone className="h-5 w-5 text-muted-foreground" />
-              <span className="text-sm font-medium">Call settings</span>
-            </span>
+        <section className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card">
+          <button type="button" onClick={onOpenCallSettings} className={rowClass}>
+            <Phone className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 text-sm font-medium">Call settings</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           </button>
-        </div>
+        </section>
 
-        <div className="overflow-hidden rounded-2xl border bg-card">
-          <button type="button" onClick={onToggleBlock} className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent">
-            <Ban className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium">{iBlockedThem ? 'Unblock' : 'Block'}</span>
+        <section className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card">
+          <button type="button" onClick={onToggleBlock} className={rowClass}>
+            <Ban className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 text-sm font-medium">{iBlockedThem ? 'Unblock' : 'Block'}</span>
           </button>
-        </div>
+        </section>
 
-        <div className="overflow-hidden rounded-2xl border bg-card">
-          <button type="button" onClick={onDeleteChat} disabled={deleting} className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50">
-            <Trash2 className="h-5 w-5" />
-            <span className="text-sm font-medium">{deleting ? 'Deleting...' : 'Delete Conversation'}</span>
+        <section className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card">
+          <button type="button" onClick={onDeleteChat} disabled={deleting} className={rowClass + ' text-destructive hover:bg-destructive/10 disabled:opacity-50'}>
+            <Trash2 className="h-5 w-5 shrink-0" />
+            <span className="min-w-0 flex-1 text-sm font-medium">{deleting ? 'Deleting...' : 'Delete Conversation'}</span>
           </button>
-        </div>
+        </section>
       </div>
     </div>
   )
