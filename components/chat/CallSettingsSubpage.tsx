@@ -36,7 +36,7 @@ export function CallSettingsSubpage({ page }: { page: 'volume' | 'ringtone' }) {
   const isArchivedByMe = Array.isArray(chat.archived_by) && chat.archived_by.includes(user.id)
   if (isArchivedByMe && !archiveUnlocked) {
     if (archiveLock && !archiveLock.hasPassword) return <ArchivePasswordWizard onClose={() => router.push('/chat')} onDone={() => setArchiveUnlocked(true)} />
-    if (archiveLock) return <ArchiveUnlockScreen hint={archiveLock.hint} onUnlock={() => setArchiveUnlocked(true)} title="Chat is locked" />
+    if (archiveLock) return <ArchiveUnlockScreen hint={archiveLock.hint} lockType={archiveLock.lockType} onUnlock={() => setArchiveUnlocked(true)} title="Chat is locked" />
     return <PageLoader />
   }
 
