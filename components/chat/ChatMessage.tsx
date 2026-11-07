@@ -26,6 +26,7 @@ import {
 } from '@/lib/hooks/useMessageActions'
 import { speakText, stopSpeaking } from '@/lib/utils/voice'
 import { ReportModal } from '@/components/shared/ReportModal'
+import { MessageActionConfirmDialog } from './MessageActionConfirmDialog'
 import { getSharedAperonixReplyLabel } from '@/lib/utils/sharedAperonix'
 
 interface ChatMessageProps {
@@ -127,6 +128,7 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
   const [showForward, setShowForward] = useState(false)
   const [showReactors, setShowReactors] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<'delete' | 'unsend' | null>(null)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(message.content)
   const [copied, setCopied] = useState(false)
@@ -252,12 +254,14 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
   // sees it happen instantly) alongside the actual database mutation - the
   // other participant gets the same result moments later via realtime.
   const handleUnsend = () => {
+    setConfirmAction(null)
     setShowMenu(false)
     onRemoveMessage?.(message.id)
     unsendMessage.mutate({ messageId: message.id, chatId: message.chat_id })
   }
 
   const handleDeleteForMe = async () => {
+    setConfirmAction(null)
     setShowMenu(false)
     try {
       await deleteForMe.mutateAsync({ messageId: message.id, chatId: message.chat_id })
@@ -434,11 +438,11 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
                 >
                   <ReplyIcon className="h-3.5 w-3.5" /> Reply
                 </button>
-                <button onClick={handleDeleteForMe} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
+                <button onClick={() => { setShowCallMenu(false); setConfirmAction('delete') }} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
                   <EyeOff className="h-3.5 w-3.5" /> Delete for me
                 </button>
                 {isOwn && (
-                  <button onClick={handleUnsend} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-500/10">
+                  <button onClick={() => { setShowCallMenu(false); setConfirmAction('unsend') }} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-500/10">
                     <Trash2 className="h-3.5 w-3.5" /> Unsend
                   </button>
                 )}
@@ -735,11 +739,11 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
             <button onClick={() => { setShowMenu(false); setShowForward(true) }} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
               <Forward className="h-3.5 w-3.5" /> Forward
             </button>
-            <button onClick={handleDeleteForMe} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
+            <button onClick={() => { setShowMenu(false); setConfirmAction('delete') }} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
               <EyeOff className="h-3.5 w-3.5" /> Delete for me
             </button>
             {isOwn && (
-              <button onClick={handleUnsend} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-500/10">
+              <button onClick={() => { setShowMenu(false); setConfirmAction('unsend') }} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-500/10">
                 <Trash2 className="h-3.5 w-3.5" /> Unsend
               </button>
             )}
@@ -807,6 +811,16 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
         />
       )}
 
+      <MessageActionConfirmDialog
+        action={confirmAction}
+        open={confirmAction !== null}
+        pending={unsendMessage.isPending || deleteForMe.isPending}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          if (confirmAction === 'unsend') handleUnsend()
+          else if (confirmAction === 'delete') void handleDeleteForMe()
+        }}
+      />
       {showReport && (
         <ReportModal
           reporterId={currentUserId}
