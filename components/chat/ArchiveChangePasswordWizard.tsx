@@ -4,8 +4,10 @@ import { useState } from 'react'
 import { X, Lock } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
 import { useVerifyArchivePassword, useSetArchivePassword } from '@/lib/hooks/useChatSettings'
+import { ArchivePatternLock } from './ArchivePatternLock'
 
 interface ArchiveChangePasswordWizardProps {
+  lockType?: 'password' | 'pattern'
   onClose: () => void
   onDone: () => void
 }
@@ -15,7 +17,7 @@ interface ArchiveChangePasswordWizardProps {
  * (new password -> confirm -> optional hint), just with one extra step up
  * front to prove they know the current password first.
  */
-export function ArchiveChangePasswordWizard({ onClose, onDone }: ArchiveChangePasswordWizardProps) {
+export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, onDone }: ArchiveChangePasswordWizardProps) {
   const { user } = useUser()
   const verify = useVerifyArchivePassword()
   const setPassword = useSetArchivePassword()
@@ -35,6 +37,14 @@ export function ArchiveChangePasswordWizard({ onClose, onDone }: ArchiveChangePa
     setStep(2)
   }
 
+  const handleVerifyOldPattern = async (pattern: string) => {
+    if (!user) return
+    setError('')
+    const ok = await verify.mutateAsync({ userId: user.id, pattern })
+    if (!ok) { setError('Incorrect pattern. Please try again.'); return }
+    setStep(2)
+  }
+
   const handleNextFromNew = () => {
     if (newPassword.length < 4) { setError('Use at least 4 digits.'); return }
     setError('')
@@ -49,7 +59,7 @@ export function ArchiveChangePasswordWizard({ onClose, onDone }: ArchiveChangePa
 
   const finish = async () => {
     if (!user) return
-    await setPassword.mutateAsync({ userId: user.id, password: newPassword, hint: hint.trim() || undefined })
+    await setPassword.mutateAsync({ userId: user.id, password: newPassword, lockType: 'password', hint: hint.trim() || undefined })
     onDone()
   }
 
@@ -58,7 +68,7 @@ export function ArchiveChangePasswordWizard({ onClose, onDone }: ArchiveChangePa
       <div className="bg-card border rounded-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b">
           <p className="font-semibold flex items-center gap-2">
-            <Lock className="h-4 w-4" /> Change archive password
+            <Lock className="h-4 w-4" /> Change archive lock
           </p>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
@@ -68,25 +78,16 @@ export function ArchiveChangePasswordWizard({ onClose, onDone }: ArchiveChangePa
         <div className="p-5 space-y-4">
           {step === 1 && (
             <>
-              <p className="text-sm text-muted-foreground">Enter your current password to continue.</p>
-              <input
-                autoFocus
-                type="password"
-                inputMode="numeric"
-                value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleVerifyOld()}
-                placeholder="Current password"
-                className="w-full bg-muted rounded-xl px-4 py-3 text-center text-lg tracking-widest outline-none border border-transparent focus:border-pink-500"
-              />
+              <p className="text-sm text-muted-foreground">{lockType === 'pattern' ? 'Draw your current 4 × 4 pattern to continue.' : 'Enter your current password to continue.'}</p>
+              {lockType === 'pattern' ? (
+                <ArchivePatternLock key="change-current-pattern" onComplete={handleVerifyOldPattern} disabled={verify.isPending} />
+              ) : (
+                <>
+                  <input autoFocus type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleVerifyOld()} placeholder="Current password" className="w-full bg-muted rounded-xl px-4 py-3 text-center text-lg tracking-widest outline-none border border-transparent focus:border-pink-500" />
+                  <button onClick={handleVerifyOld} disabled={verify.isPending || !oldPassword} className="w-full bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60">Next</button>
+                </>
+              )}
               {error && <p className="text-xs text-red-500">{error}</p>}
-              <button
-                onClick={handleVerifyOld}
-                disabled={verify.isPending || !oldPassword}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
-              >
-                Next
-              </button>
             </>
           )}
 
