@@ -222,7 +222,8 @@ export function WallpaperModal({ onDone, onClose, saving, initialImageUrl, initi
   const handleBuiltInWallpaperSelect = async (number: number) => {
     try {
       setError(null)
-      const filename = `wallpaper-${String(number).padStart(2, '0')}.jpg`
+      const extension = number === 188 ? 'png' : 'jpg'
+      const filename = `wallpaper-${String(number).padStart(2, '0')}.${extension}`
       const response = await fetch(`/images/chat-wallpapers/${filename}`)
       if (!response.ok) throw new Error('This wallpaper could not be loaded. Please try another one.')
       const blob = await response.blob()
@@ -303,11 +304,12 @@ export function WallpaperModal({ onDone, onClose, saving, initialImageUrl, initi
                 <h2 className="text-base font-semibold">Choose from wallpapers</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Pick a wallpaper to preview and edit before applying.</p>
               </div>
-              <span className="shrink-0 text-xs text-muted-foreground">309 wallpapers</span>
+              <span className="shrink-0 text-xs text-muted-foreground">310 wallpapers</span>
             </div>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-5">
-              {Array.from({ length: 310 }, (_, index) => index + 1).filter(number => number !== 188).map(number => {
-                const filename = `wallpaper-${String(number).padStart(2, '0')}.jpg`
+              {Array.from({ length: 310 }, (_, index) => index + 1).map(number => {
+                const extension = number === 188 ? 'png' : 'jpg'
+                const filename = `wallpaper-${String(number).padStart(2, '0')}.${extension}`
                 return (
                   <button
                     key={number}
