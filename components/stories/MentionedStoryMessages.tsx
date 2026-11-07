@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { createClient } from '@/lib/supabase/client'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { StoryViewer } from '@/components/stories/StoryViewer'
+import { MessageActionConfirmDialog } from '@/components/chat/MessageActionConfirmDialog'
 import { useReshareMentionedStory, type StoryGroup } from '@/lib/hooks/useStories'
 import type { StoryWithProfile } from '@/lib/types/database.types'
 
@@ -20,6 +21,8 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
   const [notice, setNotice] = useState('')
   const [actionError, setActionError] = useState('')
   const [openMenuStoryId, setOpenMenuStoryId] = useState<string | null>(null)
+  const [confirmDeleteStory, setConfirmDeleteStory] = useState<StoryWithProfile | null>(null)
+  const [deletingStory, setDeletingStory] = useState(false)
   const [mentionCreatedAt, setMentionCreatedAt] = useState<Map<string, string>>(() => new Map())
   const reshare = useReshareMentionedStory()
 
@@ -64,10 +67,12 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
   const deleteForMe = async (story: StoryWithProfile) => {
     setActionError('')
     setNotice('')
+    setDeletingStory(true)
     const { data: deleted, error: deleteError } = await supabase.rpc('delete_story_mention_for_me', {
       p_story_id: story.id,
       p_creator_id: otherUserId,
     })
+    setDeletingStory(false)
     if (deleteError || deleted !== true) {
       setActionError(deleteError?.message
         ? 'Could not delete this mention for you. Please try again.'
@@ -76,6 +81,7 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
     }
     setStories(previous => previous.filter(item => item.id !== story.id))
     setOpenMenuStoryId(null)
+    setConfirmDeleteStory(null)
     setNotice('Story mention deleted for you.')
   }
 
@@ -135,7 +141,7 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs hover:bg-white/10 disabled:opacity-50">
                           <Plus className="h-4 w-4" /> {alreadyAddedStoryIds.has(story.id) ? 'Already added' : 'Add to my story'}
                         </button>
-                        <button type="button" onClick={() => void deleteForMe(story)}
+                        <button type="button" onClick={() => { setOpenMenuStoryId(null); setConfirmDeleteStory(story) }}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs text-red-300 hover:bg-white/10">
                           <Trash2 className="h-4 w-4" /> Delete for me
                         </button>
@@ -155,6 +161,13 @@ export function MentionedStoryMessages({ userId, otherUserId }: { userId: string
         })}
         {(notice || actionError) && <p className={`rounded-lg px-3 py-2 text-xs ${actionError ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-600'}`}>{actionError || notice}</p>}
       </div>
+      <MessageActionConfirmDialog
+        action={confirmDeleteStory ? 'delete' : null}
+        open={!!confirmDeleteStory}
+        pending={deletingStory}
+        onCancel={() => setConfirmDeleteStory(null)}
+        onConfirm={() => { if (confirmDeleteStory) void deleteForMe(confirmDeleteStory) }}
+      />
       {selectedStory && <StoryViewer groups={selectedGroup} startGroupIndex={0} currentUserId={userId} onClose={() => setSelectedStory(null)} onAddToMyStory={alreadyAddedStoryIds.has(selectedStory.id) ? undefined : addToMyStory} isAddingToMyStory={reshare.isPending} showOriginalAttribution />}
     </>
   )
