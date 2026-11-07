@@ -105,12 +105,6 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
         </div>
 
         <div className="p-5 sm:p-6">
-          <div className="mb-5 flex items-center gap-2 rounded-2xl border border-border/70 bg-muted/35 p-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">{targetLockType === 'pattern' ? <Grid3X3 className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}</div>
-            <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">New lock type</p><p className="text-sm font-semibold">{targetLockType === 'pattern' ? '4 × 4 Pattern Lock' : 'Password Lock'}</p></div>
-            <button type="button" onClick={() => setShowLockPicker(true)} className="shrink-0 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition hover:bg-accent">Use different type lock</button>
-          </div>
-
           {step === 1 && <>
             <p className="mb-4 text-sm text-muted-foreground">{lockType === 'pattern' ? 'Draw your current pattern to verify it is you.' : 'Enter your current password to verify it is you.'}</p>
             {lockType === 'pattern' ? <ArchivePatternLock key="change-current-pattern" onComplete={handleVerifyOldPattern} disabled={verify.isPending} showIdleHint={false} /> : <>
@@ -120,6 +114,7 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
           </>}
 
           {step === 2 && <>
+            <div className="mb-4 flex justify-end"><button type="button" onClick={() => setShowLockPicker(true)} className="max-w-full text-right text-sm font-medium text-pink-500 underline underline-offset-4">Use different type lock</button></div>
             <p className="mb-4 text-sm text-muted-foreground">{targetLockType === 'pattern' ? 'Draw a new pattern. Connect at least four dots.' : 'Create your new password.'}</p>
             {targetLockType === 'pattern' ? <ArchivePatternLock key="change-new-pattern" onComplete={value => { setNewPattern(value); setError(''); setStep(3) }} /> : <>
               <input autoFocus type="password" value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="New password" autoComplete="new-password" className="w-full rounded-2xl border border-border bg-muted/60 px-4 py-4 text-center text-lg tracking-[0.2em] outline-none transition focus:border-pink-500" />
@@ -150,7 +145,7 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
             <div className="mb-4 flex items-center justify-between"><h3 id="change-lock-picker-title" className="font-semibold">Choose your lock type</h3><button type="button" onClick={() => setShowLockPicker(false)} aria-label="Close lock type picker" className="rounded-full p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button></div>
             <button type="button" onClick={() => chooseLock(alternateLockType)} className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left transition hover:border-primary hover:bg-primary/5">
               {alternateLockType === 'pattern' ? <Grid3X3 className="h-5 w-5 text-primary" /> : <KeyRound className="h-5 w-5 text-primary" />}
-              <span className="flex-1"><span className="block text-sm font-semibold">{alternateLockType === 'pattern' ? 'Pattern Lock (4 × 4)' : 'Password Lock'}</span><span className="block text-xs text-muted-foreground">{alternateLockType === 'pattern' ? 'Connect dots to create a private pattern' : 'Unlock with your password'}</span></span>
+              <span className="flex-1"><span className="block text-sm font-semibold">{alternateLockType === 'pattern' ? 'Pattern Lock (3 × 3)' : 'Password Lock'}</span><span className="block text-xs text-muted-foreground">{alternateLockType === 'pattern' ? 'Connect dots to create a private pattern' : 'Unlock with your password'}</span></span>
             </button>
             <button type="button" onClick={() => setShowLockPicker(false)} className="mt-4 w-full rounded-xl bg-muted py-2.5 text-sm font-semibold hover:bg-accent">Cancel</button>
           </div>
