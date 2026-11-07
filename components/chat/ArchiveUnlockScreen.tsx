@@ -87,7 +87,7 @@ export function ArchiveUnlockScreen({ hint, lockType = 'password', onUnlock, tit
           )}
         </div>
         <button onClick={() => setShowChangePassword(true)} className="text-xs text-pink-500 underline shrink-0">
-          Change password
+          {lockType === 'pattern' ? 'Change lock' : 'Change password'}
         </button>
       </div>
 
