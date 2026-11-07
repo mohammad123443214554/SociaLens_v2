@@ -493,6 +493,16 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
               </div>
             </div>
           )}
+          <MessageActionConfirmDialog
+            action={confirmAction}
+            open={confirmAction !== null}
+            pending={unsendMessage.isPending || deleteForMe.isPending}
+            onCancel={() => setConfirmAction(null)}
+            onConfirm={() => {
+              if (confirmAction === 'unsend') handleUnsend()
+              else if (confirmAction === 'delete') void handleDeleteForMe()
+            }}
+          />
         </div>
       )
     }
