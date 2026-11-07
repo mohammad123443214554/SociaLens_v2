@@ -438,7 +438,7 @@ export function useArchiveLockStatus(userId?: string) {
         .select('archive_password_hash, archive_password_hint')
         .eq('id', userId)
         .maybeSingle()
-      return { hasPassword: !!data?.archive_password_hash, hint: data?.archive_password_hint || null }
+      return { hasPassword: !!data?.archive_password_hash, hint: data?.archive_password_hint || null, lockType: data?.archive_password_hash?.startsWith('pattern:') ? 'pattern' as const : 'password' as const }
     },
     enabled: !!userId,
   })
@@ -449,8 +449,10 @@ export function useSetArchivePassword() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ userId, password, hint }: { userId: string; password: string; hint?: string }) => {
-      const hash = await hashPin(password)
+    mutationFn: async ({ userId, password, pattern, lockType = 'password', hint }: { userId: string; password?: string; pattern?: string; lockType?: 'password' | 'pattern'; hint?: string }) => {
+      const credential = lockType === 'pattern' ? pattern : password
+      if (!credential) throw new Error('A lock credential is required.')
+      const hash = (lockType === 'pattern' ? 'pattern:' : '') + await hashPin(credential)
       const { error } = await supabase
         .from('profiles')
         .update({ archive_password_hash: hash, archive_password_hint: hint?.trim() || null })
@@ -467,11 +469,16 @@ export function useVerifyArchivePassword() {
   const supabase = createClient()
 
   return useMutation({
-    mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
+    mutationFn: async ({ userId, password, pattern }: { userId: string; password?: string; pattern?: string }) => {
       const { data } = await supabase.from('profiles').select('archive_password_hash').eq('id', userId).maybeSingle()
-      if (!data?.archive_password_hash) return true // no password set yet - nothing to check against
-      const hash = await hashPin(password)
-      return hash === data.archive_password_hash
+      if (!data?.archive_password_hash) return true // no lock set yet - nothing to check against
+      const stored = data.archive_password_hash as string
+      if (stored.startsWith('pattern:')) {
+        if (!pattern) return false
+        return 'pattern:' + await hashPin(pattern) === stored
+      }
+      if (!password) return false
+      return await hashPin(password) === stored
     },
   })
 }
