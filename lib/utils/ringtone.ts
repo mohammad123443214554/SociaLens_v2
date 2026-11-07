@@ -78,17 +78,26 @@ function installGestureUnlocker() {
   const unlock = () => {
     const audio = getPlayer()
     const wasMuted = audio.muted
+    const previousSource = audio.src
+    // A tiny silent WAV gives the browser a valid media resource to unlock
+    // even when the user interacts before their profile ringtone has loaded.
+    if (!previousSource) audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='
     audio.muted = true
     const attempt = audio.play()
-    if (attempt && typeof attempt.then === 'function') {
-      void attempt.then(() => {
-        audio.pause()
-        try { audio.currentTime = 0 } catch {}
-        audio.muted = wasMuted
-      }).catch(() => { audio.muted = wasMuted })
-    } else {
+    const restore = () => {
       audio.pause()
+      try { audio.currentTime = 0 } catch {}
       audio.muted = wasMuted
+      if (!previousSource) {
+        audio.removeAttribute('src')
+        audio.load()
+        activeSourceUrl = null
+      }
+    }
+    if (attempt && typeof attempt.then === 'function') {
+      void attempt.then(restore).catch(restore)
+    } else {
+      restore()
     }
     window.removeEventListener('pointerdown', unlock, true)
     window.removeEventListener('touchstart', unlock, true)
