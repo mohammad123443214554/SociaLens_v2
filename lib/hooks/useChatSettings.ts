@@ -23,8 +23,9 @@ export function useCallSettings(userId?: string) {
         .eq('id', userId)
         .maybeSingle()
       const selectedRingtone = data?.call_ringtone || DEFAULT_RINGTONE_ID
-      // Preload while the app is idle, not when the incoming call starts.
-      void preloadRingtone(selectedRingtone)
+      // Resolve and warm the selected ringtone before publishing call settings.
+      // This keeps custom signed-URL creation off the incoming/outgoing ring path.
+      await preloadRingtone(selectedRingtone)
       return {
         ringtone: selectedRingtone,
         volume: data?.call_ringtone_volume ?? DEFAULT_RINGTONE_VOLUME,
