@@ -8,18 +8,19 @@ interface ArchivePatternLockProps {
   resetKey?: string | number
   size?: 'normal' | 'compact'
   showIdleHint?: boolean
+  gridSize?: 3 | 4
 }
 
 const GRID_SIZE = 3
 
-function addPatternPoint(current: number[], next: number) {
+function addPatternPoint(current: number[], next: number, gridSize: number) {
   if (current.includes(next)) return current
   if (current.length === 0) return [next]
   const previous = current[current.length - 1]
-  const rowA = Math.floor(previous / GRID_SIZE)
-  const colA = previous % GRID_SIZE
-  const rowB = Math.floor(next / GRID_SIZE)
-  const colB = next % GRID_SIZE
+  const rowA = Math.floor(previous / gridSize)
+  const colA = previous % gridSize
+  const rowB = Math.floor(next / gridSize)
+  const colB = next % gridSize
   const rowDiff = rowB - rowA
   const colDiff = colB - colA
   const divisor = (a: number, b: number): number => b === 0 ? Math.abs(a) : divisor(b, a % b)
@@ -27,14 +28,14 @@ function addPatternPoint(current: number[], next: number) {
   const additions: number[] = []
   if (steps > 1) {
     for (let step = 1; step < steps; step++) {
-      const middle = (rowA + (rowDiff / steps) * step) * GRID_SIZE + colA + (colDiff / steps) * step
+      const middle = (rowA + (rowDiff / steps) * step) * gridSize + colA + (colDiff / steps) * step
       if (!current.includes(middle)) additions.push(middle)
     }
   }
   return [...current, ...additions, next]
 }
 
-export function ArchivePatternLock({ onComplete, disabled = false, resetKey, size = 'normal', showIdleHint = true }: ArchivePatternLockProps) {
+export function ArchivePatternLock({ onComplete, disabled = false, resetKey, size = 'normal', showIdleHint = true, gridSize = 3 }: ArchivePatternLockProps) {
   const [path, setPath] = useState<number[]>([])
   const [drawing, setDrawing] = useState(false)
   const [error, setError] = useState('')
@@ -50,7 +51,7 @@ export function ArchivePatternLock({ onComplete, disabled = false, resetKey, siz
 
   const enter = (index: number) => {
     if (!drawing || disabled) return
-    setPath(current => addPatternPoint(current, index))
+    setPath(current => addPatternPoint(current, index, gridSize))
   }
 
   const finish = () => {
@@ -78,8 +79,8 @@ export function ArchivePatternLock({ onComplete, disabled = false, resetKey, siz
           {path.length > 1 && <polyline points={path.map(index => `${16.6667 + (index % 3) * 33.3333},${16.6667 + Math.floor(index / 3) * 33.3333}`).join(' ')} fill="none" stroke="url(#archivePatternGradient)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />}
           <defs><linearGradient id="archivePatternGradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#ec4899" /><stop offset="100%" stopColor="#a855f7" /></linearGradient></defs>
         </svg>
-        <div className="relative grid h-full w-full grid-cols-3 grid-rows-3">
-          {Array.from({ length: 9 }, (_, index) => {
+        <div className="relative grid h-full w-full grid-cols-[repeat(var(--pattern-grid),minmax(0,1fr))] grid-rows-[repeat(var(--pattern-grid),minmax(0,1fr))]">
+          {Array.from({ length: gridSize * gridSize }, (_, index) => {
             const selected = path.includes(index)
             return (
               <div key={index} className="flex items-center justify-center">
