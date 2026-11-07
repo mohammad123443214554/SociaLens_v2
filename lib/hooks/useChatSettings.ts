@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { DEFAULT_RINGTONE_ID, DEFAULT_RINGTONE_VOLUME } from '@/lib/utils/ringtone'
+import { DEFAULT_RINGTONE_ID, DEFAULT_RINGTONE_VOLUME, preloadRingtone } from '@/lib/utils/ringtone'
 
 // ------------------------------------------------------------------
 // Call settings - which ringtone plays for incoming/outgoing calls, and
@@ -22,8 +22,11 @@ export function useCallSettings(userId?: string) {
         .select('call_ringtone, call_ringtone_volume, call_output_volume, call_input_volume')
         .eq('id', userId)
         .maybeSingle()
+      const selectedRingtone = data?.call_ringtone || DEFAULT_RINGTONE_ID
+      // Preload while the app is idle, not when the incoming call starts.
+      void preloadRingtone(selectedRingtone)
       return {
-        ringtone: data?.call_ringtone || DEFAULT_RINGTONE_ID,
+        ringtone: selectedRingtone,
         volume: data?.call_ringtone_volume ?? DEFAULT_RINGTONE_VOLUME,
         outputVolume: data?.call_output_volume ?? 100,
         inputVolume: data?.call_input_volume ?? 100,
