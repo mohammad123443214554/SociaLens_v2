@@ -20,6 +20,7 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
   const setPassword = useSetArchivePassword()
   const [targetLockType, setTargetLockType] = useState<LockType>(lockType)
   const [showLockPicker, setShowLockPicker] = useState(false)
+  const [legacyPatternGrid, setLegacyPatternGrid] = useState(false)
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -107,7 +108,9 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
         <div className="p-5 sm:p-6">
           {step === 1 && <>
             <p className="mb-4 text-sm text-muted-foreground">{lockType === 'pattern' ? 'Draw your current pattern to verify it is you.' : 'Enter your current password to verify it is you.'}</p>
-            {lockType === 'pattern' ? <ArchivePatternLock key="change-current-pattern" onComplete={handleVerifyOldPattern} disabled={verify.isPending} showIdleHint={false} /> : <>
+            {lockType === 'pattern' ? <ArchivePatternLock key={`change-current-pattern-${legacyPatternGrid ? 4 : 3}`} gridSize={legacyPatternGrid ? 4 : 3} onComplete={handleVerifyOldPattern} disabled={verify.isPending} showIdleHint={false} />
+            {error && !legacyPatternGrid && <button type="button" onClick={() => { setLegacyPatternGrid(true); setError('') }} className="mt-2 text-xs text-muted-foreground underline underline-offset-4">Use previous 4 × 4 pattern</button>}
+            {legacyPatternGrid && <button type="button" onClick={() => { setLegacyPatternGrid(false); setError('') }} className="mt-2 text-xs text-muted-foreground underline underline-offset-4">Use 3 × 3 pattern</button>} : <>
               <input autoFocus type="password" value={oldPassword} onChange={event => setOldPassword(event.target.value)} onKeyDown={event => event.key === 'Enter' && handleVerifyOld()} placeholder="Current password" autoComplete="current-password" className="w-full rounded-2xl border border-border bg-muted/60 px-4 py-4 text-center text-lg tracking-[0.2em] outline-none transition focus:border-pink-500 focus:ring-2 focus:ring-pink-500/15" />
               <button type="button" onClick={handleVerifyOld} disabled={verify.isPending || !oldPassword} className="mt-4 w-full rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 text-sm font-semibold text-white disabled:opacity-60">{verify.isPending ? 'Checking…' : 'Continue'}</button>
             </>}
