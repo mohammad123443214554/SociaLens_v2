@@ -6,9 +6,12 @@ import { ArrowLeft, Lock } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
 import { useVerifyArchivePassword } from '@/lib/hooks/useChatSettings'
 import { ArchiveChangePasswordWizard } from './ArchiveChangePasswordWizard'
+import { ArchivePatternLock } from './ArchivePatternLock'
+import { Grid3X3 } from 'lucide-react'
 
 interface ArchiveUnlockScreenProps {
   hint: string | null
+  lockType?: 'password' | 'pattern'
   onUnlock: () => void
   /** Archive section shows "Archive is locked"; opening a single archived
    *  chat directly (search, someone's profile, a link) shows "Chat is
@@ -17,11 +20,12 @@ interface ArchiveUnlockScreenProps {
   title?: string
 }
 
-export function ArchiveUnlockScreen({ hint, onUnlock, title = 'Archive is locked' }: ArchiveUnlockScreenProps) {
+export function ArchiveUnlockScreen({ hint, lockType = 'password', onUnlock, title = 'Archive is locked' }: ArchiveUnlockScreenProps) {
   const router = useRouter()
   const { user } = useUser()
   const verify = useVerifyArchivePassword()
   const [password, setPassword] = useState('')
+  const [patternError, setPatternError] = useState('')
   const [error, setError] = useState('')
   const [showHint, setShowHint] = useState(false)
   const [showChangePassword, setShowChangePassword] = useState(false)
@@ -34,6 +38,14 @@ export function ArchiveUnlockScreen({ hint, onUnlock, title = 'Archive is locked
     else setError('Incorrect password.')
   }
 
+  const handlePattern = async (value: string) => {
+    if (!user || verify.isPending) return
+    setPatternError('')
+    const ok = await verify.mutateAsync({ userId: user.id, pattern: value })
+    if (ok) onUnlock()
+    else setPatternError('Incorrect pattern. Please try again.')
+  }
+
   return (
     <div className="max-w-sm mx-auto flex flex-col items-center px-4 py-16 text-center">
       <button onClick={() => router.push('/chat')} className="self-start text-muted-foreground hover:text-foreground mb-8 flex items-center gap-1 text-sm">
@@ -43,25 +55,21 @@ export function ArchiveUnlockScreen({ hint, onUnlock, title = 'Archive is locked
         <Lock className="h-6 w-6 text-muted-foreground" />
       </div>
       <h1 className="font-bold text-lg mb-1">{title}</h1>
-      <p className="text-sm text-muted-foreground mb-6">Enter your password to continue.</p>
-      <input
-        autoFocus
-        type="password"
-        inputMode="numeric"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-        placeholder="Password"
-        className="w-full bg-muted rounded-xl px-4 py-3 text-center text-lg tracking-widest outline-none border border-transparent focus:border-pink-500 mb-2"
-      />
-      {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
-      <button
-        onClick={handleSubmit}
-        disabled={verify.isPending || !password}
-        className="w-full bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60 mb-4"
-      >
-        Unlock
-      </button>
+      <p className="text-sm text-muted-foreground mb-6">{lockType === 'pattern' ? 'Draw your 4 × 4 pattern to unlock your Archive.' : 'Enter your password to continue.'}</p>
+      {lockType === 'pattern' ? (
+        <div className="w-full">
+          <div className="mb-3 flex items-center justify-center gap-2 text-xs text-muted-foreground"><Grid3X3 className="h-4 w-4" /> 4 × 4 Pattern Lock</div>
+          <ArchivePatternLock key="archive-unlock-pattern" onComplete={handlePattern} disabled={verify.isPending} />
+          {verify.isPending && <p className="mt-2 text-xs text-muted-foreground">Checking pattern…</p>}
+          {patternError && <p role="alert" className="mt-2 text-xs text-red-500">{patternError}</p>}
+        </div>
+      ) : (
+        <>
+          <input autoFocus type="password" inputMode="numeric" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSubmit()} placeholder="Password" className="w-full bg-muted rounded-xl px-4 py-3 text-center text-lg tracking-widest outline-none border border-transparent focus:border-pink-500 mb-2" />
+          {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
+          <button onClick={handleSubmit} disabled={verify.isPending || !password} className="w-full bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60 mb-4">{verify.isPending ? 'Checking…' : 'Unlock'}</button>
+        </>
+      )}
 
       {/* Hint on the left, "Change password" on the right - always visible
           (phone and desktop both), even with no hint set, so resetting the
@@ -85,6 +93,7 @@ export function ArchiveUnlockScreen({ hint, onUnlock, title = 'Archive is locked
 
       {showChangePassword && (
         <ArchiveChangePasswordWizard
+          lockType={lockType}
           onClose={() => setShowChangePassword(false)}
           onDone={() => setShowChangePassword(false)}
         />
