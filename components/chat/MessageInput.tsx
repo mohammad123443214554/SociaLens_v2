@@ -89,9 +89,12 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
 
   const [isRecording, setIsRecording] = useState(false)
   const [recordSeconds, setRecordSeconds] = useState(0)
+  const [waveformLevels, setWaveformLevels] = useState<number[]>(() => Array.from({ length: 42 }, () => 0.035))
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const waveformFrameRef = useRef<number | null>(null)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const emojiBtnRef = useRef<HTMLButtonElement>(null)
@@ -176,14 +179,63 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
   }
 
   // --- Voice recording -------------------------------------------------
+  const stopWaveformMeter = () => {
+    if (waveformFrameRef.current !== null) {
+      cancelAnimationFrame(waveformFrameRef.current)
+      waveformFrameRef.current = null
+    }
+    const context = audioContextRef.current
+    audioContextRef.current = null
+    if (context && context.state !== 'closed') void context.close().catch(() => undefined)
+    setWaveformLevels(Array.from({ length: 42 }, () => 0.035))
+  }
+
+  const startWaveformMeter = (stream: MediaStream) => {
+    try {
+      const AudioContextConstructor = window.AudioContext
+      if (!AudioContextConstructor) return
+      const context = new AudioContextConstructor()
+      const analyser = context.createAnalyser()
+      analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0.72
+      const source = context.createMediaStreamSource(stream)
+      source.connect(analyser)
+      audioContextRef.current = context
+      const samples = new Uint8Array(analyser.fftSize)
+      let lastPaint = 0
+
+      const draw = (timestamp: number) => {
+        analyser.getByteTimeDomainData(samples)
+        let energy = 0
+        for (let i = 0; i < samples.length; i += 1) {
+          const normalized = (samples[i] - 128) / 128
+          energy += normalized * normalized
+        }
+        const rms = Math.sqrt(energy / samples.length)
+        const level = Math.min(1, Math.max(0.035, rms * 4.8))
+        if (timestamp - lastPaint >= 55) {
+          setWaveformLevels(previous => [...previous.slice(1), level])
+          lastPaint = timestamp
+        }
+        waveformFrameRef.current = requestAnimationFrame(draw)
+      }
+
+      waveformFrameRef.current = requestAnimationFrame(draw)
+    } catch {
+      // Recording remains available even if live audio metering is unsupported.
+    }
+  }
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const recorder = new MediaRecorder(stream)
       audioChunksRef.current = []
+      setWaveformLevels(Array.from({ length: 42 }, () => 0.035))
       recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
       recorder.start()
       mediaRecorderRef.current = recorder
+      startWaveformMeter(stream)
       setIsRecording(true)
       setRecordSeconds(0)
       recordTimerRef.current = setInterval(() => setRecordSeconds(s => s + 1), 1000)
@@ -197,11 +249,12 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
     if (!recorder) return
     recorder.onstop = async () => {
       recorder.stream.getTracks().forEach(t => t.stop())
+      stopWaveformMeter()
       if (recordTimerRef.current) clearInterval(recordTimerRef.current)
       const duration = recordSeconds
       setIsRecording(false)
       if (duration < 1) return // accidental tap, nothing worth sending
-      const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+      const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
       setSending(true)
       try {
         const url = await uploadChatMedia(blob, `voice-${Date.now()}.webm`, currentUserId)
@@ -219,8 +272,13 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
   const cancelRecording = () => {
     const recorder = mediaRecorderRef.current
     if (recorder) {
-      recorder.onstop = () => recorder.stream.getTracks().forEach(t => t.stop())
+      recorder.onstop = () => {
+        recorder.stream.getTracks().forEach(t => t.stop())
+        stopWaveformMeter()
+      }
       recorder.stop()
+    } else {
+      stopWaveformMeter()
     }
     if (recordTimerRef.current) clearInterval(recordTimerRef.current)
     setIsRecording(false)
@@ -365,21 +423,60 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
       <input ref={videoInputRef} type="file" accept="video/*" hidden onChange={handleVideoPicked} />
 
       {isRecording ? (
-        <div className="flex items-center gap-3 p-3">
-          <button onClick={cancelRecording} className="text-muted-foreground hover:text-red-500 shrink-0">
-            <Trash2 className="h-5 w-5" />
-          </button>
-          <div className="flex-1 flex items-center gap-2 text-sm">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-            <span className="tabular-nums">{Math.floor(recordSeconds / 60)}:{String(recordSeconds % 60).padStart(2, '0')}</span>
-            <span className="text-muted-foreground text-xs">Recording voice message...</span>
+        <div className="px-3 py-2.5 sm:px-4 sm:py-3">
+          <div className="flex min-h-12 items-center gap-3 rounded-[26px] border border-white/10 bg-background/85 px-3 py-2 shadow-sm backdrop-blur-xl sm:gap-4 sm:px-4">
+            <button
+              type="button"
+              onClick={cancelRecording}
+              aria-label="Discard voice recording"
+              title="Discard recording"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
+            >
+              <Trash2 className="h-[18px] w-[18px]" />
+            </button>
+
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <div className="flex shrink-0 items-center gap-1.5">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500 opacity-50" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500" />
+                </span>
+                <span className="min-w-[38px] font-mono text-[13px] font-semibold tabular-nums text-foreground">
+                  {Math.floor(recordSeconds / 60)}:{String(recordSeconds % 60).padStart(2, '0')}
+                </span>
+              </div>
+
+              <div
+                className="flex h-9 min-w-0 flex-1 items-center justify-center gap-[3px] overflow-hidden"
+                role="img"
+                aria-label="Live microphone waveform"
+              >
+                {waveformLevels.map((level, index) => (
+                  <span
+                    key={index}
+                    className="w-[3px] max-w-[3px] shrink-0 rounded-full bg-gradient-to-t from-pink-500 via-fuchsia-500 to-violet-400 transition-[height,opacity] duration-75"
+                    style={{
+                      height: `${Math.max(4, Math.round(level * 34))}px`,
+                      opacity: 0.48 + level * 0.52,
+                    }}
+                  />
+                ))}
+              </div>
+              <span className="hidden shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-rose-400 sm:inline">
+                Rec
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={stopRecordingAndSend}
+              aria-label="Send voice message"
+              title="Send voice message"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-fuchsia-500 to-violet-600 text-white shadow-[0_3px_14px_rgba(217,70,239,0.28)] transition-transform hover:scale-[1.04] active:scale-95"
+            >
+              <Send className="h-[17px] w-[17px] translate-x-[-1px]" />
+            </button>
           </div>
-          <button
-            onClick={stopRecordingAndSend}
-            className="w-10 h-10 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white flex items-center justify-center shrink-0"
-          >
-            <Send className="h-4 w-4" />
-          </button>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="px-3 py-2 sm:px-4 sm:py-3"><div className={`flex w-full ${isComposerExpanded ? "items-end rounded-[26px] sm:rounded-[28px]" : "items-center rounded-full"} gap-1 border border-white/15 bg-background/85 px-1.5 py-1 sm:gap-1.5 sm:px-2 sm:py-1.5 shadow-sm focus-within:border-white/30 transition-[border-radius] duration-150`}>
