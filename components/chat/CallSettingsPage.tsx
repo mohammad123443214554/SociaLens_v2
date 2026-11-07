@@ -143,14 +143,20 @@ export function CallSettingsPage({ userId, onBack }: CallSettingsPageProps) {
 
     const extension = picked.name.split('.').pop()?.toLowerCase() || ''
     if (!CUSTOM_AUDIO_TYPES[extension]) {
+      setSelectedAudioFile(null)
+      setFilePreviewUrl(null)
       setUploadError('Choose an MP3, WAV, M4A, AAC, OGG or WEBM audio file.')
       return
     }
     if (picked.size > MAX_CUSTOM_RINGTONE_BYTES) {
+      setSelectedAudioFile(null)
+      setFilePreviewUrl(null)
       setUploadError('The audio file must be 10 MB or smaller.')
       return
     }
     if (picked.size === 0) {
+      setSelectedAudioFile(null)
+      setFilePreviewUrl(null)
       setUploadError('This audio file is empty. Choose another file.')
       return
     }
