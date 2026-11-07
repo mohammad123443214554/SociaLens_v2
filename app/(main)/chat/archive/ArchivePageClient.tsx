@@ -149,7 +149,7 @@ export default function ArchivePage() {
   }
 
   if (!unlocked) {
-    return <ArchiveUnlockScreen hint={archiveLock.hint} onUnlock={() => setUnlocked(true)} />
+    return <ArchiveUnlockScreen hint={archiveLock.hint} lockType={archiveLock.lockType} onUnlock={() => setUnlocked(true)} />
   }
 
   return (
