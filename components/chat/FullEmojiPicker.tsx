@@ -23,6 +23,7 @@ const CATEGORIES = ['Popular', 'All', ...Array.from(new Set(EMOJIS.map(item => i
 export function FullEmojiPicker({ onSelect, onClose, style }: FullEmojiPickerProps) {
   const [activeCategory, setActiveCategory] = useState('All')
   const [search, setSearch] = useState('')
+  const [visibleCount, setVisibleCount] = useState(180)
   const filteredEmojis = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
     if (query) {
@@ -35,6 +36,8 @@ export function FullEmojiPicker({ onSelect, onClose, style }: FullEmojiPickerPro
     if (activeCategory === 'All') return EMOJIS
     return EMOJIS.filter(item => item.category === activeCategory)
   }, [activeCategory, search])
+
+  const visibleEmojis = filteredEmojis.slice(0, visibleCount)
 
   if (typeof document === 'undefined') return null
 
@@ -51,14 +54,13 @@ export function FullEmojiPicker({ onSelect, onClose, style }: FullEmojiPickerPro
         <div className="mb-2 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">Choose an emoji</p>
-            <p className="text-[11px] text-muted-foreground">{EMOJIS.length.toLocaleString()} emojis and skin-tone variations</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close emoji picker" className="rounded-full px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">Close</button>
         </div>
         <input
           type="search"
           value={search}
-          onChange={event => setSearch(event.target.value)}
+          onChange={event => { setSearch(event.target.value); setVisibleCount(180) }}
           placeholder="Search emojis"
           aria-label="Search emojis"
           className="h-9 w-full rounded-xl border border-border bg-muted/50 px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-pink-500"
@@ -68,7 +70,7 @@ export function FullEmojiPicker({ onSelect, onClose, style }: FullEmojiPickerPro
             <button
               key={category}
               type="button"
-              onClick={() => { setActiveCategory(category); setSearch('') }}
+              onClick={() => { setActiveCategory(category); setSearch(''); setVisibleCount(180) }}
               className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${activeCategory === category && !search ? 'bg-pink-500 text-white' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'}`}
             >
               {category}
@@ -79,7 +81,7 @@ export function FullEmojiPicker({ onSelect, onClose, style }: FullEmojiPickerPro
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5">
         {filteredEmojis.length ? (
           <div className="grid grid-cols-9 gap-1">
-            {filteredEmojis.map(item => (
+            {visibleEmojis.map(item => (
               <button
                 key={item.emoji}
                 type="button"
@@ -96,9 +98,9 @@ export function FullEmojiPicker({ onSelect, onClose, style }: FullEmojiPickerPro
           <p className="py-12 text-center text-sm text-muted-foreground">No emojis found.</p>
         )}
       </div>
-      <div className="shrink-0 border-t border-border px-3 py-2 text-[10px] text-muted-foreground">
-        {filteredEmojis.length.toLocaleString()} shown · Tap an emoji to add it to your message
-      </div>
+      {visibleCount < filteredEmojis.length && (
+        <button type="button" onClick={() => setVisibleCount(count => count + 180)} className="shrink-0 border-t border-border px-3 py-2 text-xs font-medium text-pink-500 hover:bg-muted">Show more emojis</button>
+      )}
     </div>,
     document.body
   )
