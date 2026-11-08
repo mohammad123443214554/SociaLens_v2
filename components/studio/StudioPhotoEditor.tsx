@@ -8,7 +8,7 @@ type CanvasFormat = 'post' | 'portrait' | 'story' | 'custom'
 type FitMode = 'cover' | 'contain'
 type Layer = { id: string; kind: 'text' | 'rect' | 'circle'; text: string; color: string; x: number; y: number; size: number; visible: boolean; locked: boolean }
 
-const FORMATS: Record<CanvasFormat, { label: string; width: number; height: number; ratio: string }> = {
+const FORMATS: Record<Exclude<CanvasFormat, 'custom'>, { label: string; width: number; height: number; ratio: string }> = {
   post: { label: 'Square Post', width: 1080, height: 1080, ratio: '1:1' },
   portrait: { label: 'Portrait Post', width: 1080, height: 1350, ratio: '4:5' },
   story: { label: 'Story', width: 1080, height: 1920, ratio: '9:16' },
