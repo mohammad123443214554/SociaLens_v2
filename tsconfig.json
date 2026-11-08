@@ -25,7 +25,9 @@
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "target": "ES2017",
+    "allowImportingTsExtensions": true
   },
   "include": [
     "next-env.d.ts",
