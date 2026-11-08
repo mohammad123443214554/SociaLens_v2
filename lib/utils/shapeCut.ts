@@ -1,7 +1,7 @@
-export type ShapeCutCategory = 'Basic' | 'Geometric' | 'Stars & Symbols' | 'Nature & Flowers' | 'Frames & Arches' | 'Creative'
+export type ShapeCutCategory = 'Basic' | 'Geometric' | 'Stars & Symbols' | 'Nature & Flowers' | 'Organic Blobs' | 'Frames & Arches' | 'Creative'
 export type ShapeCutTemplate = { id: string; name: string; category: ShapeCutCategory; kind: number; index: number }
 
-export const SHAPECUT_CATEGORIES: ShapeCutCategory[] = ["Basic","Geometric","Stars & Symbols","Nature & Flowers","Frames & Arches","Creative"]
+export const SHAPECUT_CATEGORIES: ShapeCutCategory[] = ["Basic","Geometric","Stars & Symbols","Nature & Flowers","Organic Blobs","Frames & Arches","Creative"]
 export const SHAPECUT_SHAPES: ShapeCutTemplate[] = [
   {
     "id": "sc-001",
@@ -459,6 +459,146 @@ export const SHAPECUT_SHAPES: ShapeCutTemplate[] = [
     "index": 14
   },
   {
+    "id": "sc-066",
+    "name": "Soft Organic Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 0
+  },
+  {
+    "id": "sc-067",
+    "name": "Rounded Organic Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 1
+  },
+  {
+    "id": "sc-068",
+    "name": "Asymmetric Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 2
+  },
+  {
+    "id": "sc-069",
+    "name": "Petal Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 3
+  },
+  {
+    "id": "sc-070",
+    "name": "Cloud Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 4
+  },
+  {
+    "id": "sc-071",
+    "name": "Pebble Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 5
+  },
+  {
+    "id": "sc-072",
+    "name": "Flowing Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 6
+  },
+  {
+    "id": "sc-073",
+    "name": "Ripple Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 7
+  },
+  {
+    "id": "sc-074",
+    "name": "Wide Organic Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 8
+  },
+  {
+    "id": "sc-075",
+    "name": "Tall Organic Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 9
+  },
+  {
+    "id": "sc-076",
+    "name": "Squircle Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 10
+  },
+  {
+    "id": "sc-077",
+    "name": "Five-Lobe Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 11
+  },
+  {
+    "id": "sc-078",
+    "name": "Six-Lobe Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 12
+  },
+  {
+    "id": "sc-079",
+    "name": "Droplet Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 13
+  },
+  {
+    "id": "sc-080",
+    "name": "Twist Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 14
+  },
+  {
+    "id": "sc-081",
+    "name": "Smooth Amoeba",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 15
+  },
+  {
+    "id": "sc-082",
+    "name": "Soft Star Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 16
+  },
+  {
+    "id": "sc-083",
+    "name": "Double-Bulge Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 17
+  },
+  {
+    "id": "sc-084",
+    "name": "Abstract Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 18
+  },
+  {
+    "id": "sc-085",
+    "name": "Freeform Blob",
+    "category": "Organic Blobs",
+    "kind": 4,
+    "index": 19
+  },
+  {
     "id": "sc-086",
     "name": "Classic Arch",
     "category": "Frames & Arches",
@@ -711,7 +851,7 @@ const regularPolygon = (count:number, rx=42, ry=42, offset=-Math.PI/2) => Array.
 const star = (points:number, outer=44, inner=20, offset=-Math.PI/2) => Array.from({length:points*2},(_,i)=>{const r=i%2?inner:outer;const a=offset+i*Math.PI/points;return [50+Math.cos(a)*r,50+Math.sin(a)*r] as [number,number]})
 
 /** Returns a stable vector silhouette for a ShapeCut template. All coordinates use a 100×100 viewBox. */
-export function getShapeCutPath(shapeId:string):string {
+function getShapeCutPathRaw(shapeId:string):string {
  const s=SHAPECUT_SHAPES.find(item=>item.id===shapeId) ?? SHAPECUT_SHAPES[0]
  const i=s.index
  if(s.category==='Basic') {
@@ -748,11 +888,40 @@ export function getShapeCutPath(shapeId:string):string {
   if(i>=6&&i<=8)return 'M8 50 C24 13 63 2 92 8 C88 43 60 82 8 50 Z';
   if(i===10||i===11)return 'M6 57 C6 35 26 24 39 31 C46 5 75 5 81 30 C103 29 105 61 86 67 H22 Q6 67 6 57 Z';if(i===12)return 'M2 50 Q14 20 26 50 T50 50 T74 50 T98 50 V100 H2 Z';if(i===13)return 'M50 2 C39 20 16 44 16 63 A34 34 0 0 0 84 63 C84 44 61 20 50 2 Z';return 'M50 3 C37 23 12 44 17 66 C23 91 49 100 67 83 C84 67 77 49 62 37 C64 57 46 64 42 50 C37 37 47 23 50 3 Z'
  }
+ if(s.category==='Organic Blobs') {
+  // Smooth closed quadratic silhouettes with deterministic variation per template.
+  const count = 12
+  const points = Array.from({ length: count }, (_, pointIndex) => {
+   const angle = -Math.PI / 2 + pointIndex * Math.PI * 2 / count
+   const wave = Math.sin((pointIndex + 1) * (i + 2) * 0.37) * 5
+   const secondary = Math.cos((pointIndex + 2) * (i + 1) * 0.19) * 3
+   const radius = 34 + ((pointIndex * 7 + i * 11) % 13) + wave + secondary
+   const x = clamp(50 + Math.cos(angle) * radius * (i % 3 === 0 ? 1.08 : 1), 4, 96)
+   const y = clamp(50 + Math.sin(angle) * radius * (i % 4 === 0 ? 0.88 : 1), 4, 96)
+   return [x, y] as [number, number]
+  })
+  const midpoint = (a:[number,number], b:[number,number]):[number,number] => [(a[0]+b[0])/2,(a[1]+b[1])/2]
+  const first = midpoint(points[points.length-1], points[0])
+  let path = `M ${first[0].toFixed(2)} ${first[1].toFixed(2)}`
+  for (let pointIndex=0; pointIndex<points.length; pointIndex++) {
+   const current = points[pointIndex]
+   const next = points[(pointIndex+1)%points.length]
+   const mid = midpoint(current,next)
+   path += ` Q ${current[0].toFixed(2)} ${current[1].toFixed(2)} ${mid[0].toFixed(2)} ${mid[1].toFixed(2)}`
+  }
+  return path + ' Z'
+ }
  if(s.category==='Frames & Arches') {
   const arch=['M5 95 V48 A45 45 0 0 1 95 48 V95 Z','M15 95 V35 A35 35 0 0 1 85 35 V95 Z','M3 95 V65 A47 47 0 0 1 97 65 V95 Z','M8 95 V44 Q8 5 50 5 Q92 5 92 44 V95 Z','M5 95 V45 L50 3 L95 45 V95 Z','M8 95 V45 L50 5 L92 45 V95 Z','M50 4 A44 44 0 1 1 49.9 4 Z','M8 20 L20 8 H80 L92 20 V80 L80 92 H20 L8 80 Z','M5 25 Q15 5 25 25 T45 25 T65 25 T85 25 T95 25 V75 Q85 95 75 75 T55 75 T35 75 T15 75 T5 75 Z','M5 18 Q25 8 45 18 T85 18 L95 82 Q75 92 55 82 T15 82 L5 18 Z','M12 8 H88 Q94 8 94 14 V92 H6 V14 Q6 8 12 8 Z','M4 20 H96 V80 H4 Z','M5 20 L15 5 H85 L95 20 V80 L85 95 H15 L5 80 Z','M5 95 V50 A30 30 0 0 1 50 25 A30 30 0 0 1 95 50 V95 Z','M12 12 H88 V88 H12 Z'];return arch[i]
  }
  const patterns: Array<Array<[number,number]>>=[[[10,15],[78,7],[92,40],[75,55],[90,90],[38,82],[7,65]],[[5,35],[22,5],[47,18],[80,3],[95,42],[70,60],[82,92],[30,85]],[[12,8],[55,3],[64,28],[95,22],[84,58],[98,84],[45,93],[23,67],[3,38]],[[5,10],[92,18],[78,47],[97,77],[50,91],[31,70],[3,83],[18,42]],[[50,2],[71,23],[97,16],[83,45],[98,65],[68,68],[74,97],[47,79],[23,97],[31,65],[3,54],[28,36],[9,13]]];
  if(i===0)return 'M5 12 H70 Q94 12 94 36 V67 Q94 86 72 86 H42 L24 98 V86 H15 Q5 86 5 76 Z';if(i===1)return 'M6 12 H85 Q95 12 95 22 V76 Q95 86 85 86 H60 L76 98 L43 86 H16 Q6 86 6 76 Z';if(i===2)return 'M20 5 H80 Q95 5 95 20 V60 Q95 75 80 75 H58 L45 95 L42 75 H20 Q5 75 5 60 V20 Q5 5 20 5 Z';if(i===3||i===4||i===12)return polygon(star(i===3?12:i===4?16:10,46,31));if(i===5)return 'M14 5 H86 Q96 5 91 18 Q83 32 93 45 Q83 58 92 72 Q96 95 82 95 H18 Q4 95 8 78 Q17 64 7 50 Q17 36 7 22 Q4 5 14 5 Z';if(i===6)return 'M8 18 Q50 4 92 18 Q98 50 92 82 Q50 96 8 82 Q2 50 8 18 Z';if(i===7)return polygon(regularPolygon(7,44,42,-Math.PI/2+i*.13));if(i===8)return polygon([[8,15],[92,15],[74,50],[92,85],[8,85],[26,50]]);if(i===9)return 'M5 24 Q5 5 24 5 H76 Q95 5 95 24 Q80 32 95 40 V60 Q80 68 95 76 Q95 95 76 95 H24 Q5 95 5 76 Q20 68 5 60 V40 Q20 32 5 24 Z';if(i===10)return polygon(star(20,46,40));if(i===11)return polygon(star(16,46,34));if(i===13)return 'M2 40 Q25 10 50 40 T98 40 V62 Q75 92 50 62 T2 62 Z';if(i===14)return 'M40 2 H60 V40 H98 V60 H60 V98 H40 V60 H2 V40 H40 Z';if(i===15)return 'M50 5 A30 30 0 0 1 80 35 A30 30 0 0 1 50 65 A30 30 0 0 1 20 35 A30 30 0 0 1 50 5 Z M50 35 A30 30 0 0 1 80 65 A30 30 0 0 1 50 95 A30 30 0 0 1 20 65 A30 30 0 0 1 50 35 Z';if(i===16)return 'M35 8 A27 27 0 0 1 62 35 A27 27 0 0 1 35 62 A27 27 0 0 1 8 35 A27 27 0 0 1 35 8 Z M65 38 A27 27 0 0 1 92 65 A27 27 0 0 1 65 92 A27 27 0 0 1 38 65 A27 27 0 0 1 65 38 Z';if(i===17)return 'M30 4 H70 V30 H96 V70 H70 V96 H30 V70 H4 V30 H30 Z';if(i===18)return 'M5 5 H95 V25 L78 25 L78 78 L95 78 V95 H5 V78 H22 V25 H5 Z';return polygon(patterns[i%patterns.length] as [number, number][])
+}
+
+/** Public path API: normalize the initial move command for consistent SVG output. */
+export function getShapeCutPath(shapeId:string):string {
+ const path = getShapeCutPathRaw(shapeId)
+ return path.replace(/^M(?=\\S)/, 'M ')
 }
 
 export function searchShapeCutShapes(query:string):ShapeCutTemplate[] { const q=query.trim().toLowerCase(); if(!q)return SHAPECUT_SHAPES; const aliases:Record<string,string[]>={heart:['double heart'],star:['spark','sun symbol','burst'],circle:['oval','ellipse','round'],arch:['gothic arch','pointed arch','rounded arch'],flower:['daisy','petal','rose','sunflower'],speech:['bubble','comic'],frame:['arch','polaroid','film','stamp']}; return SHAPECUT_SHAPES.filter(s=>s.name.toLowerCase().includes(q)||s.category.toLowerCase().includes(q)||(aliases[q]||[]).some(a=>s.name.toLowerCase().includes(a))) }
