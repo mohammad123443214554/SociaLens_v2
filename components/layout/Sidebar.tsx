@@ -32,7 +32,7 @@ export function Sidebar() {
           </Link>
         ))}
 
-        <Link href="/create" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-accent text-left w-full">
+        <Link href="/create/options" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-accent text-left w-full', pathname.startsWith('/create') && 'bg-accent text-accent-foreground')}>
           <PlusSquare className="h-5 w-5" />
           Create
         </Link>
