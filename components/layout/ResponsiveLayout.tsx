@@ -18,7 +18,7 @@ export function ResponsiveLayout({ children }: { children: React.ReactNode }) {
   // the /chat/[chatId] pattern below, or the navbar disappears on mobile
   // there too and the page's own sticky header ends up overlapping its
   // first list item (there's no more navbar height for it to stick under).
-  const isFullScreenPage = pathname === '/create'
+  const isFullScreenPage = pathname === '/create' || pathname === '/studio'
   const isImmersivePage =
     (/^\/chat\/[^/]+(?:\/settings(?:\/(?:wallpaper|call))?)?$/.test(pathname || '') && pathname !== '/chat/archive') ||
     pathname === '/aperonix' || pathname === '/aperonix/voice' || pathname === '/reels'
