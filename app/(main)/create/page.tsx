@@ -584,8 +584,8 @@ export default function CreateEditorPage() {
             <h1 className="text-2xl font-bold tracking-tight">Create</h1>
             <p className="text-sm text-muted-foreground">Make something worth sharing.</p>
           </div>
-          <div className="ml-1 hidden items-center gap-2 sm:flex">
-            <Link href="/aperonix" aria-label="Open Aperonix AI" className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:border-purple-500/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500">
+          <div className="ml-1 flex items-center gap-2">
+            <Link href="/aperonix" aria-label="Open Aperonix AI" className="hidden items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:border-purple-500/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 sm:inline-flex">
               <img src="/images/aperonix-logo.png" alt="" className="h-5 w-5 object-contain" />
               <span>Aperonix AI</span>
             </Link>
