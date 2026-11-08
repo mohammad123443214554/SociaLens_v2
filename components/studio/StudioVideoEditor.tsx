@@ -154,7 +154,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       }
     }, 1000)
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
-  }, [hydrated, projectId, projectName, templateId, clips, audio, selectedId, muted, volume, audioVolume, aspect, titleText, showTitle, exportWidth, exportHeight])
+  }, [hydrated, projectId, projectName, templateId, clips, audio, selectedId, muted, volume, audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, exportWidth, exportHeight])
 
 
   useEffect(() => {
@@ -344,6 +344,22 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         ctx.textBaseline = 'middle'
         ctx.font = '900 ' + Math.round(canvas.width * 0.055) + 'px Arial'
         ctx.fillText(titleText, canvas.width / 2, canvas.height * 0.17, canvas.width * 0.82)
+        if (subtitleText) {
+          ctx.font = '500 ' + Math.round(canvas.width * 0.026) + 'px Arial'
+          ctx.fillStyle = 'rgba(255,255,255,.82)'
+          ctx.fillText(subtitleText, canvas.width / 2, canvas.height * 0.235, canvas.width * 0.82)
+        }
+        if (ctaText) {
+          const buttonWidth = canvas.width * 0.38
+          const buttonHeight = canvas.height * 0.055
+          ctx.fillStyle = '#ffffff'
+          ctx.beginPath()
+          ctx.roundRect((canvas.width - buttonWidth) / 2, canvas.height * 0.82, buttonWidth, buttonHeight, buttonHeight / 2)
+          ctx.fill()
+          ctx.fillStyle = '#111827'
+          ctx.font = '800 ' + Math.round(canvas.width * 0.022) + 'px Arial'
+          ctx.fillText(ctaText, canvas.width / 2, canvas.height * 0.847, buttonWidth * .88)
+        }
         ctx.restore()
       }
       const drawVideoFrame = (video: HTMLVideoElement) => {
@@ -491,9 +507,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           </section>
           <div className="h-px bg-white/[0.08]" />
           <section>
-            <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-300">Text overlay</h2>
-            <label className="block text-[10px] text-slate-400">Title text<input value={titleText} maxLength={100} onChange={event => setTitleText(event.target.value)} placeholder="Add a title to your video" className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-white placeholder:text-slate-600" /></label>
-            <label className="mt-2 flex items-center gap-2 text-[10px] text-slate-400"><input type="checkbox" checked={showTitle} onChange={event => setShowTitle(event.target.checked)} className="accent-pink-500" /> Show title on preview</label>
+            <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-300">Editable design text</h2>
+            <label className="block text-[10px] text-slate-400">Main headline<input value={titleText} maxLength={100} onChange={event => setTitleText(event.target.value)} placeholder="Your main headline" className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-white placeholder:text-slate-600" /></label>
+            <label className="mt-2 block text-[10px] text-slate-400">Supporting text<input value={subtitleText} maxLength={140} onChange={event => setSubtitleText(event.target.value)} placeholder="Add supporting message" className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-white placeholder:text-slate-600" /></label>
+            <label className="mt-2 block text-[10px] text-slate-400">Button / call to action<input value={ctaText} maxLength={32} onChange={event => setCtaText(event.target.value)} placeholder="WATCH NOW" className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-white placeholder:text-slate-600" /></label>
+            <label className="mt-3 flex items-center gap-2 text-[10px] text-slate-400"><input type="checkbox" checked={showTitle} onChange={event => setShowTitle(event.target.checked)} className="accent-pink-500" /> Show design text on preview and export</label>
           </section>
         </aside>
 
