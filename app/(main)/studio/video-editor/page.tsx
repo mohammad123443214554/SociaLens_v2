@@ -10,11 +10,12 @@ export const metadata: Metadata = {
 export default async function StudioVideoEditorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ name?: string; template?: string }>
+  searchParams: Promise<{ name?: string; template?: string; projectId?: string }>
 }) {
   const params = await searchParams
   const projectName = (params.name || 'Untitled video project').slice(0, 80)
   const templateId = (params.template || '').slice(0, 64)
+  const projectId = (params.projectId || '').slice(0, 64)
 
-  return <StudioVideoEditor projectName={projectName} templateId={templateId} />
+  return <StudioVideoEditor projectName={projectName} templateId={templateId} projectId={projectId} />
 }
