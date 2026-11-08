@@ -204,6 +204,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     for (const file of accepted) {
       const url = URL.createObjectURL(file)
       objectUrls.current.add(url)
+      let storagePath: string
+      try { storagePath = await uploadStudioAsset(projectId, file) }
+      catch (cause) { URL.revokeObjectURL(url); objectUrls.current.delete(url); setError(cause instanceof Error ? cause.message : 'Media upload failed.'); continue }
       const duration = kind === 'image' ? 5 : await readMediaDuration(file, url, kind)
       if (kind === 'video' && duration <= 0) {
         URL.revokeObjectURL(url)
@@ -211,7 +214,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         setError('Could not read ' + file.name + '. Try another MP4, WebM or MOV file.')
         continue
       }
-      additions.push({ id: makeId(), kind, name: file.name, url, duration, trimStart: 0, trimEnd: duration, fileSize: file.size })
+      additions.push({ id: makeId(), kind, name: file.name, url, duration, trimStart: 0, trimEnd: duration, fileSize: file.size, storagePath })
     }
     if (additions.length) {
       setClips(items => [...items, ...additions])
@@ -227,6 +230,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (file.size > MAX_AUDIO_BYTES) { setError('Audio file is larger than 50 MB.'); return }
     const url = URL.createObjectURL(file)
     objectUrls.current.add(url)
+    let storagePath: string
+    try { storagePath = await uploadStudioAsset(projectId, file) }
+    catch (cause) { URL.revokeObjectURL(url); objectUrls.current.delete(url); setError(cause instanceof Error ? cause.message : 'Audio upload failed.'); return }
     const duration = await new Promise<number>(resolve => {
       const el = document.createElement('audio')
       el.onloadedmetadata = () => resolve(Number.isFinite(el.duration) ? el.duration : 0)
@@ -234,7 +240,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       el.src = url
     })
     if (!duration) { URL.revokeObjectURL(url); objectUrls.current.delete(url); setError('Could not read this audio file.'); return }
-    setAudio(current => { if (current) { URL.revokeObjectURL(current.url); objectUrls.current.delete(current.url) }; return { id: makeId(), name: file.name, url, duration, fileSize: file.size } })
+    setAudio(current => { if (current) { URL.revokeObjectURL(current.url); objectUrls.current.delete(current.url) }; return { id: makeId(), name: file.name, url, duration, fileSize: file.size, storagePath } })
     setNotice('Music track added. Adjust its volume in the Audio panel.')
   }
 
