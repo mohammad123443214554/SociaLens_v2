@@ -26,12 +26,17 @@ export function ArchivePasswordWizard({ onClose, onDone }: ArchivePasswordWizard
   const [hint, setHint] = useState('')
   const [error, setError] = useState('')
   const [popupStateReady, setPopupStateReady] = useState(false)
-  const popupStorageKey = user?.id ? `socia-archive-setup-picker:${user.id}` : null
+  const popupStorageKey = user?.id ? `socia-archive-setup-state:${user.id}` : null
 
   useEffect(() => {
     if (!popupStorageKey) return
     try {
-      setShowLockPicker(sessionStorage.getItem(popupStorageKey) === '1')
+      const saved = sessionStorage.getItem(popupStorageKey)
+      if (saved) {
+        const state = JSON.parse(saved) as { lockType?: LockType; pickerOpen?: boolean }
+        if (state.lockType === 'password' || state.lockType === 'pattern' || state.lockType === 'pattern4') setLockType(state.lockType)
+        setShowLockPicker(state.pickerOpen === true)
+      }
     } catch {
       setShowLockPicker(false)
     } finally {
@@ -42,12 +47,11 @@ export function ArchivePasswordWizard({ onClose, onDone }: ArchivePasswordWizard
   useEffect(() => {
     if (!popupStateReady || !popupStorageKey) return
     try {
-      if (showLockPicker) sessionStorage.setItem(popupStorageKey, '1')
-      else sessionStorage.removeItem(popupStorageKey)
+      sessionStorage.setItem(popupStorageKey, JSON.stringify({ lockType, pickerOpen: showLockPicker }))
     } catch {
       // Storage can be unavailable in private browsing.
     }
-  }, [popupStateReady, popupStorageKey, showLockPicker])
+  }, [popupStateReady, popupStorageKey, lockType, showLockPicker])
 
   const chooseLock = (type: LockType) => {
     setLockType(type)
