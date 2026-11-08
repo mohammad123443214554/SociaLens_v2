@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { ArrowLeft, ImagePlus, Sparkles } from 'lucide-react'
-import { StudioBrandLink } from '@/components/studio/StudioBrandLink'
 
 export default function CreateOptionsPage() {
   return (
