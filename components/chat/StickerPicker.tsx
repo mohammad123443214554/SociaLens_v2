@@ -1,33 +1,26 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import emojiCatalog from '@/lib/data/emoji-catalog.json'
 
-const STICKERS = [
-  '😀','😁','😄','😆','🤣','😂','🙂','😊','😇','🥳','🎉','✨',
-  '😍','🥰','😘','💕','💖','💘','❤️','💗','💝','😻','💋','💍',
-  '🤪','😜','🤭','🙈','🤡','😹','🥴','🫠','🙃','😝','🤓','😎',
-  '😢','😭','🥺','😞','💔','😔','😿','😥','🙁','😪','😓','😰',
-  '😡','🤬','😤','👿','💢','😾','🔥','😠','🙄','😑','🤦','🤷',
-  '🥰','😘','🤗','💞','🫶','👉👈','🙏','💐','🌹','💌','😳','☺️',
-  '🎊','🎂','🥂','🍾','🎁','🏆','🙌','👏','🥳','🎈','⭐','💯',
-  '😴','🥱','☕','🛌','😌','🧘','🌙','😪','🫡','🤙','😏','🍿',
-]
-
-const GIF_STICKERS = [
-  { id: 'hello-wave', label: 'Hello wave', url: 'https://media.giphy.com/media/3og0IPxVg8JED6E7Xy/giphy.gif' },
-  { id: 'hello-friends', label: 'Hello friends', url: 'https://media.giphy.com/media/ZdNIT7ETTbvDi/giphy.gif' },
-  { id: 'hello-cute', label: 'Cute hello', url: 'https://media.giphy.com/media/3o6Yf37jDv4I4f4xlS/giphy.gif' },
-  { id: 'hello-cats', label: 'Hello cats', url: 'https://media.giphy.com/media/3o6Yf1TeeTQhXyv66s/giphy.gif' },
-  { id: 'hello-bear', label: 'Hello bear', url: 'https://media.giphy.com/media/3oEjHGSyClrTtTfTtC/giphy.gif' },
-  { id: 'hello-kitty', label: 'Hello kitty', url: 'https://media.giphy.com/media/3o6Yf4I9XEJL4D8G4U/giphy.gif' },
-  { id: 'anime-wave', label: 'Anime wave', url: 'https://media.giphy.com/media/VJh6PuU6Vn4Xe/giphy.gif' },
-  { id: 'anime-blush', label: 'Anime blush', url: 'https://media.giphy.com/media/3o7TKFr3ZhJv2fQxWw/giphy.gif' },
-  { id: 'anime-laugh', label: 'Anime laugh', url: 'https://media.giphy.com/media/VFZ5i6pEe6y5K/giphy.gif' },
-  { id: 'giphy-sample', label: 'Happy reaction', url: 'https://media1.giphy.com/media/cZ7rmKfFYOvYI/200w_d.gif' },
-]
+interface EmojiRecord {
+  emoji: string
+  name: string
+  category: string
+  skinTone: boolean
+}
 
 type RecentItem = { kind: 'sticker'; value: string; label: string } | { kind: 'gif'; value: string; label: string }
+type GiphyItem = {
+  id: string
+  title?: string
+  images?: {
+    fixed_width?: { webp?: string; url?: string }
+    fixed_width_small?: { webp?: string; url?: string }
+    original?: { webp?: string; url?: string }
+  }
+}
 
 interface StickerPickerProps {
   onSelect: (sticker: string) => void
@@ -35,11 +28,17 @@ interface StickerPickerProps {
   style?: React.CSSProperties
 }
 
+const EMOJIS = emojiCatalog.emojis as EmojiRecord[]
+const POPULAR = new Set(emojiCatalog.popular)
+const EMOJI_CATEGORIES = ['Popular', 'All', ...Array.from(new Set(EMOJIS.map(item => item.category)))]
 const RECENT_KEY = 'socialens-chat-recent-stickers-v1'
+const PAGE_SIZE = 24
+const BATCH_SIZE = 180
 
 export function StickerPicker({ onSelect, onClose, style }: StickerPickerProps) {
-  const [activeCategory, setActiveCategory] = useState<'Recently' | 'Stickers' | 'GIF Stickers'>('Recently')
+  const [activeCategory, setActiveCategory] = useState('Recently')
   const [search, setSearch] = useState('')
+  const [visibleCount, setVisibleCount] = useState(BATCH_SIZE)
   const [recent, setRecent] = useState<RecentItem[]>(() => {
     if (typeof window === 'undefined') return []
     try {
@@ -48,18 +47,89 @@ export function StickerPicker({ onSelect, onClose, style }: StickerPickerProps) 
     } catch { return [] }
   })
 
-  const results = useMemo(() => {
+  const [gifs, setGifs] = useState<GiphyItem[]>([])
+  const [gifOffset, setGifOffset] = useState(0)
+  const [gifLoading, setGifLoading] = useState(false)
+  const [gifError, setGifError] = useState('')
+  const [gifHasMore, setGifHasMore] = useState(true)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const requestRef = useRef(0)
+  const apiKey = process.env.NEXT_PUBLIC_GIPHY_API_KEY
+
+  const isGifCategory = activeCategory === 'GIF Stickers' || (Boolean(search.trim()) && activeCategory === 'GIF Stickers')
+  const isEmojiCategory = activeCategory === 'Emojis' || activeCategory === 'Popular' || activeCategory === 'All' || EMOJI_CATEGORIES.includes(activeCategory)
+
+  const filteredEmojis = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
-    if (query) {
-      return [
-        ...STICKERS.filter(value => value.includes(query)).map(value => ({ kind: 'sticker' as const, value, label: value })),
-        ...GIF_STICKERS.filter(item => item.label.toLocaleLowerCase().includes(query)).map(item => ({ kind: 'gif' as const, value: item.url, label: item.label })),
-      ]
+    if (query) return EMOJIS.filter(item => item.name.toLocaleLowerCase().includes(query) || item.emoji.includes(query))
+    if (activeCategory === 'Popular') return EMOJIS.filter(item => POPULAR.has(item.emoji))
+    if (activeCategory === 'All' || activeCategory === 'Emojis') return EMOJIS
+    return EMOJIS.filter(item => item.category === activeCategory)
+  }, [activeCategory, search])
+
+  const visibleEmojis = filteredEmojis.slice(0, visibleCount)
+
+  // Use the same GIPHY stickers API, API key, rating and pagination model as Story GIFPicker.
+  useEffect(() => {
+    if (activeCategory !== 'GIF Stickers') return
+    const requestId = ++requestRef.current
+    const timer = window.setTimeout(async () => {
+      setGifLoading(true)
+      setGifError('')
+      setGifOffset(0)
+      setGifHasMore(true)
+      if (!apiKey) {
+        setGifs([])
+        setGifError('GIF search is not configured. Add NEXT_PUBLIC_GIPHY_API_KEY in Vercel Environment Variables.')
+        setGifLoading(false)
+        return
+      }
+      try {
+        const query = search.trim()
+        const endpoint = query ? 'search' : 'trending'
+        const params = new URLSearchParams({ api_key: apiKey, limit: String(PAGE_SIZE), offset: '0', rating: 'g', ...(query ? { q: query } : {}) })
+        const response = await fetch(`https://api.giphy.com/v1/stickers/${endpoint}?${params.toString()}`)
+        if (!response.ok) throw new Error(response.status === 429 ? 'GIF search limit reached. Please try again shortly.' : 'Could not load GIFs. Please try again.')
+        const data = await response.json()
+        if (requestId !== requestRef.current) return
+        const next = Array.isArray(data.data) ? data.data : []
+        setGifs(next)
+        setGifHasMore(next.length >= PAGE_SIZE)
+      } catch (error) {
+        if (requestId === requestRef.current) {
+          setGifs([])
+          setGifError(error instanceof Error ? error.message : 'Could not load GIFs.')
+        }
+      } finally {
+        if (requestId === requestRef.current) setGifLoading(false)
+      }
+    }, search.trim() ? 300 : 0)
+    return () => { window.clearTimeout(timer); requestRef.current += 1 }
+  }, [activeCategory, search, apiKey])
+
+  const loadMoreGifs = async () => {
+    if (gifLoading || !gifHasMore || !apiKey) return
+    const requestId = requestRef.current
+    const nextOffset = gifOffset + PAGE_SIZE
+    setGifLoading(true)
+    try {
+      const query = search.trim()
+      const endpoint = query ? 'search' : 'trending'
+      const params = new URLSearchParams({ api_key: apiKey, limit: String(PAGE_SIZE), offset: String(nextOffset), rating: 'g', ...(query ? { q: query } : {}) })
+      const response = await fetch(`https://api.giphy.com/v1/stickers/${endpoint}?${params.toString()}`)
+      if (!response.ok) throw new Error('Could not load more GIFs.')
+      const data = await response.json()
+      if (requestId !== requestRef.current) return
+      const next = Array.isArray(data.data) ? data.data : []
+      setGifs(current => [...current, ...next])
+      setGifOffset(nextOffset)
+      setGifHasMore(next.length >= PAGE_SIZE)
+    } catch (error) {
+      if (requestId === requestRef.current) setGifError(error instanceof Error ? error.message : 'Could not load more GIFs.')
+    } finally {
+      if (requestId === requestRef.current) setGifLoading(false)
     }
-    if (activeCategory === 'Recently') return recent
-    if (activeCategory === 'Stickers') return STICKERS.map(value => ({ kind: 'sticker' as const, value, label: value }))
-    return GIF_STICKERS.map(item => ({ kind: 'gif' as const, value: item.url, label: item.label }))
-  }, [activeCategory, recent, search])
+  }
 
   const choose = (item: RecentItem) => {
     const next = [item, ...recent.filter(entry => entry.value !== item.value)].slice(0, 36)
@@ -68,7 +138,22 @@ export function StickerPicker({ onSelect, onClose, style }: StickerPickerProps) 
     onSelect(item.kind === 'gif' ? `gif:${item.value}` : item.value)
   }
 
+  const chooseGif = (item: GiphyItem) => {
+    const url = item.images?.fixed_width?.webp || item.images?.fixed_width?.url || item.images?.original?.webp || item.images?.original?.url
+    if (!url) return
+    choose({ kind: 'gif', value: url, label: item.title || 'GIF sticker' })
+  }
+
+  const changeCategory = (category: string) => {
+    setActiveCategory(category)
+    setSearch('')
+    setVisibleCount(BATCH_SIZE)
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
+  }
+
   if (typeof document === 'undefined') return null
+
+  const tabs = ['Recently', 'Stickers', 'GIF Stickers', 'Emojis']
 
   return createPortal(
     <div
@@ -81,53 +166,92 @@ export function StickerPicker({ onSelect, onClose, style }: StickerPickerProps) 
     >
       <div className="shrink-0 border-b border-border p-3">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-semibold text-foreground">Stickers</p>
-          <button type="button" onClick={onClose} className="rounded-full px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">Close</button>
+          <p className="text-sm font-semibold text-foreground">Stickers & GIFs</p>
+          <button type="button" onClick={onClose} aria-label="Close sticker picker" className="rounded-full px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">Close</button>
         </div>
         <input
           type="search"
           value={search}
-          onChange={event => setSearch(event.target.value)}
-          placeholder="Search stickers and GIFs"
-          aria-label="Search stickers and GIFs"
+          onChange={event => { setSearch(event.target.value); setVisibleCount(BATCH_SIZE) }}
+          placeholder="Search stickers, emojis and GIFs"
+          aria-label="Search stickers, emojis and GIFs"
           className="h-9 w-full rounded-xl border border-border bg-muted/50 px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-pink-500"
         />
-        <div className="mt-2 flex gap-1.5">
-          {(['Recently', 'Stickers', 'GIF Stickers'] as const).map(category => (
-            <button key={category} type="button" onClick={() => { setActiveCategory(category); setSearch('') }}
-              className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-medium transition-colors ${activeCategory === category && !search ? 'bg-pink-500 text-white' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'}`}>
+        <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {tabs.map(category => (
+            <button key={category} type="button" onClick={() => changeCategory(category)}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${activeCategory === category ? 'bg-pink-500 text-white' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'}`}>
               {category}
             </button>
           ))}
         </div>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5">
-        {results.length ? (
-          <div className={activeCategory === 'GIF Stickers' || (search && results.some(item => item.kind === 'gif')) ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-6 gap-1'}>
-            {results.map((item, index) => item.kind === 'gif' ? (
-              <button key={item.value} type="button" title={item.label} aria-label={item.label} onClick={() => choose(item)}
-                className="overflow-hidden rounded-xl border border-border bg-muted/40 hover:border-pink-400">
-                {/* GIFs are loaded directly from GIPHY's public media URLs. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.value} alt={item.label} loading="lazy" className="h-[92px] w-full object-cover" />
-                <span className="block truncate px-1.5 py-1 text-[10px] text-muted-foreground">{item.label}</span>
-              </button>
-            ) : (
-              <button key={item.value + index} type="button" title={item.label} aria-label={item.label} onClick={() => choose(item)}
-                className="flex aspect-square items-center justify-center rounded-lg text-[29px] leading-none transition-colors hover:bg-accent active:scale-95">
-                {item.value}
+        {isEmojiCategory && activeCategory !== 'Recently' && (
+          <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {EMOJI_CATEGORIES.map(category => (
+              <button key={category} type="button" onClick={() => { setActiveCategory(category); setVisibleCount(BATCH_SIZE) }}
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] ${activeCategory === category ? 'bg-pink-500/15 text-pink-500' : 'bg-muted text-muted-foreground'}`}>
+                {category}
               </button>
             ))}
           </div>
-        ) : (
-          <p className="py-12 text-center text-sm text-muted-foreground">{activeCategory === 'Recently' && !search ? 'Your recently used stickers and GIFs will appear here.' : 'No stickers found.'}</p>
         )}
       </div>
-      {activeCategory === 'GIF Stickers' && (
-        <div className="shrink-0 border-t border-border px-3 py-2 text-center text-[10px] text-muted-foreground">
-          Powered by GIPHY
-        </div>
-      )}
+      <div
+        ref={scrollRef}
+        onScroll={event => {
+          const el = event.currentTarget
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 180) {
+            if (activeCategory === 'GIF Stickers') void loadMoreGifs()
+            else if (isEmojiCategory && visibleCount < filteredEmojis.length) setVisibleCount(count => Math.min(count + BATCH_SIZE, filteredEmojis.length))
+          }
+        }}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5"
+      >
+        {activeCategory === 'Recently' ? (
+          recent.length ? (
+            <div className="grid grid-cols-6 gap-1">
+              {recent.map((item, index) => item.kind === 'gif' ? (
+                <button key={item.value} type="button" title={item.label} aria-label={item.label} onClick={() => choose(item)} className="aspect-square overflow-hidden rounded-lg bg-muted hover:ring-2 hover:ring-pink-400">
+                  <img src={item.value} alt={item.label} loading="lazy" className="h-full w-full object-cover" />
+                </button>
+              ) : (
+                <button key={item.value + index} type="button" title={item.label} onClick={() => choose(item)} className="flex aspect-square items-center justify-center rounded-lg text-[29px] hover:bg-accent">{item.value}</button>
+              ))}
+            </div>
+          ) : <p className="py-12 text-center text-sm text-muted-foreground">Your recently used stickers and GIFs will appear here.</p>
+        ) : activeCategory === 'GIF Stickers' ? (
+          <>
+            {gifError && <p role="alert" className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">{gifError}</p>}
+            {!gifError && gifs.length === 0 && !gifLoading && <p className="py-10 text-center text-sm text-muted-foreground">No GIFs found. Try another search.</p>}
+            <div className="grid grid-cols-2 gap-2">
+              {gifs.map(item => {
+                const url = item.images?.fixed_width?.webp || item.images?.fixed_width?.url || item.images?.original?.webp || item.images?.original?.url
+                const preview = item.images?.fixed_width_small?.webp || item.images?.fixed_width_small?.url || url
+                if (!url || !preview) return null
+                return <button key={item.id} type="button" onClick={() => chooseGif(item)} aria-label={`Add ${item.title || 'GIF'} sticker`} className="overflow-hidden rounded-xl border border-border bg-muted/40 hover:border-pink-400">
+                  <img src={preview} alt={item.title || 'GIF sticker'} loading="lazy" decoding="async" className="h-[92px] w-full object-cover" />
+                </button>
+              })}
+            </div>
+            {gifLoading && <p className="py-3 text-center text-xs text-muted-foreground">Loading GIFs…</p>}
+            {gifHasMore && gifs.length > 0 && !gifLoading && <button type="button" onClick={() => void loadMoreGifs()} className="mt-2 w-full rounded-lg bg-muted px-3 py-2 text-xs font-medium hover:bg-accent">Load more GIFs</button>}
+            <p className="pt-2 text-center text-[10px] text-muted-foreground">Powered by GIPHY</p>
+          </>
+        ) : isEmojiCategory ? (
+          filteredEmojis.length ? (
+            <div className="grid grid-cols-8 gap-1">
+              {visibleEmojis.map(item => (
+                <button key={item.emoji} type="button" title={item.name} aria-label={item.name} onClick={() => choose({ kind: 'sticker', value: item.emoji, label: item.name })}
+                  className="flex aspect-square items-center justify-center rounded-lg text-[25px] leading-none transition-colors hover:bg-accent active:scale-95">
+                  {item.emoji}
+                </button>
+              ))}
+            </div>
+          ) : <p className="py-12 text-center text-sm text-muted-foreground">No emojis found.</p>
+        ) : (
+          <p className="py-12 text-center text-sm text-muted-foreground">Select a category to browse.</p>
+        )}
+      </div>
     </div>,
     document.body
   )
