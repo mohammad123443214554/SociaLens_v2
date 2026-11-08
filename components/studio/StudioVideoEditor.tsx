@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import {
   ArrowLeft, ArrowDown, ArrowUp, AudioLines, Check, ChevronLeft, ChevronRight,
@@ -87,7 +86,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const selected = clips.find(item => item.id === selectedId) || clips[0] || null
   const totalDuration = useMemo(() => clips.reduce((sum, item) => sum + Math.max(0.1, item.trimEnd - item.trimStart), 0), [clips])
   const currentDuration = selected ? Math.max(0, selected.trimEnd - selected.trimStart) : 0
-  const backUrl = '/studio?step=templates&mode=video&created=1&name=' + encodeURIComponent(projectName) + '&projectId=' + encodeURIComponent(projectId) + (templateId ? '&template=' + encodeURIComponent(templateId) : '')
 
   useEffect(() => () => {
     objectUrls.current.forEach(url => URL.revokeObjectURL(url))
@@ -450,11 +448,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     <main className="fixed inset-0 z-[70] flex min-h-0 flex-col overflow-hidden bg-[#080a13] pt-[env(safe-area-inset-top)] text-white">
       <header className="z-20 flex min-h-16 shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-[#0d1020] px-2 sm:gap-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href={backUrl} aria-label="Back to templates" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-slate-300 hover:bg-white/10"><ArrowLeft className="h-4 w-4" /></Link>
+          <button type="button" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.assign("/studio") }} aria-label="Go back one step" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-white/[0.06]"><ArrowLeft className="h-4 w-4" /></button>
           <div className="min-w-0"><p className="truncate text-sm font-bold">Video Editor</p><p className="max-w-[38vw] truncate text-[11px] text-slate-500">{projectName || 'Untitled video project'}</p></div>
         </div>
         <div className="flex items-center gap-2"><span className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] text-slate-400 sm:flex"><Check className="h-3.5 w-3.5 text-emerald-400" /> {saveStatus}</span><button type="button" disabled={exporting || !clips.length} onClick={() => void exportVideo()} className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-pink-600 px-3 text-[10px] font-bold text-white disabled:opacity-40">{exporting ? 'Rendering ' + exportProgress + '%' : <><span className="sm:hidden">Export</span><span className="hidden sm:inline">Export video</span></>}</button></div>
-        <Link href="/studio" className="hidden rounded-lg px-3 py-2 text-xs font-medium text-slate-400 hover:bg-white/5 hover:text-white sm:inline-flex">Exit</Link>
+
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
