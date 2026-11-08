@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Lock, Grid3X3, KeyRound, ShieldCheck, ArrowLeft } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
 import { useSetArchivePassword } from '@/lib/hooks/useChatSettings'
@@ -25,6 +25,29 @@ export function ArchivePasswordWizard({ onClose, onDone }: ArchivePasswordWizard
   const [confirmPattern, setConfirmPattern] = useState('')
   const [hint, setHint] = useState('')
   const [error, setError] = useState('')
+  const [popupStateReady, setPopupStateReady] = useState(false)
+  const popupStorageKey = user?.id ? `socia-archive-setup-picker:${user.id}` : null
+
+  useEffect(() => {
+    if (!popupStorageKey) return
+    try {
+      setShowLockPicker(sessionStorage.getItem(popupStorageKey) === '1')
+    } catch {
+      setShowLockPicker(false)
+    } finally {
+      setPopupStateReady(true)
+    }
+  }, [popupStorageKey])
+
+  useEffect(() => {
+    if (!popupStateReady || !popupStorageKey) return
+    try {
+      if (showLockPicker) sessionStorage.setItem(popupStorageKey, '1')
+      else sessionStorage.removeItem(popupStorageKey)
+    } catch {
+      // Storage can be unavailable in private browsing.
+    }
+  }, [popupStateReady, popupStorageKey, showLockPicker])
 
   const chooseLock = (type: LockType) => {
     setLockType(type)
@@ -131,7 +154,7 @@ export function ArchivePasswordWizard({ onClose, onDone }: ArchivePasswordWizard
           {error && <p role="alert" className="mt-3 text-center text-xs text-red-500">{error}</p>}
         </div>
 
-        {showLockPicker && <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={() => setShowLockPicker(false)}>
+        {showLockPicker && popupStateReady && <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={() => setShowLockPicker(false)}>
           <div role="dialog" aria-modal="true" aria-labelledby="lock-picker-title" className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between"><h3 id="lock-picker-title" className="font-semibold">Use a different lock</h3><button type="button" onClick={() => setShowLockPicker(false)} aria-label="Close lock type picker" className="rounded-full p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button></div>
             <div className="space-y-2">
