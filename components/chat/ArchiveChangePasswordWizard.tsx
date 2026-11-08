@@ -7,12 +7,12 @@ import { useVerifyArchivePassword, useSetArchivePassword } from '@/lib/hooks/use
 import { ArchivePatternLock } from './ArchivePatternLock'
 
 interface ArchiveChangePasswordWizardProps {
-  lockType?: 'password' | 'pattern'
+  lockType?: 'password' | 'pattern' | 'pattern4'
   onClose: () => void
   onDone: () => void
 }
 
-type LockType = 'password' | 'pattern'
+type LockType = 'password' | 'pattern' | 'pattern4'
 
 export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, onDone }: ArchiveChangePasswordWizardProps) {
   const { user } = useUser()
@@ -82,7 +82,7 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
       await setPassword.mutateAsync({
         userId: user.id,
         lockType: targetLockType,
-        ...(targetLockType === 'pattern' ? { pattern: newPattern } : { password: newPassword }),
+        ...(targetLockType === 'password' ? { password: newPassword } : { pattern: newPattern }),
         hint: hint.trim() || undefined,
       })
       onDone()
@@ -91,7 +91,7 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
     }
   }
 
-  const alternateLockType: LockType = lockType === 'pattern' ? 'password' : 'pattern'
+  const alternateLockType: LockType = lockType === 'password' ? 'pattern' : 'password'
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
@@ -107,11 +107,11 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
 
         <div className="p-5 sm:p-6">
           {step === 1 && <>
-            <p className="mb-4 text-sm text-muted-foreground">{lockType === 'pattern' ? 'Draw your current pattern to verify it is you.' : 'Enter your current password to verify it is you.'}</p>
-            {lockType === 'pattern' ? <>
-              <ArchivePatternLock key={`change-current-pattern-${legacyPatternGrid ? 4 : 3}`} gridSize={legacyPatternGrid ? 4 : 3} onComplete={handleVerifyOldPattern} disabled={verify.isPending} showIdleHint={false} />
-            {error && !legacyPatternGrid && <button type="button" onClick={() => { setLegacyPatternGrid(true); setError('') }} className="mt-2 text-xs text-muted-foreground underline underline-offset-4">Use previous 4 × 4 pattern</button>}
-            {legacyPatternGrid && <button type="button" onClick={() => { setLegacyPatternGrid(false); setError('') }} className="mt-2 text-xs text-muted-foreground underline underline-offset-4">Use 3 × 3 pattern</button>}
+            <p className="mb-4 text-sm text-muted-foreground">{lockType !== 'password' ? 'Draw your current pattern to verify it is you.' : 'Enter your current password to verify it is you.'}</p>
+            {lockType !== 'password' ? <>
+              <ArchivePatternLock key={`change-current-pattern-${legacyPatternGrid ? 4 : 3}`} gridSize={legacyPatternGrid ? (lockType === 'pattern4' ? 3 : 4) : (lockType === 'pattern4' ? 4 : 3)} onComplete={handleVerifyOldPattern} disabled={verify.isPending} showIdleHint={false} />
+            {error && !legacyPatternGrid && <button type="button" onClick={() => { setLegacyPatternGrid(true); setError('') }} className="mt-2 text-xs text-muted-foreground underline underline-offset-4">Use alternate pattern grid</button>}
+            {legacyPatternGrid && <button type="button" onClick={() => { setLegacyPatternGrid(false); setError('') }} className="mt-2 text-xs text-muted-foreground underline underline-offset-4">Use current pattern grid</button>}
             </> : <>
               <input autoFocus type="password" value={oldPassword} onChange={event => setOldPassword(event.target.value)} onKeyDown={event => event.key === 'Enter' && handleVerifyOld()} placeholder="Current password" autoComplete="current-password" className="w-full rounded-2xl border border-border bg-muted/60 px-4 py-4 text-center text-lg tracking-[0.2em] outline-none transition focus:border-pink-500 focus:ring-2 focus:ring-pink-500/15" />
               <button type="button" onClick={handleVerifyOld} disabled={verify.isPending || !oldPassword} className="mt-4 w-full rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 text-sm font-semibold text-white disabled:opacity-60">{verify.isPending ? 'Checking…' : 'Continue'}</button>
@@ -120,23 +120,23 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
 
           {step === 2 && <>
             <div className="mb-4 flex justify-end"><button type="button" onClick={() => setShowLockPicker(true)} className="max-w-full text-right text-sm font-medium text-pink-500 underline underline-offset-4">Use different type lock</button></div>
-            <p className="mb-4 text-sm text-muted-foreground">{targetLockType === 'pattern' ? 'Draw a new pattern. Connect at least four dots.' : 'Create your new password.'}</p>
-            {targetLockType === 'pattern' ? <ArchivePatternLock key="change-new-pattern" onComplete={value => { setNewPattern(value); setError(''); setStep(3) }} /> : <>
+            <p className="mb-4 text-sm text-muted-foreground">{targetLockType !== 'password' ? 'Draw a new ' + (targetLockType === 'pattern4' ? '4 × 4' : '3 × 3') + ' pattern. Connect at least four dots.' : 'Create your new password.'}</p>
+            {targetLockType !== 'password' ? <ArchivePatternLock key={'change-new-pattern-' + targetLockType} gridSize={targetLockType === 'pattern4' ? 4 : 3} onComplete={value => { setNewPattern(value); setError(''); setStep(3) }} /> : <>
               <input autoFocus type="password" value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="New password" autoComplete="new-password" className="w-full rounded-2xl border border-border bg-muted/60 px-4 py-4 text-center text-lg tracking-[0.2em] outline-none transition focus:border-pink-500" />
               <button type="button" onClick={handleNextFromNew} className="mt-4 w-full rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 text-sm font-semibold text-white">Continue</button>
             </>}
           </>}
 
           {step === 3 && <>
-            <p className="mb-4 text-sm text-muted-foreground">{targetLockType === 'pattern' ? 'Draw the same pattern again to confirm it.' : 'Enter your new password one more time.'}</p>
-            {targetLockType === 'pattern' ? <ArchivePatternLock key="change-confirm-pattern" onComplete={handleConfirmPattern} /> : <>
+            <p className="mb-4 text-sm text-muted-foreground">{targetLockType !== 'password' ? 'Draw the same pattern again to confirm it.' : 'Enter your new password one more time.'}</p>
+            {targetLockType !== 'password' ? <ArchivePatternLock key={'change-confirm-pattern-' + targetLockType} gridSize={targetLockType === 'pattern4' ? 4 : 3} onComplete={handleConfirmPattern} /> : <>
               <input autoFocus type="password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} onKeyDown={event => event.key === 'Enter' && handleNextFromConfirm()} placeholder="Confirm new password" autoComplete="new-password" className="w-full rounded-2xl border border-border bg-muted/60 px-4 py-4 text-center text-lg tracking-[0.2em] outline-none transition focus:border-pink-500" />
               <button type="button" onClick={handleNextFromConfirm} className="mt-4 w-full rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 text-sm font-semibold text-white">Continue</button>
             </>}
           </>}
 
           {step === 4 && <>
-            <div className="mb-4 flex items-center gap-3 rounded-2xl bg-emerald-500/10 p-3 text-emerald-500"><ShieldCheck className="h-5 w-5 shrink-0" /><p className="text-sm font-medium">Your new {targetLockType === 'pattern' ? 'pattern' : 'password'} is confirmed.</p></div>
+            <div className="mb-4 flex items-center gap-3 rounded-2xl bg-emerald-500/10 p-3 text-emerald-500"><ShieldCheck className="h-5 w-5 shrink-0" /><p className="text-sm font-medium">Your new {targetLockType !== 'password' ? 'pattern' : 'password'} is confirmed.</p></div>
             <p className="mb-3 text-sm text-muted-foreground">Add an optional hint to help you remember your lock.</p>
             <input autoFocus type="text" value={hint} onChange={event => setHint(event.target.value)} placeholder="Lock hint (optional)" maxLength={80} className="w-full rounded-xl border border-border bg-muted/60 px-4 py-3 text-sm outline-none focus:border-pink-500" />
             <button type="button" onClick={finish} disabled={setPassword.isPending} className="mt-4 w-full rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 text-sm font-semibold text-white disabled:opacity-60">{setPassword.isPending ? 'Saving your lock…' : 'Save Archive lock'}</button>
@@ -148,10 +148,10 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
         {showLockPicker && <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={() => setShowLockPicker(false)}>
           <div role="dialog" aria-modal="true" aria-labelledby="change-lock-picker-title" className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between"><h3 id="change-lock-picker-title" className="font-semibold">Choose your lock type</h3><button type="button" onClick={() => setShowLockPicker(false)} aria-label="Close lock type picker" className="rounded-full p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button></div>
-            <button type="button" onClick={() => chooseLock(alternateLockType)} className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left transition hover:border-primary hover:bg-primary/5">
-              {alternateLockType === 'pattern' ? <Grid3X3 className="h-5 w-5 text-primary" /> : <KeyRound className="h-5 w-5 text-primary" />}
-              <span className="flex-1"><span className="block text-sm font-semibold">{alternateLockType === 'pattern' ? 'Pattern Lock (3 × 3)' : 'Password Lock'}</span><span className="block text-xs text-muted-foreground">{alternateLockType === 'pattern' ? 'Connect dots to create a private pattern' : 'Unlock with your password'}</span></span>
-            </button>
+            {(['password', 'pattern', 'pattern4'] as const).filter(type => type !== lockType).map(type => <button key={type} type="button" onClick={() => chooseLock(type)} className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left transition hover:border-primary hover:bg-primary/5">
+              {type === 'password' ? <KeyRound className="h-5 w-5 text-primary" /> : <Grid3X3 className="h-5 w-5 text-primary" />}
+              <span className="flex-1"><span className="block text-sm font-semibold">{type === 'password' ? 'Password Lock' : 'Pattern Lock (' + (type === 'pattern4' ? '4 × 4' : '3 × 3') + ')'}</span><span className="block text-xs text-muted-foreground">{type === 'password' ? 'Unlock with your password' : 'Connect dots to create a private pattern'}</span></span>
+            </button>)}
             <button type="button" onClick={() => setShowLockPicker(false)} className="mt-4 w-full rounded-xl bg-muted py-2.5 text-sm font-semibold hover:bg-accent">Cancel</button>
           </div>
         </div>}
