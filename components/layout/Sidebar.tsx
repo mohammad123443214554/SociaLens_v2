@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Search, SquarePlay, Send, Settings, PlusSquare, Archive, Sparkles } from 'lucide-react'
+import { Home, Search, SquarePlay, Send, Settings, PlusSquare, Archive } from 'lucide-react'
 import { cn } from '@/lib/utils/helpers'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -35,11 +35,6 @@ export function Sidebar() {
         <Link href="/create/options" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-accent text-left w-full', pathname.startsWith('/create') && 'bg-accent text-accent-foreground')}>
           <PlusSquare className="h-5 w-5" />
           Create
-        </Link>
-
-        <Link href="/studio" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-accent text-left w-full', pathname.startsWith('/studio') && 'bg-accent text-accent-foreground')}>
-          <Sparkles className="h-5 w-5" />
-          SociaLens Studio
         </Link>
 
         <div className="mt-auto pt-4 border-t space-y-1">
