@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Lock } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
@@ -29,6 +29,29 @@ export function ArchiveUnlockScreen({ hint, lockType = 'password', onUnlock, tit
   const [error, setError] = useState('')
   const [showHint, setShowHint] = useState(false)
   const [showChangePassword, setShowChangePassword] = useState(false)
+  const [popupStateReady, setPopupStateReady] = useState(false)
+  const popupStorageKey = user?.id ? `socia-archive-change-lock-open:${user.id}` : null
+
+  useEffect(() => {
+    if (!popupStorageKey) return
+    try {
+      setShowChangePassword(sessionStorage.getItem(popupStorageKey) === '1')
+    } catch {
+      setShowChangePassword(false)
+    } finally {
+      setPopupStateReady(true)
+    }
+  }, [popupStorageKey])
+
+  useEffect(() => {
+    if (!popupStateReady || !popupStorageKey) return
+    try {
+      if (showChangePassword) sessionStorage.setItem(popupStorageKey, '1')
+      else sessionStorage.removeItem(popupStorageKey)
+    } catch {
+      // Storage can be unavailable in private browsing; the popup still works for this page session.
+    }
+  }, [popupStateReady, popupStorageKey, showChangePassword])
 
   const handleSubmit = async () => {
     if (!user) return
@@ -93,7 +116,7 @@ export function ArchiveUnlockScreen({ hint, lockType = 'password', onUnlock, tit
         </button>
       </div>
 
-      {showChangePassword && (
+      {showChangePassword && popupStateReady && (
         <ArchiveChangePasswordWizard
           lockType={lockType}
           onClose={() => setShowChangePassword(false)}
