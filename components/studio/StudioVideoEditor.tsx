@@ -210,6 +210,7 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
     let audioContext: AudioContext | null = null
     let musicElement: HTMLAudioElement | null = null
     let audioDestination: MediaStreamAudioDestinationNode | null = null
+    const exportVideos = new Map<string, HTMLVideoElement>()
     let animationFrame = 0
     try {
       const canvas = document.createElement('canvas')
@@ -218,20 +219,34 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Could not create the video rendering canvas.')
       const stream = canvas.captureStream(30)
-      if (audio) {
-        const AudioContextClass = window.AudioContext
-        if (AudioContextClass) {
-          audioContext = new AudioContextClass()
-          await audioContext.resume()
-          audioDestination = audioContext.createMediaStreamDestination()
+      const AudioContextClass = window.AudioContext
+      if (AudioContextClass && (audio || clips.some(item => item.kind === 'video'))) {
+        audioContext = new AudioContextClass()
+        await audioContext.resume()
+        audioDestination = audioContext.createMediaStreamDestination()
+        audioDestination.stream.getAudioTracks().forEach(track => stream.addTrack(track))
+        if (audio) {
           musicElement = document.createElement('audio')
           musicElement.src = audio.url
           musicElement.loop = true
-          const source = audioContext.createMediaElementSource(musicElement)
-          source.connect(audioDestination)
-          audioDestination.stream.getAudioTracks().forEach(track => stream.addTrack(track))
+          const musicSource = audioContext.createMediaElementSource(musicElement)
+          musicSource.connect(audioDestination)
           musicElement.volume = audioVolume / 100
           await musicElement.play()
+        }
+        for (const clip of clips.filter(item => item.kind === 'video')) {
+          const videoElement = document.createElement('video')
+          videoElement.src = clip.url
+          videoElement.muted = false
+          videoElement.playsInline = true
+          videoElement.preload = 'auto'
+          await new Promise<void>((resolve, reject) => {
+            videoElement.onloadedmetadata = () => resolve()
+            videoElement.onerror = () => reject(new Error('Could not prepare audio/video clip: ' + clip.name))
+          })
+          const videoSource = audioContext.createMediaElementSource(videoElement)
+          videoSource.connect(audioDestination)
+          exportVideos.set(clip.id, videoElement)
         }
       }
       const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']
@@ -291,15 +306,17 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
             animationFrame = requestAnimationFrame(frame)
           })
         } else {
-          const video = document.createElement('video')
-          video.src = clip.url
-          video.muted = true
-          video.playsInline = true
-          video.preload = 'auto'
-          await new Promise<void>((resolve, reject) => {
-            video.onloadedmetadata = () => resolve()
-            video.onerror = () => reject(new Error('Could not load video clip: ' + clip.name))
-          })
+          const video = exportVideos.get(clip.id) || document.createElement('video')
+          if (!exportVideos.has(clip.id)) {
+            video.src = clip.url
+            video.muted = true
+            video.playsInline = true
+            video.preload = 'auto'
+            await new Promise<void>((resolve, reject) => {
+              video.onloadedmetadata = () => resolve()
+              video.onerror = () => reject(new Error('Could not load video clip: ' + clip.name))
+            })
+          }
           video.currentTime = clip.trimStart
           await new Promise<void>(resolve => { video.onseeked = () => resolve() })
           await video.play()
@@ -339,6 +356,7 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
     } finally {
       if (animationFrame) cancelAnimationFrame(animationFrame)
       if (musicElement) { musicElement.pause(); musicElement.removeAttribute('src'); musicElement.load() }
+      exportVideos.forEach(video => { video.pause(); video.removeAttribute('src'); video.load() })
       if (audioContext) await audioContext.close().catch(() => undefined)
       setExporting(false)
     }
