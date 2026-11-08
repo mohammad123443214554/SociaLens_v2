@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Search, SquarePlay, Send, Settings, PlusSquare, Archive } from 'lucide-react'
+import { Home, Search, SquarePlay, Send, Settings, PlusSquare, Archive, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils/helpers'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
