@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Check, ChevronDown, Expand, ImagePlus, RotateCcw, RotateCw, Upload, X, ZoomIn, ZoomOut, Type, Square, Circle, Trash2, Eye, EyeOff, ArrowUp, ArrowDown, Undo2, Redo2 } from 'lucide-react'
 
-type CanvasFormat = 'post' | 'portrait' | 'story'
+type CanvasFormat = 'post' | 'portrait' | 'story' | 'custom'
 type FitMode = 'cover' | 'contain'
 type Layer = { id: string; kind: 'text' | 'rect' | 'circle'; text: string; color: string; x: number; y: number; size: number; visible: boolean; locked: boolean }
 
@@ -29,6 +29,10 @@ const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 export function StudioPhotoEditor({ projectName, templateId }: { projectName: string; templateId: string }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [format, setFormat] = useState<CanvasFormat>('post')
+  const [customWidth, setCustomWidth] = useState(1080)
+  const [customHeight, setCustomHeight] = useState(1080)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
   const [background, setBackground] = useState('#ffffff')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageName, setImageName] = useState('')
@@ -38,7 +42,7 @@ export function StudioPhotoEditor({ projectName, templateId }: { projectName: st
   const [error, setError] = useState('')
   const [showBackgrounds, setShowBackgrounds] = useState(true)
   const template = TEMPLATE_STYLES[templateId]
-  const dimensions = FORMATS[format]
+  const dimensions = format === 'custom' ? { label: 'Custom canvas', width: customWidth, height: customHeight, ratio: (customWidth / customHeight).toFixed(2) + ':1' } : FORMATS[format]
   const canvasScale = useMemo(() => Math.min(zoom / 100, 1), [zoom])
 
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl) }, [imageUrl])
@@ -74,6 +78,101 @@ export function StudioPhotoEditor({ projectName, templateId }: { projectName: st
   const undo = () => { if (!history.length) return; setRedoStack(items => [layers, ...items].slice(0, 40)); setLayers(history[history.length - 1]); setHistory(items => items.slice(0, -1)) }
   const redo = () => { if (!redoStack.length) return; setHistory(items => [...items.slice(-39), layers]); setLayers(redoStack[0]); setRedoStack(items => items.slice(1)) }
   const reorder = (direction: number) => { if (!selected || selected.locked) return; const index = layers.findIndex(item => item.id === selected.id); const target = index + direction; if (target < 0 || target >= layers.length) return; const next = [...layers]; [next[index], next[target]] = [next[target], next[index]]; commitLayers(next) }
+
+  const exportImage = async (type: 'image/png' | 'image/jpeg') => {
+    setExportError('')
+    setExporting(true)
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = dimensions.width
+      canvas.height = dimensions.height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('Your browser could not create the export canvas.')
+      ctx.fillStyle = background
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      if (template && !imageUrl) {
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
+        gradient.addColorStop(0, template.from)
+        gradient.addColorStop(1, template.to)
+        ctx.fillStyle = gradient
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        ctx.fillStyle = template.accent
+        ctx.font = '700 ' + Math.round(canvas.width * 0.018) + 'px Arial'
+        ctx.fillText(template.eyebrow, canvas.width * 0.09, canvas.height * 0.13)
+        ctx.fillRect(canvas.width * 0.09, canvas.height * 0.67, canvas.width * 0.18, Math.max(5, canvas.width * 0.004))
+        ctx.fillStyle = '#ffffff'
+        ctx.font = '900 ' + Math.round(canvas.width * 0.075) + 'px Arial'
+        const title = projectName || 'Your creative idea'
+        const words = title.split(' ')
+        let line = ''
+        let y = canvas.height * 0.76
+        for (const word of words) {
+          const candidate = line ? line + ' ' + word : word
+          if (ctx.measureText(candidate).width > canvas.width * 0.82 && line) {
+            ctx.fillText(line, canvas.width * 0.09, y)
+            y += canvas.width * 0.085
+            line = word
+          } else line = candidate
+        }
+        if (line) ctx.fillText(line, canvas.width * 0.09, y)
+        ctx.fillStyle = 'rgba(255,255,255,.72)'
+        ctx.font = Math.round(canvas.width * 0.018) + 'px Arial'
+        ctx.fillText('Make something worth sharing.', canvas.width * 0.09, canvas.height * 0.88)
+        ctx.fillText('SOCIALENS STUDIO', canvas.width * 0.09, canvas.height * 0.95)
+      }
+      if (imageUrl) {
+        const image = new Image()
+        image.src = imageUrl
+        await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('The selected image could not be loaded for export.')) })
+        ctx.save()
+        ctx.translate(canvas.width / 2, canvas.height / 2)
+        ctx.rotate(rotation * Math.PI / 180)
+        const rotatedWidth = rotation % 180 === 0 ? canvas.width : canvas.height
+        const rotatedHeight = rotation % 180 === 0 ? canvas.height : canvas.width
+        const scale = fit === 'cover' ? Math.max(rotatedWidth / image.width, rotatedHeight / image.height) : Math.min(rotatedWidth / image.width, rotatedHeight / image.height)
+        ctx.drawImage(image, -image.width * scale / 2, -image.height * scale / 2, image.width * scale, image.height * scale)
+        ctx.restore()
+      }
+      for (const layer of layers.filter(item => item.visible)) {
+        const x = canvas.width * layer.x / 100
+        const y = canvas.height * layer.y / 100
+        const size = canvas.width * layer.size / 1080
+        ctx.save()
+        ctx.fillStyle = layer.color
+        if (layer.kind === 'text') {
+          ctx.font = '700 ' + size + 'px Arial'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          const maxWidth = canvas.width * 0.84
+          const lines: string[] = []
+          let line = ''
+          for (const word of layer.text.split(' ')) {
+            const candidate = line ? line + ' ' + word : word
+            if (ctx.measureText(candidate).width > maxWidth && line) { lines.push(line); line = word } else line = candidate
+          }
+          if (line) lines.push(line)
+          const lineHeight = size * 1.2
+          lines.forEach((value, index) => ctx.fillText(value, x, y + (index - (lines.length - 1) / 2) * lineHeight, maxWidth))
+        } else {
+          const shapeSize = size * 3
+          if (layer.kind === 'rect') ctx.fillRect(x - shapeSize / 2, y - shapeSize / 2, shapeSize, shapeSize)
+          else { ctx.beginPath(); ctx.arc(x, y, shapeSize / 2, 0, Math.PI * 2); ctx.fill() }
+        }
+        ctx.restore()
+      }
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Image encoding failed. Try PNG or a smaller canvas.')), type, type === 'image/jpeg' ? 0.92 : undefined))
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = (projectName || 'socialens-design').replace(/[^a-z0-9-_]+/gi, '-').slice(0, 60) + (type === 'image/png' ? '.png' : '.jpg')
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000)
+    } catch (cause) {
+      setExportError(cause instanceof Error ? cause.message : 'Export failed. Please try again.')
+    } finally { setExporting(false) }
+  }
 
   const backUrl = '/studio?step=templates&mode=photo&created=1&name=' + encodeURIComponent(projectName) + (templateId ? '&template=' + encodeURIComponent(templateId) : '')
 
