@@ -37,6 +37,11 @@ export function Sidebar() {
           Create
         </Link>
 
+        <Link href="/studio" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-accent text-left w-full', pathname.startsWith('/studio') && 'bg-accent text-accent-foreground')}>
+          <Sparkles className="h-5 w-5" />
+          SociaLens Studio
+        </Link>
+
         <div className="mt-auto pt-4 border-t space-y-1">
           {profile && (
             <Link href={`/profile/${profile.username}`}
