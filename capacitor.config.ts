@@ -11,14 +11,13 @@ import type { CapacitorConfig } from '@capacitor/cli'
 // dependency on the Chrome app being installed/updated on the device
 // (The WebView component ships with Android itself).
 //
-// Before running `npx cap sync android`, change `url` below to your
-// production domain if that ever changes from the current Vercel one.
+// The Android WebView must load the V2 production app, not the retired V1 site.
 const config: CapacitorConfig = {
   appId: 'com.socialens.app',
   appName: 'SociaLens',
   webDir: 'public', // unused in server.url mode, but Capacitor requires a value
   server: {
-    url: 'https://social-lens-one.vercel.app',
+    url: 'https://socia-lens-v2.vercel.app',
     cleartext: false,
   },
   android: {
