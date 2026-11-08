@@ -331,7 +331,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const mimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type))
       if (!mimeType) throw new Error('No supported WebM or MP4 recording format was found in this browser.')
       const chunks: BlobPart[] = []
-      recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: canvas.width >= 1080 ? 5_000_000 : 2_500_000 })
+      recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: /Android|iPhone|iPad/i.test(navigator.userAgent) ? 3_000_000 : canvas.width >= 1080 ? 5_000_000 : 2_500_000 })
       const stopped = new Promise<Blob>((resolve, reject) => {
         recorder!.ondataavailable = event => { if (event.data.size) chunks.push(event.data) }
         recorder!.onstop = () => resolve(new Blob(chunks, { type: recorder!.mimeType || mimeType }))
@@ -455,8 +455,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           <Link href={backUrl} aria-label="Back to templates" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-slate-300 hover:bg-white/10"><ArrowLeft className="h-4 w-4" /></Link>
           <div className="min-w-0"><p className="truncate text-sm font-bold">Video Editor</p><p className="max-w-[38vw] truncate text-[11px] text-slate-500">{projectName || 'Untitled video project'}</p></div>
         </div>
-        <div className="flex items-center gap-2"><span className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] text-slate-400 sm:flex"><Check className="h-3.5 w-3.5 text-emerald-400" /> {saveStatus}</span><button type="button" disabled={exporting || !clips.length} onClick={() => void exportVideo()} className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-pink-600 px-3 text-[10px] font-bold text-white disabled:opacity-40">{exporting ? 'Rendering ' + exportProgress + '%' : 'Export video'}</button></div>
-        <Link href="/studio" className="rounded-lg px-3 py-2 text-xs font-medium text-slate-400 hover:bg-white/5 hover:text-white">Exit</Link>
+        <div className="flex items-center gap-2"><span className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] text-slate-400 sm:flex"><Check className="h-3.5 w-3.5 text-emerald-400" /> {saveStatus}</span><button type="button" disabled={exporting || !clips.length} onClick={() => void exportVideo()} className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-pink-600 px-3 text-[10px] font-bold text-white disabled:opacity-40">{exporting ? 'Rendering ' + exportProgress + '%' : <><span className="sm:hidden">Export</span><span className="hidden sm:inline">Export video</span></>}</button></div>
+        <Link href="/studio" className="hidden rounded-lg px-3 py-2 text-xs font-medium text-slate-400 hover:bg-white/5 hover:text-white sm:inline-flex">Exit</Link>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
