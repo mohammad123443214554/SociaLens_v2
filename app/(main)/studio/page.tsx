@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { ArrowLeft, FolderOpen } from 'lucide-react'
-import { StudioBrandLink } from '@/components/studio/StudioBrandLink'
 
 export default function SociaLensStudioPage() {
   return (
