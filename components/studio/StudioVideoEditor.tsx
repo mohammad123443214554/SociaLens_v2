@@ -74,6 +74,10 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
   const [aspect, setAspect] = useState<'9:16' | '16:9' | '1:1'>('9:16')
   const [titleText, setTitleText] = useState('')
   const [showTitle, setShowTitle] = useState(false)
+  const [exportWidth, setExportWidth] = useState(1080)
+  const [exportHeight, setExportHeight] = useState(1920)
+  const [exporting, setExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState(0)
   const selected = clips.find(item => item.id === selectedId) || clips[0] || null
   const totalDuration = useMemo(() => clips.reduce((sum, item) => sum + Math.max(0.1, item.trimEnd - item.trimStart), 0), [clips])
   const currentDuration = selected ? Math.max(0, selected.trimEnd - selected.trimStart) : 0
@@ -193,6 +197,154 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
     catch { setError('The browser could not play this video. Try another supported file or format.') }
   }
   useEffect(() => { if (audioRef.current) audioRef.current.volume = audioVolume / 100 }, [audioVolume, audio?.url])
+
+  const exportVideo = async () => {
+    if (!clips.length) { setError('Add at least one video or photo clip before exporting.'); return }
+    if (typeof MediaRecorder === 'undefined') { setError('Video export is not supported by this browser. Try the latest Chrome or Edge.'); return }
+    if (!HTMLCanvasElement.prototype.captureStream) { setError('This browser does not support canvas video export. Try the latest Chrome or Edge.'); return }
+    setError('')
+    setNotice('')
+    setExporting(true)
+    setExportProgress(0)
+    let recorder: MediaRecorder | null = null
+    let audioContext: AudioContext | null = null
+    let musicElement: HTMLAudioElement | null = null
+    let animationFrame = 0
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.min(1920, Math.max(240, Math.round(exportWidth)))
+      canvas.height = Math.min(1920, Math.max(240, Math.round(exportHeight)))
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('Could not create the video rendering canvas.')
+      const stream = canvas.captureStream(30)
+      if (audio) {
+        const AudioContextClass = window.AudioContext
+        if (AudioContextClass) {
+          audioContext = new AudioContextClass()
+          await audioContext.resume()
+          musicElement = document.createElement('audio')
+          musicElement.src = audio.url
+          musicElement.loop = true
+          const source = audioContext.createMediaElementSource(musicElement)
+          source.connect(audioContext.destination)
+          source.connect(audioContext.createMediaStreamDestination())
+          const destination = audioContext.createMediaStreamDestination()
+          source.disconnect()
+          source.connect(destination)
+          destination.stream.getAudioTracks().forEach(track => stream.addTrack(track))
+          musicElement.volume = audioVolume / 100
+          await musicElement.play()
+        }
+      }
+      const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']
+      const mimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type))
+      if (!mimeType) throw new Error('No supported WebM or MP4 recording format was found in this browser.')
+      const chunks: BlobPart[] = []
+      recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: canvas.width >= 1080 ? 5_000_000 : 2_500_000 })
+      const stopped = new Promise<Blob>((resolve, reject) => {
+        recorder!.ondataavailable = event => { if (event.data.size) chunks.push(event.data) }
+        recorder!.onstop = () => resolve(new Blob(chunks, { type: recorder!.mimeType || mimeType }))
+        recorder!.onerror = () => reject(new Error('The browser stopped recording unexpectedly.'))
+      })
+      const drawTitle = () => {
+        if (!showTitle || !titleText) return
+        ctx.save()
+        ctx.fillStyle = 'rgba(0,0,0,.42)'
+        ctx.fillRect(canvas.width * 0.06, canvas.height * 0.09, canvas.width * 0.88, canvas.height * 0.16)
+        ctx.fillStyle = '#ffffff'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.font = '900 ' + Math.round(canvas.width * 0.055) + 'px Arial'
+        ctx.fillText(titleText, canvas.width / 2, canvas.height * 0.17, canvas.width * 0.82)
+        ctx.restore()
+      }
+      const drawVideoFrame = (video: HTMLVideoElement) => {
+        ctx.fillStyle = '#000000'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        const scale = Math.min(canvas.width / video.videoWidth, canvas.height / video.videoHeight)
+        const width = video.videoWidth * scale
+        const height = video.videoHeight * scale
+        ctx.drawImage(video, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
+        drawTitle()
+      }
+      recorder.start(1000)
+      const startedAt = performance.now()
+      for (let index = 0; index < clips.length; index++) {
+        const clip = clips[index]
+        if (clip.kind === 'image') {
+          const image = new Image()
+          image.src = clip.url
+          await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('Could not load photo clip: ' + clip.name)) })
+          const durationMs = Math.max(100, (clip.trimEnd - clip.trimStart) * 1000)
+          const start = performance.now()
+          await new Promise<void>(resolve => {
+            const frame = (now: number) => {
+              ctx.fillStyle = '#000000'
+              ctx.fillRect(0, 0, canvas.width, canvas.height)
+              const scale = Math.min(canvas.width / image.width, canvas.height / image.height)
+              const width = image.width * scale
+              const height = image.height * scale
+              ctx.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
+              drawTitle()
+              setExportProgress(Math.min(99, Math.round(((index + (now - start) / durationMs) / clips.length) * 100)))
+              if (now - start >= durationMs) resolve()
+              else animationFrame = requestAnimationFrame(frame)
+            }
+            animationFrame = requestAnimationFrame(frame)
+          })
+        } else {
+          const video = document.createElement('video')
+          video.src = clip.url
+          video.muted = true
+          video.playsInline = true
+          video.preload = 'auto'
+          await new Promise<void>((resolve, reject) => {
+            video.onloadedmetadata = () => resolve()
+            video.onerror = () => reject(new Error('Could not load video clip: ' + clip.name))
+          })
+          video.currentTime = clip.trimStart
+          await new Promise<void>(resolve => { video.onseeked = () => resolve() })
+          await video.play()
+          await new Promise<void>((resolve, reject) => {
+            const frame = () => {
+              if (video.readyState >= 2 && video.videoWidth > 0) drawVideoFrame(video)
+              setExportProgress(Math.min(99, Math.round(((index + Math.min(1, (video.currentTime - clip.trimStart) / Math.max(0.1, clip.trimEnd - clip.trimStart))) / clips.length) * 100)))
+              if (video.currentTime >= clip.trimEnd || video.ended) { video.pause(); resolve(); return }
+              animationFrame = requestAnimationFrame(frame)
+            }
+            video.onerror = () => reject(new Error('Playback failed while exporting: ' + clip.name))
+            animationFrame = requestAnimationFrame(frame)
+          })
+          video.pause()
+          video.removeAttribute('src')
+          video.load()
+        }
+      }
+      if (recorder.state !== 'inactive') recorder.stop()
+      const blob = await stopped
+      if (!blob.size) throw new Error('The exported video was empty. Please try again.')
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const extension = blob.type.includes('mp4') ? 'mp4' : 'webm'
+      link.download = (projectName || 'socialens-video').replace(/[^a-z0-9-_]+/gi, '-').slice(0, 60) + '.' + extension
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+      setExportProgress(100)
+      setNotice('Video export complete. Your ' + extension.toUpperCase() + ' file is ready.')
+      void startedAt
+    } catch (cause) {
+      if (recorder && recorder.state !== 'inactive') recorder.stop()
+      setError(cause instanceof Error ? cause.message : 'Video export failed. Please try again.')
+    } finally {
+      if (animationFrame) cancelAnimationFrame(animationFrame)
+      if (musicElement) { musicElement.pause(); musicElement.removeAttribute('src'); musicElement.load() }
+      if (audioContext) await audioContext.close().catch(() => undefined)
+      setExporting(false)
+    }
+  }
 
   const jumpClip = (direction: number) => {
     if (!clips.length) return
