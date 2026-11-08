@@ -426,17 +426,17 @@ async function hashPin(pin: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-async function hashPattern(pattern: string): Promise<string> {
+async function hashPattern(pattern: string, lockType: 'pattern' | 'pattern4'): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16))
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pattern), 'PBKDF2', false, ['deriveBits'])
   const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 210000 }, key, 256)
   const hex = (value: Uint8Array) => Array.from(value).map(byte => byte.toString(16).padStart(2, '0')).join('')
-  return `pattern:v2:${hex(salt)}:${hex(new Uint8Array(bits))}`
+  return `${lockType}:v2:${hex(salt)}:${hex(new Uint8Array(bits))}`
 }
 
 async function verifyPattern(pattern: string, stored: string): Promise<boolean> {
   const parts = stored.split(':')
-  if (parts.length === 4 && parts[0] === 'pattern' && parts[1] === 'v2') {
+  if (parts.length === 4 && (parts[0] === 'pattern' || parts[0] === 'pattern4') && parts[1] === 'v2') {
     const salt = new Uint8Array(parts[2].match(/.{2}/g)?.map(byte => parseInt(byte, 16)) || [])
     const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pattern), 'PBKDF2', false, ['deriveBits'])
     const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 210000 }, key, 256)
@@ -459,7 +459,7 @@ export function useArchiveLockStatus(userId?: string) {
         .select('archive_password_hash, archive_password_hint')
         .eq('id', userId)
         .maybeSingle()
-      return { hasPassword: !!data?.archive_password_hash, hint: data?.archive_password_hint || null, lockType: data?.archive_password_hash?.startsWith('pattern:') ? 'pattern' as const : 'password' as const }
+      return { hasPassword: !!data?.archive_password_hash, hint: data?.archive_password_hint || null, lockType: data?.archive_password_hash?.startsWith('pattern4:') ? 'pattern4' as const : data?.archive_password_hash?.startsWith('pattern:') ? 'pattern' as const : 'password' as const }
     },
     enabled: !!userId,
   })
@@ -470,10 +470,10 @@ export function useSetArchivePassword() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ userId, password, pattern, lockType = 'password', hint }: { userId: string; password?: string; pattern?: string; lockType?: 'password' | 'pattern'; hint?: string }) => {
-      const credential = lockType === 'pattern' ? pattern : password
+    mutationFn: async ({ userId, password, pattern, lockType = 'password', hint }: { userId: string; password?: string; pattern?: string; lockType?: 'password' | 'pattern' | 'pattern4'; hint?: string }) => {
+      const credential = lockType === 'password' ? password : pattern
       if (!credential) throw new Error('A lock credential is required.')
-      const hash = lockType === 'pattern' ? await hashPattern(credential) : await hashPin(credential)
+      const hash = lockType === 'password' ? await hashPin(credential) : await hashPattern(credential, lockType)
       const { error } = await supabase
         .from('profiles')
         .update({ archive_password_hash: hash, archive_password_hint: hint?.trim() || null })
@@ -494,7 +494,7 @@ export function useVerifyArchivePassword() {
       const { data } = await supabase.from('profiles').select('archive_password_hash').eq('id', userId).maybeSingle()
       if (!data?.archive_password_hash) return true // no lock set yet - nothing to check against
       const stored = data.archive_password_hash as string
-      if (stored.startsWith('pattern:')) {
+      if (stored.startsWith('pattern:') || stored.startsWith('pattern4:')) {
         if (!pattern) return false
         return await verifyPattern(pattern, stored)
       }
