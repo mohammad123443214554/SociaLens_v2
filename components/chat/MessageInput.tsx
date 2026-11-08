@@ -114,7 +114,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
 
   const openEmoji = () => {
     const rect = emojiBtnRef.current?.getBoundingClientRect()
-    if (rect) setEmojiPos(getClampedPopupPosition(rect, 288, 288))
+    if (rect) setEmojiPos(getClampedPopupPosition(rect, 360, 440))
     setShowEmoji(v => !v)
     setShowStickers(false)
   }
