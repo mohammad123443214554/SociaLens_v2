@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { Ban, ShieldCheck } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
@@ -24,6 +25,7 @@ export default function ChatSettingsRoutePage() {
   const [showNickname, setShowNickname] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDeleteChat, setConfirmDeleteChat] = useState(false)
+  const [confirmBlockAction, setConfirmBlockAction] = useState(false)
   const [confirmRemoveWallpaper, setConfirmRemoveWallpaper] = useState(false)
   const [removingWallpaper, setRemovingWallpaper] = useState(false)
   const [archiveUnlocked, setArchiveUnlocked] = useState(false)
@@ -79,9 +81,18 @@ export default function ChatSettingsRoutePage() {
   const theyBlockedMe = !!blockStatus?.theyBlockedMe
 
   const handleToggleBlock = () => {
-    const block = !iBlockedThem
-    if (block && !window.confirm(`Block ${other.username}? They won't be able to message you, and your profile will be hidden from them here.`)) return
-    toggleBlock.mutate({ blockerId: user.id, blockedId: other.id, block })
+    if (toggleBlock.isPending) return
+    setConfirmBlockAction(true)
+  }
+
+  const confirmToggleBlock = async () => {
+    if (toggleBlock.isPending) return
+    try {
+      await toggleBlock.mutateAsync({ blockerId: user.id, blockedId: other.id, block: !iBlockedThem })
+      setConfirmBlockAction(false)
+    } catch (error) {
+      console.error('Could not update block status:', error)
+    }
   }
 
   const handleDeleteChat = () => {
@@ -141,6 +152,56 @@ export default function ChatSettingsRoutePage() {
         onDeleteChat={handleDeleteChat}
         onOpenCallSettings={() => router.push(`/chat/${chatId}/settings/call`)}
       />
+      {confirmBlockAction && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !toggleBlock.isPending) setConfirmBlockAction(false)
+          }}
+        >
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="block-chat-title"
+            aria-describedby="block-chat-description"
+            className="w-full max-w-sm overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+          >
+            <div className="h-1 w-full bg-gradient-to-r from-pink-500 via-fuchsia-500 to-violet-500" />
+            <div className="p-5">
+              <div className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full ${iBlockedThem ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'}`}>
+                {iBlockedThem ? <ShieldCheck className="h-6 w-6" /> : <Ban className="h-6 w-6" />}
+              </div>
+              <h2 id="block-chat-title" className="text-center text-lg font-semibold">
+                {iBlockedThem ? `Unblock ${other.username}?` : `Block ${other.username}?`}
+              </h2>
+              <p id="block-chat-description" className="mt-2 text-center text-sm leading-relaxed text-muted-foreground">
+                {iBlockedThem
+                  ? 'This person will be able to message you and see your profile again, subject to your privacy settings.'
+                  : "They won't be able to message you, and your profile will be hidden from them here. You can unblock them anytime."}
+              </p>
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  disabled={toggleBlock.isPending}
+                  onClick={() => setConfirmBlockAction(false)}
+                  className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={toggleBlock.isPending}
+                  onClick={confirmToggleBlock}
+                  className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 ${iBlockedThem ? 'bg-emerald-600' : 'bg-destructive'}`}
+                >
+                  {toggleBlock.isPending ? 'Please wait…' : iBlockedThem ? 'Unblock' : 'Block'}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
       {confirmDeleteChat && (
         <div
           className="fixed inset-0 z-[190] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
