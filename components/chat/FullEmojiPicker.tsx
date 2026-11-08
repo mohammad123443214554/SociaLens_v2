@@ -1,45 +1,15 @@
 'use client'
 
-// A large, dependency-free emoji picker (no npm package needed) - grouped
-// into categories so it still feels browsable instead of one giant wall.
-const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
-  {
-    label: 'Smileys',
-    emojis: ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎','🤓','🧐'],
-  },
-  {
-    label: 'Reactions',
-    emojis: ['😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾'],
-  },
-  {
-    label: 'Gestures & Hands',
-    emojis: ['👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✍️','💪','🦾'],
-  },
-  {
-    label: 'Hearts',
-    emojis: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','♥️','💌','💋'],
-  },
-  {
-    label: 'People',
-    emojis: ['👶','🧒','👦','👧','🧑','👱','👨','🧔','👩','🧓','👴','👵','😀','👮','🕵️','💂','👷','🤴','👸','👳','👲','🧕','🤵','👰','🤰','🤱','👼','🎅','🤶','🦸','🦹','🧙','🧚','🧛','🧜','🧝','🧞','🧟','💆','💇','🚶','🧍','🧎','🏃','💃','🕺'],
-  },
-  {
-    label: 'Animals',
-    emojis: ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐽','🐸','🐵','🙈','🙉','🙊','🐒','🐔','🐧','🐦','🐤','🐣','🐥','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐜','🦟','🦗','🕷️','🕸️','🐢','🐍','🦎','🦖','🦕','🐙','🦑','🦐','🦞','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊'],
-  },
-  {
-    label: 'Food & Drink',
-    emojis: ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶️','🫑','🌽','🥕','🫒','🧄','🧅','🥔','🍠','🥐','🥯','🍞','🥖','🥨','🧀','🥚','🍳','🧈','🥞','🧇','🥓','🥩','🍗','🍖','🌭','🍔','🍟','🍕','🥪','🥙','🧆','🌮','🌯','🫔','🥗','🥘','🫕','🥫','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🦪','🍤','🍙','🍚','🍘','🍥','🥠','🥮','🍢','🍡','🍧','🍨','🍦','🥧','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍿','🍩','🍪','🌰','🥜','🍯','🥛','🍼','☕','🍵','🧃','🥤','🧋','🍶','🍺','🍻','🥂','🍷','🥃','🍸','🍹','🍾'],
-  },
-  {
-    label: 'Activities',
-    emojis: ['⚽','🏀','🏈','⚾','🥎','🎾','🏐','🏉','🎱','🪀','🏓','🏸','🏒','🏑','🥍','🏏','🥅','⛳','🪁','🏹','🎣','🤿','🥊','🥋','🎽','🛹','🛼','🛷','⛸️','🥌','🎿','⛷️','🏂','🏋️','🤼','🤸','🤺','⛹️','🤾','🏌️','🏇','🧘','🏄','🏊','🤽','🚣','🧗','🚵','🚴','🏆','🥇','🥈','🥉','🏅','🎖️','🏵️','🎗️','🎫','🎟️','🎪','🤹','🎭','🩰','🎨','🎬','🎤','🎧','🎼','🎹','🥁','🪘','🎷','🎺','🎸','🪕','🎻'],
-  },
-  {
-    label: 'Objects & Symbols',
-    emojis: ['📱','💻','⌨️','🖥️','🖨️','🖱️','💾','💿','📷','📹','🎥','📞','☎️','📺','📻','🎙️','⏰','⏱️','⏲️','🕰️','⌛','⏳','📡','🔋','🔌','💡','🔦','🕯️','🧯','🛢️','💸','💵','💴','💶','💷','💰','💳','💎','⚖️','🔧','🔨','⚙️','🗜️','⚗️','🧪','🧫','🧬','🔬','🔭','📡','💊','🩹','🩺','🚪','🪑','🛏️','🛋️','🚽','🚿','🛁','🪒','🧴','🧷','🧹','🧺','🧻','🪣','🧼','🪥','🧽','🔑','🗝️','🔒','🔓','🔔','🔕','📢','📣','📯','🔊','🔇','🎵','🎶','💯','🔥','✨','🌟','⭐','💫','⚡','☄️','💥','💢','💦','💨','🕳️','💣','💬','👁️‍🗨️','🗨️','🗯️','💭','🎈','🎉','🎊','🎁','🏆','🚩','🏳️','🏴'],
-  },
-]
+import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
+import emojiCatalog from '@/lib/data/emoji-catalog.json'
+
+interface EmojiRecord {
+  emoji: string
+  name: string
+  category: string
+  skinTone: boolean
+}
 
 interface FullEmojiPickerProps {
   onSelect: (emoji: string) => void
@@ -47,36 +17,89 @@ interface FullEmojiPickerProps {
   style?: React.CSSProperties
 }
 
+const EMOJIS = emojiCatalog.emojis as EmojiRecord[]
+const CATEGORIES = ['Popular', 'All', ...Array.from(new Set(EMOJIS.map(item => item.category)))]
+
 export function FullEmojiPicker({ onSelect, onClose, style }: FullEmojiPickerProps) {
-  return (
+  const [activeCategory, setActiveCategory] = useState('Popular')
+  const [search, setSearch] = useState('')
+  const filteredEmojis = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase()
+    if (query) {
+      return EMOJIS.filter(item => item.name.toLocaleLowerCase().includes(query) || item.emoji.includes(query))
+    }
+    if (activeCategory === 'Popular') {
+      const popular = new Set(emojiCatalog.popular)
+      return EMOJIS.filter(item => popular.has(item.emoji))
+    }
+    if (activeCategory === 'All') return EMOJIS
+    return EMOJIS.filter(item => item.category === activeCategory)
+  }, [activeCategory, search])
+
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div
-      className="fixed bg-card border rounded-xl shadow-2xl w-72 max-h-72 flex flex-col z-50"
-      style={style}
-      onClick={e => e.stopPropagation()}
+      role="dialog"
+      aria-label="Emoji picker"
+      className="fixed z-[100] flex h-[min(440px,calc(100dvh-16px))] w-[min(360px,calc(100vw-16px))] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+      style={{ top: style?.top, left: style?.left }}
+      onMouseDown={event => event.stopPropagation()}
+      onClick={event => event.stopPropagation()}
     >
-      <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
-        <p className="text-xs font-semibold text-muted-foreground">React with</p>
-        <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">Close</button>
-      </div>
-      <div className="overflow-y-auto p-2 space-y-2">
-        {EMOJI_CATEGORIES.map(cat => (
-          <div key={cat.label}>
-            <p className="text-[10px] font-medium text-muted-foreground px-1 mb-0.5">{cat.label}</p>
-            <div className="grid grid-cols-8 gap-0.5">
-              {cat.emojis.map((emoji, i) => (
-                <button
-                  key={cat.label + i}
-                  type="button"
-                  onClick={() => onSelect(emoji)}
-                  className="text-lg p-1 rounded-lg hover:bg-accent transition-colors"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
+      <div className="shrink-0 border-b border-border p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Choose an emoji</p>
+            <p className="text-[11px] text-muted-foreground">{EMOJIS.length.toLocaleString()} emojis and skin-tone variations</p>
           </div>
-        ))}
+          <button type="button" onClick={onClose} aria-label="Close emoji picker" className="rounded-full px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">Close</button>
+        </div>
+        <input
+          type="search"
+          value={search}
+          onChange={event => setSearch(event.target.value)}
+          placeholder="Search emojis"
+          aria-label="Search emojis"
+          className="h-9 w-full rounded-xl border border-border bg-muted/50 px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-pink-500"
+        />
+        <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {CATEGORIES.map(category => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => { setActiveCategory(category); setSearch('') }}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${activeCategory === category && !search ? 'bg-pink-500 text-white' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5">
+        {filteredEmojis.length ? (
+          <div className="grid grid-cols-9 gap-1">
+            {filteredEmojis.map(item => (
+              <button
+                key={item.emoji}
+                type="button"
+                title={item.name}
+                aria-label={item.name}
+                onClick={() => onSelect(item.emoji)}
+                className="flex aspect-square items-center justify-center rounded-lg text-[23px] leading-none transition-colors hover:bg-accent active:scale-95"
+              >
+                {item.emoji}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="py-12 text-center text-sm text-muted-foreground">No emojis found.</p>
+        )}
+      </div>
+      <div className="shrink-0 border-t border-border px-3 py-2 text-[10px] text-muted-foreground">
+        {filteredEmojis.length.toLocaleString()} shown · Tap an emoji to add it to your message
+      </div>
+    </div>,
+    document.body
   )
 }
