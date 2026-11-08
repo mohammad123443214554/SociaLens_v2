@@ -33,6 +33,7 @@ interface MessageInputProps {
 }
 
 const MAX_VIDEO_SECONDS = 60 * 60 // 60 minutes
+const MAX_CHAT_FILE_SIZE_BYTES = 50 * 1024 * 1024 // 50 MB per photo or video
 const MAX_MESSAGE_WORDS = 10000
 
 function countWords(text: string): number {
@@ -53,6 +54,7 @@ function getVideoDuration(file: File): Promise<number> {
 }
 
 async function uploadChatMedia(file: File | Blob, filename: string, userId: string): Promise<string> {
+  if (file.size > MAX_CHAT_FILE_SIZE_BYTES) throw new Error('File is larger than 50 MB. Choose a smaller file.')
   // Uploaded straight from the browser to Supabase Storage rather than
   // routed through a server API endpoint - a server route's request body
   // gets rejected by the hosting platform's size limit well before a
@@ -75,7 +77,6 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
   const [message, setMessage] = useState('')
   const [showEmoji, setShowEmoji] = useState(false)
   const [showStickers, setShowStickers] = useState(false)
-  const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [emojiPos, setEmojiPos] = useState<{ top: number; left: number } | null>(null)
   const [stickerPos, setStickerPos] = useState<{ top: number; left: number } | null>(null)
 
@@ -100,8 +101,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const emojiBtnRef = useRef<HTMLButtonElement>(null)
   const stickerBtnRef = useRef<HTMLButtonElement>(null)
-  const photoInputRef = useRef<HTMLInputElement>(null)
-  const videoInputRef = useRef<HTMLInputElement>(null)
+  const mediaInputRef = useRef<HTMLInputElement>(null)
 
   const resizeTextarea = () => {
     const el = textareaRef.current
@@ -146,42 +146,52 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
     setAttachError(null)
   }
 
-  const handlePhotoPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
-    setShowAttachMenu(false)
     if (!file) return
-    clearAttachment()
-    setAttachedFile(file)
-    setAttachedType('image')
-    setAttachedPreviewUrl(URL.createObjectURL(file))
-  }
 
-  const handleVideoPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    setShowAttachMenu(false)
-    if (!file) return
     clearAttachment()
-    setCheckingVideo(true)
-    try {
-      const duration = await getVideoDuration(file)
-      if (duration > MAX_VIDEO_SECONDS) {
-        setLimitPopup({
-          title: 'Video is too long',
-          description: 'You can only send a video up to 60 minutes long in chat. Please trim it or pick a shorter one.',
-        })
-        setCheckingVideo(false)
-        return
-      }
-      setAttachedFile(file)
-      setAttachedType('video')
-      setAttachedPreviewUrl(URL.createObjectURL(file))
-    } catch {
-      setAttachError('Could not read that video. Try a different file.')
-    } finally {
-      setCheckingVideo(false)
+    setAttachError(null)
+
+    if (file.size > MAX_CHAT_FILE_SIZE_BYTES) {
+      setLimitPopup({
+        title: 'File is too large',
+        description: `Chat photos and videos can be up to 50 MB each. This file is ${(file.size / (1024 * 1024)).toFixed(1)} MB. Please choose a smaller file.`,
+      })
+      return
     }
+
+    if (file.type.startsWith('image/')) {
+      setAttachedFile(file)
+      setAttachedType('image')
+      setAttachedPreviewUrl(URL.createObjectURL(file))
+      return
+    }
+
+    if (file.type.startsWith('video/')) {
+      setCheckingVideo(true)
+      try {
+        const duration = await getVideoDuration(file)
+        if (duration > MAX_VIDEO_SECONDS) {
+          setLimitPopup({
+            title: 'Video is too long',
+            description: 'You can only send a video up to 60 minutes long in chat. Please trim it or pick a shorter one.',
+          })
+          return
+        }
+        setAttachedFile(file)
+        setAttachedType('video')
+        setAttachedPreviewUrl(URL.createObjectURL(file))
+      } catch {
+        setAttachError('Could not read that video. Try a different file.')
+      } finally {
+        setCheckingVideo(false)
+      }
+      return
+    }
+
+    setAttachError('Please choose a photo or video from your device.')
   }
 
   // --- Voice recording -------------------------------------------------
@@ -425,8 +435,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
         </div>
       )}
 
-      <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={handlePhotoPicked} />
-      <input ref={videoInputRef} type="file" accept="video/*" hidden onChange={handleVideoPicked} />
+      <input ref={mediaInputRef} type="file" accept="image/*,video/*" hidden onChange={handleMediaPicked} />
 
       {isRecording ? (
         <div className="px-3 py-2.5 sm:px-4 sm:py-3">
@@ -527,29 +536,16 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
               <button type="button" onClick={startRecording} disabled={disabled} className="p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
                 <Mic className="h-5 w-5 sm:h-6 sm:w-6" />
               </button>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowAttachMenu(v => !v)}
-                  disabled={disabled}
-                  className="p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  <ImageIcon className="h-5 w-5 sm:h-6 sm:w-6" />
-                </button>
-                {showAttachMenu && (
-                  <>
-                    <div className="fixed inset-0 z-30" onClick={() => setShowAttachMenu(false)} />
-                    <div className="absolute bottom-11 right-0 z-40 w-40 bg-card border rounded-xl shadow-xl overflow-hidden">
-                      <button onClick={() => photoInputRef.current?.click()} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
-                        📷 Photo
-                      </button>
-                      <button onClick={() => videoInputRef.current?.click()} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted">
-                        🎥 Video
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => mediaInputRef.current?.click()}
+                disabled={disabled}
+                aria-label="Choose photo or video from device"
+                title="Choose photo or video"
+                className="p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <ImageIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+              </button>
               <button ref={stickerBtnRef} type="button" onClick={openStickers} disabled={disabled} className="p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
                 <StickerIcon className="h-5 w-5 sm:h-6 sm:w-6" />
               </button>
