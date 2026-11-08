@@ -59,6 +59,8 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
   const imageInput = useRef<HTMLInputElement>(null)
   const audioInput = useRef<HTMLInputElement>(null)
   const previewRef = useRef<HTMLVideoElement>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const objectUrls = useRef<Set<string>>(new Set())
   const [clips, setClips] = useState<Clip[]>([])
   const [audio, setAudio] = useState<AudioTrack | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -78,10 +80,8 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
   const backUrl = '/studio?step=templates&mode=video&created=1&name=' + encodeURIComponent(projectName) + (templateId ? '&template=' + encodeURIComponent(templateId) : '')
 
   useEffect(() => () => {
-    clips.forEach(item => URL.revokeObjectURL(item.url))
-    if (audio) URL.revokeObjectURL(audio.url)
-  // Object URLs belong to this editor session and are released on unmount.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    objectUrls.current.forEach(url => URL.revokeObjectURL(url))
+    objectUrls.current.clear()
   }, [])
 
   useEffect(() => {
@@ -128,9 +128,11 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
     const additions: Clip[] = []
     for (const file of accepted) {
       const url = URL.createObjectURL(file)
+      objectUrls.current.add(url)
       const duration = kind === 'image' ? 5 : await readMediaDuration(file, url, kind)
       if (kind === 'video' && duration <= 0) {
         URL.revokeObjectURL(url)
+        objectUrls.current.delete(url)
         setError('Could not read ' + file.name + '. Try another MP4, WebM or MOV file.')
         continue
       }
@@ -149,14 +151,15 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
     if (!file.type.startsWith('audio/')) { setError('Choose an MP3, WAV, M4A, AAC or other supported audio file.'); return }
     if (file.size > MAX_AUDIO_BYTES) { setError('Audio file is larger than 50 MB.'); return }
     const url = URL.createObjectURL(file)
+    objectUrls.current.add(url)
     const duration = await new Promise<number>(resolve => {
       const el = document.createElement('audio')
       el.onloadedmetadata = () => resolve(Number.isFinite(el.duration) ? el.duration : 0)
       el.onerror = () => resolve(0)
       el.src = url
     })
-    if (!duration) { URL.revokeObjectURL(url); setError('Could not read this audio file.'); return }
-    setAudio(current => { if (current) URL.revokeObjectURL(current.url); return { id: makeId(), name: file.name, url, duration, fileSize: file.size } })
+    if (!duration) { URL.revokeObjectURL(url); objectUrls.current.delete(url); setError('Could not read this audio file.'); return }
+    setAudio(current => { if (current) { URL.revokeObjectURL(current.url); objectUrls.current.delete(current.url) }; return { id: makeId(), name: file.name, url, duration, fileSize: file.size } })
     setNotice('Music track added. Adjust its volume in the Audio panel.')
   }
 
@@ -165,6 +168,7 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
     const target = clips.find(item => item.id === id)
     if (!target) return
     URL.revokeObjectURL(target.url)
+    objectUrls.current.delete(target.url)
     const next = clips.filter(item => item.id !== id)
     setClips(next)
     if (selectedId === id) setSelectedId(next[0]?.id || null)
@@ -183,11 +187,13 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
       setNotice('Select a video clip to play its preview.')
       return
     }
-    if (playing) { video.pause(); setPlaying(false); return }
+    if (playing) { video.pause(); audioRef.current?.pause(); setPlaying(false); return }
     if (video.currentTime < selected.trimStart || video.currentTime >= selected.trimEnd) video.currentTime = selected.trimStart
-    try { await video.play(); setPlaying(true); setError('') }
+    try { await video.play(); if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.volume = audioVolume / 100; void audioRef.current.play().catch(() => setNotice('Video is playing; browser blocked automatic music preview. Press play again after interacting with the page.')) }; setPlaying(true); setError('') }
     catch { setError('The browser could not play this video. Try another supported file or format.') }
   }
+  useEffect(() => { if (audioRef.current) audioRef.current.volume = audioVolume / 100 }, [audioVolume, audio?.url])
+
   const jumpClip = (direction: number) => {
     if (!clips.length) return
     const index = clips.findIndex(item => item.id === selectedId)
@@ -237,7 +243,7 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
             <div className="mb-3 flex items-center justify-between"><h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">Audio track</h2><Music2 className="h-4 w-4 text-pink-300" /></div>
             <button type="button" onClick={() => audioInput.current?.click()} className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] text-[11px] font-semibold hover:bg-white/[0.08]"><Upload className="h-4 w-4" /> {audio ? 'Replace music' : 'Add music'}</button>
             <input ref={audioInput} type="file" accept="audio/*" className="hidden" onChange={event => { void addAudio(event.target.files?.[0]); event.currentTarget.value = '' }} />
-            {audio && <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"><p className="truncate text-[10px] font-semibold">{audio.name}</p><p className="mt-1 text-[10px] text-slate-500">{formatTime(audio.duration)} · {(audio.fileSize / (1024 * 1024)).toFixed(1)} MB</p><label className="mt-3 block text-[10px] text-slate-400">Music volume · {audioVolume}%<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="mt-2 w-full accent-pink-500" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); setAudio(null) }} className="mt-2 flex items-center gap-1 text-[10px] text-red-300"><X className="h-3 w-3" /> Remove music</button></div>}
+            {audio && <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"><p className="truncate text-[10px] font-semibold">{audio.name}</p><p className="mt-1 text-[10px] text-slate-500">{formatTime(audio.duration)} · {(audio.fileSize / (1024 * 1024)).toFixed(1)} MB</p><label className="mt-3 block text-[10px] text-slate-400">Music volume · {audioVolume}%<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="mt-2 w-full accent-pink-500" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="mt-2 flex items-center gap-1 text-[10px] text-red-300"><X className="h-3 w-3" /> Remove music</button></div>}
           </section>
           <div className="h-px bg-white/[0.08]" />
           <section>
@@ -254,7 +260,8 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
           </div>
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-[radial-gradient(ellipse_at_50%_45%,rgba(65,55,105,0.18),transparent_55%),#080a13] p-4 sm:p-6">
             <div className={'relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-xl bg-black shadow-[0_24px_80px_rgba(0,0,0,0.55)] ring-1 ring-white/15 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-4xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(100%, 680px)' }}>
-              {selected?.kind === 'video' ? <video key={selected.id} ref={previewRef} src={selected.url} playsInline preload="metadata" className="h-full w-full object-contain" onEnded={() => setPlaying(false)} /> : selected?.kind === 'image' ? <img src={selected.url} alt={selected.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-slate-600" /><p className="text-sm font-semibold text-slate-300">Your video preview</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">Add videos and photos to build your sequence. Select a clip in the timeline to preview it here.</p><button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-pink-500 to-violet-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import first video</button></div>}
+              {selected?.kind === 'video' ? <video key={selected.id} ref={previewRef} src={selected.url} playsInline preload="metadata" className="h-full w-full object-contain" onEnded={() => { audioRef.current?.pause(); setPlaying(false) }} /> : selected?.kind === 'image' ? <img src={selected.url} alt={selected.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-slate-600" /><p className="text-sm font-semibold text-slate-300">Your video preview</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">Add videos and photos to build your sequence. Select a clip in the timeline to preview it here.</p><button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-pink-500 to-violet-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import first video</button></div>}
+              {audio && <audio ref={audioRef} src={audio.url} preload="metadata" />}
               {showTitle && titleText && <div className="pointer-events-none absolute inset-x-3 top-[12%] rounded-lg bg-black/40 px-3 py-2 text-center text-xl font-black text-white drop-shadow-lg sm:text-3xl">{titleText}</div>}
               {selected?.kind === 'video' && <div className="absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-1 text-[9px] tabular-nums text-white">{formatTime(playhead)} / {formatTime(selected.duration)}</div>}
             </div>
