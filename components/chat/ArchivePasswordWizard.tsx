@@ -11,7 +11,7 @@ interface ArchivePasswordWizardProps {
   onDone: () => void
 }
 
-type LockType = 'password' | 'pattern'
+type LockType = 'password' | 'pattern' | 'pattern4'
 
 export function ArchivePasswordWizard({ onClose, onDone }: ArchivePasswordWizardProps) {
   const { user } = useUser()
@@ -73,7 +73,7 @@ export function ArchivePasswordWizard({ onClose, onDone }: ArchivePasswordWizard
       await setPassword.mutateAsync({
         userId: user.id,
         lockType,
-        ...(lockType === 'pattern' ? { pattern: newPattern } : { password: newPassword }),
+        ...(lockType === 'password' ? { password: newPassword } : { pattern: newPattern }),
         hint: hint.trim() || undefined,
       })
       onDone()
@@ -110,19 +110,19 @@ export function ArchivePasswordWizard({ onClose, onDone }: ArchivePasswordWizard
             <button type="button" onClick={handleNextFromConfirm} className="mt-4 w-full rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 text-sm font-semibold text-white">Continue</button>
           </>}
 
-          {lockType === 'pattern' && step === 1 && <>
-            <p className="mb-3 text-sm leading-6 text-muted-foreground">Draw a unique pattern on the 3 × 3 grid. Connect at least four dots.</p>
-            <ArchivePatternLock key="new-pattern" onComplete={handleNewPattern} />
+          {lockType !== 'password' && step === 1 && <>
+            <p className="mb-3 text-sm leading-6 text-muted-foreground">Draw a unique pattern on the {lockType === 'pattern4' ? '4 × 4' : '3 × 3'} grid. Connect at least four dots.</p>
+            <ArchivePatternLock key={`new-pattern-${lockType}`} gridSize={lockType === 'pattern4' ? 4 : 3} onComplete={handleNewPattern} />
           </>}
 
-          {lockType === 'pattern' && step === 2 && <>
+          {lockType !== 'password' && step === 2 && <>
             <button type="button" onClick={() => { setStep(1); setNewPattern(''); setError('') }} className="mb-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3 w-3" /> Draw again</button>
             <p className="mb-3 text-sm text-muted-foreground">Draw the same pattern again to confirm it.</p>
-            <ArchivePatternLock key="confirm-pattern" onComplete={handleConfirmPattern} />
+            <ArchivePatternLock key={`confirm-pattern-${lockType}`} gridSize={lockType === 'pattern4' ? 4 : 3} onComplete={handleConfirmPattern} />
           </>}
 
           {step === 3 && <>
-            <div className="mb-4 flex items-center gap-3 rounded-2xl bg-emerald-500/10 p-3 text-emerald-500"><ShieldCheck className="h-5 w-5 shrink-0" /><p className="text-sm font-medium">{lockType === 'pattern' ? 'Pattern confirmed successfully.' : 'Password confirmed successfully.'}</p></div>
+            <div className="mb-4 flex items-center gap-3 rounded-2xl bg-emerald-500/10 p-3 text-emerald-500"><ShieldCheck className="h-5 w-5 shrink-0" /><p className="text-sm font-medium">{lockType !== 'password' ? 'Pattern confirmed successfully.' : 'Password confirmed successfully.'}</p></div>
             <p className="mb-3 text-sm text-muted-foreground">Add an optional hint to help you remember your lock.</p>
             <input autoFocus type="text" value={hint} onChange={event => setHint(event.target.value)} placeholder="Lock hint (optional)" maxLength={80} className="w-full rounded-xl border border-border bg-muted/60 px-4 py-3 text-sm outline-none focus:border-pink-500" />
             <button type="button" onClick={finish} disabled={setPassword.isPending} className="mt-4 w-full rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 text-sm font-semibold text-white shadow-lg shadow-pink-500/15 disabled:opacity-60">{setPassword.isPending ? 'Saving your lock…' : 'Save Archive lock'}</button>
@@ -135,7 +135,7 @@ export function ArchivePasswordWizard({ onClose, onDone }: ArchivePasswordWizard
           <div role="dialog" aria-modal="true" aria-labelledby="lock-picker-title" className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between"><h3 id="lock-picker-title" className="font-semibold">Use a different lock</h3><button type="button" onClick={() => setShowLockPicker(false)} aria-label="Close lock type picker" className="rounded-full p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button></div>
             <div className="space-y-2">
-              <button type="button" onClick={() => chooseLock('pattern')} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${lockType === 'pattern' ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'}`}><Grid3X3 className="h-5 w-5 text-primary" /><span className="flex-1"><span className="block text-sm font-semibold">Pattern Lock (3 × 3)</span><span className="block text-xs text-muted-foreground">Connect dots to create a private pattern</span></span></button>
+              {(['pattern', 'pattern4'] as const).map(type => <button key={type} type="button" onClick={() => chooseLock(type)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${lockType === type ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'}`}><Grid3X3 className="h-5 w-5 text-primary" /><span className="flex-1"><span className="block text-sm font-semibold">Pattern Lock ({type === 'pattern4' ? '4 × 4' : '3 × 3'})</span><span className="block text-xs text-muted-foreground">Connect dots to create a private pattern</span></span></button>)}
             </div>
             <button type="button" onClick={() => setShowLockPicker(false)} className="mt-4 w-full rounded-xl bg-muted py-2.5 text-sm font-semibold hover:bg-accent">Cancel</button>
           </div>
