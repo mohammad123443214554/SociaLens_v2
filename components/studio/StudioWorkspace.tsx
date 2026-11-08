@@ -1,155 +1,136 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import {
-  ArrowLeft, Check, ChevronDown, ImagePlus, Layers3, LayoutTemplate,
-  MousePointer2, Palette, Redo2, Save, Sparkles, Sticker, Type,
-  Undo2, WandSparkles, X, ZoomIn, ZoomOut
-} from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Clapperboard, FolderOpen, Image as ImageIcon, Layers3, Plus, Sparkles, Video } from 'lucide-react'
 
-type CanvasKind = 'story' | 'post' | 'reel'
-type StudioTool = 'select' | 'media' | 'text' | 'stickers' | 'background' | 'effects'
+type Mode = 'photo' | 'video'
+type Step = 'home' | 'setup' | 'templates'
+type Flow = { step: Step; mode: Mode | null; name: string; created: boolean }
+const initialFlow: Flow = { step: 'home', mode: null, name: '', created: false }
 
-const canvasPresets: Record<CanvasKind, { label: string; width: number; height: number; description: string }> = {
-  story: { label: 'Story', width: 1080, height: 1920, description: 'Vertical 9:16 canvas' },
-  post: { label: 'Post', width: 1080, height: 1080, description: 'Square 1:1 canvas' },
-  reel: { label: 'Reel', width: 1080, height: 1920, description: 'Vertical 9:16 canvas' },
+function readFlow(): Flow {
+  if (typeof window === 'undefined') return initialFlow
+  const p = new URLSearchParams(window.location.search)
+  const mode = p.get('mode') === 'photo' || p.get('mode') === 'video' ? p.get('mode') as Mode : null
+  const requested = p.get('step')
+  if (!mode || (requested !== 'setup' && requested !== 'templates')) return initialFlow
+  const created = p.get('created') === '1'
+  return { step: requested === 'templates' && created ? 'templates' : 'setup', mode, name: p.get('name') || '', created }
 }
 
-const tools: { id: StudioTool; label: string; icon: typeof MousePointer2; description: string }[] = [
-  { id: 'select', label: 'Select', icon: MousePointer2, description: 'Select and arrange objects on your canvas.' },
-  { id: 'media', label: 'Media', icon: ImagePlus, description: 'Add a photo or video to your project.' },
-  { id: 'text', label: 'Text', icon: Type, description: 'Add titles, captions and text elements.' },
-  { id: 'stickers', label: 'Stickers', icon: Sticker, description: 'Explore stickers and expressive elements.' },
-  { id: 'background', label: 'Background', icon: Palette, description: 'Choose a background for your canvas.' },
-  { id: 'effects', label: 'Effects', icon: WandSparkles, description: 'Explore creative looks and visual effects.' },
-]
+function pushFlow(flow: Flow, replace = false) {
+  const p = new URLSearchParams()
+  if (flow.step !== 'home') p.set('step', flow.step)
+  if (flow.mode) p.set('mode', flow.mode)
+  if (flow.name.trim()) p.set('name', flow.name.trim())
+  if (flow.created) p.set('created', '1')
+  const query = p.toString()
+  const url = query ? '/studio?' + query : '/studio'
+  if (replace) window.history.replaceState({ studio: true }, '', url)
+  else window.history.pushState({ studio: true }, '', url)
+}
+
+const modeCopy = {
+  photo: { title: 'Photo Studio', subtitle: 'Create polished graphics, posts and visual designs.', format: 'Still image project', icon: ImageIcon, accent: 'pink', action: 'Create Photo Project' },
+  video: { title: 'Video Studio', subtitle: 'Create engaging videos, stories and short-form content.', format: 'Video project', icon: Video, accent: 'violet', action: 'Create Video Project' },
+}
 
 export function StudioWorkspace() {
-  const [kind, setKind] = useState<CanvasKind>('story')
-  const [tool, setTool] = useState<StudioTool>('select')
-  const [projectName, setProjectName] = useState('Untitled project')
-  const [zoom, setZoom] = useState(58)
-  const [mediaUrl, setMediaUrl] = useState<string | null>(null)
-  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null)
-  const [mediaName, setMediaName] = useState('')
-  const [showPresets, setShowPresets] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [flow, setFlow] = useState<Flow>(initialFlow)
+  const [ready, setReady] = useState(false)
 
-  useEffect(() => () => {
-    if (mediaUrl?.startsWith('blob:')) URL.revokeObjectURL(mediaUrl)
-  }, [mediaUrl])
+  useEffect(() => {
+    const sync = () => setFlow(readFlow())
+    sync()
+    setReady(true)
+    window.addEventListener('popstate', sync)
+    return () => window.removeEventListener('popstate', sync)
+  }, [])
 
-  const selectMedia = (file?: File) => {
-    if (!file) return
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) return
-    const nextUrl = URL.createObjectURL(file)
-    setMediaUrl(previous => {
-      if (previous?.startsWith('blob:')) URL.revokeObjectURL(previous)
-      return nextUrl
-    })
-    setMediaType(file.type.startsWith('video/') ? 'video' : 'image')
-    setMediaName(file.name)
-    setTool('select')
+  const navigate = useCallback((next: Flow, replace = false) => {
+    pushFlow(next, replace)
+    setFlow(next)
+  }, [])
+
+  const back = () => {
+    if (flow.step === 'templates' && flow.mode) navigate({ ...flow, step: 'setup', created: false })
+    else navigate(initialFlow)
   }
 
-  const preset = canvasPresets[kind]
-  const activeTool = tools.find(item => item.id === tool) ?? tools[0]
+  const createProject = () => {
+    if (!flow.mode || !flow.name.trim()) return
+    navigate({ ...flow, step: 'templates', name: flow.name.trim(), created: true })
+  }
+
+  if (!ready) return <main className="fixed inset-0 z-[60] grid place-items-center bg-[#080a13] text-sm text-slate-400">Opening SociaLens Studio…</main>
+
+  const details = flow.mode ? modeCopy[flow.mode] : null
+  const ModeIcon = details?.icon
 
   return (
     <main className="fixed inset-0 z-[60] flex min-h-dvh flex-col overflow-hidden bg-[#080a13] text-white">
-      <header className="z-20 flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-[#0d1020] px-3 sm:px-5">
+      <header className="z-20 flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-[#0d1020] px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href="/create/options" aria-label="Back to create options" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+          <button type="button" onClick={back} aria-label="Go back" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"><ArrowLeft className="h-4 w-4" /></button>
           <img src="/images/socialens-studio-logo.png" alt="SociaLens Studio" className="h-9 w-9 shrink-0 object-contain" />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold tracking-tight">SociaLens Studio</p>
-            <input aria-label="Project name" value={projectName} onChange={event => setProjectName(event.target.value)} maxLength={80} className="block w-full max-w-44 border-0 bg-transparent p-0 text-[11px] text-slate-400 outline-none placeholder:text-slate-500 focus:text-white" />
-          </div>
+          <div className="min-w-0"><p className="truncate text-sm font-bold tracking-tight">SociaLens Studio</p><p className="truncate text-[11px] text-slate-500">Create. Edit. Express.</p></div>
         </div>
-
-        <div className="hidden items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1 md:flex">
-          {(['story', 'post', 'reel'] as CanvasKind[]).map(value => (
-            <button key={value} type="button" onClick={() => setKind(value)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition ${kind === value ? 'bg-pink-500/15 text-pink-300' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>{value}</button>
-          ))}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1.5">
-          <button type="button" disabled title="Undo will be available with editing tools" className="hidden h-9 w-9 items-center justify-center rounded-lg text-slate-600 sm:flex"><Undo2 className="h-4 w-4" /></button>
-          <button type="button" disabled title="Redo will be available with editing tools" className="hidden h-9 w-9 items-center justify-center rounded-lg text-slate-600 sm:flex"><Redo2 className="h-4 w-4" /></button>
-          <span className="mx-1 hidden h-6 w-px bg-white/10 sm:block" />
-          <button type="button" disabled title="Project saving will be enabled in a later Studio part" className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-3 text-xs font-bold text-white opacity-60 sm:px-4"><Save className="h-4 w-4" /><span className="hidden sm:inline">Save project</span></button>
-        </div>
+        <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-slate-400 sm:flex"><Sparkles className="h-3.5 w-3.5 text-pink-400" />{flow.step === 'home' ? 'Choose creation type' : flow.step === 'setup' ? 'New project' : 'Project starting point'}</div>
+        <Link href="/create/options" className="rounded-lg px-3 py-2 text-xs font-medium text-slate-400 transition hover:bg-white/5 hover:text-white">Exit Studio</Link>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <aside className="z-10 flex shrink-0 flex-row overflow-x-auto border-b border-white/10 bg-[#0d1020] p-2 md:w-[76px] md:flex-col md:items-center md:gap-2 md:overflow-visible md:border-b-0 md:border-r md:p-3">
-          {tools.map(({ id, label, icon: Icon }) => (
-            <button key={id} type="button" onClick={() => { setTool(id); if (id === 'media') fileRef.current?.click() }} aria-pressed={tool === id} className={`flex min-w-[62px] flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium transition md:w-full md:py-3 ${tool === id ? 'bg-pink-500/15 text-pink-300 ring-1 ring-pink-500/25' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
-              <Icon className="h-5 w-5" /><span>{label}</span>
-            </button>
-          ))}
-          <div className="hidden flex-1 md:block" />
-          <button type="button" onClick={() => setShowPresets(value => !value)} className="ml-auto flex min-w-[62px] flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] text-slate-400 hover:bg-white/5 md:ml-0 md:w-full md:py-3"><LayoutTemplate className="h-5 w-5" /><span>Canvas</span></button>
-        </aside>
-
-        <section className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-[radial-gradient(ellipse_at_center,_rgba(74,58,120,0.16),_transparent_62%),#090c17]">
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/5 px-3 py-2.5 sm:px-5">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="text-xs font-semibold text-slate-200">{preset.label} canvas</span>
-              <span className="hidden text-[11px] text-slate-500 sm:inline">{preset.width} × {preset.height} px</span>
-              <button type="button" onClick={() => setShowPresets(value => !value)} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[11px] text-slate-400 hover:bg-white/5 md:hidden">{kind}<ChevronDown className="h-3 w-3" /></button>
+      <section className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[radial-gradient(ellipse_at_50%_0%,rgba(91,58,160,0.18),transparent_48%),#090c17]">
+        {flow.step === 'home' && (
+          <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-5 py-12 sm:px-8">
+            <div className="mb-10 text-center">
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]"><Layers3 className="h-7 w-7 text-pink-300" /></div>
+              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.24em] text-pink-300">SociaLens Studio</p>
+              <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">What would you like to create?</h1>
+              <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-400">Choose a creation type to start a new project and enter its dedicated workflow.</p>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <button type="button" onClick={() => setZoom(value => Math.max(25, value - 5))} aria-label="Zoom out" className="rounded-lg p-1.5 hover:bg-white/10"><ZoomOut className="h-4 w-4" /></button>
-              <span className="w-9 text-center tabular-nums">{zoom}%</span>
-              <button type="button" onClick={() => setZoom(value => Math.min(100, value + 5))} aria-label="Zoom in" className="rounded-lg p-1.5 hover:bg-white/10"><ZoomIn className="h-4 w-4" /></button>
+            <div className="grid gap-5 md:grid-cols-2">
+              <button type="button" onClick={() => navigate({ step: 'setup', mode: 'photo', name: 'Untitled photo project', created: false })} className="group relative min-h-[230px] overflow-hidden rounded-2xl border border-pink-400/20 bg-gradient-to-br from-pink-500/15 via-[#171326] to-[#101426] p-6 text-left transition duration-200 hover:-translate-y-1 hover:border-pink-400/50 hover:shadow-[0_20px_70px_rgba(219,39,119,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400">
+                <div className="absolute -right-10 -top-12 h-48 w-48 rounded-full bg-pink-500/10 blur-3xl transition group-hover:bg-pink-500/20" />
+                <div className="relative flex h-full flex-col"><div className="mb-7 flex h-14 w-14 items-center justify-center rounded-2xl border border-pink-300/20 bg-pink-400/10"><ImageIcon className="h-7 w-7 text-pink-300" /></div><div className="mt-auto flex items-end justify-between gap-3"><div><h2 className="text-xl font-bold">Photo</h2><p className="mt-2 max-w-xs text-xs leading-5 text-slate-400">Design posts, stories, announcements and graphics.</p></div><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-500/15 text-pink-200 transition group-hover:translate-x-1"><ArrowRight className="h-5 w-5" /></span></div></div>
+              </button>
+              <button type="button" onClick={() => navigate({ step: 'setup', mode: 'video', name: 'Untitled video project', created: false })} className="group relative min-h-[230px] overflow-hidden rounded-2xl border border-violet-400/20 bg-gradient-to-br from-violet-500/15 via-[#15152a] to-[#101426] p-6 text-left transition duration-200 hover:-translate-y-1 hover:border-violet-400/50 hover:shadow-[0_20px_70px_rgba(124,58,237,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400">
+                <div className="absolute -right-10 -top-12 h-48 w-48 rounded-full bg-violet-500/10 blur-3xl transition group-hover:bg-violet-500/20" />
+                <div className="relative flex h-full flex-col"><div className="mb-7 flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-300/20 bg-violet-400/10"><Clapperboard className="h-7 w-7 text-violet-300" /></div><div className="mt-auto flex items-end justify-between gap-3"><div><h2 className="text-xl font-bold">Video</h2><p className="mt-2 max-w-xs text-xs leading-5 text-slate-400">Prepare reels, stories, shorts and creative videos.</p></div><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-violet-200 transition group-hover:translate-x-1"><ArrowRight className="h-5 w-5" /></span></div></div>
+              </button>
             </div>
+            <p className="mt-8 text-center text-[11px] text-slate-600">Photo and Video use one unified SociaLens Studio.</p>
           </div>
+        )}
 
-          {showPresets && <div className="absolute left-3 top-14 z-30 w-52 rounded-xl border border-white/10 bg-[#111629] p-2 shadow-2xl md:left-4">
-            <p className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">Canvas format</p>
-            {(['story', 'post', 'reel'] as CanvasKind[]).map(value => <button key={value} type="button" onClick={() => { setKind(value); setShowPresets(false) }} className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-xs capitalize hover:bg-white/5"><span>{value}</span>{kind === value && <Check className="h-4 w-4 text-pink-400" />}</button>)}
-          </div>}
-
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4 sm:p-7">
-            <div style={{ width: `min(calc(100vw - 40px), calc((100dvh - 210px) * ${preset.width / preset.height}), ${zoom * 7}px)`, aspectRatio: `${preset.width} / ${preset.height}` }} className="relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-[3px] border border-white/20 bg-[#111827] shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
-              {mediaUrl && mediaType === 'image' && <img src={mediaUrl} alt={mediaName || 'Selected canvas media'} className="absolute inset-0 h-full w-full object-contain" />}
-              {mediaUrl && mediaType === 'video' && <video src={mediaUrl} controls playsInline className="absolute inset-0 h-full w-full object-contain" />}
-              {!mediaUrl && <div className="flex max-w-[80%] flex-col items-center text-center">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]"><ImagePlus className="h-6 w-6 text-slate-400" /></div>
-                <h2 className="text-sm font-semibold text-slate-200 sm:text-base">Your {kind} starts here</h2>
-                <p className="mt-2 text-xs leading-5 text-slate-500">Choose a photo or video to place it on your canvas. Editing controls will be added in the next Studio part.</p>
-                <button type="button" onClick={() => fileRef.current?.click()} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-pink-950/30"><ImagePlus className="h-4 w-4" /> Add media</button>
-              </div>}
-              {mediaUrl && <button type="button" onClick={() => { if (mediaUrl.startsWith('blob:')) URL.revokeObjectURL(mediaUrl); setMediaUrl(null); setMediaType(null); setMediaName('') }} aria-label="Remove selected media" className="absolute right-2 top-2 z-10 rounded-lg bg-black/65 p-2 text-white hover:bg-black"><X className="h-4 w-4" /></button>}
+        {flow.step === 'setup' && details && ModeIcon && (
+          <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-5 py-10 sm:px-8">
+            <button type="button" onClick={back} className="mb-7 inline-flex w-fit items-center gap-2 text-xs font-medium text-slate-400 transition hover:text-white"><ArrowLeft className="h-4 w-4" /> Back to creation type</button>
+            <div className={'rounded-3xl border border-' + details.accent + '-400/25 bg-gradient-to-br from-' + details.accent + '-500/20 via-[#171326] to-[#101426] p-6 sm:p-8'}>
+              <div className="flex items-center gap-4"><div className={'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-black/20 text-' + details.accent + '-300'}><ModeIcon className="h-7 w-7" /></div><div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">New {flow.mode} project</p><h1 className="mt-1 text-2xl font-bold">{details.title}</h1></div></div>
+              <p className="mt-5 max-w-xl text-sm leading-6 text-slate-300">{details.subtitle}</p>
+              <div className="mt-7 rounded-2xl border border-white/10 bg-[#080a13]/65 p-4 sm:p-5">
+                <label htmlFor="studio-project-name" className="mb-2 block text-xs font-semibold text-slate-300">Project name</label>
+                <input id="studio-project-name" value={flow.name} onChange={event => setFlow(current => ({ ...current, name: event.target.value.slice(0, 80) }))} maxLength={80} autoComplete="off" placeholder="Enter project name" className="h-12 w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-pink-400/50 focus:ring-2 focus:ring-pink-400/10" />
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500"><span>{details.format}</span><span>{flow.name.length}/80</span></div>
+              </div>
+              <button type="button" disabled={!flow.name.trim()} onClick={createProject} className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-5 text-sm font-bold text-white shadow-lg shadow-violet-950/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">{details.action}<ArrowRight className="h-4 w-4" /></button>
             </div>
           </div>
+        )}
 
-          <div className="flex shrink-0 items-center justify-between border-t border-white/5 px-3 py-2 text-[10px] text-slate-500 sm:px-5">
-            <span className="truncate">{mediaName || 'No media selected'}</span>
-            <span>{preset.description}</span>
+        {flow.step === 'templates' && details && ModeIcon && (
+          <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-5 py-8 sm:px-8">
+            <div className="mb-7 flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><button type="button" onClick={back} aria-label="Back to project setup" className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 text-slate-300 hover:bg-white/5"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Project created</p><h1 className="mt-1 text-xl font-bold">{flow.name}</h1></div></div><span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-300"><ModeIcon className="h-4 w-4" />{flow.mode === 'photo' ? 'Photo project' : 'Video project'}</span></div>
+            <div className="mb-7"><h2 className="text-2xl font-bold tracking-tight">{flow.mode === 'photo' ? 'Start your photo design' : 'Start your video project'}</h2><p className="mt-2 text-sm text-slate-400">{flow.mode === 'photo' ? 'Your photo project is ready. Choose a starting point for your design.' : 'Your video project is ready. Choose a starting point for your edit.'}</p></div>
+            <div className="grid flex-1 content-start gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-[#101426] p-5 sm:p-6"><div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]"><Layers3 className="h-6 w-6 text-pink-300" /></div><h3 className="text-base font-bold">Templates</h3><p className="mt-2 text-xs leading-5 text-slate-400">Explore ready-made {flow.mode} layouts and choose one as the starting point for your project.</p><div className="mt-5 flex items-center gap-2 rounded-xl border border-dashed border-white/10 bg-black/20 px-3 py-3 text-[11px] text-slate-500"><Sparkles className="h-4 w-4 shrink-0 text-pink-400" />Template library is part of the next Studio stage.</div></div>
+              <div className="rounded-2xl border border-white/10 bg-[#101426] p-5 sm:p-6"><div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]"><Plus className="h-6 w-6 text-cyan-300" /></div><h3 className="text-base font-bold">Blank project</h3><p className="mt-2 text-xs leading-5 text-slate-400">Start with an empty {flow.mode} workspace and build your own composition.</p><div className="mt-5 flex items-center gap-2 rounded-xl border border-dashed border-white/10 bg-black/20 px-3 py-3 text-[11px] text-slate-500"><FolderOpen className="h-4 w-4 shrink-0 text-cyan-300" />The editing workspace is connected in its dedicated development stage.</div></div>
+            </div>
+            <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5"><button type="button" onClick={back} className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 px-4 text-xs font-semibold text-slate-300 hover:bg-white/5"><ArrowLeft className="h-4 w-4" /> Project settings</button><div className="inline-flex items-center gap-2 text-[11px] text-slate-500"><Check className="h-4 w-4 text-emerald-400" /> Project setup complete</div></div>
           </div>
-        </section>
-
-        <aside className="hidden w-[270px] shrink-0 flex-col border-l border-white/10 bg-[#0d1020] lg:flex">
-          <div className="border-b border-white/10 px-4 py-4">
-            <p className="text-sm font-bold">{activeTool.label}</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">{activeTool.description}</p>
-          </div>
-          <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]"><Layers3 className="h-5 w-5 text-slate-500" /></div>
-            <p className="text-xs font-semibold text-slate-300">Workspace panel</p>
-            <p className="mt-2 text-[11px] leading-5 text-slate-500">This panel is ready for {activeTool.label.toLowerCase()} controls. The full editing tools arrive in the next Studio part.</p>
-          </div>
-          <div className="border-t border-white/10 p-4"><div className="flex items-center gap-2 text-[10px] text-slate-500"><Sparkles className="h-3.5 w-3.5 text-pink-400" /> One unified creative workspace</div></div>
-        </aside>
-      </div>
-
-      <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={event => { selectMedia(event.target.files?.[0]); event.target.value = '' }} />
+        )}
+      </section>
     </main>
   )
 }
