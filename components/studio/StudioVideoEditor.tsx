@@ -74,6 +74,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [playhead, setPlayhead] = useState(0)
   const [aspect, setAspect] = useState<'9:16' | '16:9' | '1:1'>('9:16')
   const [titleText, setTitleText] = useState('')
+  const [subtitleText, setSubtitleText] = useState('')
+  const [ctaText, setCtaText] = useState('')
   const [showTitle, setShowTitle] = useState(false)
   const [exportWidth, setExportWidth] = useState(1080)
   const [exportHeight, setExportHeight] = useState(1920)
