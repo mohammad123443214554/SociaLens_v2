@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import { ArrowLeft, Check, ChevronDown, Expand, ImagePlus, RotateCcw, RotateCw, Upload, X, ZoomIn, ZoomOut, Type, Square, Circle, Trash2, Eye, EyeOff, ArrowUp, ArrowDown, Undo2, Redo2 } from 'lucide-react'
 
@@ -240,17 +239,16 @@ export function StudioPhotoEditor({ projectName, templateId, projectId }: { proj
     } finally { setExporting(false) }
   }
 
-  const backUrl = '/studio?step=templates&mode=photo&created=1&name=' + encodeURIComponent(projectName) + '&projectId=' + encodeURIComponent(projectId) + (templateId ? '&template=' + encodeURIComponent(templateId) : '')
 
   return (
     <main className="fixed inset-0 z-[70] flex min-h-0 flex-col overflow-hidden bg-[#080a13] pt-[env(safe-area-inset-top)] text-white">
       <header className="z-20 flex min-h-16 shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-[#0d1020] px-2 sm:gap-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href={backUrl} aria-label="Back to templates" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-slate-300 hover:bg-white/10"><ArrowLeft className="h-4 w-4" /></Link>
+          <button type="button" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.assign("/studio") }} aria-label="Go back one step" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-white/[0.06]"><ArrowLeft className="h-4 w-4" /></button>
           <div className="min-w-0"><p className="truncate text-sm font-bold">Photo Editor</p><p className="max-w-[38vw] truncate text-[11px] text-slate-500">{projectName || 'Untitled photo project'}</p></div>
         </div>
         <div className="flex items-center gap-2"><span className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] text-slate-400 sm:flex"><Check className="h-3.5 w-3.5 text-emerald-400" /> {saveStatus}</span><button type="button" disabled={exporting} onClick={() => void exportImage('image/png')} className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-2.5 text-[10px] font-bold text-white disabled:opacity-50">{exporting ? 'Exporting…' : <><span className="sm:hidden">PNG</span><span className="hidden sm:inline">Export PNG</span></>}</button><button type="button" disabled={exporting} onClick={() => void exportImage('image/jpeg')} className="hidden h-9 items-center rounded-xl border border-white/10 px-3 text-[10px] font-semibold text-slate-200 hover:bg-white/5 sm:inline-flex">JPG</button></div>
-        <Link href="/studio" className="hidden rounded-lg px-3 py-2 text-xs font-medium text-slate-400 hover:bg-white/5 hover:text-white sm:inline-flex">Exit</Link>
+
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
