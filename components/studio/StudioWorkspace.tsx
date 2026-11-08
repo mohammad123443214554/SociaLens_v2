@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Check, Clapperboard, FolderOpen, Image as ImageIcon, Layers3, Plus, Search, Sparkles, Video, X, SlidersHorizontal } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Clapperboard, FolderOpen, Image as ImageIcon, Layers3, Plus, Search, Sparkles, Video, X, SlidersHorizontal, Trash2, Clock3 } from 'lucide-react'
+import { deleteStudioProject, listStudioProjects } from '@/lib/studio/persistence'
 
 type Mode = 'photo' | 'video'
 type Step = 'home' | 'setup' | 'templates'
@@ -109,11 +110,15 @@ function TemplateLibrary({ mode, selectedId, onChoose }: { mode: Mode; selectedI
 export function StudioWorkspace() {
   const [flow, setFlow] = useState<Flow>(initialFlow)
   const [ready, setReady] = useState(false)
+  const [drafts, setDrafts] = useState<Array<{ id: string; project_type: Mode; name: string; template_id: string | null; updated_at: string }>>([])
+  const [draftsLoading, setDraftsLoading] = useState(true)
+  const [draftsError, setDraftsError] = useState('')
 
   useEffect(() => {
     const sync = () => setFlow(readFlow())
     sync()
     setReady(true)
+    void listStudioProjects().then(items => setDrafts(items as typeof drafts)).catch(() => setDraftsError('Sign in to view your saved Studio drafts.')).finally(() => setDraftsLoading(false))
     window.addEventListener('popstate', sync)
     return () => window.removeEventListener('popstate', sync)
   }, [])
@@ -134,6 +139,13 @@ export function StudioWorkspace() {
   }
 
   const chooseTemplate = (id: string) => navigate({ ...flow, selectedTemplate: id || null })
+  const removeDraft = async (id: string) => {
+    if (!window.confirm('Delete this Studio project and its uploaded media? This cannot be undone.')) return
+    try {
+      await deleteStudioProject(id)
+      setDrafts(items => items.filter(item => item.id !== id))
+    } catch (cause) { setDraftsError(cause instanceof Error ? cause.message : 'Could not delete this draft.') }
+  }
 
   if (!ready) return <main className="fixed inset-0 z-[60] grid place-items-center bg-[#080a13] text-sm text-slate-400">Opening SociaLens Studio…</main>
 
@@ -172,6 +184,17 @@ export function StudioWorkspace() {
                 <div className="relative flex h-full flex-col"><div className="mb-7 flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-300/20 bg-violet-400/10"><Clapperboard className="h-7 w-7 text-violet-300" /></div><div className="mt-auto flex items-end justify-between gap-3"><div><h2 className="text-xl font-bold">Video</h2><p className="mt-2 max-w-xs text-xs leading-5 text-slate-400">Prepare reels, stories, shorts and creative videos.</p></div><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-violet-200 transition group-hover:translate-x-1"><ArrowRight className="h-5 w-5" /></span></div></div>
               </button>
             </div>
+            <section className="mt-10 rounded-2xl border border-white/10 bg-[#101426]/90 p-4 sm:p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-bold text-white">Your saved projects</h2><p className="mt-1 text-[11px] text-slate-500">Autosaved drafts are available when you return or refresh.</p></div><span className="rounded-full border border-white/10 px-3 py-1 text-[10px] text-slate-400">{drafts.length} drafts</span></div>
+              {draftsLoading ? <p className="py-5 text-center text-xs text-slate-500">Loading your drafts…</p> : drafts.length ? <div className="grid gap-2 sm:grid-cols-2">
+                {drafts.map(draft => <div key={draft.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-white/10 bg-black/15 p-3">
+                  <div className={'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ' + (draft.project_type === 'photo' ? 'bg-pink-500/10 text-pink-300' : 'bg-violet-500/10 text-violet-300')}>{draft.project_type === 'photo' ? <ImageIcon className="h-5 w-5" /> : <Video className="h-5 w-5" />}</div>
+                  <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-white">{draft.name}</p><p className="mt-1 flex items-center gap-1 text-[10px] text-slate-500"><Clock3 className="h-3 w-3" />{new Date(draft.updated_at).toLocaleString()}</p></div>
+                  <Link href={'/studio/' + (draft.project_type === 'photo' ? 'photo-editor' : 'video-editor') + '?projectId=' + encodeURIComponent(draft.id) + '&name=' + encodeURIComponent(draft.name) + (draft.template_id ? '&template=' + encodeURIComponent(draft.template_id) : '')} className="rounded-lg bg-white/[0.08] px-3 py-2 text-[10px] font-bold text-white hover:bg-white/[0.14]">Open</Link>
+                  <button type="button" onClick={() => void removeDraft(draft.id)} aria-label={'Delete ' + draft.name} className="rounded-lg p-2 text-slate-500 hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-4 w-4" /></button>
+                </div>)}
+              </div> : <p className="py-5 text-center text-xs text-slate-500">{draftsError || 'Your saved Studio projects will appear here.'}</p>}
+            </section>
             <p className="mt-8 text-center text-[11px] text-slate-600">Photo and Video use one unified SociaLens Studio.</p>
           </div>
         )}
