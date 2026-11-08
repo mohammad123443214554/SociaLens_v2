@@ -129,8 +129,8 @@ export function StudioWorkspace() {
   }, [])
 
   const back = () => {
-    if (flow.step === 'templates' && flow.mode) navigate({ ...flow, step: 'setup', created: false, selectedTemplate: null, projectId: null })
-    else navigate(initialFlow)
+    if (window.history.length > 1) window.history.back()
+    else navigate(initialFlow, true)
   }
 
   const createProject = () => {
@@ -157,12 +157,12 @@ export function StudioWorkspace() {
     <main className="fixed inset-0 z-[60] flex min-h-dvh flex-col overflow-hidden bg-[#080a13] text-white">
       <header className="z-20 flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-[#0d1020] px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <button type="button" onClick={back} aria-label="Go back" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"><ArrowLeft className="h-4 w-4" /></button>
+          <button type="button" onClick={back} aria-label="Go back" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-300 transition hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"><ArrowLeft className="h-4 w-4" /></button>
           <img src="/images/socialens-studio-logo.png" alt="SociaLens Studio" className="h-9 w-9 shrink-0 object-contain" />
           <div className="min-w-0"><p className="truncate text-sm font-bold tracking-tight">SociaLens Studio</p><p className="truncate text-[11px] text-slate-500">Create. Edit. Express.</p></div>
         </div>
         <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-slate-400 sm:flex"><Sparkles className="h-3.5 w-3.5 text-pink-400" />{flow.step === 'home' ? 'Choose creation type' : flow.step === 'setup' ? 'New project' : 'Project starting point'}</div>
-        <Link href="/create/options" className="rounded-lg px-3 py-2 text-xs font-medium text-slate-400 transition hover:bg-white/5 hover:text-white">Exit Studio</Link>
+        <span className="w-2 sm:w-4" aria-hidden="true" />
       </header>
 
       <section className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[radial-gradient(ellipse_at_50%_0%,rgba(91,58,160,0.18),transparent_48%),#090c17]">
