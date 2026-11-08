@@ -56,7 +56,7 @@ export function StickerPicker({ onSelect, onClose, style }: StickerPickerProps) 
   const requestRef = useRef(0)
   const apiKey = process.env.NEXT_PUBLIC_GIPHY_API_KEY
 
-  const isEmojiCategory = activeCategory === 'Emojis' || activeCategory === 'Popular' || activeCategory === 'All' || EMOJI_CATEGORIES.includes(activeCategory)
+  const isEmojiCategory = activeCategory === 'Emojis' || activeCategory === 'Stickers' || activeCategory === 'Popular' || activeCategory === 'All' || EMOJI_CATEGORIES.includes(activeCategory)
 
   const filteredEmojis = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
