@@ -595,7 +595,14 @@ export function ChatMessage({ message, isOwn, currentUserId, otherUsername, curr
           </div>
         ) : (message as any).sticker ? (
           <div className="flex flex-col" style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
-            <div className="text-6xl leading-none px-1">{(message as any).sticker}</div>
+            {(message as any).sticker.startsWith('gif:') ? (
+              <div className="max-w-[240px] overflow-hidden rounded-2xl">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={(message as any).sticker.slice(4)} alt="GIF sticker" loading="lazy" className="block max-h-[240px] max-w-full object-contain" />
+              </div>
+            ) : (
+              <div className="text-6xl leading-none px-1">{(message as any).sticker}</div>
+            )}
             <p className={cn('text-[10px] mt-1 flex items-center gap-1.5', isOwn ? 'text-muted-foreground' : 'text-muted-foreground')}>
               {formatTimeAgo(message.created_at)}
               {isOwn && <MessageReadReceipt isRead={message.is_read} avatarUrl={otherAvatarUrl} />}
