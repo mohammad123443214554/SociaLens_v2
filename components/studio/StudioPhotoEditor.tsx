@@ -38,6 +38,10 @@ export function StudioPhotoEditor({ projectName, templateId, projectId }: { proj
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageName, setImageName] = useState('')
   const [imagePath, setImagePath] = useState<string | null>(null)
+  const [layers, setLayers] = useState<Layer[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [history, setHistory] = useState<Layer[][]>([])
+  const [redoStack, setRedoStack] = useState<Layer[][]>([])
   const [saveStatus, setSaveStatus] = useState('Loading project…')
   const [hydrated, setHydrated] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -131,10 +135,7 @@ export function StudioPhotoEditor({ projectName, templateId, projectId }: { proj
     setRotation(0)
   }
 
-  const [layers, setLayers] = useState<Layer[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [history, setHistory] = useState<Layer[][]>([])
-  const [redoStack, setRedoStack] = useState<Layer[][]>([])
+
   const selected = layers.find(item => item.id === selectedId) || null
   const commitLayers = (next: Layer[]) => { setHistory(items => [...items.slice(-39), layers]); setRedoStack([]); setLayers(next) }
   const addLayer = (kind: Layer['kind']) => { const item: Layer = { id: 'layer-' + Date.now(), kind, text: kind === 'text' ? 'Your text' : '', color: '#ffffff', x: 50, y: 50, size: kind === 'text' ? 32 : 24, visible: true, locked: false }; commitLayers([...layers, item]); setSelectedId(item.id) }
