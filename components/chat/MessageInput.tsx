@@ -1,10 +1,11 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { Send, X, Smile, Mic, Square, Image as ImageIcon, Sticker as StickerIcon, Trash2, Loader2 } from 'lucide-react'
 import { Message } from '@/lib/types/database.types'
 import { createClient } from '@/lib/supabase/client'
-import { FullEmojiPicker } from './FullEmojiPicker'
+const FullEmojiPicker = dynamic(() => import('./FullEmojiPicker').then(module => module.FullEmojiPicker), { ssr: false })
 import { StickerPicker } from './StickerPicker'
 import { getClampedPopupPosition } from '@/lib/utils/popupPosition'
 import { LimitAlertDialog } from '@/components/shared/LimitAlertDialog'
@@ -112,6 +113,11 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
   }
   useLayoutEffect(() => { resizeTextarea() }, [message])
 
+  // Warm the emoji picker chunk after the chat composer mounts so opening it is immediate.
+  useEffect(() => {
+    void import('./FullEmojiPicker')
+  }, [])
+
   const openEmoji = () => {
     const rect = emojiBtnRef.current?.getBoundingClientRect()
     if (rect) setEmojiPos(getClampedPopupPosition(rect, 360, 440))
@@ -121,7 +127,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
 
   const openStickers = () => {
     const rect = stickerBtnRef.current?.getBoundingClientRect()
-    if (rect) setStickerPos(getClampedPopupPosition(rect, 320, 320))
+    if (rect) setStickerPos(getClampedPopupPosition(rect, 360, 440))
     setShowStickers(v => !v)
     setShowEmoji(false)
   }
@@ -481,7 +487,7 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
       ) : (
         <form onSubmit={handleSubmit} className="px-3 py-2 sm:px-4 sm:py-3"><div className={`flex w-full ${isComposerExpanded ? "items-end rounded-[26px] sm:rounded-[28px]" : "items-center rounded-full"} gap-1 border border-white/15 bg-background/85 px-1.5 py-1 sm:gap-1.5 sm:px-2 sm:py-1.5 shadow-sm focus-within:border-white/30 transition-[border-radius] duration-150`}>
           <div className="relative shrink-0">
-            <button ref={emojiBtnRef} type="button" onClick={openEmoji} className="p-1.5 sm:p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
+            <button ref={emojiBtnRef} type="button" onMouseEnter={() => { void import('./FullEmojiPicker') }} onFocus={() => { void import('./FullEmojiPicker') }} onClick={openEmoji} className="p-1.5 sm:p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
               <Smile className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
           </div>
