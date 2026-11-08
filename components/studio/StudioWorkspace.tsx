@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
-  ArrowLeft, Check, ChevronDown, Crop, ImagePlus, Layers3, LayoutTemplate,
-  MousePointer2, Palette, Play, Redo2, Save, Sparkles, Sticker, Type,
-  Undo2, Video, WandSparkles, X, ZoomIn, ZoomOut
+  ArrowLeft, Check, ChevronDown, ImagePlus, Layers3, LayoutTemplate,
+  MousePointer2, Palette, Redo2, Save, Sparkles, Sticker, Type,
+  Undo2, WandSparkles, X, ZoomIn, ZoomOut
 } from 'lucide-react'
 
 type CanvasKind = 'story' | 'post' | 'reel'
