@@ -1,19 +1,33 @@
 'use client'
 
-// SociaLens doesn't ship illustrated sticker packs (that's a whole art asset
-// library), so "stickers" here are large, borderless mood emoji sent at
-// sticker size - same tap-a-mood UX as a real sticker tray, grouped by
-// feeling rather than the alphabetical emoji-picker layout.
-const STICKER_CATEGORIES: { label: string; stickers: string[] }[] = [
-  { label: 'Happy', stickers: ['😀','😁','😄','😆','🤣','😂','🙂','😊','😇','🥳','🎉','✨'] },
-  { label: 'Love', stickers: ['😍','🥰','😘','💕','💖','💘','❤️','💗','💝','😻','💋','💍'] },
-  { label: 'Funny', stickers: ['🤪','😜','🤭','🙈','🤡','😹','🥴','🫠','🙃','😝','🤓','😎'] },
-  { label: 'Sad', stickers: ['😢','😭','🥺','😞','💔','😔','😿','😥','🙁','😪','😓','😰'] },
-  { label: 'Angry', stickers: ['😡','🤬','😤','👿','💢','😾','🔥','😠','🙄','😑','🤦','🤷'] },
-  { label: 'Love you', stickers: ['🥰','😘','🤗','💞','🫶','👉👈','🙏','💐','🌹','💌','😳','☺️'] },
-  { label: 'Celebrate', stickers: ['🎊','🎂','🥂','🍾','🎁','🏆','🙌','👏','🥳','🎈','⭐','💯'] },
-  { label: 'Chill', stickers: ['😴','🥱','☕','🛌','😌','🧘','🌙','😪','🫡','🤙','😏','🍿'] },
+import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
+
+const STICKERS = [
+  '😀','😁','😄','😆','🤣','😂','🙂','😊','😇','🥳','🎉','✨',
+  '😍','🥰','😘','💕','💖','💘','❤️','💗','💝','😻','💋','💍',
+  '🤪','😜','🤭','🙈','🤡','😹','🥴','🫠','🙃','😝','🤓','😎',
+  '😢','😭','🥺','😞','💔','😔','😿','😥','🙁','😪','😓','😰',
+  '😡','🤬','😤','👿','💢','😾','🔥','😠','🙄','😑','🤦','🤷',
+  '🥰','😘','🤗','💞','🫶','👉👈','🙏','💐','🌹','💌','😳','☺️',
+  '🎊','🎂','🥂','🍾','🎁','🏆','🙌','👏','🥳','🎈','⭐','💯',
+  '😴','🥱','☕','🛌','😌','🧘','🌙','😪','🫡','🤙','😏','🍿',
 ]
+
+const GIF_STICKERS = [
+  { id: 'hello-wave', label: 'Hello wave', url: 'https://media.giphy.com/media/3og0IPxVg8JED6E7Xy/giphy.gif' },
+  { id: 'hello-friends', label: 'Hello friends', url: 'https://media.giphy.com/media/ZdNIT7ETTbvDi/giphy.gif' },
+  { id: 'hello-cute', label: 'Cute hello', url: 'https://media.giphy.com/media/3o6Yf37jDv4I4f4xlS/giphy.gif' },
+  { id: 'hello-cats', label: 'Hello cats', url: 'https://media.giphy.com/media/3o6Yf1TeeTQhXyv66s/giphy.gif' },
+  { id: 'hello-bear', label: 'Hello bear', url: 'https://media.giphy.com/media/3oEjHGSyClrTtTfTtC/giphy.gif' },
+  { id: 'hello-kitty', label: 'Hello kitty', url: 'https://media.giphy.com/media/3o6Yf4I9XEJL4D8G4U/giphy.gif' },
+  { id: 'anime-wave', label: 'Anime wave', url: 'https://media.giphy.com/media/VJh6PuU6Vn4Xe/giphy.gif' },
+  { id: 'anime-blush', label: 'Anime blush', url: 'https://media.giphy.com/media/3o7TKFr3ZhJv2fQxWw/giphy.gif' },
+  { id: 'anime-laugh', label: 'Anime laugh', url: 'https://media.giphy.com/media/VFZ5i6pEe6y5K/giphy.gif' },
+  { id: 'giphy-sample', label: 'Happy reaction', url: 'https://media1.giphy.com/media/cZ7rmKfFYOvYI/200w_d.gif' },
+]
+
+type RecentItem = { kind: 'sticker'; value: string; label: string } | { kind: 'gif'; value: string; label: string }
 
 interface StickerPickerProps {
   onSelect: (sticker: string) => void
@@ -21,36 +35,100 @@ interface StickerPickerProps {
   style?: React.CSSProperties
 }
 
+const RECENT_KEY = 'socialens-chat-recent-stickers-v1'
+
 export function StickerPicker({ onSelect, onClose, style }: StickerPickerProps) {
-  return (
+  const [activeCategory, setActiveCategory] = useState<'Recently' | 'Stickers' | 'GIF Stickers'>('Recently')
+  const [search, setSearch] = useState('')
+  const [recent, setRecent] = useState<RecentItem[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(RECENT_KEY) || '[]')
+      return Array.isArray(saved) ? saved.slice(0, 36) : []
+    } catch { return [] }
+  })
+
+  const results = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase()
+    if (query) {
+      return [
+        ...STICKERS.filter(value => value.includes(query)).map(value => ({ kind: 'sticker' as const, value, label: value })),
+        ...GIF_STICKERS.filter(item => item.label.toLocaleLowerCase().includes(query)).map(item => ({ kind: 'gif' as const, value: item.url, label: item.label })),
+      ]
+    }
+    if (activeCategory === 'Recently') return recent
+    if (activeCategory === 'Stickers') return STICKERS.map(value => ({ kind: 'sticker' as const, value, label: value }))
+    return GIF_STICKERS.map(item => ({ kind: 'gif' as const, value: item.url, label: item.label }))
+  }, [activeCategory, recent, search])
+
+  const choose = (item: RecentItem) => {
+    const next = [item, ...recent.filter(entry => entry.value !== item.value)].slice(0, 36)
+    setRecent(next)
+    try { window.localStorage.setItem(RECENT_KEY, JSON.stringify(next)) } catch { /* storage can be disabled */ }
+    onSelect(item.kind === 'gif' ? `gif:${item.value}` : item.value)
+  }
+
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div
-      className="fixed bg-card border rounded-2xl shadow-2xl w-80 max-h-80 flex flex-col z-50"
-      style={style}
-      onClick={e => e.stopPropagation()}
+      role="dialog"
+      aria-label="Sticker picker"
+      className="fixed z-[100] flex h-[min(440px,calc(100dvh-16px))] w-[min(360px,calc(100vw-16px))] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+      style={{ top: style?.top, left: style?.left }}
+      onMouseDown={event => event.stopPropagation()}
+      onClick={event => event.stopPropagation()}
     >
-      <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
-        <p className="text-xs font-semibold text-muted-foreground">Stickers</p>
-        <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">Close</button>
+      <div className="shrink-0 border-b border-border p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-sm font-semibold text-foreground">Stickers</p>
+          <button type="button" onClick={onClose} className="rounded-full px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">Close</button>
+        </div>
+        <input
+          type="search"
+          value={search}
+          onChange={event => setSearch(event.target.value)}
+          placeholder="Search stickers and GIFs"
+          aria-label="Search stickers and GIFs"
+          className="h-9 w-full rounded-xl border border-border bg-muted/50 px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-pink-500"
+        />
+        <div className="mt-2 flex gap-1.5">
+          {(['Recently', 'Stickers', 'GIF Stickers'] as const).map(category => (
+            <button key={category} type="button" onClick={() => { setActiveCategory(category); setSearch('') }}
+              className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-medium transition-colors ${activeCategory === category && !search ? 'bg-pink-500 text-white' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'}`}>
+              {category}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="overflow-y-auto p-2.5 space-y-3">
-        {STICKER_CATEGORIES.map(cat => (
-          <div key={cat.label}>
-            <p className="text-[10px] font-medium text-muted-foreground px-1 mb-1">{cat.label}</p>
-            <div className="grid grid-cols-6 gap-1">
-              {cat.stickers.map((sticker, i) => (
-                <button
-                  key={cat.label + i}
-                  type="button"
-                  onClick={() => onSelect(sticker)}
-                  className="text-3xl p-1.5 rounded-xl hover:bg-accent hover:scale-110 transition-transform"
-                >
-                  {sticker}
-                </button>
-              ))}
-            </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5">
+        {results.length ? (
+          <div className={activeCategory === 'GIF Stickers' || (search && results.some(item => item.kind === 'gif')) ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-6 gap-1'}>
+            {results.map((item, index) => item.kind === 'gif' ? (
+              <button key={item.value} type="button" title={item.label} aria-label={item.label} onClick={() => choose(item)}
+                className="overflow-hidden rounded-xl border border-border bg-muted/40 hover:border-pink-400">
+                {/* GIFs are loaded directly from GIPHY's public media URLs. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.value} alt={item.label} loading="lazy" className="h-[92px] w-full object-cover" />
+                <span className="block truncate px-1.5 py-1 text-[10px] text-muted-foreground">{item.label}</span>
+              </button>
+            ) : (
+              <button key={item.value + index} type="button" title={item.label} aria-label={item.label} onClick={() => choose(item)}
+                className="flex aspect-square items-center justify-center rounded-lg text-[29px] leading-none transition-colors hover:bg-accent active:scale-95">
+                {item.value}
+              </button>
+            ))}
           </div>
-        ))}
+        ) : (
+          <p className="py-12 text-center text-sm text-muted-foreground">{activeCategory === 'Recently' && !search ? 'Your recently used stickers and GIFs will appear here.' : 'No stickers found.'}</p>
+        )}
       </div>
-    </div>
+      {activeCategory === 'GIF Stickers' && (
+        <div className="shrink-0 border-t border-border px-3 py-2 text-center text-[10px] text-muted-foreground">
+          Powered by GIPHY
+        </div>
+      )}
+    </div>,
+    document.body
   )
 }
