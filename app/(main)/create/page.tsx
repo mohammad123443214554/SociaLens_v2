@@ -10,6 +10,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { isRestricted } from '@/lib/utils/restrictionCheck'
 import { RestrictionPopup } from '@/components/shared/RestrictionPopup'
 import { compressImageIfNeeded, LONG_CACHE_CONTROL } from '@/lib/utils/imageCompression'
+import { StudioBrandLink } from '@/components/studio/StudioBrandLink'
 
 type ContentType = 'post' | 'reel'
 type MediaType = 'image' | 'video' | 'none'
@@ -589,10 +590,7 @@ export default function CreateEditorPage() {
               <img src="/images/aperonix-logo.png" alt="" className="h-5 w-5 object-contain" />
               <span>Aperonix AI</span>
             </Link>
-            <Link href="/studio" aria-label="Open SociaLens Studio" title="SociaLens Studio" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:border-pink-500/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500">
-              <img src="/images/socialens-studio-logo.png" alt="" className="h-6 w-6 object-contain" />
-              <span className="hidden md:inline">SociaLens Studio</span>
-            </Link>
+            <StudioBrandLink className="px-2 sm:px-3" />
           </div>
         </div>
         <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
