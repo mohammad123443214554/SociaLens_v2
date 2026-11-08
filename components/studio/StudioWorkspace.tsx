@@ -6,10 +6,10 @@ import { ArrowLeft, ArrowRight, Check, Clapperboard, FolderOpen, Image as ImageI
 
 type Mode = 'photo' | 'video'
 type Step = 'home' | 'setup' | 'templates'
-type Flow = { step: Step; mode: Mode | null; name: string; created: boolean; selectedTemplate: string | null }
+type Flow = { step: Step; mode: Mode | null; name: string; created: boolean; selectedTemplate: string | null; projectId: string | null }
 type Template = { id: string; title: string; category: string; modes: Mode[]; format: string; description: string; colors: [string, string, string]; layout: 'editorial' | 'bold' | 'minimal' | 'collage' | 'gradient'; tag?: string }
 
-const initialFlow: Flow = { step: 'home', mode: null, name: '', created: false, selectedTemplate: null }
+const initialFlow: Flow = { step: 'home', mode: null, name: '', created: false, selectedTemplate: null, projectId: null }
 
 // Add new template definitions here. The library UI, filters and preview are generated from this registry.
 const TEMPLATE_REGISTRY: Template[] = [
@@ -38,7 +38,7 @@ function readFlow(): Flow {
   const requested = p.get('step')
   if (!mode || (requested !== 'setup' && requested !== 'templates')) return initialFlow
   const created = p.get('created') === '1'
-  return { step: requested === 'templates' && created ? 'templates' : 'setup', mode, name: p.get('name') || '', created, selectedTemplate: p.get('template') || null }
+  return { step: requested === 'templates' && created ? 'templates' : 'setup', mode, name: p.get('name') || '', created, selectedTemplate: p.get('template') || null, projectId: p.get('projectId') || null }
 }
 
 function pushFlow(flow: Flow, replace = false) {
@@ -48,6 +48,7 @@ function pushFlow(flow: Flow, replace = false) {
   if (flow.name.trim()) p.set('name', flow.name.trim())
   if (flow.created) p.set('created', '1')
   if (flow.selectedTemplate) p.set('template', flow.selectedTemplate)
+  if (flow.projectId) p.set('projectId', flow.projectId)
   const query = p.toString()
   const url = query ? '/studio?' + query : '/studio'
   if (replace) window.history.replaceState({ studio: true }, '', url)
@@ -123,13 +124,13 @@ export function StudioWorkspace() {
   }, [])
 
   const back = () => {
-    if (flow.step === 'templates' && flow.mode) navigate({ ...flow, step: 'setup', created: false, selectedTemplate: null })
+    if (flow.step === 'templates' && flow.mode) navigate({ ...flow, step: 'setup', created: false, selectedTemplate: null, projectId: null })
     else navigate(initialFlow)
   }
 
   const createProject = () => {
     if (!flow.mode || !flow.name.trim()) return
-    navigate({ ...flow, step: 'templates', name: flow.name.trim(), created: true, selectedTemplate: null })
+    navigate({ ...flow, step: 'templates', name: flow.name.trim(), created: true, selectedTemplate: null, projectId: crypto.randomUUID() })
   }
 
   const chooseTemplate = (id: string) => navigate({ ...flow, selectedTemplate: id || null })
@@ -200,7 +201,7 @@ export function StudioWorkspace() {
               <aside className="h-fit rounded-2xl border border-white/10 bg-[#101426] p-5"><div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-300/15 bg-cyan-300/10"><Plus className="h-5 w-5 text-cyan-300" /></div><h3 className="text-sm font-bold">Blank project</h3><p className="mt-2 text-xs leading-5 text-slate-400">Start without a preset and build your own design when the editing workspace is available.</p><button type="button" onClick={() => chooseTemplate('')} className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] text-xs font-semibold text-slate-200 transition hover:bg-white/[0.08]"><FolderOpen className="h-4 w-4" /> Choose blank project</button></aside>
             </div>
             {chosenTemplate && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-4 py-3"><div className="flex items-center gap-2 text-xs text-emerald-200"><Check className="h-4 w-4" /> <span><strong>{chosenTemplate.title}</strong> selected for this project</span></div><span className="text-[10px] text-slate-400">Template choice saved</span></div>}
-            <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5"><button type="button" onClick={back} className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 px-4 text-xs font-semibold text-slate-300 hover:bg-white/5"><ArrowLeft className="h-4 w-4" /> Project settings</button><div className="flex flex-wrap items-center gap-3"><div className="inline-flex items-center gap-2 text-[11px] text-slate-500"><Check className="h-4 w-4 text-emerald-400" /> Project setup complete</div>{flow.mode === 'photo' ? <Link href={'/studio/photo-editor?name=' + encodeURIComponent(flow.name) + (flow.selectedTemplate ? '&template=' + encodeURIComponent(flow.selectedTemplate) : '')} className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-5 text-xs font-bold text-white shadow-lg shadow-violet-950/25 transition hover:brightness-110">Open Photo Editor <ArrowRight className="h-4 w-4" /></Link> : <Link href={'/studio/video-editor?name=' + encodeURIComponent(flow.name) + (flow.selectedTemplate ? '&template=' + encodeURIComponent(flow.selectedTemplate) : '')} className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-pink-600 px-5 text-xs font-bold text-white shadow-lg shadow-violet-950/25 transition hover:brightness-110">Open Video Editor <ArrowRight className="h-4 w-4" /></Link>}</div></div>
+            <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5"><button type="button" onClick={back} className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 px-4 text-xs font-semibold text-slate-300 hover:bg-white/5"><ArrowLeft className="h-4 w-4" /> Project settings</button><div className="flex flex-wrap items-center gap-3"><div className="inline-flex items-center gap-2 text-[11px] text-slate-500"><Check className="h-4 w-4 text-emerald-400" /> Project setup complete</div>{flow.mode === 'photo' ? <Link href={'/studio/photo-editor?name=' + encodeURIComponent(flow.name) + '&projectId=' + encodeURIComponent(flow.projectId || '') + (flow.selectedTemplate ? '&template=' + encodeURIComponent(flow.selectedTemplate) : '')} className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-5 text-xs font-bold text-white shadow-lg shadow-violet-950/25 transition hover:brightness-110">Open Photo Editor <ArrowRight className="h-4 w-4" /></Link> : <Link href={'/studio/video-editor?name=' + encodeURIComponent(flow.name) + '&projectId=' + encodeURIComponent(flow.projectId || '') + (flow.selectedTemplate ? '&template=' + encodeURIComponent(flow.selectedTemplate) : '')} className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-pink-600 px-5 text-xs font-bold text-white shadow-lg shadow-violet-950/25 transition hover:brightness-110">Open Video Editor <ArrowRight className="h-4 w-4" /></Link>}</div></div>
           </div>
         )}
       </section>
