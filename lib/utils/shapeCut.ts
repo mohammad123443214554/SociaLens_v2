@@ -921,7 +921,7 @@ function getShapeCutPathRaw(shapeId:string):string {
 /** Public path API: normalize the initial move command for consistent SVG output. */
 export function getShapeCutPath(shapeId:string):string {
  const path = getShapeCutPathRaw(shapeId)
- return path.replace(/^M(?=\\S)/, 'M ')
+ return path.replace(/^M(?=\S)/, 'M ')
 }
 
 export function searchShapeCutShapes(query:string):ShapeCutTemplate[] { const q=query.trim().toLowerCase(); if(!q)return SHAPECUT_SHAPES; const aliases:Record<string,string[]>={heart:['double heart'],star:['spark','sun symbol','burst'],circle:['oval','ellipse','round'],arch:['gothic arch','pointed arch','rounded arch'],flower:['daisy','petal','rose','sunflower'],speech:['bubble','comic'],frame:['arch','polaroid','film','stamp']}; return SHAPECUT_SHAPES.filter(s=>s.name.toLowerCase().includes(q)||s.category.toLowerCase().includes(q)||(aliases[q]||[]).some(a=>s.name.toLowerCase().includes(a))) }
