@@ -8,7 +8,7 @@ import { deleteStudioProject, listStudioProjects } from '@/lib/studio/persistenc
 type Mode = 'photo' | 'video'
 type Step = 'home' | 'setup' | 'templates'
 type Flow = { step: Step; mode: Mode | null; name: string; created: boolean; selectedTemplate: string | null; projectId: string | null }
-type Template = { id: string; title: string; category: string; modes: Mode[]; format: string; description: string; colors: [string, string, string]; layout: 'editorial' | 'bold' | 'minimal' | 'collage' | 'gradient'; tag?: string }
+type Template = { id: string; title: string; category: string; modes: Mode[]; format: string; description: string; colors: [string, string, string]; layout: 'editorial' | 'bold' | 'minimal' | 'collage' | 'gradient' | 'video-pro'; tag?: string }
 
 const initialFlow: Flow = { step: 'home', mode: null, name: '', created: false, selectedTemplate: null, projectId: null }
 
@@ -22,14 +22,7 @@ const TEMPLATE_REGISTRY: Template[] = [
   { id: 'creator-cover', title: 'Creator Reel Cover', category: 'Reel Covers', modes: ['photo'], format: '9:16', description: 'A bold cover design with a large title that stays readable in a profile grid.', colors: ['#3b0764', '#d946ef', '#f5d0fe'], layout: 'bold' },
   { id: 'soft-brand-kit', title: 'Soft Brand Feature', category: 'Business', modes: ['photo'], format: '1:1', description: 'A balanced square brand feature for services, products and introductions.', colors: ['#134e4a', '#14b8a6', '#99f6e4'], layout: 'collage' },
   { id: 'travel-diary', title: 'Travel Diary', category: 'Lifestyle', modes: ['photo'], format: '4:5', description: 'A photo-led travel layout with a location label and editorial caption.', colors: ['#422006', '#d97706', '#fde68a'], layout: 'collage' },
-  { id: 'neon-reel', title: 'Neon Reel Opener', category: 'Reels & Shorts', modes: ['video'], format: '9:16', description: 'A punchy vertical opener designed for short-form video titles.', colors: ['#18102d', '#9333ea', '#22d3ee'], layout: 'bold', tag: 'Trending' },
-  { id: 'cinematic-intro', title: 'Cinematic Intro', category: 'Intros & Outros', modes: ['video'], format: '16:9', description: 'A dramatic opening frame for trailers, explainers and video stories.', colors: ['#0f172a', '#334155', '#e2e8f0'], layout: 'editorial' },
-  { id: 'product-showcase', title: 'Product Showcase', category: 'Business', modes: ['video'], format: '9:16', description: 'A product-first video cover with space for a feature and short message.', colors: ['#3f0d2e', '#db2777', '#fbcfe8'], layout: 'collage' },
-  { id: 'vlog-chapter', title: 'Vlog Chapter', category: 'Vlogs', modes: ['video'], format: '16:9', description: 'A clean chapter title card for daily vlogs and travel edits.', colors: ['#082f49', '#0284c7', '#bae6fd'], layout: 'minimal' },
-  { id: 'story-countdown', title: 'Story Countdown', category: 'Stories', modes: ['video'], format: '9:16', description: 'A vertical countdown opener for launches, events and special moments.', colors: ['#4a044e', '#c026d3', '#f5d0fe'], layout: 'gradient' },
-  { id: 'event-recap', title: 'Event Recap', category: 'Events', modes: ['video'], format: '16:9', description: 'A polished title frame for highlights, recaps and event aftermovies.', colors: ['#052e16', '#16a34a', '#bbf7d0'], layout: 'editorial' },
-  { id: 'photo-montage', title: 'Photo Montage', category: 'Montage', modes: ['video'], format: '9:16', description: 'A multi-moment composition for memories, celebrations and recaps.', colors: ['#312e81', '#818cf8', '#e0e7ff'], layout: 'collage' },
-  { id: 'minimal-promo', title: 'Minimal Promo', category: 'Promos', modes: ['video'], format: '16:9', description: 'A restrained promotional opener with clear hierarchy and a modern finish.', colors: ['#1c1917', '#a8a29e', '#fafaf9'], layout: 'minimal' },
+  { id: 'creator-pro-reel', title: 'Creator Pro Reel', category: 'Creator', modes: ['video'], format: '9:16', description: 'A premium vertical video composition with editable headline, supporting copy, call to action, layered graphic accents and a cinematic color system. Add your own footage, music and brand message.', colors: ['#090b1d', '#6d28d9', '#22d3ee'], layout: 'video-pro', tag: 'Studio signature' },
 ]
 
 function readFlow(): Flow {
@@ -67,7 +60,17 @@ function TemplateArtwork({ template, compact = false }: { template: Template; co
     <div className="relative isolate flex h-full min-h-[170px] w-full items-center justify-center overflow-hidden rounded-xl p-4" style={{ background: 'radial-gradient(circle at 80% 12%, ' + c + '55, transparent 38%), linear-gradient(140deg, ' + a + ', ' + b + ')' }}>
       <div className="absolute -right-8 -top-10 h-32 w-32 rounded-full border border-white/20" />
       <div className="absolute -bottom-12 -left-8 h-36 w-36 rounded-full border border-white/15" />
-      {template.layout === 'collage' ? (
+      {template.layout === 'video-pro' ? (
+        <div className="relative flex h-full w-full flex-col justify-between overflow-hidden rounded-2xl border border-white/15 bg-[#090b1d] p-5 text-left shadow-2xl">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_78%_16%,rgba(34,211,238,.38),transparent_34%),radial-gradient(ellipse_at_18%_82%,rgba(168,85,247,.55),transparent_42%),linear-gradient(145deg,#11152d,#090b1d_58%,#24104b)]" />
+          <div className="absolute -right-10 top-14 h-36 w-36 rounded-full border border-cyan-200/30 shadow-[0_0_50px_rgba(34,211,238,.18)]" />
+          <div className="absolute -bottom-12 -left-8 h-40 w-40 rotate-12 rounded-[2rem] border border-fuchsia-200/25 bg-fuchsia-400/10 backdrop-blur-sm" />
+          <div className="relative flex items-center justify-between"><span className="rounded-full border border-cyan-200/30 bg-cyan-300/10 px-3 py-1 text-[8px] font-bold uppercase tracking-[.24em] text-cyan-100">YOUR BRAND / 2026</span><span className="text-[9px] font-semibold tracking-[.2em] text-white/60">01 — 03</span></div>
+          <div className="relative py-5"><div className="mb-3 h-1 w-12 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,.8)]" /><div className="max-w-[90%] text-3xl font-black uppercase leading-[.9] tracking-[-.06em] text-white sm:text-4xl">MAKE<br/><span className="bg-gradient-to-r from-cyan-200 via-white to-fuchsia-200 bg-clip-text text-transparent">IT</span> MATTER.</div><p className="mt-4 max-w-[80%] text-[10px] leading-4 text-slate-200/75">Your story. Your style. Your next big moment.</p></div>
+          <div className="relative flex items-center justify-between"><span className="rounded-full bg-white px-3 py-2 text-[8px] font-black uppercase tracking-wider text-slate-950">WATCH NOW ↗</span><span className="text-[8px] font-semibold uppercase tracking-[.2em] text-white/55">SociaLens Studio</span></div>
+          <div className="absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r from-cyan-300 via-violet-400 to-fuchsia-400" />
+        </div>
+      ) : template.layout === 'collage' ? (
         <div className="relative grid w-[82%] grid-cols-2 gap-2"><div className="col-span-2 h-16 rounded-lg border border-white/25 bg-white/20 backdrop-blur-sm" /><div className="h-20 rounded-lg border border-white/20 bg-black/15" /><div className="h-20 rounded-lg border border-white/20 bg-white/25" /></div>
       ) : template.layout === 'minimal' ? (
         <div className="relative w-[82%] text-left"><div className="mb-3 h-1 w-10 rounded-full" style={{ backgroundColor: c }} /><div className="h-3 w-[88%] rounded bg-white/90" /><div className="mt-2 h-3 w-[62%] rounded bg-white/65" /><div className="mt-6 h-1.5 w-16 rounded-full" style={{ backgroundColor: c }} /></div>
