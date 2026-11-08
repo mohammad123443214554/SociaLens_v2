@@ -39,6 +39,27 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
   const [popupStateReady, setPopupStateReady] = useState(false)
   const popupStorageKey = user?.id ? `socia-archive-change-lock-view:${user.id}` : null
 
+  const lockChoiceStorageKey = user?.id ? `socia-archive-change-lock-choice:${user.id}` : null
+
+  useEffect(() => {
+    if (!lockChoiceStorageKey) return
+    try {
+      const saved = sessionStorage.getItem(lockChoiceStorageKey)
+      if (saved === 'password' || saved === 'pattern' || saved === 'pattern4') setTargetLockType(saved)
+    } catch {
+      // Keep the currently selected lock type when storage is unavailable.
+    }
+  }, [lockChoiceStorageKey])
+
+  useEffect(() => {
+    if (!lockChoiceStorageKey) return
+    try {
+      sessionStorage.setItem(lockChoiceStorageKey, targetLockType)
+    } catch {
+      // Storage can be unavailable in private browsing.
+    }
+  }, [lockChoiceStorageKey, targetLockType])
+
   useEffect(() => {
     if (!popupStorageKey) return
     try {
