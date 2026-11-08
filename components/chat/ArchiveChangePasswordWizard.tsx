@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { X, Lock, Grid3X3, KeyRound, ShieldCheck } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
 import { useVerifyArchivePassword, useSetArchivePassword } from '@/lib/hooks/useChatSettings'
+import { createClient } from '@/lib/supabase/client'
 import { ArchivePatternLock } from './ArchivePatternLock'
 
 interface ArchiveChangePasswordWizardProps {
@@ -29,6 +30,12 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
   const [confirmPattern, setConfirmPattern] = useState('')
   const [hint, setHint] = useState('')
   const [error, setError] = useState('')
+  const [recoveryView, setRecoveryView] = useState<null | 'options' | 'email' | 'account'>(null)
+  const [recoveryBusy, setRecoveryBusy] = useState(false)
+  const [recoveryError, setRecoveryError] = useState('')
+  const [otp, setOtp] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
+  const [accountPassword, setAccountPassword] = useState('')
 
   const chooseLock = (type: LockType) => {
     setTargetLockType(type)
@@ -54,6 +61,90 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
     const ok = await verify.mutateAsync({ userId: user.id, pattern })
     if (!ok) { setError('Incorrect pattern. Please try again.'); return }
     setStep(2)
+  }
+
+  const beginRecovery = () => {
+    setError('')
+    setRecoveryError('')
+    setOtp('')
+    setOtpSent(false)
+    setAccountPassword('')
+    setRecoveryView('options')
+  }
+
+  const continueAfterRecovery = () => {
+    setRecoveryView(null)
+    setRecoveryError('')
+    setError('')
+    setLegacyPatternGrid(false)
+    setStep(2)
+  }
+
+  const sendRecoveryOtp = async () => {
+    if (!user?.email || recoveryBusy) return
+    setRecoveryBusy(true)
+    setRecoveryError('')
+    try {
+      const supabase = createClient()
+      const { error: sendError } = await supabase.auth.signInWithOtp({
+        email: user.email,
+        options: { shouldCreateUser: false },
+      })
+      if (sendError) throw sendError
+      setOtpSent(true)
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : ''
+      setRecoveryError(/rate limit|too many|email rate/i.test(message)
+        ? 'Email limit reached. Please wait before requesting another code.'
+        : 'Could not send the verification code. Please try again later.')
+    } finally {
+      setRecoveryBusy(false)
+    }
+  }
+
+  const verifyRecoveryOtp = async () => {
+    if (!user?.email || !otp.trim() || recoveryBusy) return
+    setRecoveryBusy(true)
+    setRecoveryError('')
+    try {
+      const supabase = createClient()
+      const { data, error: otpError } = await supabase.auth.verifyOtp({
+        email: user.email,
+        token: otp.trim(),
+        type: 'email',
+      })
+      if (otpError) throw otpError
+      if (data.user?.id !== user.id) {
+        await supabase.auth.signOut()
+        throw new Error('The verified account did not match the signed-in account.')
+      }
+      continueAfterRecovery()
+    } catch {
+      setRecoveryError('That code is invalid or expired. Check the code and try again.')
+    } finally {
+      setRecoveryBusy(false)
+    }
+  }
+
+  const verifyAccountPassword = async () => {
+    if (!user?.email || !accountPassword || recoveryBusy) return
+    setRecoveryBusy(true)
+    setRecoveryError('')
+    try {
+      const supabase = createClient()
+      const { data, error: passwordError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: accountPassword,
+      })
+      if (passwordError || data.user?.id !== user.id) {
+        throw new Error('Account password verification failed.')
+      }
+      continueAfterRecovery()
+    } catch {
+      setRecoveryError('Incorrect account password. Please try again.')
+    } finally {
+      setRecoveryBusy(false)
+    }
   }
 
   const handleNextFromNew = () => {
@@ -114,6 +205,7 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
               <input autoFocus type="password" value={oldPassword} onChange={event => setOldPassword(event.target.value)} onKeyDown={event => event.key === 'Enter' && handleVerifyOld()} placeholder="Current password" autoComplete="current-password" className="w-full rounded-2xl border border-border bg-muted/60 px-4 py-4 text-center text-lg tracking-[0.2em] outline-none transition focus:border-pink-500 focus:ring-2 focus:ring-pink-500/15" />
               <button type="button" onClick={handleVerifyOld} disabled={verify.isPending || !oldPassword} className="mt-4 w-full rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 text-sm font-semibold text-white disabled:opacity-60">{verify.isPending ? 'Checking…' : 'Continue'}</button>
             </>}
+              <button type="button" onClick={beginRecovery} className="mt-3 w-full text-center text-xs font-medium text-pink-500 underline underline-offset-4">Forgot password?</button>
           </>}
 
           {step === 2 && <>
@@ -143,6 +235,54 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
           {error && <p role="alert" className="mt-3 text-center text-xs text-red-500">{error}</p>}
         </div>
 
+        {recoveryView && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" onClick={() => setRecoveryView(null)}>
+            <div role="dialog" aria-modal="true" aria-labelledby="archive-recovery-title" className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
+              <div className="mb-4 flex items-center justify-between">
+                <div><h3 id="archive-recovery-title" className="font-semibold">Recover Archive lock</h3><p className="mt-1 text-xs text-muted-foreground">Verify your SociaLens account to continue</p></div>
+                <button type="button" onClick={() => setRecoveryView(null)} aria-label="Close recovery" className="rounded-full p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
+              </div>
+
+              {recoveryView === 'options' && (
+                <div className="space-y-3">
+                  <button type="button" disabled={!user?.email} onClick={() => { setRecoveryView('email'); setRecoveryError('') }} className="flex w-full items-center gap-3 rounded-xl border border-border p-4 text-left transition hover:border-pink-500 hover:bg-pink-500/5 disabled:opacity-50">
+                    <ShieldCheck className="h-5 w-5 text-pink-500" /><span><span className="block text-sm font-semibold">Email verification</span><span className="block text-xs text-muted-foreground">Get a one-time code at your registered email</span></span>
+                  </button>
+                  <button type="button" onClick={() => { setRecoveryView('account'); setRecoveryError('') }} className="flex w-full items-center gap-3 rounded-xl border border-border p-4 text-left transition hover:border-pink-500 hover:bg-pink-500/5">
+                    <KeyRound className="h-5 w-5 text-pink-500" /><span><span className="block text-sm font-semibold">Account password</span><span className="block text-xs text-muted-foreground">Verify with your SociaLens login password</span></span>
+                  </button>
+                </div>
+              )}
+
+              {recoveryView === 'email' && (
+                <div>
+                  <p className="mb-3 text-sm text-muted-foreground">We’ll send a one-time sign-in code to your registered SociaLens email address.</p>
+                  <p className="mb-4 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">{user?.email}</p>
+                  {!otpSent ? (
+                    <button type="button" onClick={sendRecoveryOtp} disabled={recoveryBusy || !user?.email} className="w-full rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 text-sm font-semibold text-white disabled:opacity-60">{recoveryBusy ? 'Sending code…' : 'Send verification code'}</button>
+                  ) : (
+                    <>
+                      <input autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={otp} onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, 8))} onKeyDown={event => event.key === 'Enter' && verifyRecoveryOtp()} placeholder="Enter email code" className="mb-3 w-full rounded-xl border border-border bg-muted/60 px-4 py-3 text-center text-lg tracking-[0.35em] outline-none focus:border-pink-500" />
+                      <button type="button" onClick={verifyRecoveryOtp} disabled={recoveryBusy || otp.trim().length < 6} className="w-full rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 text-sm font-semibold text-white disabled:opacity-60">{recoveryBusy ? 'Verifying…' : 'Verify code'}</button>
+                      <p className="mt-2 text-center text-[11px] text-muted-foreground">For now, request only one code. Supabase free email limits may delay another request.</p>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {recoveryView === 'account' && (
+                <div>
+                  <p className="mb-3 text-sm text-muted-foreground">Enter the password you use to sign in to SociaLens.</p>
+                  <input autoFocus type="password" autoComplete="current-password" value={accountPassword} onChange={event => setAccountPassword(event.target.value)} onKeyDown={event => event.key === 'Enter' && verifyAccountPassword()} placeholder="SociaLens account password" className="mb-3 w-full rounded-xl border border-border bg-muted/60 px-4 py-3 text-center outline-none focus:border-pink-500" />
+                  <button type="button" onClick={verifyAccountPassword} disabled={recoveryBusy || !accountPassword} className="w-full rounded-xl bg-gradient-to-r from-pink-500 to-violet-500 py-3 text-sm font-semibold text-white disabled:opacity-60">{recoveryBusy ? 'Verifying…' : 'Verify and continue'}</button>
+                </div>
+              )}
+
+              {recoveryError && <p role="alert" className="mt-3 text-center text-xs text-red-500">{recoveryError}</p>}
+              <button type="button" onClick={() => { setRecoveryView(recoveryView === 'options' ? null : 'options'); setRecoveryError('') }} className="mt-4 w-full text-center text-xs text-muted-foreground underline underline-offset-4">{recoveryView === 'options' ? 'Cancel' : 'Back to options'}</button>
+            </div>
+          </div>
+        )}
         {showLockPicker && <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={() => setShowLockPicker(false)}>
           <div role="dialog" aria-modal="true" aria-labelledby="change-lock-picker-title" className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between"><h3 id="change-lock-picker-title" className="font-semibold">Choose your lock type</h3><button type="button" onClick={() => setShowLockPicker(false)} aria-label="Close lock type picker" className="rounded-full p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button></div>
