@@ -27,6 +27,7 @@ interface MessageInputProps {
   onFailPending?: (tempId: string) => void
   onTyping: () => void
   currentUserId: string
+  chatId: string
   disabled?: boolean
   replyingTo?: Message | null
   onCancelReply?: () => void
@@ -73,8 +74,10 @@ async function uploadChatMedia(file: File | Blob, filename: string, userId: stri
   return data.publicUrl
 }
 
-export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPending, onTyping, currentUserId, disabled, replyingTo, onCancelReply }: MessageInputProps) {
+export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPending, onTyping, currentUserId, chatId, disabled, replyingTo, onCancelReply }: MessageInputProps) {
   const [message, setMessage] = useState('')
+  const [draftReady, setDraftReady] = useState(false)
+  const draftStorageKey = `socialens:chat-draft:${currentUserId}:${chatId}`
   const [showEmoji, setShowEmoji] = useState(false)
   const [showStickers, setShowStickers] = useState(false)
   const [emojiPos, setEmojiPos] = useState<{ top: number; left: number } | null>(null)
@@ -111,6 +114,30 @@ export function MessageInput({ onSend, onSendPending, onResolvePending, onFailPe
     el.style.height = `${nextHeight}px`
     setIsComposerExpanded(nextHeight > (window.innerWidth >= 640 ? 44 : 36) + 2)
   }
+  useEffect(() => {
+    // Restore this user's unsent text for this exact conversation before
+    // enabling draft writes, so the initial empty state cannot erase it.
+    try {
+      const savedDraft = window.localStorage.getItem(draftStorageKey)
+      if (savedDraft !== null) setMessage(savedDraft)
+    } catch (error) {
+      console.warn('Could not restore chat draft:', error)
+    } finally {
+      setDraftReady(true)
+    }
+  }, [draftStorageKey])
+
+  useEffect(() => {
+    if (!draftReady) return
+    try {
+      if (message.length > 0) window.localStorage.setItem(draftStorageKey, message)
+      else window.localStorage.removeItem(draftStorageKey)
+    } catch (error) {
+      // Draft saving must never interrupt typing or sending if storage is unavailable.
+      console.warn('Could not save chat draft:', error)
+    }
+  }, [draftReady, draftStorageKey, message])
+
   useLayoutEffect(() => { resizeTextarea() }, [message])
 
   // Warm the emoji picker chunk after the chat composer mounts so opening it is immediate.
