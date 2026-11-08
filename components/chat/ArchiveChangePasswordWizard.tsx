@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Lock, Grid3X3, KeyRound, ShieldCheck } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
 import { useVerifyArchivePassword, useSetArchivePassword } from '@/lib/hooks/useChatSettings'
@@ -36,6 +36,34 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
   const [otp, setOtp] = useState('')
   const [otpSent, setOtpSent] = useState(false)
   const [accountPassword, setAccountPassword] = useState('')
+  const [popupStateReady, setPopupStateReady] = useState(false)
+  const popupStorageKey = user?.id ? `socia-archive-change-lock-view:${user.id}` : null
+
+  useEffect(() => {
+    if (!popupStorageKey) return
+    try {
+      const saved = sessionStorage.getItem(popupStorageKey)
+      if (saved === 'picker') setShowLockPicker(true)
+      if (saved === 'recovery-options' || saved === 'recovery-email' || saved === 'recovery-account') {
+        setRecoveryView(saved.replace('recovery-', '') as 'options' | 'email' | 'account')
+      }
+    } catch {
+      // Keep the default view when session storage is unavailable.
+    } finally {
+      setPopupStateReady(true)
+    }
+  }, [popupStorageKey])
+
+  useEffect(() => {
+    if (!popupStateReady || !popupStorageKey) return
+    try {
+      const savedView = recoveryView ? `recovery-${recoveryView}` : showLockPicker ? 'picker' : ''
+      if (savedView) sessionStorage.setItem(popupStorageKey, savedView)
+      else sessionStorage.removeItem(popupStorageKey)
+    } catch {
+      // Storage can be unavailable in private browsing.
+    }
+  }, [popupStateReady, popupStorageKey, recoveryView, showLockPicker])
 
   const chooseLock = (type: LockType) => {
     setTargetLockType(type)
@@ -235,7 +263,7 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
           {error && <p role="alert" className="mt-3 text-center text-xs text-red-500">{error}</p>}
         </div>
 
-        {recoveryView && (
+        {recoveryView && popupStateReady && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" onClick={() => setRecoveryView(null)}>
             <div role="dialog" aria-modal="true" aria-labelledby="archive-recovery-title" className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
               <div className="mb-4 flex items-center justify-between">
@@ -283,7 +311,7 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
             </div>
           </div>
         )}
-        {showLockPicker && <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={() => setShowLockPicker(false)}>
+        {showLockPicker && popupStateReady && <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={() => setShowLockPicker(false)}>
           <div role="dialog" aria-modal="true" aria-labelledby="change-lock-picker-title" className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between"><h3 id="change-lock-picker-title" className="font-semibold">Choose your lock type</h3><button type="button" onClick={() => setShowLockPicker(false)} aria-label="Close lock type picker" className="rounded-full p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button></div>
             {(['password', 'pattern', 'pattern4'] as const).filter(type => type !== lockType).map(type => <button key={type} type="button" onClick={() => chooseLock(type)} className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left transition hover:border-primary hover:bg-primary/5">
