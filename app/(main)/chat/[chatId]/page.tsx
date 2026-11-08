@@ -472,6 +472,7 @@ export default function ChatRoomPage() {
           onFailPending={failPendingMessage}
           onTyping={sendTypingIndicator}
           currentUserId={user.id}
+          chatId={chatId}
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
         />
