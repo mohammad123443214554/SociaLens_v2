@@ -21,7 +21,7 @@ const EMOJIS = emojiCatalog.emojis as EmojiRecord[]
 const CATEGORIES = ['Popular', 'All', ...Array.from(new Set(EMOJIS.map(item => item.category)))]
 
 export function FullEmojiPicker({ onSelect, onClose, style }: FullEmojiPickerProps) {
-  const [activeCategory, setActiveCategory] = useState('Popular')
+  const [activeCategory, setActiveCategory] = useState('All')
   const [search, setSearch] = useState('')
   const filteredEmojis = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
