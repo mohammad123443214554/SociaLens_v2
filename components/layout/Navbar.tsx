@@ -9,6 +9,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { getAvatarUrl } from '@/lib/utils/helpers'
 import { NotificationPanel } from '@/components/shared/NotificationPanel'
 import { cn } from '@/lib/utils/helpers'
+import { StudioBrandLink } from '@/components/studio/StudioBrandLink'
 
 export function Navbar({ className }: { className?: string } = {}) {
   const { profile } = useUser()
@@ -35,6 +36,9 @@ export function Navbar({ className }: { className?: string } = {}) {
         </div>
 
         <div className="ml-auto flex items-center gap-1">
+          {/* SociaLens Studio - logo only on phones, logo + name on larger screens */}
+          <StudioBrandLink compactOnMobile className="h-9 min-h-9 border-0 bg-transparent px-2 py-1 hover:bg-accent" />
+
           {/* Aperonix AI */}
           <Link href="/aperonix">
             <Button variant="ghost" size="icon" className="gap-1 px-2 w-auto" title="Aperonix AI">
