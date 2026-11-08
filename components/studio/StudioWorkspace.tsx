@@ -32,8 +32,8 @@ function pushFlow(flow: Flow, replace = false) {
 }
 
 const modeCopy = {
-  photo: { title: 'Photo Studio', subtitle: 'Create polished graphics, posts and visual designs.', format: 'Still image project', icon: ImageIcon, accent: 'pink', action: 'Create Photo Project' },
-  video: { title: 'Video Studio', subtitle: 'Create engaging videos, stories and short-form content.', format: 'Video project', icon: Video, accent: 'violet', action: 'Create Video Project' },
+  photo: { title: 'Photo Studio', subtitle: 'Create polished graphics, posts and visual designs.', format: 'Still image project', icon: ImageIcon, panel: 'border-pink-400/25 bg-gradient-to-br from-pink-500/15 via-[#171326] to-[#101426]', iconBox: 'border-pink-300/20 bg-pink-400/10 text-pink-300', action: 'Create Photo Project' },
+  video: { title: 'Video Studio', subtitle: 'Create engaging videos, stories and short-form content.', format: 'Video project', icon: Video, panel: 'border-violet-400/25 bg-gradient-to-br from-violet-500/15 via-[#15152a] to-[#101426]', iconBox: 'border-violet-300/20 bg-violet-400/10 text-violet-300', action: 'Create Video Project' },
 }
 
 export function StudioWorkspace() {
@@ -106,8 +106,8 @@ export function StudioWorkspace() {
         {flow.step === 'setup' && details && ModeIcon && (
           <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-5 py-10 sm:px-8">
             <button type="button" onClick={back} className="mb-7 inline-flex w-fit items-center gap-2 text-xs font-medium text-slate-400 transition hover:text-white"><ArrowLeft className="h-4 w-4" /> Back to creation type</button>
-            <div className={'rounded-3xl border border-' + details.accent + '-400/25 bg-gradient-to-br from-' + details.accent + '-500/20 via-[#171326] to-[#101426] p-6 sm:p-8'}>
-              <div className="flex items-center gap-4"><div className={'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-black/20 text-' + details.accent + '-300'}><ModeIcon className="h-7 w-7" /></div><div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">New {flow.mode} project</p><h1 className="mt-1 text-2xl font-bold">{details.title}</h1></div></div>
+            <div className={'rounded-3xl border p-6 sm:p-8 ' + details.panel}>
+              <div className="flex items-center gap-4"><div className={'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border ' + details.iconBox}><ModeIcon className="h-7 w-7" /></div><div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">New {flow.mode} project</p><h1 className="mt-1 text-2xl font-bold">{details.title}</h1></div></div>
               <p className="mt-5 max-w-xl text-sm leading-6 text-slate-300">{details.subtitle}</p>
               <div className="mt-7 rounded-2xl border border-white/10 bg-[#080a13]/65 p-4 sm:p-5">
                 <label htmlFor="studio-project-name" className="mb-2 block text-xs font-semibold text-slate-300">Project name</label>
