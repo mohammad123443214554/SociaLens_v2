@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import {
   ArrowLeft, ArrowDown, ArrowUp, AudioLines, Check, ChevronLeft, ChevronRight,
-  Clapperboard, Film, ImagePlus, Music2, Pause, Play, Plus, Scissors, Trash2,
-  Upload, Video, Volume2, VolumeX, X
+  Clapperboard, Film, ImagePlus, Layers3, Music2, Pause, Play, Plus, Scissors, Trash2,
+  Video, Volume2, VolumeX, X
 } from 'lucide-react'
 
 type ClipKind = 'video' | 'image'
