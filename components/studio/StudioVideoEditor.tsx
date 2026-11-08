@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import {
   ArrowLeft, ArrowDown, ArrowUp, AudioLines, Check, ChevronLeft, ChevronRight,
   Clapperboard, Film, ImagePlus, Music2, Pause, Play, Plus, Scissors, Trash2,
@@ -18,8 +19,9 @@ type Clip = {
   trimStart: number
   trimEnd: number
   fileSize: number
+  storagePath?: string
 }
-type AudioTrack = { id: string; name: string; url: string; duration: number; fileSize: number }
+type AudioTrack = { id: string; name: string; url: string; duration: number; fileSize: number; storagePath?: string }
 
 const MAX_VIDEO_BYTES = 250 * 1024 * 1024
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
@@ -54,7 +56,7 @@ function readMediaDuration(file: File, url: string, kind: ClipKind): Promise<num
   })
 }
 
-export function StudioVideoEditor({ projectName, templateId }: { projectName: string; templateId: string }) {
+export function StudioVideoEditor({ projectName, templateId, projectId }: { projectName: string; templateId: string; projectId: string }) {
   const videoInput = useRef<HTMLInputElement>(null)
   const imageInput = useRef<HTMLInputElement>(null)
   const audioInput = useRef<HTMLInputElement>(null)
@@ -78,15 +80,84 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
   const [exportHeight, setExportHeight] = useState(1920)
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
+  const [saveStatus, setSaveStatus] = useState('Loading project…')
+  const [hydrated, setHydrated] = useState(false)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const saveSequence = useRef(0)
   const selected = clips.find(item => item.id === selectedId) || clips[0] || null
   const totalDuration = useMemo(() => clips.reduce((sum, item) => sum + Math.max(0.1, item.trimEnd - item.trimStart), 0), [clips])
   const currentDuration = selected ? Math.max(0, selected.trimEnd - selected.trimStart) : 0
-  const backUrl = '/studio?step=templates&mode=video&created=1&name=' + encodeURIComponent(projectName) + (templateId ? '&template=' + encodeURIComponent(templateId) : '')
+  const backUrl = '/studio?step=templates&mode=video&created=1&name=' + encodeURIComponent(projectName) + '&projectId=' + encodeURIComponent(projectId) + (templateId ? '&template=' + encodeURIComponent(templateId) : '')
 
   useEffect(() => () => {
     objectUrls.current.forEach(url => URL.revokeObjectURL(url))
     objectUrls.current.clear()
   }, [])
+  useEffect(() => {
+    let active = true
+    const restore = async () => {
+      try {
+        const row = await loadStudioProject(projectId, 'video')
+        if (!active) return
+        if (row?.data) {
+          const data = row.data as Record<string, unknown>
+          const savedClips = Array.isArray(data.clips) ? data.clips as Array<Record<string, unknown>> : []
+          const restored = await Promise.all(savedClips.map(async item => ({
+            id: String(item.id), kind: item.kind as ClipKind, name: String(item.name),
+            url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration),
+            trimStart: Number(item.trimStart), trimEnd: Number(item.trimEnd), fileSize: Number(item.fileSize),
+            storagePath: String(item.storagePath),
+          })))
+          if (!active) return
+          setClips(restored)
+          if (typeof data.audioPath === 'string' && data.audioPath) {
+            const audioUrl = await createStudioAssetUrl(data.audioPath)
+            if (!active) return
+            setAudio({ id: String(data.audioId || makeId()), name: String(data.audioName || 'Background music'), url: audioUrl, duration: Number(data.audioDuration || 0), fileSize: Number(data.audioFileSize || 0), storagePath: data.audioPath })
+          }
+          if (typeof data.selectedId === 'string') setSelectedId(data.selectedId)
+          if (typeof data.muted === 'boolean') setMuted(data.muted)
+          if (typeof data.volume === 'number') setVolume(data.volume)
+          if (typeof data.audioVolume === 'number') setAudioVolume(data.audioVolume)
+          if (data.aspect === '9:16' || data.aspect === '16:9' || data.aspect === '1:1') setAspect(data.aspect)
+          if (typeof data.titleText === 'string') setTitleText(data.titleText)
+          if (typeof data.showTitle === 'boolean') setShowTitle(data.showTitle)
+          if (typeof data.exportWidth === 'number') setExportWidth(data.exportWidth)
+          if (typeof data.exportHeight === 'number') setExportHeight(data.exportHeight)
+          setSaveStatus('Draft restored')
+        } else setSaveStatus('New draft')
+      } catch (cause) {
+        if (active) setSaveStatus(cause instanceof Error ? cause.message : 'Could not load draft')
+      } finally { if (active) setHydrated(true) }
+    }
+    void restore()
+    return () => { active = false }
+  }, [projectId])
+
+  useEffect(() => {
+    if (!hydrated) return
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    setSaveStatus('Unsaved changes')
+    const sequence = ++saveSequence.current
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await saveStudioProject({
+          id: projectId, project_type: 'video', name: projectName, template_id: templateId || null,
+          data: {
+            clips: clips.map(({ id, kind, name, duration, trimStart, trimEnd, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, fileSize, storagePath })),
+            audioPath: audio?.storagePath || null, audioId: audio?.id || null, audioName: audio?.name || null,
+            audioDuration: audio?.duration || 0, audioFileSize: audio?.fileSize || 0, selectedId, muted, volume,
+            audioVolume, aspect, titleText, showTitle, exportWidth, exportHeight,
+          },
+        })
+        if (sequence === saveSequence.current) setSaveStatus('All changes saved')
+      } catch (cause) {
+        if (sequence === saveSequence.current) setSaveStatus(cause instanceof Error ? cause.message : 'Save failed')
+      }
+    }, 1000)
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+  }, [hydrated, projectId, projectName, templateId, clips, audio, selectedId, muted, volume, audioVolume, aspect, titleText, showTitle, exportWidth, exportHeight])
+
 
   useEffect(() => {
     const video = previewRef.current
