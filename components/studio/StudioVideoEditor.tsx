@@ -119,11 +119,22 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           if (typeof data.audioVolume === 'number') setAudioVolume(data.audioVolume)
           if (data.aspect === '9:16' || data.aspect === '16:9' || data.aspect === '1:1') setAspect(data.aspect)
           if (typeof data.titleText === 'string') setTitleText(data.titleText)
+          if (typeof data.subtitleText === 'string') setSubtitleText(data.subtitleText)
+          if (typeof data.ctaText === 'string') setCtaText(data.ctaText)
           if (typeof data.showTitle === 'boolean') setShowTitle(data.showTitle)
           if (typeof data.exportWidth === 'number') setExportWidth(data.exportWidth)
           if (typeof data.exportHeight === 'number') setExportHeight(data.exportHeight)
           setSaveStatus('Draft restored')
-        } else setSaveStatus('New draft')
+        } else {
+          if (templateId === 'creator-pro-reel') {
+            setAspect('9:16')
+            setTitleText('MAKE IT MATTER')
+            setSubtitleText('Your story. Your style. Your next big moment.')
+            setCtaText('WATCH NOW')
+            setShowTitle(true)
+          }
+          setSaveStatus('New draft')
+        }
       } catch (cause) {
         if (active) setSaveStatus(cause instanceof Error ? cause.message : 'Could not load draft')
       } finally { if (active) setHydrated(true) }
@@ -145,7 +156,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             clips: clips.map(({ id, kind, name, duration, trimStart, trimEnd, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, fileSize, storagePath })),
             audioPath: audio?.storagePath || null, audioId: audio?.id || null, audioName: audio?.name || null,
             audioDuration: audio?.duration || 0, audioFileSize: audio?.fileSize || 0, selectedId, muted, volume,
-            audioVolume, aspect, titleText, showTitle, exportWidth, exportHeight,
+            audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, exportWidth, exportHeight,
           },
         })
         if (sequence === saveSequence.current) setSaveStatus('All changes saved')
