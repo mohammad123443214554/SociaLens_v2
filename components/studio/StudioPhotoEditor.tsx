@@ -186,6 +186,7 @@ export function StudioPhotoEditor({ projectName, templateId, projectId }: { proj
       }
       if (imageUrl) {
         const image = new Image()
+        image.crossOrigin = 'anonymous'
         image.src = imageUrl
         await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('The selected image could not be loaded for export.')) })
         ctx.save()
@@ -238,7 +239,7 @@ export function StudioPhotoEditor({ projectName, templateId, projectId }: { proj
     } finally { setExporting(false) }
   }
 
-  const backUrl = '/studio?step=templates&mode=photo&created=1&name=' + encodeURIComponent(projectName) + (templateId ? '&template=' + encodeURIComponent(templateId) : '')
+  const backUrl = '/studio?step=templates&mode=photo&created=1&name=' + encodeURIComponent(projectName) + '&projectId=' + encodeURIComponent(projectId) + (templateId ? '&template=' + encodeURIComponent(templateId) : '')
 
   return (
     <main className="fixed inset-0 z-[70] flex min-h-dvh flex-col overflow-hidden bg-[#080a13] text-white">
