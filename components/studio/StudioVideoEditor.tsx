@@ -309,7 +309,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           const musicSource = audioContext.createMediaElementSource(musicElement)
           musicSource.connect(audioDestination)
           musicElement.volume = audioVolume / 100
-          await musicElement.play()
         }
         for (const clip of clips.filter(item => item.kind === 'video')) {
           const videoElement = document.createElement('video')
@@ -359,7 +358,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         drawTitle()
       }
       recorder.start(1000)
-      const startedAt = performance.now()
+      if (musicElement) { musicElement.currentTime = 0; await musicElement.play() }
       for (let index = 0; index < clips.length; index++) {
         const clip = clips[index]
         if (clip.kind === 'image') {
@@ -428,7 +427,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       window.setTimeout(() => URL.revokeObjectURL(url), 60000)
       setExportProgress(100)
       setNotice('Video export complete. Your ' + extension.toUpperCase() + ' file is ready.')
-      void startedAt
     } catch (cause) {
       if (recorder && recorder.state !== 'inactive') recorder.stop()
       setError(cause instanceof Error ? cause.message : 'Video export failed. Please try again.')
