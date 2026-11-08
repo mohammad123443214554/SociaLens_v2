@@ -9,6 +9,7 @@ import { ChevronLeft } from 'lucide-react'
 // on top of those just adds clutter, so it's skipped there.
 const EXACT_EXCLUDE = new Set([
   '/feed',
+  '/create/options',
   '/explore',
   '/explore/hashtags',
   '/explore/reels',
