@@ -313,6 +313,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         }
         for (const clip of clips.filter(item => item.kind === 'video')) {
           const videoElement = document.createElement('video')
+          videoElement.crossOrigin = 'anonymous'
           videoElement.src = clip.url
           videoElement.muted = false
           videoElement.playsInline = true
@@ -385,6 +386,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         } else {
           const video = exportVideos.get(clip.id) || document.createElement('video')
           if (!exportVideos.has(clip.id)) {
+            video.crossOrigin = 'anonymous'
             video.src = clip.url
             video.muted = true
             video.playsInline = true
