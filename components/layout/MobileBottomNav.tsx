@@ -80,8 +80,8 @@ export function MobileBottomNav({ className }: { className?: string } = {}) {
             </Link>
           ))}
 
-          {/* Open the dedicated Post/Reel editor */}
-          <Link href="/create"
+          {/* Open the Create options screen */}
+          <Link href="/create/options"
             className={cn('flex flex-col items-center gap-0.5 p-2 rounded-lg transition-colors', pathname.startsWith('/create') ? 'text-pink-500' : 'text-muted-foreground hover:text-foreground')}>
             <Plus className="h-5 w-5" />
             <span className="text-[10px]">Create</span>
