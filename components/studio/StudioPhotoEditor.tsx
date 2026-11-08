@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import { ArrowLeft, Check, ChevronDown, Expand, ImagePlus, RotateCcw, RotateCw, Upload, X, ZoomIn, ZoomOut, Type, Square, Circle, Trash2, Eye, EyeOff, ArrowUp, ArrowDown, Undo2, Redo2 } from 'lucide-react'
 
 type CanvasFormat = 'post' | 'portrait' | 'story' | 'custom'
@@ -26,7 +27,7 @@ const TEMPLATE_STYLES: Record<string, { from: string; to: string; accent: string
 }
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
-export function StudioPhotoEditor({ projectName, templateId }: { projectName: string; templateId: string }) {
+export function StudioPhotoEditor({ projectName, templateId, projectId }: { projectName: string; templateId: string; projectId: string }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [format, setFormat] = useState<CanvasFormat>('post')
   const [customWidth, setCustomWidth] = useState(1080)
@@ -36,6 +37,11 @@ export function StudioPhotoEditor({ projectName, templateId }: { projectName: st
   const [background, setBackground] = useState('#ffffff')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageName, setImageName] = useState('')
+  const [imagePath, setImagePath] = useState<string | null>(null)
+  const [saveStatus, setSaveStatus] = useState('Loading project…')
+  const [hydrated, setHydrated] = useState(false)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const saveSequence = useRef(0)
   const [fit, setFit] = useState<FitMode>('cover')
   const [rotation, setRotation] = useState(0)
   const [zoom, setZoom] = useState(70)
@@ -45,9 +51,62 @@ export function StudioPhotoEditor({ projectName, templateId }: { projectName: st
   const dimensions = format === 'custom' ? { label: 'Custom canvas', width: customWidth, height: customHeight, ratio: (customWidth / customHeight).toFixed(2) + ':1' } : FORMATS[format]
   const canvasScale = useMemo(() => Math.min(zoom / 100, 1), [zoom])
 
-  useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl) }, [imageUrl])
+  useEffect(() => () => { if (imageUrl?.startsWith('blob:')) URL.revokeObjectURL(imageUrl) }, [imageUrl])
 
-  const importImage = (file?: File) => {
+  useEffect(() => {
+    let active = true
+    const restore = async () => {
+      try {
+        const row = await loadStudioProject(projectId, 'photo')
+        if (!active) return
+        if (row?.data) {
+          const data = row.data as Record<string, unknown>
+          if (['post', 'portrait', 'story', 'custom'].includes(String(data.format))) setFormat(data.format as CanvasFormat)
+          if (typeof data.customWidth === 'number') setCustomWidth(data.customWidth)
+          if (typeof data.customHeight === 'number') setCustomHeight(data.customHeight)
+          if (typeof data.background === 'string') setBackground(data.background)
+          if (typeof data.fit === 'string') setFit(data.fit as FitMode)
+          if (typeof data.rotation === 'number') setRotation(data.rotation)
+          if (typeof data.zoom === 'number') setZoom(data.zoom)
+          if (Array.isArray(data.layers)) setLayers(data.layers as Layer[])
+          if (typeof data.imageName === 'string') setImageName(data.imageName)
+          if (typeof data.imagePath === 'string' && data.imagePath) {
+            setImagePath(data.imagePath)
+            setImageUrl(await createStudioAssetUrl(data.imagePath))
+          }
+          setSaveStatus('Draft restored')
+        } else setSaveStatus('New draft')
+      } catch (cause) {
+        if (active) setSaveStatus(cause instanceof Error ? cause.message : 'Could not load draft')
+      } finally { if (active) setHydrated(true) }
+    }
+    void restore()
+    return () => { active = false }
+  }, [projectId])
+
+  useEffect(() => {
+    if (!hydrated) return
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    setSaveStatus('Unsaved changes')
+    const sequence = ++saveSequence.current
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await saveStudioProject({
+          id: projectId,
+          project_type: 'photo',
+          name: projectName,
+          template_id: templateId || null,
+          data: { format, customWidth, customHeight, background, fit, rotation, zoom, imageName, imagePath, layers },
+        })
+        if (sequence === saveSequence.current) setSaveStatus('All changes saved')
+      } catch (cause) {
+        if (sequence === saveSequence.current) setSaveStatus(cause instanceof Error ? cause.message : 'Save failed')
+      }
+    }, 900)
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+  }, [hydrated, projectId, projectName, templateId, format, customWidth, customHeight, background, fit, rotation, zoom, imageName, imagePath, layers])
+
+  const importImage = async (file?: File) => {
     if (!file) return
     setError('')
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'].includes(file.type)) {
@@ -58,7 +117,12 @@ export function StudioPhotoEditor({ projectName, templateId }: { projectName: st
       setError('Image is larger than 20 MB. Choose a smaller image to keep the editor fast.')
       return
     }
+    setSaveStatus('Uploading image…')
+    let uploadedPath: string
+    try { uploadedPath = await uploadStudioAsset(projectId, file) }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Image upload failed.'); setSaveStatus('Upload failed'); return }
     const nextUrl = URL.createObjectURL(file)
+    setImagePath(uploadedPath)
     setImageUrl(current => {
       if (current) URL.revokeObjectURL(current)
       return nextUrl
@@ -183,7 +247,7 @@ export function StudioPhotoEditor({ projectName, templateId }: { projectName: st
           <Link href={backUrl} aria-label="Back to templates" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-slate-300 hover:bg-white/10"><ArrowLeft className="h-4 w-4" /></Link>
           <div className="min-w-0"><p className="truncate text-sm font-bold">Photo Editor</p><p className="max-w-[38vw] truncate text-[11px] text-slate-500">{projectName || 'Untitled photo project'}</p></div>
         </div>
-        <div className="flex items-center gap-2"><span className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] text-slate-400 sm:flex"><Check className="h-3.5 w-3.5 text-emerald-400" /> Local editing workspace</span><button type="button" disabled={exporting} onClick={() => void exportImage('image/png')} className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-3 text-[10px] font-bold text-white disabled:opacity-50">{exporting ? 'Exporting…' : 'Export PNG'}</button><button type="button" disabled={exporting} onClick={() => void exportImage('image/jpeg')} className="hidden h-9 items-center rounded-xl border border-white/10 px-3 text-[10px] font-semibold text-slate-200 hover:bg-white/5 sm:inline-flex">JPG</button></div>
+        <div className="flex items-center gap-2"><span className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] text-slate-400 sm:flex"><Check className="h-3.5 w-3.5 text-emerald-400" /> {saveStatus}</span><button type="button" disabled={exporting} onClick={() => void exportImage('image/png')} className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-3 text-[10px] font-bold text-white disabled:opacity-50">{exporting ? 'Exporting…' : 'Export PNG'}</button><button type="button" disabled={exporting} onClick={() => void exportImage('image/jpeg')} className="hidden h-9 items-center rounded-xl border border-white/10 px-3 text-[10px] font-semibold text-slate-200 hover:bg-white/5 sm:inline-flex">JPG</button></div>
         <Link href="/studio" className="rounded-lg px-3 py-2 text-xs font-medium text-slate-400 hover:bg-white/5 hover:text-white">Exit</Link>
       </header>
 
@@ -202,7 +266,7 @@ export function StudioPhotoEditor({ projectName, templateId }: { projectName: st
             <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-300">Photo</h2>
             <button type="button" onClick={() => inputRef.current?.click()} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 text-xs font-bold text-white transition hover:brightness-110"><ImagePlus className="h-4 w-4" /> {imageUrl ? 'Replace photo' : 'Upload photo'}</button>
             <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif" className="hidden" onChange={event => { importImage(event.target.files?.[0]); event.currentTarget.value = '' }} />
-            {imageUrl ? <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"><div className="flex items-center gap-2"><img src={imageUrl} alt="Selected upload thumbnail" className="h-12 w-12 rounded-lg object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-[11px] font-semibold text-slate-200">{imageName}</p><p className="text-[10px] text-emerald-300">Ready on canvas</p></div><button type="button" onClick={() => { setImageUrl(null); setImageName(''); setRotation(0) }} aria-label="Remove photo" className="rounded-lg p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-300"><X className="h-4 w-4" /></button></div><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setFit('cover')} className={'rounded-lg border py-2 text-[10px] font-semibold ' + (fit === 'cover' ? 'border-pink-400/50 bg-pink-500/10 text-pink-200' : 'border-white/10 text-slate-400')}>Fill canvas</button><button type="button" onClick={() => setFit('contain')} className={'rounded-lg border py-2 text-[10px] font-semibold ' + (fit === 'contain' ? 'border-pink-400/50 bg-pink-500/10 text-pink-200' : 'border-white/10 text-slate-400')}>Fit photo</button></div><div className="mt-3 flex gap-2"><button type="button" onClick={() => setRotation(value => (value - 90 + 360) % 360)} className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/10 py-2 text-[10px] text-slate-300 hover:bg-white/5"><RotateCcw className="h-3.5 w-3.5" /> Rotate left</button><button type="button" onClick={() => setRotation(value => (value + 90) % 360)} className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/10 py-2 text-[10px] text-slate-300 hover:bg-white/5"><RotateCw className="h-3.5 w-3.5" /> Rotate right</button></div></div> : <p className="mt-2 text-[10px] leading-4 text-slate-500">Add a photo from your device. JPG, PNG, WebP, AVIF and GIF up to 20 MB.</p>}
+            {imageUrl ? <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"><div className="flex items-center gap-2"><img src={imageUrl} alt="Selected upload thumbnail" className="h-12 w-12 rounded-lg object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-[11px] font-semibold text-slate-200">{imageName}</p><p className="text-[10px] text-emerald-300">Ready on canvas</p></div><button type="button" onClick={() => { setImageUrl(null); setImageName(''); setImagePath(null); setRotation(0) }} aria-label="Remove photo" className="rounded-lg p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-300"><X className="h-4 w-4" /></button></div><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setFit('cover')} className={'rounded-lg border py-2 text-[10px] font-semibold ' + (fit === 'cover' ? 'border-pink-400/50 bg-pink-500/10 text-pink-200' : 'border-white/10 text-slate-400')}>Fill canvas</button><button type="button" onClick={() => setFit('contain')} className={'rounded-lg border py-2 text-[10px] font-semibold ' + (fit === 'contain' ? 'border-pink-400/50 bg-pink-500/10 text-pink-200' : 'border-white/10 text-slate-400')}>Fit photo</button></div><div className="mt-3 flex gap-2"><button type="button" onClick={() => setRotation(value => (value - 90 + 360) % 360)} className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/10 py-2 text-[10px] text-slate-300 hover:bg-white/5"><RotateCcw className="h-3.5 w-3.5" /> Rotate left</button><button type="button" onClick={() => setRotation(value => (value + 90) % 360)} className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/10 py-2 text-[10px] text-slate-300 hover:bg-white/5"><RotateCw className="h-3.5 w-3.5" /> Rotate right</button></div></div> : <p className="mt-2 text-[10px] leading-4 text-slate-500">Add a photo from your device. JPG, PNG, WebP, AVIF and GIF up to 20 MB.</p>}
             {error && <p role="alert" className="mt-2 rounded-lg border border-red-400/20 bg-red-400/10 p-2 text-[10px] leading-4 text-red-200">{error}</p>}
           </section>
 
