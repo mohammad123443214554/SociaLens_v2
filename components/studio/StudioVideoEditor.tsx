@@ -209,6 +209,7 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
     let recorder: MediaRecorder | null = null
     let audioContext: AudioContext | null = null
     let musicElement: HTMLAudioElement | null = null
+    let audioDestination: MediaStreamAudioDestinationNode | null = null
     let animationFrame = 0
     try {
       const canvas = document.createElement('canvas')
@@ -222,16 +223,13 @@ export function StudioVideoEditor({ projectName, templateId }: { projectName: st
         if (AudioContextClass) {
           audioContext = new AudioContextClass()
           await audioContext.resume()
+          audioDestination = audioContext.createMediaStreamDestination()
           musicElement = document.createElement('audio')
           musicElement.src = audio.url
           musicElement.loop = true
           const source = audioContext.createMediaElementSource(musicElement)
-          source.connect(audioContext.destination)
-          source.connect(audioContext.createMediaStreamDestination())
-          const destination = audioContext.createMediaStreamDestination()
-          source.disconnect()
-          source.connect(destination)
-          destination.stream.getAudioTracks().forEach(track => stream.addTrack(track))
+          source.connect(audioDestination)
+          audioDestination.stream.getAudioTracks().forEach(track => stream.addTrack(track))
           musicElement.volume = audioVolume / 100
           await musicElement.play()
         }
