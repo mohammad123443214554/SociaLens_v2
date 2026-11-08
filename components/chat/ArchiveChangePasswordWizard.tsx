@@ -91,8 +91,6 @@ export function ArchiveChangePasswordWizard({ lockType = 'password', onClose, on
     }
   }
 
-  const alternateLockType: LockType = lockType === 'password' ? 'pattern' : 'password'
-
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="change-archive-lock-title" className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-card shadow-[0_24px_90px_rgba(0,0,0,0.55)]" onClick={event => event.stopPropagation()}>
