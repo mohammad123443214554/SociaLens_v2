@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import {
-  ArrowLeft, ArrowDown, ArrowUp, AudioLines, Check, ChevronLeft, ChevronRight,
-  Clapperboard, Film, ImagePlus, Layers3, Music2, Pause, Play, Plus, Scissors, Trash2,
-  Video, Volume2, VolumeX, X
+  ArrowLeft, AudioLines, Check, ChevronLeft, ChevronRight, Clapperboard,
+  FolderOpen, ImagePlus, Music2, Pause, Play, Plus, Trash2, Type, Video,
+  Volume2, VolumeX, X
 } from 'lucide-react'
 
 type ClipKind = 'video' | 'image'
@@ -529,6 +529,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         </aside>
 
         <section className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(ellipse_at_50%_30%,rgba(88,54,160,0.15),transparent_55%),#080a13]">
+          <div className="flex h-10 min-h-10 shrink-0 items-center gap-2 overflow-x-auto border-b border-white/[0.07] bg-[#0c0f1c] px-3 md:hidden">
+            <button type="button" onClick={() => videoInput.current?.click()} className="shrink-0 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2 text-[9px] font-bold">Import video</button>
+            <button type="button" onClick={() => imageInput.current?.click()} className="shrink-0 rounded-md border border-white/10 px-3 py-2 text-[9px] font-semibold text-slate-200">Add photo</button>
+            <button type="button" onClick={() => audioInput.current?.click()} className="shrink-0 rounded-md border border-white/10 px-3 py-2 text-[9px] font-semibold text-slate-200">Add audio</button>
+            <button type="button" onClick={() => { setActivePanel('text'); setShowTitle(true) }} className="shrink-0 rounded-md border border-white/10 px-3 py-2 text-[9px] font-semibold text-slate-200">Text</button>
+          </div>
           <div className="flex h-[48px] min-h-[48px] shrink-0 items-center justify-between border-b border-white/[0.07] bg-[#0c0f1c]/85 px-3 sm:px-5">
             <div className="flex items-center gap-2"><span className="text-[10px] font-semibold text-slate-200">Preview</span><span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1 text-[9px] text-slate-500">{aspect}</span><span className="hidden text-[9px] text-slate-600 sm:inline">{selected ? selected.kind === 'video' ? 'Video clip' : 'Photo clip' : 'No clip selected'}</span></div>
             <div className="flex items-center gap-1.5">
