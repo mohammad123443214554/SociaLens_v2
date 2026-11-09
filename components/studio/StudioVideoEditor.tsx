@@ -901,7 +901,16 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         const scale = canvas.width / 420
         for (const layer of visibleLayers) {
           ctx.save()
-          ctx.globalAlpha = Math.min(100, Math.max(0, layer.opacity ?? 100)) / 100
+          const animationSample = getLayerAnimationSample(layer, timelineTime)
+          if (animationSample && !animationSample.visible) { ctx.restore(); continue }
+          ctx.globalAlpha = Math.min(100, Math.max(0, layer.opacity ?? 100)) / 100 * (animationSample?.opacity ?? 1)
+          if (animationSample) {
+            ctx.translate(animationSample.translateX * scale, animationSample.translateY * scale)
+            ctx.scale(animationSample.scaleX, animationSample.scaleY)
+            ctx.rotate(animationSample.rotate * Math.PI / 180)
+            ctx.transform(1, Math.tan(animationSample.skewY * Math.PI / 180), Math.tan(animationSample.skewX * Math.PI / 180), 1, 0, 0)
+            if (typeof ctx.filter === 'string' && animationSample.blur > 0) ctx.filter = 'blur(' + animationSample.blur * scale + 'px)'
+          }
           ctx.fillStyle = layer.color
           ctx.textAlign = layer.align
           ctx.textBaseline = 'top'
