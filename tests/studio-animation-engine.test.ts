@@ -8,6 +8,7 @@ import {
   type TextAnimationDefinition,
 } from '../lib/studio/animation-engine.ts'
 import { BASIC_ENTRANCE_ANIMATIONS } from '../lib/studio/basic-entrance-animations.ts'
+import { EXIT_ANIMATIONS } from '../lib/studio/exit-animations.ts'
 
 const entrance: TextAnimationDefinition = {
   id: 'test-fade-in',
@@ -180,5 +181,54 @@ test('each Basic Entrance preset samples to a visible neutral settled state at c
     assert.ok(Math.abs(sample.scaleY - 1) < 0.0001, definition.name)
     assert.ok(Math.abs(sample.rotate) < 0.0001, definition.name)
     assert.ok(Math.abs(sample.blur) < 0.0001, definition.name)
+  }
+})
+
+
+test('Exit catalog contains exactly 25 uniquely named and visually distinct presets', () => {
+  assert.equal(EXIT_ANIMATIONS.length, 25)
+  assert.deepEqual(validateTextAnimationRegistry(EXIT_ANIMATIONS), [])
+  assert.equal(new Set(EXIT_ANIMATIONS.map(item => item.name)).size, 25)
+  assert.equal(new Set(EXIT_ANIMATIONS.map(item => JSON.stringify(item.keyframes))).size, 25)
+  for (const item of EXIT_ANIMATIONS) {
+    assert.equal(item.category, 'Exit')
+    assert.equal(item.mode, 'exit')
+    assert.ok(item.description && item.description.length > 8)
+  }
+})
+
+test('each Exit preset stays neutral before its exit window and reaches its authored terminal state', () => {
+  for (const definition of EXIT_ANIMATIONS) {
+    const duration = definition.defaultDurationMs / 1000
+    const layerStart = 2
+    const layerDuration = 5
+    const exitStart = Math.max(layerStart, layerStart + layerDuration - duration)
+    const before = sampleTextAnimation({
+      definition,
+      settings: { animationId: definition.id, durationMs: definition.defaultDurationMs, enabled: true },
+      timelineTimeSeconds: Math.max(layerStart, exitStart - 0.01),
+      layerStartSeconds: layerStart,
+      layerDurationSeconds: layerDuration,
+    })
+    const middle = sampleTextAnimation({
+      definition,
+      settings: { animationId: definition.id, durationMs: definition.defaultDurationMs, enabled: true },
+      timelineTimeSeconds: exitStart + duration * 0.5,
+      layerStartSeconds: layerStart,
+      layerDurationSeconds: layerDuration,
+    })
+    const end = sampleTextAnimation({
+      definition,
+      settings: { animationId: definition.id, durationMs: definition.defaultDurationMs, enabled: true },
+      timelineTimeSeconds: exitStart + duration,
+      layerStartSeconds: layerStart,
+      layerDurationSeconds: layerDuration,
+    })
+    assert.equal(before.opacity, 1, definition.name + ' before')
+    assert.equal(before.phase, 'before', definition.name + ' phase before')
+    assert.equal(middle.phase, 'running', definition.name + ' phase middle')
+    assert.equal(end.opacity, 0, definition.name + ' terminal opacity')
+    assert.equal(end.phase, 'after', definition.name + ' phase end')
+    assert.equal(end.visible, true, definition.name + ' terminal visibility')
   }
 })
