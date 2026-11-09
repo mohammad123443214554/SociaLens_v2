@@ -869,12 +869,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             if (effect === 'Double Outline' || effect === 'Triple Stroke') { ctx.lineWidth = Math.max(1, scale); ctx.strokeStyle = secondEffectColor; ctx.strokeText(line, textX, y + index * lineHeight, maxWidth) }
             if (effect === 'Hollow Text') { ctx.shadowBlur = 0; return }
           }
-          if (['Metallic','Hologram'].includes(effect) {
+          if (['Metallic','Hologram'].includes(effect)) {
             const gradient = ctx.createLinearGradient(x, y, x + maxWidth, y + lineHeight)
-            if (effect === 'Rainbow Fill' || effect === 'Hologram') { gradient.addColorStop(0,'#ff4d6d'); gradient.addColorStop(.22,'#ffb703'); gradient.addColorStop(.45,'#80ed99'); gradient.addColorStop(.68,'#4cc9f0'); gradient.addColorStop(.85,'#9b5de5'); gradient.addColorStop(1,'#ff4d6d') }
-            else if (effect === 'Fire') { gradient.addColorStop(0,'#fff7ed'); gradient.addColorStop(.4,'#f97316'); gradient.addColorStop(1,'#991b1b') }
-            else if (effect === 'Ice' || effect === 'Water') { gradient.addColorStop(0,'#fff'); gradient.addColorStop(.5,'#38bdf8'); gradient.addColorStop(1,'#075985') }
-            else if (effect === 'Metallic' || effect === 'Chrome') { gradient.addColorStop(0,'#fff'); gradient.addColorStop(.25,'#64748b'); gradient.addColorStop(.48,'#f8fafc'); gradient.addColorStop(.7,'#475569'); gradient.addColorStop(1,'#fff') }
+            if (effect === 'Hologram') { gradient.addColorStop(0,'#ff4d6d'); gradient.addColorStop(.22,'#ffb703'); gradient.addColorStop(.45,'#80ed99'); gradient.addColorStop(.68,'#4cc9f0'); gradient.addColorStop(.85,'#9b5de5'); gradient.addColorStop(1,'#ff4d6d') }
             else { gradient.addColorStop(0,effectColor); gradient.addColorStop(.5,secondEffectColor); gradient.addColorStop(1,effectColor) }
             ctx.fillStyle = gradient
           }
