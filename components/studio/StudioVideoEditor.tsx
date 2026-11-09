@@ -876,6 +876,16 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           const strength = Math.max(0, Math.min(100, layer.effectIntensity ?? 60)) / 60
           const effectColor = layer.effectColor || '#a855f7'
           const secondEffectColor = layer.effectSecondaryColor || '#22d3ee'
+          const maxWidth = canvas.width * layer.width / 100
+          const boxX = canvas.width * layer.x / 100
+          const boxY = canvas.height * layer.y / 100
+          ctx.translate(boxX + maxWidth / 2, boxY + Math.round(layer.fontSize * scale) / 2)
+          ctx.rotate(layer.rotation * Math.PI / 180)
+          const x = -maxWidth / 2
+          const y = -Math.round(layer.fontSize * scale) / 2
+          const lineHeight = Math.round(layer.fontSize * scale * 1.2)
+          getFormattedText(layer).split(/\n/).forEach((line, index) => {
+            const textX = layer.align === 'left' ? x : layer.align === 'right' ? x + maxWidth : x + maxWidth / 2
           ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0
           ctx.lineJoin = 'round'
           if (['Drop Shadow','Floating Shadow','Ambient Shadow','Layered Shadow','Hard Shadow','Long Shadow','3D Extrude','Perspective Depth'].includes(effect)) {
@@ -904,16 +914,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           if (effect === 'Engrave') { ctx.shadowColor = 'rgba(0,0,0,.8)'; ctx.shadowOffsetX = -1*scale; ctx.shadowOffsetY = -1*scale; ctx.shadowBlur = 1*scale }
           if (effect === 'Glitch' || effect === 'RGB Split') { ctx.save(); ctx.globalAlpha *= .55; ctx.fillStyle = effect === 'Glitch' ? '#ff1744' : '#ff3030'; ctx.fillText(line, textX - 2*scale, y + index * lineHeight, maxWidth); ctx.fillStyle = '#00d9ff'; ctx.fillText(line, textX + 2*scale, y + index * lineHeight, maxWidth); ctx.restore() }
           if (effect === 'Echo' || effect === 'Ghost' || effect === 'Long Shadow' || effect === '3D Extrude') { ctx.save(); ctx.globalAlpha *= .32; ctx.fillStyle = effectColor; for(let step=4;step>=1;step--) ctx.fillText(line,textX+step*scale,y+index*lineHeight+step*scale,maxWidth); ctx.restore() }
-          const maxWidth = canvas.width * layer.width / 100
-          const boxX = canvas.width * layer.x / 100
-          const boxY = canvas.height * layer.y / 100
-          ctx.translate(boxX + maxWidth / 2, boxY + Math.round(layer.fontSize * scale) / 2)
-          ctx.rotate(layer.rotation * Math.PI / 180)
-          const x = -maxWidth / 2
-          const y = -Math.round(layer.fontSize * scale) / 2
-          const lineHeight = Math.round(layer.fontSize * scale * 1.2)
-          getFormattedText(layer).split(/\n/).forEach((line, index) => {
-            const textX = layer.align === 'left' ? x : layer.align === 'right' ? x + maxWidth : x + maxWidth / 2
             ctx.fillText(line, textX, y + index * lineHeight, maxWidth)
             if (layer.underline || layer.strikethrough) {
               const measured = Math.min(maxWidth, ctx.measureText(line).width)
