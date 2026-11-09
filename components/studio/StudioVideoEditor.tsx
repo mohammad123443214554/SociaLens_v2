@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import {
   ArrowLeft, AudioLines, Check, Clapperboard,
-  Bold, CaseUpper, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
-  Palette, Pause, Play, Plus, Strikethrough, Trash2, Type, Underline, Video,
+  Bold, CaseUpper, ChevronDown, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
+  Palette, Pause, Play, Plus, Search, Strikethrough, Trash2, Type, Underline, Video,
   Volume2, VolumeX, X
 } from 'lucide-react'
 
@@ -23,7 +23,7 @@ type Clip = {
   storagePath?: string
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
-type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number }
+type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
 type TextDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'rotate'; startX: number; startY: number; startAngle: number; originX: number; originY: number; originWidth: number; originFontSize: number; originRotation: number }
 type TimelineDrag = { id: string; kind: 'clip' | 'text' | 'audio'; mode: 'move' | 'left' | 'right'; pointerId: number; startX: number; startAt: number; trimStart: number; trimEnd: number; duration: number }
 const MIN_TIMELINE_SECONDS = 60
@@ -39,6 +39,27 @@ const formatTime = (seconds: number) => {
   return String(Math.floor(safe / 60)).padStart(2, '0') + ':' + String(safe % 60).padStart(2, '0')
 }
 const makeId = () => typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : 'clip-' + Date.now() + '-' + Math.random().toString(36).slice(2)
+
+type FontOption = { family: string; category: string }
+const googleFontLoads = new Map<string, Promise<void>>()
+function loadGoogleFont(family: string): Promise<void> {
+  if (!family || family === 'Default') return Promise.resolve()
+  const cached = googleFontLoads.get(family)
+  if (cached) return cached
+  const promise = new Promise<void>(resolve => {
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    const params = new URLSearchParams({ family, display: 'swap' })
+    link.href = 'https://fonts.googleapis.com/css2?' + params.toString()
+    link.onload = () => resolve()
+    link.onerror = () => resolve()
+    document.head.appendChild(link)
+  }).then(async () => {
+    try { await document.fonts.load('16px "' + family.replace(/["\\\\]/g, '') + '"') } catch { /* Keep the editor usable if a remote font fails. */ }
+  })
+  googleFontLoads.set(family, promise)
+  return promise
+}
 
 function readMediaDuration(file: File, url: string, kind: ClipKind): Promise<number> {
   return new Promise(resolve => {
@@ -93,6 +114,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [textLayers, setTextLayers] = useState<TextLayer[]>([])
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
   const [editingTextId, setEditingTextId] = useState<string | null>(null)
+  const [fontMenuOpen, setFontMenuOpen] = useState(false)
+  const [fontSearch, setFontSearch] = useState('')
+  const [fontCatalog, setFontCatalog] = useState<FontOption[]>([])
+  const [fontCatalogLoading, setFontCatalogLoading] = useState(false)
+  const [fontCatalogError, setFontCatalogError] = useState('')
   const [exportWidth, setExportWidth] = useState(1080)
   const [exportHeight, setExportHeight] = useState(1920)
   const [exporting, setExporting] = useState(false)
@@ -157,7 +183,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               text: String(item.text), x: Math.min(95, Math.max(0, Number(item.x) || 0)), y: Math.min(95, Math.max(0, Number(item.y) || 0)),
               width: Math.min(100, Math.max(12, Number(item.width) || 80)), fontSize: Math.min(160, Math.max(10, Number(item.fontSize) || 24)),
               color: typeof item.color === 'string' ? item.color : '#ffffff', bold: item.bold !== false, italic: item.italic === true,
-              underline: item.underline === true, align: item.align === 'left' || item.align === 'right' ? item.align : 'center', rotation: typeof item.rotation === 'number' && Number.isFinite(item.rotation) ? item.rotation : 0,
+              underline: item.underline === true, fontFamily: typeof item.fontFamily === 'string' ? item.fontFamily : 'Default', align: item.align === 'left' || item.align === 'right' ? item.align : 'center', rotation: typeof item.rotation === 'number' && Number.isFinite(item.rotation) ? item.rotation : 0,
               timelineStart: Math.max(0, Number(item.timelineStart) || 0), timelineDuration: Math.max(0.1, Number(item.timelineDuration) || 5),
             }))
             setTextLayers(restoredText)
@@ -326,7 +352,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       body: { text: 'Add a little bit of body text', fontSize: 20, bold: false, y: 45 },
     }
     const preset = presets[kind]
-    const layer: TextLayer = { id: makeId(), kind, text: preset.text, x: 10, y: preset.y, width: 80, fontSize: preset.fontSize, color: '#ffffff', bold: preset.bold, italic: false, underline: false, align: 'center', rotation: 0, timelineStart: 0, timelineDuration: 5 }
+    const layer: TextLayer = { id: makeId(), kind, text: preset.text, x: 10, y: preset.y, width: 80, fontSize: preset.fontSize, color: '#ffffff', bold: preset.bold, italic: false, underline: false, fontFamily: 'Default', align: 'center', rotation: 0, timelineStart: 0, timelineDuration: 5 }
     setTextLayers(items => [...items, layer])
     setSelectedTextId(layer.id)
     setEditingTextId(null)
@@ -517,6 +543,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const exportVideos = new Map<string, HTMLVideoElement>()
     let animationFrame = 0
     try {
+      await Promise.all([...new Set(textLayers.map(layer => layer.fontFamily || 'Default'))].filter(family => family !== 'Default').map(loadGoogleFont))
       const canvas = document.createElement('canvas')
       canvas.width = Math.min(1920, Math.max(240, Math.round(exportWidth)))
       canvas.height = Math.min(1920, Math.max(240, Math.round(exportHeight)))
@@ -573,7 +600,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           ctx.fillStyle = layer.color
           ctx.textAlign = layer.align
           ctx.textBaseline = 'top'
-          ctx.font = (layer.italic ? 'italic ' : '') + (layer.bold ? '700 ' : '400 ') + Math.round(layer.fontSize * scale) + 'px Arial'
+          const exportFontFamily = layer.fontFamily && layer.fontFamily !== 'Default' ? '\"' + layer.fontFamily.replace(/[\"\\\\]/g, '') + '\", sans-serif' : 'Arial, Helvetica, sans-serif'\n          ctx.font = (layer.italic ? 'italic ' : '') + (layer.bold ? '700 ' : '400 ') + Math.round(layer.fontSize * scale) + 'px ' + exportFontFamily
           const maxWidth = canvas.width * layer.width / 100
           const boxX = canvas.width * layer.x / 100
           const boxY = canvas.height * layer.y / 100
@@ -796,6 +823,44 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           {selectedText && <div data-text-toolbar="true" className="sticky top-0 z-40 flex min-h-[48px] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-fuchsia-400/20 bg-[#111629] px-3 py-2 shadow-xl sm:px-5" role="toolbar" aria-label="Selected text formatting">
             <button type="button" onClick={() => removeTextLayer(selectedText.id)} title="Delete text" aria-label="Delete text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-300 transition hover:bg-red-400/10"><Trash2 className="h-4 w-4" /></button>
             <button type="button" onClick={() => duplicateTextLayer(selectedText.id)} title="Duplicate text" aria-label="Duplicate text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-200 transition hover:bg-white/10"><Copy className="h-4 w-4" /></button>
+            <div className="relative shrink-0">
+              <button type="button" onClick={async () => {
+                const opening = !fontMenuOpen
+                setFontMenuOpen(opening)
+                if (opening && fontCatalog.length === 0 && !fontCatalogLoading) {
+                  setFontCatalogLoading(true)
+                  setFontCatalogError('')
+                  try {
+                    const response = await fetch('/api/studio/fonts')
+                    const data = await response.json() as { fonts?: FontOption[]; error?: string }
+                    if (!response.ok || !Array.isArray(data.fonts) || data.fonts.length < 1000) throw new Error(data.error || 'The font catalogue could not be loaded.')
+                    setFontCatalog(data.fonts)
+                  } catch (cause) {
+                    setFontCatalogError(cause instanceof Error ? cause.message : 'The font catalogue could not be loaded.')
+                  } finally { setFontCatalogLoading(false) }
+                }
+              }} title="Choose font" aria-label="Choose font" aria-expanded={fontMenuOpen} className="flex h-8 max-w-[150px] items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 text-[10px] font-semibold text-slate-100 transition hover:bg-white/10">
+                <Type className="h-3.5 w-3.5 shrink-0 text-fuchsia-300" /><span className="max-w-[105px] truncate">{selectedText.fontFamily || 'Default'}</span><ChevronDown className="h-3 w-3 shrink-0" />
+              </button>
+              {fontMenuOpen && <div className="absolute left-0 top-10 z-[80] flex w-[min(300px,80vw)] max-h-[min(420px,65vh)] flex-col overflow-hidden rounded-xl border border-white/15 bg-[#111629] p-2 shadow-2xl">
+                <div className="mb-2 flex items-center gap-2 rounded-lg border border-white/10 bg-[#080c18] px-2">
+                  <Search className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                  <input value={fontSearch} onChange={event => setFontSearch(event.target.value)} placeholder="Search 1,000+ fonts" aria-label="Search fonts" className="h-9 min-w-0 flex-1 bg-transparent text-[11px] text-white outline-none placeholder:text-slate-500" />
+                  <span className="text-[9px] text-slate-500">{fontCatalog.length ? fontCatalog.length.toLocaleString() + '+' : ''}</span>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  <button type="button" onClick={() => { updateTextLayer(selectedText.id, { fontFamily: 'Default' }); setFontMenuOpen(false); setFontSearch('') }} className={'mb-1 flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[11px] transition hover:bg-white/10 ' + ((!selectedText.fontFamily || selectedText.fontFamily === 'Default') ? 'bg-fuchsia-500/15 text-fuchsia-100' : 'text-slate-200')}>
+                    <span>Default</span><span className="text-[9px] text-slate-500">Simple</span>
+                  </button>
+                  {fontCatalogLoading && <p className="px-3 py-5 text-center text-[10px] text-slate-400">Loading Google Fonts…</p>}
+                  {fontCatalogError && <p className="px-3 py-4 text-center text-[10px] text-rose-300">{fontCatalogError}</p>}
+                  {!fontCatalogLoading && fontCatalog.filter(font => font.family.toLowerCase().includes(fontSearch.trim().toLowerCase())).map(font => <button key={font.family} type="button" onClick={async () => { await loadGoogleFont(font.family); updateTextLayer(selectedText.id, { fontFamily: font.family }); setFontMenuOpen(false); setFontSearch('') }} className={'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[11px] transition hover:bg-white/10 ' + (selectedText.fontFamily === font.family ? 'bg-fuchsia-500/15 text-fuchsia-100' : 'text-slate-200')}>
+                    <span className="truncate">{font.family}</span><span className="shrink-0 text-[8px] capitalize text-slate-500">{font.category}</span>
+                  </button>)}
+                  {!fontCatalogLoading && !fontCatalogError && fontCatalog.length > 0 && fontCatalog.filter(font => font.family.toLowerCase().includes(fontSearch.trim().toLowerCase())).length === 0 && <p className="px-3 py-5 text-center text-[10px] text-slate-500">No fonts found.</p>}
+                </div>
+              </div>}
+            </div>
             <span className="mx-1 h-6 w-px shrink-0 bg-white/10" />
             <label title="Text color" className="relative flex h-8 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-100 transition hover:bg-white/10"><Palette className="h-4 w-4" /><span className="absolute bottom-1 left-2 right-2 h-1 rounded-full" style={{ backgroundColor: selectedText.color }} /><input aria-label="Text color" type="color" value={selectedText.color} onChange={event => updateTextLayer(selectedText.id,{color:event.target.value})} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" /></label>
             <span className="mx-1 h-6 w-px shrink-0 bg-white/10" />
@@ -814,7 +879,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               <div ref={canvasRef} onPointerDown={event => { const target = event.target as HTMLElement; if (!target.closest("[data-text-layer-id], [data-text-toolbar]")) { setSelectedTextId(null); setEditingTextId(null) } }} className={'relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-md bg-black ring-1 ring-violet-400/20 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-5xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(72dvh, 720px)' }}>
                 {activeTimelineClip?.kind === 'video' ? <video key={activeTimelineClip.id} ref={previewRef} src={activeTimelineClip.url} playsInline preload="auto" className="h-full w-full object-contain" /> : activeTimelineClip?.kind === 'image' ? <img src={activeTimelineClip.url} alt={activeTimelineClip.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">{clips.length ? 'Timeline gap' : 'Your video canvas'}</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">{clips.length ? 'No media clip is placed at this point in the timeline.' : 'Import a video or photo to start editing your project.'}</p>{!clips.length && <button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button>}</div>}
                 {audio && <audio ref={audioRef} src={audio.url} preload="metadata" />}
-                {textLayers.filter(layer => playhead >= layer.timelineStart && playhead < layer.timelineStart + layer.timelineDuration).map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : layer.strikethrough ? 'line-through' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: 'rotate(' + layer.rotation + 'deg)', transformOrigin: 'center center' }}>
+                {textLayers.filter(layer => playhead >= layer.timelineStart && playhead < layer.timelineStart + layer.timelineDuration).map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontFamily: layer.fontFamily && layer.fontFamily !== 'Default' ? '\"' + layer.fontFamily + '\", sans-serif' : 'Arial, Helvetica, sans-serif', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : layer.strikethrough ? 'line-through' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: 'rotate(' + layer.rotation + 'deg)', transformOrigin: 'center center' }}>
                   <div dir="auto" contentEditable={editingTextId === layer.id} suppressContentEditableWarning onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); if (editingTextId !== layer.id) { const node = event.currentTarget; setEditingTextId(layer.id); window.requestAnimationFrame(() => { node.focus(); const selection = window.getSelection(); const range = document.createRange(); range.selectNodeContents(node); range.collapse(false); selection?.removeAllRanges(); selection?.addRange(range) }) } }} onInput={event => { textDrafts.current.set(layer.id, event.currentTarget.innerText.split(/\n/).map(line => layer.listStyle === 'bullet' ? line.replace(/^•\s?/, '') : layer.listStyle === 'number' ? line.replace(/^\d+\\.\s?/, '') : line).join('\n')) }} onBlur={event => { const value = textDrafts.current.get(layer.id); if (value !== undefined) { updateTextLayer(layer.id,{text:value}); textDrafts.current.delete(layer.id) } setEditingTextId(current => current === layer.id ? null : current) }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.blur() } }} className="min-h-[24px] whitespace-pre-wrap break-words outline-none">{getFormattedText(layer)}</div>
                   {selectedTextId === layer.id && <>
                     <button type="button" aria-label="Move text" title="Drag to move" onPointerDown={event => beginTextDrag(event,layer,'move')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -top-7 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-white bg-slate-900 text-[11px] text-white shadow-md cursor-move touch-none">✥</button>
