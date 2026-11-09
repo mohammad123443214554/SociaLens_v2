@@ -26,9 +26,8 @@ type AudioTrack = { id: string; name: string; url: string; duration: number; tri
 type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number }
 type TextDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'rotate'; startX: number; startY: number; startAngle: number; originX: number; originY: number; originWidth: number; originFontSize: number; originRotation: number }
 type TimelineDrag = { id: string; kind: 'clip' | 'text' | 'audio'; mode: 'move' | 'left' | 'right'; pointerId: number; startX: number; startAt: number; trimStart: number; trimEnd: number; duration: number }
-const TIMELINE_SECONDS = 60
+const MIN_TIMELINE_SECONDS = 60
 const TIMELINE_PX_PER_SECOND = 16
-const TIMELINE_WIDTH = TIMELINE_SECONDS * TIMELINE_PX_PER_SECOND
 
 const MAX_VIDEO_BYTES = 250 * 1024 * 1024
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
@@ -112,7 +111,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     return value
   }
   const totalDuration = useMemo(() => clips.reduce((sum, item) => sum + Math.max(0.1, item.trimEnd - item.trimStart), 0), [clips])
-  const projectEnd = useMemo(() => Math.min(60, Math.max(0, ...clips.map(item => item.timelineStart + item.trimEnd - item.trimStart), ...textLayers.map(item => item.timelineStart + item.timelineDuration), audio ? audio.timelineStart + audio.trimEnd - audio.trimStart : 0)), [clips, textLayers, audio])
+  const projectEnd = useMemo(() => Math.max(0, ...clips.map(item => item.timelineStart + item.trimEnd - item.trimStart), ...textLayers.map(item => item.timelineStart + item.timelineDuration), audio ? audio.timelineStart + audio.trimEnd - audio.trimStart : 0), [clips, textLayers, audio])
+  const timelineSeconds = Math.max(MIN_TIMELINE_SECONDS, Math.ceil(projectEnd / 5) * 5)
+  const timelineWidth = timelineSeconds * TIMELINE_PX_PER_SECOND
   const activeTimelineClip = useMemo(() => [...clips].filter(item => playhead >= item.timelineStart && playhead < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1) || null, [clips, playhead])
   const currentDuration = selected ? Math.max(0, selected.trimEnd - selected.trimStart) : 0
 
@@ -132,7 +133,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           const restored = await Promise.all(savedClips.map(async item => ({
             id: String(item.id), kind: item.kind as ClipKind, name: String(item.name),
             url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration),
-            trimStart: Number(item.trimStart), trimEnd: Number(item.trimEnd), timelineStart: Math.max(0, Math.min(60, Number(item.timelineStart) || 0)), fileSize: Number(item.fileSize),
+            trimStart: Number(item.trimStart), trimEnd: Number(item.trimEnd), timelineStart: Math.max(0, Number(item.timelineStart) || 0), fileSize: Number(item.fileSize),
             storagePath: String(item.storagePath),
           })))
           if (!active) return
@@ -140,7 +141,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           if (typeof data.audioPath === 'string' && data.audioPath) {
             const audioUrl = await createStudioAssetUrl(data.audioPath)
             if (!active) return
-            setAudio({ id: String(data.audioId || makeId()), name: String(data.audioName || 'Background music'), url: audioUrl, duration: Number(data.audioDuration || 0), trimStart: Number(data.audioTrimStart) || 0, trimEnd: Number(data.audioTrimEnd) || Number(data.audioDuration || 0), timelineStart: Math.max(0, Math.min(60, Number(data.audioTimelineStart) || 0)), fileSize: Number(data.audioFileSize || 0), storagePath: data.audioPath })
+            setAudio({ id: String(data.audioId || makeId()), name: String(data.audioName || 'Background music'), url: audioUrl, duration: Number(data.audioDuration || 0), trimStart: Number(data.audioTrimStart) || 0, trimEnd: Number(data.audioTrimEnd) || Number(data.audioDuration || 0), timelineStart: Math.max(0, Number(data.audioTimelineStart) || 0), fileSize: Number(data.audioFileSize || 0), storagePath: data.audioPath })
           }
           if (typeof data.selectedId === 'string') setSelectedId(data.selectedId)
           if (typeof data.muted === 'boolean') setMuted(data.muted)
@@ -157,7 +158,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               width: Math.min(100, Math.max(12, Number(item.width) || 80)), fontSize: Math.min(160, Math.max(10, Number(item.fontSize) || 24)),
               color: typeof item.color === 'string' ? item.color : '#ffffff', bold: item.bold !== false, italic: item.italic === true,
               underline: item.underline === true, align: item.align === 'left' || item.align === 'right' ? item.align : 'center', rotation: typeof item.rotation === 'number' && Number.isFinite(item.rotation) ? item.rotation : 0,
-              timelineStart: Math.max(0, Math.min(60, Number(item.timelineStart) || 0)), timelineDuration: Math.max(0.1, Math.min(60, Number(item.timelineDuration) || 5)),
+              timelineStart: Math.max(0, Number(item.timelineStart) || 0), timelineDuration: Math.max(0.1, Math.min(60, Number(item.timelineDuration) || 5)),
             }))
             setTextLayers(restoredText)
             if (typeof data.selectedTextId === 'string') setSelectedTextId(data.selectedTextId)
@@ -286,8 +287,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         setError('Could not read ' + file.name + '. Try another MP4, WebM or MOV file.')
         continue
       }
-      const timelineStart = Math.min(60, Math.max(0, [...clips, ...additions].reduce((end, item) => Math.max(end, item.timelineStart + item.trimEnd - item.trimStart), 0)))
-      additions.push({ id: makeId(), kind, name: file.name, url, duration, trimStart: 0, trimEnd: Math.min(duration, Math.max(0.1, 60 - timelineStart)), timelineStart, fileSize: file.size, storagePath })
+      const timelineStart = Math.max(0, [...clips, ...additions].reduce((end, item) => Math.max(end, item.timelineStart + item.trimEnd - item.trimStart), 0))
+      additions.push({ id: makeId(), kind, name: file.name, url, duration, trimStart: 0, trimEnd: Math.max(0.1, duration), timelineStart, fileSize: file.size, storagePath })
     }
     if (additions.length) {
       setClips(items => [...items, ...additions])
@@ -313,7 +314,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       el.src = url
     })
     if (!duration) { URL.revokeObjectURL(url); objectUrls.current.delete(url); setError('Could not read this audio file.'); return }
-    setAudio(current => { if (current) { URL.revokeObjectURL(current.url); objectUrls.current.delete(current.url) }; return { id: makeId(), name: file.name, url, duration, trimStart: 0, trimEnd: Math.min(duration, 60), timelineStart: 0, fileSize: file.size, storagePath } })
+    setAudio(current => { if (current) { URL.revokeObjectURL(current.url); objectUrls.current.delete(current.url) }; return { id: makeId(), name: file.name, url, duration, trimStart: 0, trimEnd: duration, timelineStart: 0, fileSize: file.size, storagePath } })
     setNotice('Music track added. Adjust its volume in the Audio panel.')
   }
 
@@ -350,7 +351,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const layer = kind === 'text' ? textLayers.find(item => item.id === id) : null
     const track = kind === 'audio' && audio?.id === id ? audio : null
     if (clip) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startAt: clip.timelineStart, trimStart: clip.trimStart, trimEnd: clip.trimEnd, duration: clip.duration }
-    else if (layer) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startAt: layer.timelineStart, trimStart: 0, trimEnd: layer.timelineDuration, duration: 60 }
+    else if (layer) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startAt: layer.timelineStart, trimStart: 0, trimEnd: layer.timelineDuration, duration: Math.max(MIN_TIMELINE_SECONDS, layer.timelineStart + layer.timelineDuration) }
     else if (track) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startAt: track.timelineStart, trimStart: track.trimStart, trimEnd: track.trimEnd, duration: track.duration }
   }
   const moveTimelineDrag = (event: ReactPointerEvent<HTMLElement>) => {
@@ -360,26 +361,26 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (drag.kind === 'text') {
       const layer = textLayers.find(item => item.id === drag.id)
       if (!layer) return
-      if (drag.mode === 'move') updateTextLayer(drag.id, { timelineStart: Math.max(0, Math.min(60 - layer.timelineDuration, drag.startAt + delta)) })
+      if (drag.mode === 'move') updateTextLayer(drag.id, { timelineStart: Math.max(0, drag.startAt + delta) })
       else if (drag.mode === 'left') {
         const end = drag.startAt + drag.trimEnd
         const nextStart = Math.max(0, Math.min(end - 0.1, drag.startAt + delta))
         updateTextLayer(drag.id, { timelineStart: nextStart, timelineDuration: Math.max(0.1, end - nextStart) })
-      } else updateTextLayer(drag.id, { timelineDuration: Math.max(0.1, Math.min(60 - drag.startAt, drag.trimEnd + delta)) })
+      } else updateTextLayer(drag.id, { timelineDuration: Math.max(0.1, drag.trimEnd + delta) })
     } else if (drag.kind === 'clip') {
       const clip = clips.find(item => item.id === drag.id)
       if (!clip) return
-      if (drag.mode === 'move') updateClip(drag.id, { timelineStart: Math.max(0, Math.min(60 - (drag.trimEnd - drag.trimStart), drag.startAt + delta)) })
+      if (drag.mode === 'move') updateClip(drag.id, { timelineStart: Math.max(0, drag.startAt + delta) })
       else if (drag.mode === 'left') {
         const nextStart = Math.max(0, Math.min(drag.trimEnd - 0.1, drag.trimStart + delta))
-        updateClip(drag.id, { trimStart: nextStart, timelineStart: Math.max(0, Math.min(60 - (drag.trimEnd - nextStart), drag.startAt + nextStart - drag.trimStart)) })
-      } else updateClip(drag.id, { trimEnd: Math.max(drag.trimStart + 0.1, Math.min(drag.duration, 60 - drag.startAt + drag.trimStart, drag.trimEnd + delta)) })
+        updateClip(drag.id, { trimStart: nextStart, timelineStart: Math.max(0, drag.startAt + nextStart - drag.trimStart) })
+      } else updateClip(drag.id, { trimEnd: Math.max(drag.trimStart + 0.1, Math.min(drag.duration, drag.trimEnd + delta)) })
     } else if (audio?.id === drag.id) {
-      if (drag.mode === 'move') setAudio({ ...audio, timelineStart: Math.max(0, Math.min(60 - (drag.trimEnd - drag.trimStart), drag.startAt + delta)) })
+      if (drag.mode === 'move') setAudio({ ...audio, timelineStart: Math.max(0, drag.startAt + delta) })
       else if (drag.mode === 'left') {
         const nextStart = Math.max(0, Math.min(drag.trimEnd - 0.1, drag.trimStart + delta))
-        setAudio({ ...audio, trimStart: nextStart, timelineStart: Math.max(0, Math.min(60 - (drag.trimEnd - nextStart), drag.startAt + nextStart - drag.trimStart)) })
-      } else setAudio({ ...audio, trimEnd: Math.max(drag.trimStart + 0.1, Math.min(drag.duration, 60 - drag.startAt + drag.trimStart, drag.trimEnd + delta)) })
+        setAudio({ ...audio, trimStart: nextStart, timelineStart: Math.max(0, drag.startAt + nextStart - drag.trimStart) })
+      } else setAudio({ ...audio, trimEnd: Math.max(drag.trimStart + 0.1, Math.min(drag.duration, drag.trimEnd + delta)) })
     }
   }
   const endTimelineDrag = (event: ReactPointerEvent<HTMLElement>) => {
@@ -496,7 +497,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       setPlaying(false)
     }
     const rect = event.currentTarget.getBoundingClientRect()
-    const localX = Math.max(0, Math.min(TIMELINE_WIDTH, event.clientX - rect.left))
+    const localX = Math.max(0, Math.min(timelineWidth, event.clientX - rect.left))
     setPlayhead(localX / TIMELINE_PX_PER_SECOND)
   }
   useEffect(() => { if (audioRef.current) audioRef.current.volume = audioVolume / 100 }, [audioVolume, audio?.url])
@@ -632,7 +633,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               ctx.fillRect(0, 0, canvas.width, canvas.height)
               drawTitle(timelineTime)
               syncMusic(timelineTime)
-              setExportProgress(Math.min(99, Math.round((timelineTime / 60) * 100)))
+              setExportProgress(Math.min(99, Math.round((timelineTime / Math.max(1, projectEnd)) * 100)))
               if (elapsed >= gapDuration) resolve()
               else animationFrame = requestAnimationFrame(frame)
             }
@@ -657,7 +658,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               const timelineTime = clip.timelineStart + Math.min(durationMs / 1000, (now - start) / 1000)
               drawTitle(timelineTime)
               syncMusic(timelineTime)
-              setExportProgress(Math.min(99, Math.round((timelineTime / 60) * 100)))
+              setExportProgress(Math.min(99, Math.round((timelineTime / Math.max(1, projectEnd)) * 100)))
               if (now - start >= durationMs) { timelineCursor = Math.max(timelineCursor, clip.timelineStart + durationMs / 1000); resolve() }
               else animationFrame = requestAnimationFrame(frame)
             }
@@ -684,7 +685,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               const timelineTime = clip.timelineStart + Math.min(clip.trimEnd - clip.trimStart, video.currentTime - clip.trimStart)
               if (video.readyState >= 2 && video.videoWidth > 0) drawVideoFrame(video, timelineTime)
               syncMusic(timelineTime)
-              setExportProgress(Math.min(99, Math.round((timelineTime / 60) * 100)))
+              setExportProgress(Math.min(99, Math.round((timelineTime / Math.max(1, projectEnd)) * 100)))
               if (video.currentTime >= clip.trimEnd || video.ended) { video.pause(); resolve(); return }
               animationFrame = requestAnimationFrame(frame)
             }
@@ -832,13 +833,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           </div>
 
           <section className="z-10 shrink-0 border-t border-white/[0.09] bg-[#0b0e1a] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 sm:px-4">
-            <div className="mb-2 flex items-center justify-between gap-2"><div className="flex items-center gap-2"><AudioLines className="h-3.5 w-3.5 text-fuchsia-300" /><h2 className="text-[10px] font-bold text-slate-200">Timeline</h2><span className="hidden text-[9px] text-slate-600 sm:inline">60-second editing range · drag strips to move, drag edges to trim</span></div><div className="flex items-center gap-3"><span className="text-[9px] tabular-nums text-slate-500">{formatTime(playhead)} / 01:00</span><button type="button" onClick={() => void togglePlayback()} disabled={!clips.length} aria-label={playing ? 'Pause timeline' : 'Play timeline'} className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md shadow-violet-950/40 disabled:opacity-30">{playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}</button></div></div>
+            <div className="mb-2 flex items-center justify-between gap-2"><div className="flex items-center gap-2"><AudioLines className="h-3.5 w-3.5 text-fuchsia-300" /><h2 className="text-[10px] font-bold text-slate-200">Timeline</h2><span className="hidden text-[9px] text-slate-600 sm:inline">Full-length editing range · drag strips to move, drag edges to trim</span></div><div className="flex items-center gap-3"><span className="text-[9px] tabular-nums text-slate-500">{formatTime(playhead)} / {formatTime(projectEnd)}</span><button type="button" onClick={() => void togglePlayback()} disabled={!clips.length} aria-label={playing ? 'Pause timeline' : 'Play timeline'} className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md shadow-violet-950/40 disabled:opacity-30">{playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}</button></div></div>
             <div className="overflow-x-auto overscroll-x-contain rounded-md">
-              <div className="relative" style={{ width: TIMELINE_WIDTH + 72 }}>
+              <div className="relative" style={{ width: timelineWidth + 72 }}>
                 <div className="flex h-6 items-end border-b border-white/10">
                   <div className="w-[72px] shrink-0" />
-                  <div className="relative h-full cursor-crosshair" style={{ width: TIMELINE_WIDTH }} onPointerDown={seekTimeline}>
-                    {Array.from({ length: 13 }, (_, index) => <div key={index} className="absolute bottom-0 h-3 border-l border-white/20 pl-1 text-[8px] tabular-nums text-slate-500 pointer-events-none" style={{ left: index * 5 * TIMELINE_PX_PER_SECOND }}>{formatTime(index * 5)}</div>)}
+                  <div className="relative h-full cursor-crosshair" style={{ width: timelineWidth }} onPointerDown={seekTimeline}>
+                    {Array.from({ length: Math.floor(timelineSeconds / 5) + 1 }, (_, index) => <div key={index} className="absolute bottom-0 h-3 border-l border-white/20 pl-1 text-[8px] tabular-nums text-slate-500 pointer-events-none" style={{ left: index * 5 * TIMELINE_PX_PER_SECOND }}>{formatTime(index * 5)}</div>)}
                   </div>
                 </div>
                 {[
@@ -848,7 +849,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   { key: 'audio', label: 'Audio', icon: <Music2 className="h-3 w-3" />, tone: 'emerald' },
                 ].map(track => <div key={track.key} className="flex min-h-[34px] border-b border-white/[0.045]">
                   <div className={'flex w-[72px] shrink-0 items-center gap-1.5 border-r px-2 text-[9px] font-semibold ' + (track.tone === 'fuchsia' ? 'border-fuchsia-400/10 bg-[#21152b] text-fuchsia-100' : track.tone === 'sky' ? 'border-sky-400/10 bg-[#10212b] text-sky-100' : track.tone === 'violet' ? 'border-violet-400/10 bg-[#1b1830] text-violet-100' : 'border-emerald-400/10 bg-[#10271f] text-emerald-100')}>{track.icon}{track.label}</div>
-                  <div className="relative min-h-[34px] shrink-0 cursor-crosshair" style={{ width: TIMELINE_WIDTH, height: track.key === 'text' ? Math.max(34, textLayers.length * 30 + 4) : 34 }} onPointerDown={seekTimeline}>
+                  <div className="relative min-h-[34px] shrink-0 cursor-crosshair" style={{ width: timelineWidth, height: track.key === 'text' ? Math.max(34, textLayers.length * 30 + 4) : 34 }} onPointerDown={seekTimeline}>
                     {track.key === 'text' && textLayers.map(layer => <div key={layer.id} onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => { setSelectedTextId(layer.id); setActivePanel('text') }} title={layer.text} className={'absolute flex h-[22px] min-w-[12px] items-center overflow-visible rounded bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[8px] font-semibold text-white shadow-sm cursor-grab touch-none ' + (selectedTextId === layer.id ? 'ring-1 ring-fuchsia-200' : '')} style={{ top: 6 + textLayers.findIndex(item => item.id === layer.id) * 30, left: layer.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(12, layer.timelineDuration * TIMELINE_PX_PER_SECOND) }}>
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/30" />
                       <span className="min-w-0 flex-1 truncate px-2">{layer.text || 'Untitled text'}</span>
