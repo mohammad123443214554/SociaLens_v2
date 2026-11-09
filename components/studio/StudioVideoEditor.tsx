@@ -245,10 +245,12 @@ const TEXT_EFFECTS = [
 ] as const
 const EFFECT_CATEGORIES = [...new Set(TEXT_EFFECTS.map(effect => effect.category))]
 type TextEffect = typeof TEXT_EFFECTS[number]['name']
-function getTextEffectStyle(effect: string | undefined, intensity = 60, color = '#a855f7', secondary = '#22d3ee'): Record<string, string | number> {
+function getTextEffectStyle(effect: string | undefined, intensity = 60, color = '#a855f7', secondary = '#22d3ee', blur = 8, distance = 4, angle = 45): Record<string, string | number> {
   const n = Math.max(0.1, intensity / 60)
-  const soft = Math.round(3 * n)
-  const glow = Math.round(8 * n)
+  const dx = Math.round(Math.cos(angle * Math.PI / 180) * distance * n)
+  const dy = Math.round(Math.sin(angle * Math.PI / 180) * distance * n)
+  const soft = Math.max(0, Math.round(blur * n))
+  const glow = Math.max(0, Math.round(blur * n))
   const styles: Record<string, Record<string, string | number>> = {
     'Drop Shadow': { textShadow: `${dx}px ${dy}px ${soft}px rgba(0,0,0,.75)` },
     'Long Shadow': { textShadow: Array.from({length:Math.min(12,Math.max(3,Math.round(8*n)))},(_,i)=>`${i+1}px ${i+1}px 0 ${color}`).join(',') },
