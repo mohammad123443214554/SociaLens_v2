@@ -21,8 +21,8 @@ type Clip = {
   storagePath?: string
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; fileSize: number; storagePath?: string }
-type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; bold: boolean; italic: boolean; underline: boolean; align: 'left' | 'center' | 'right' }
-type TextDrag = { id: string; pointerId: number; mode: 'move' | 'resize'; startX: number; startY: number; originX: number; originY: number; originWidth: number; originFontSize: number }
+type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; bold: boolean; italic: boolean; underline: boolean; align: 'left' | 'center' | 'right'; rotation: number }
+type TextDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'rotate'; startX: number; startY: number; startAngle: number; originX: number; originY: number; originWidth: number; originFontSize: number; originRotation: number }
 
 const MAX_VIDEO_BYTES = 250 * 1024 * 1024
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
@@ -65,6 +65,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const audioRef = useRef<HTMLAudioElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const textDrag = useRef<TextDrag | null>(null)
+  const textDrafts = useRef<Map<string, string>>(new Map())
   const objectUrls = useRef<Set<string>>(new Set())
   const [clips, setClips] = useState<Clip[]>([])
   const [audio, setAudio] = useState<AudioTrack | null>(null)
@@ -138,7 +139,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               text: String(item.text), x: Math.min(95, Math.max(0, Number(item.x) || 0)), y: Math.min(95, Math.max(0, Number(item.y) || 0)),
               width: Math.min(100, Math.max(12, Number(item.width) || 80)), fontSize: Math.min(160, Math.max(10, Number(item.fontSize) || 24)),
               color: typeof item.color === 'string' ? item.color : '#ffffff', bold: item.bold !== false, italic: item.italic === true,
-              underline: item.underline === true, align: item.align === 'left' || item.align === 'right' ? item.align : 'center',
+              underline: item.underline === true, align: item.align === 'left' || item.align === 'right' ? item.align : 'center', rotation: typeof item.rotation === 'number' && Number.isFinite(item.rotation) ? item.rotation : 0,
             }))
             setTextLayers(restoredText)
             if (typeof data.selectedTextId === 'string') setSelectedTextId(data.selectedTextId)
@@ -308,7 +309,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       body: { text: 'Add a little bit of body text', fontSize: 20, bold: false, y: 45 },
     }
     const preset = presets[kind]
-    const layer: TextLayer = { id: makeId(), kind, text: preset.text, x: 10, y: preset.y, width: 80, fontSize: preset.fontSize, color: '#ffffff', bold: preset.bold, italic: false, underline: false, align: 'center' }
+    const layer: TextLayer = { id: makeId(), kind, text: preset.text, x: 10, y: preset.y, width: 80, fontSize: preset.fontSize, color: '#ffffff', bold: preset.bold, italic: false, underline: false, align: 'center', rotation: 0 }
     setTextLayers(items => [...items, layer])
     setSelectedTextId(layer.id)
     setEditingTextId(layer.id)
@@ -317,17 +318,22 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   }
   const updateTextLayer = (id: string, patch: Partial<TextLayer>) => setTextLayers(items => items.map(item => item.id === id ? { ...item, ...patch } : item))
   const removeTextLayer = (id: string) => {
+    textDrafts.current.delete(id)
     setTextLayers(items => items.filter(item => item.id !== id))
     if (selectedTextId === id) setSelectedTextId(null)
     if (editingTextId === id) setEditingTextId(null)
   }
-  const beginTextDrag = (event: ReactPointerEvent<HTMLElement>, layer: TextLayer, mode: 'move' | 'resize') => {
-    if (editingTextId === layer.id && mode === 'move') return
+  const beginTextDrag = (event: ReactPointerEvent<HTMLElement>, layer: TextLayer, mode: TextDrag['mode']) => {
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
-    textDrag.current = { id: layer.id, pointerId: event.pointerId, mode, startX: event.clientX, startY: event.clientY, originX: layer.x, originY: layer.y, originWidth: layer.width, originFontSize: layer.fontSize }
+    const rect = canvasRef.current?.getBoundingClientRect()
+    const centerX = rect ? rect.left + (layer.x + layer.width / 2) / 100 * rect.width : event.clientX
+    const centerY = rect ? rect.top + (layer.y + 2) / 100 * rect.height : event.clientY
+    const startAngle = Math.atan2(event.clientY - centerY, event.clientX - centerX)
+    textDrag.current = { id: layer.id, pointerId: event.pointerId, mode, startX: event.clientX, startY: event.clientY, startAngle, originX: layer.x, originY: layer.y, originWidth: layer.width, originFontSize: layer.fontSize, originRotation: layer.rotation }
     setSelectedTextId(layer.id)
+    setEditingTextId(null)
   }
   const moveTextPointer = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = textDrag.current
@@ -336,7 +342,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const dx = event.clientX - drag.startX
     const dy = event.clientY - drag.startY
     if (drag.mode === 'move') updateTextLayer(drag.id, { x: Math.min(100, Math.max(0, drag.originX + dx / rect.width * 100)), y: Math.min(96, Math.max(0, drag.originY + dy / rect.height * 100)) })
-    else updateTextLayer(drag.id, { width: Math.min(100, Math.max(12, drag.originWidth + dx / rect.width * 100)), fontSize: Math.min(160, Math.max(10, drag.originFontSize + dy * 0.35)) })
+    else if (drag.mode === 'resize') updateTextLayer(drag.id, { width: Math.min(100, Math.max(12, drag.originWidth + dx / rect.width * 100)), fontSize: Math.min(160, Math.max(10, drag.originFontSize + dy * 0.35)) })
+    else {
+      const centerX = rect.left + (drag.originX + drag.originWidth / 2) / 100 * rect.width
+      const centerY = rect.top + (drag.originY + 2) / 100 * rect.height
+      const angle = Math.atan2(event.clientY - centerY, event.clientX - centerX)
+      const delta = (angle - drag.startAngle) * 180 / Math.PI
+      updateTextLayer(drag.id, { rotation: ((drag.originRotation + delta + 360) % 360) })
+    }
   }
   const endTextPointer = (event: ReactPointerEvent<HTMLElement>) => {
     if (textDrag.current?.pointerId === event.pointerId) textDrag.current = null
@@ -437,13 +450,18 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         ctx.save()
         const scale = canvas.width / 420
         for (const layer of textLayers) {
+          ctx.save()
           ctx.fillStyle = layer.color
           ctx.textAlign = layer.align
           ctx.textBaseline = 'top'
           ctx.font = (layer.italic ? 'italic ' : '') + (layer.bold ? '700 ' : '400 ') + Math.round(layer.fontSize * scale) + 'px Arial'
-          const x = canvas.width * layer.x / 100
-          const y = canvas.height * layer.y / 100
           const maxWidth = canvas.width * layer.width / 100
+          const boxX = canvas.width * layer.x / 100
+          const boxY = canvas.height * layer.y / 100
+          ctx.translate(boxX + maxWidth / 2, boxY + Math.round(layer.fontSize * scale) / 2)
+          ctx.rotate(layer.rotation * Math.PI / 180)
+          const x = -maxWidth / 2
+          const y = -Math.round(layer.fontSize * scale) / 2
           const lineHeight = Math.round(layer.fontSize * scale * 1.2)
           layer.text.split(/\\n/).forEach((line, index) => {
             const textX = layer.align === 'left' ? x : layer.align === 'right' ? x + maxWidth : x + maxWidth / 2
@@ -454,6 +472,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               ctx.fillRect(startX, y + index * lineHeight + lineHeight - Math.max(1, scale), measured, Math.max(1, scale))
             }
           })
+          ctx.restore()
         }
         ctx.restore()
       }
@@ -639,9 +658,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               <div ref={canvasRef} onPointerDown={event => { if (event.target === event.currentTarget) { setSelectedTextId(null); setEditingTextId(null) } }} className={'relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-md bg-black ring-1 ring-violet-400/20 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-5xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(72dvh, 720px)' }}>
                 {selected?.kind === 'video' ? <video key={selected.id} ref={previewRef} src={selected.url} playsInline preload="metadata" className="h-full w-full object-contain" onEnded={() => { audioRef.current?.pause(); setPlaying(false) }} /> : selected?.kind === 'image' ? <img src={selected.url} alt={selected.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">Your video canvas</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">Import a video or photo to start editing your project.</p><button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button></div>}
                 {audio && <audio ref={audioRef} src={audio.url} preload="metadata" />}
-                {textLayers.map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => beginTextDrag(event,layer,'move')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} onDoubleClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); setEditingTextId(layer.id) }} className={'absolute z-20 min-h-[28px] touch-none rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline ? 'underline' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere' }}>
-                  <div contentEditable={editingTextId === layer.id} suppressContentEditableWarning onInput={event => updateTextLayer(layer.id,{text:event.currentTarget.innerText})} onBlur={() => setEditingTextId(current => current === layer.id ? null : current)} className="min-h-[24px] whitespace-pre-wrap break-words outline-none">{layer.text}</div>
-                  {selectedTextId === layer.id && editingTextId !== layer.id && <button type="button" aria-label="Resize text" onPointerDown={event => beginTextDrag(event,layer,'resize')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-fuchsia-500 shadow-md" />}
+                {textLayers.map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline ? 'underline' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: 'rotate(' + layer.rotation + 'deg)', transformOrigin: 'center center' }}>
+                  <div contentEditable={editingTextId === layer.id} suppressContentEditableWarning onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); if (editingTextId !== layer.id) { const node = event.currentTarget; setEditingTextId(layer.id); window.requestAnimationFrame(() => { node.focus(); const selection = window.getSelection(); const range = document.createRange(); range.selectNodeContents(node); range.collapse(false); selection?.removeAllRanges(); selection?.addRange(range) }) } }} onInput={event => { textDrafts.current.set(layer.id,event.currentTarget.innerText) }} onBlur={event => { const value = textDrafts.current.get(layer.id); if (value !== undefined) { updateTextLayer(layer.id,{text:value}); textDrafts.current.delete(layer.id) } setEditingTextId(current => current === layer.id ? null : current) }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.blur() } }} className="min-h-[24px] whitespace-pre-wrap break-words outline-none">{layer.text}</div>
+                  {selectedTextId === layer.id && editingTextId !== layer.id && <>
+                    <button type="button" aria-label="Move text" title="Drag to move" onPointerDown={event => beginTextDrag(event,layer,'move')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -top-7 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-white bg-slate-900 text-[11px] text-white shadow-md cursor-move">✥</button>
+                    <button type="button" aria-label="Rotate text" title="Drag to rotate" onPointerDown={event => beginTextDrag(event,layer,'rotate')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -bottom-7 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-white bg-slate-900 text-[12px] text-white shadow-md cursor-grab">↻</button>
+                    <button type="button" aria-label="Resize text" title="Drag to resize" onPointerDown={event => beginTextDrag(event,layer,'resize')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-fuchsia-500 shadow-md cursor-nwse-resize" />
+                  </>}
                 </div>)}
                 {selected?.kind === 'video' && <div className="absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-1 text-[9px] tabular-nums text-white">{formatTime(playhead)} / {formatTime(selected.duration)}</div>}
               </div>
