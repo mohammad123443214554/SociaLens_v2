@@ -198,6 +198,17 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
 
 
   useEffect(() => {
+    if (!editingTextId) return
+    const editable = document.querySelector<HTMLElement>('[data-text-layer-id="' + editingTextId + '"] [contenteditable="true"]')
+    if (editable) {
+      editable.focus()
+      const selection = window.getSelection()
+      selection?.selectAllChildren(editable)
+      selection?.collapseToEnd()
+    }
+  }, [editingTextId])
+
+  useEffect(() => {
     const video = previewRef.current
     if (!video || !selected || selected.kind !== 'video') return
     video.currentTime = Math.min(selected.trimStart, Math.max(0, selected.duration - 0.05))
@@ -303,7 +314,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (selectedTextId === id) setSelectedTextId(null)
     if (editingTextId === id) setEditingTextId(null)
   }
-  const beginTextDrag = (event: ReactPointerEvent<HTMLDivElement>, layer: TextLayer, mode: 'move' | 'resize') => {
+  const beginTextDrag = (event: ReactPointerEvent<HTMLElement>, layer: TextLayer, mode: 'move' | 'resize') => {
     if (editingTextId === layer.id && mode === 'move') return
     event.preventDefault()
     event.stopPropagation()
@@ -311,7 +322,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     textDrag.current = { id: layer.id, pointerId: event.pointerId, mode, startX: event.clientX, startY: event.clientY, originX: layer.x, originY: layer.y, originWidth: layer.width, originFontSize: layer.fontSize }
     setSelectedTextId(layer.id)
   }
-  const moveTextPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const moveTextPointer = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = textDrag.current
     const rect = canvasRef.current?.getBoundingClientRect()
     if (!drag || drag.pointerId !== event.pointerId || !rect) return
@@ -320,7 +331,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (drag.mode === 'move') updateTextLayer(drag.id, { x: Math.min(100, Math.max(0, drag.originX + dx / rect.width * 100)), y: Math.min(96, Math.max(0, drag.originY + dy / rect.height * 100)) })
     else updateTextLayer(drag.id, { width: Math.min(100, Math.max(12, drag.originWidth + dx / rect.width * 100)), fontSize: Math.min(160, Math.max(10, drag.originFontSize + dy * 0.35)) })
   }
-  const endTextPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const endTextPointer = (event: ReactPointerEvent<HTMLElement>) => {
     if (textDrag.current?.pointerId === event.pointerId) textDrag.current = null
   }
   const removeClip = (id: string) => {
@@ -621,7 +632,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               <div ref={canvasRef} onPointerDown={event => { if (event.target === event.currentTarget) { setSelectedTextId(null); setEditingTextId(null) } }} className={'relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-md bg-black ring-1 ring-violet-400/20 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-5xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(72dvh, 720px)' }}>
                 {selected?.kind === 'video' ? <video key={selected.id} ref={previewRef} src={selected.url} playsInline preload="metadata" className="h-full w-full object-contain" onEnded={() => { audioRef.current?.pause(); setPlaying(false) }} /> : selected?.kind === 'image' ? <img src={selected.url} alt={selected.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">Your video canvas</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">Import a video or photo to start editing your project.</p><button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button></div>}
                 {audio && <audio ref={audioRef} src={audio.url} preload="metadata" />}
-                {textLayers.map(layer => <div key={layer.id} onPointerDown={event => beginTextDrag(event,layer,'move')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} onDoubleClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); setEditingTextId(layer.id) }} className={'absolute z-20 min-h-[28px] touch-none rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline ? 'underline' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere' }}>
+                {textLayers.map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => beginTextDrag(event,layer,'move')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} onDoubleClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); setEditingTextId(layer.id) }} className={'absolute z-20 min-h-[28px] touch-none rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline ? 'underline' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere' }}>
                   <div contentEditable={editingTextId === layer.id} suppressContentEditableWarning onInput={event => updateTextLayer(layer.id,{text:event.currentTarget.innerText})} onBlur={() => setEditingTextId(current => current === layer.id ? null : current)} className="min-h-[24px] whitespace-pre-wrap break-words outline-none">{layer.text}</div>
                   {selectedTextId === layer.id && editingTextId !== layer.id && <button type="button" aria-label="Resize text" onPointerDown={event => beginTextDrag(event,layer,'resize')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-fuchsia-500 shadow-md" />}
                 </div>)}
