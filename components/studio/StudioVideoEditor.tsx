@@ -5,7 +5,7 @@ import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudi
 import {
   ArrowLeft, AudioLines, Check, Clapperboard,
   Bold, CaseUpper, ChevronDown, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
-  Palette, Pause, Play, Plus, Search, Strikethrough, Trash2, Type, Underline, Video,
+  Palette, Pause, Play, Plus, Search, Sparkles, Strikethrough, Trash2, Type, Underline, Video,
   Volume2, VolumeX, X
 } from 'lucide-react'
 
@@ -361,7 +361,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
   const [saveStatus, setSaveStatus] = useState('Loading project…')
-  const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects'>('media')
+  const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects' | 'animation'>('media')
+  const [animationCategory, setAnimationCategory] = useState('Basic Entrance')
+  const [animationSearch, setAnimationSearch] = useState('')
   const [hydrated, setHydrated] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveSequence = useRef(0)
@@ -1048,6 +1050,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           <button type="button" onClick={() => setActivePanel('media')} className={'flex w-[60px] flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-[9px] font-semibold transition ' + (activePanel === 'media' ? 'bg-gradient-to-b from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-950/40' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white')}><FolderOpen className="h-5 w-5" />Media</button>
           <button type="button" onClick={() => setActivePanel('text')} className={'flex w-[60px] flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-[9px] font-semibold transition ' + (activePanel === 'text' ? 'bg-gradient-to-b from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-950/40' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white')}><Type className="h-5 w-5" />Text</button>
           <button type="button" onClick={() => setActivePanel('audio')} className={'flex w-[60px] flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-[9px] font-semibold transition ' + (activePanel === 'audio' ? 'bg-gradient-to-b from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-950/40' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white')}><Music2 className="h-5 w-5" />Audio</button>
+          <button type="button" onClick={() => { setActivePanel('animation'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} className={'flex w-[60px] flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-[9px] font-semibold transition ' + (activePanel === 'animation' ? 'bg-gradient-to-b from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-950/40' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white')}><Sparkles className="h-5 w-5" />Animate</button>
           <div className="mt-auto flex flex-col items-center gap-1 pb-2"><span className="text-[8px] text-slate-600">SOCIALENS</span><span className="h-1 w-1 rounded-full bg-fuchsia-400" /></div>
         </nav>
 
@@ -1085,6 +1088,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               <button type="button" onClick={()=>updateTextLayer(selectedText.id,{effect:'Simple',effectIntensity:60,effectBlur:8,effectDistance:4,effectAngle:45,effectColor:'#a855f7',effectSecondaryColor:'#22d3ee'})} className="rounded-lg border border-white/10 py-2 text-[9px] font-semibold text-slate-400 hover:bg-white/[0.05]">Reset effect settings</button>
             </>}
           </div>}
+          {activePanel === 'animation' && <StudioAnimationPanel selectedCategory={animationCategory} onSelectCategory={setAnimationCategory} search={animationSearch} onSearchChange={setAnimationSearch} />}
           {activePanel === 'audio' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <button type="button" onClick={() => audioInput.current?.click()} className="flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[10px] font-bold"><Music2 className="h-4 w-4" /> {audio ? 'Replace audio track' : 'Import audio'}</button>
             {audio ? <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.04] p-3"><div className="flex items-center gap-2"><Music2 className="h-4 w-4 shrink-0 text-cyan-300" /><div className="min-w-0"><p className="truncate text-[10px] font-semibold text-cyan-100">{audio.name}</p><p className="text-[9px] text-cyan-100/50">{formatTime(audio.duration)} duration</p></div></div><label className="mt-4 block text-[9px] text-slate-400">Track volume · {audioVolume}%<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="mt-2 w-full accent-cyan-400" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="mt-3 w-full rounded-lg border border-red-400/20 py-2 text-[9px] font-semibold text-red-300 hover:bg-red-400/[0.06]">Remove audio track</button></div> : <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center"><Music2 className="mx-auto h-7 w-7 text-slate-600" /><p className="mt-2 text-[10px] font-semibold text-slate-300">No audio track</p><p className="mt-1 text-[9px] text-slate-500">Import a music or audio file to add it to your project.</p></div>}
@@ -1099,6 +1103,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             <button type="button" onClick={() => audioInput.current?.click()} className="shrink-0 rounded-md border border-white/10 px-3 py-2 text-[9px] font-semibold text-slate-200">Add audio</button>
             <button type="button" onClick={() => setActivePanel('text')} className="shrink-0 rounded-md border border-white/10 px-3 py-2 text-[9px] font-semibold text-slate-200">Text</button>
             <button type="button" onClick={() => setActivePanel('audio')} className="shrink-0 rounded-md border border-white/10 px-3 py-2 text-[9px] font-semibold text-slate-200">Audio settings</button>
+            <button type="button" onClick={() => setActivePanel('animation')} className={'shrink-0 rounded-md border px-3 py-2 text-[9px] font-semibold '+(activePanel==='animation'?'border-fuchsia-400/40 bg-fuchsia-500/10 text-fuchsia-100':'border-white/10 text-slate-200')}>Animation</button>
           </div>
           {activePanel === 'text' && <div className="grid shrink-0 grid-cols-3 gap-2 border-b border-white/[0.07] bg-[#101426] p-3 md:hidden">
             <button type="button" onClick={() => addTextLayer('heading')} className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-3 text-[10px] font-extrabold text-white">Heading</button>
@@ -1162,6 +1167,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             </div>
             <label title="Text color" className="relative flex h-8 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-100 transition hover:bg-white/10"><Palette className="h-4 w-4" /><span className="absolute bottom-1 left-2 right-2 h-1 rounded-full" style={{ backgroundColor: selectedText.color }} /><input aria-label="Text color" type="color" value={selectedText.color} onChange={event => updateTextLayer(selectedText.id,{color:event.target.value})} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" /></label>
             <button type="button" onClick={() => { setActivePanel('effects'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Text effects" title="Text effects" className={'flex h-8 items-center gap-1.5 rounded-lg border px-2 text-[10px] font-semibold transition '+(activePanel==='effects'?'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100':'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10')}><span className="text-sm">✧</span> Effects</button>
+            <button type="button" onClick={() => { setActivePanel('animation'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Text animations" title="Text animations" className={'flex h-8 items-center gap-1.5 rounded-lg border px-2 text-[10px] font-semibold transition '+(activePanel==='animation'?'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100':'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10')}><Sparkles className="h-3.5 w-3.5" /> Animation</button>
             <span className="mx-1 h-6 w-px shrink-0 bg-white/10" />
             <span className="mx-1 h-6 w-px shrink-0 bg-white/10" />
             <button type="button" onClick={() => updateTextLayer(selectedText.id,{bold:!selectedText.bold})} aria-label="Bold" aria-pressed={selectedText.bold} title="Bold" className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ' + (selectedText.bold ? 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30' : 'text-slate-200 hover:bg-white/10')}><Bold className="h-4 w-4" /></button>
