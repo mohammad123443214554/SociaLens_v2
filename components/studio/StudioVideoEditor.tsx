@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import { StudioAnimationPanel } from './StudioAnimationPanel'
-import { sampleTextAnimation, type TextAnimationDefinition, type TextAnimationSettings } from '@/lib/studio/animation-engine'
+import { normalizeTextAnimationSettings, sampleTextAnimation, type TextAnimationDefinition, type TextAnimationSettings } from '@/lib/studio/animation-engine'
 import {
   ArrowLeft, AudioLines, Check, Clapperboard,
   Bold, CaseUpper, ChevronDown, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
@@ -436,6 +436,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               color: typeof item.color === 'string' ? item.color : '#ffffff', effect: TEXT_EFFECTS.some(effect => effect.name === item.effect) ? item.effect as TextEffect : 'Simple', effectIntensity: Number.isFinite(Number(item.effectIntensity)) ? Math.min(100, Math.max(0, Number(item.effectIntensity))) : 60, effectBlur: Number.isFinite(Number(item.effectBlur)) ? Math.min(40, Math.max(0, Number(item.effectBlur))) : 8, effectDistance: Number.isFinite(Number(item.effectDistance)) ? Math.min(40, Math.max(0, Number(item.effectDistance))) : 4, effectAngle: Number.isFinite(Number(item.effectAngle)) ? Number(item.effectAngle) : 45, effectColor: typeof item.effectColor === 'string' ? item.effectColor : '#a855f7', effectSecondaryColor: typeof item.effectSecondaryColor === 'string' ? item.effectSecondaryColor : '#22d3ee', opacity: Number.isFinite(Number(item.opacity)) ? Math.min(100, Math.max(0, Number(item.opacity))) : 100, bold: item.bold !== false, italic: item.italic === true,
               underline: item.underline === true, fontFamily: typeof item.fontFamily === 'string' ? item.fontFamily : 'Default', align: item.align === 'left' || item.align === 'right' ? item.align : 'center', rotation: typeof item.rotation === 'number' && Number.isFinite(item.rotation) ? item.rotation : 0,
               timelineStart: Math.max(0, Number(item.timelineStart) || 0), timelineDuration: Math.max(0.1, Number(item.timelineDuration) || 5),
+              animation: item.animation && typeof item.animation === 'object' ? normalizeTextAnimationSettings(item.animation as Partial<TextAnimationSettings>) : undefined,
             }))
             setTextLayers(restoredText)
             if (typeof data.selectedTextId === 'string') setSelectedTextId(data.selectedTextId)
