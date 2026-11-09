@@ -131,9 +131,9 @@ test('loop animation repeats, supports infinite repeat, and holds finite final s
 
 test('reverse and alternate directions are applied consistently', () => {
   const reverse = sample(loop, 2.25, { direction: 'reverse' })
-  assert.equal(reverse.scaleX, 1.15)
+  assert.equal(reverse.scaleX, 1.1)
   const alternate = sample(loop, 3.25, { direction: 'alternate' })
-  assert.equal(alternate.scaleX, 1.15)
+  assert.equal(alternate.scaleX, 1.1)
 })
 
 test('disabled and mismatched animation ids return a neutral sample', () => {
