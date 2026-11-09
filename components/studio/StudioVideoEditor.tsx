@@ -303,7 +303,24 @@ function getTextEffectStyle(effect: string | undefined, intensity = 60, color = 
     'Glitter': { color: 'transparent', background: `linear-gradient(120deg,#fff,${color},#fff,${secondary},#fff)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 0 6px rgba(255,255,255,.7)', filter: 'brightness(1.2)' },
     'Texture Fill': { color: 'transparent', background: `repeating-linear-gradient(135deg,${color} 0 4px,${secondary} 4px 7px,#fff 7px 8px)`, WebkitBackgroundClip: 'text', backgroundClip: 'text' },
   }
-  return styles[effect || ''] || {}
+  const style = styles[effect || ''] || {}
+  // Gradient/material fills must paint through the glyph mask, never the text layer's
+  // full-width editing box. WebKit needs text-fill-color explicitly transparent.
+  if (style.WebkitBackgroundClip === 'text' || style.backgroundClip === 'text') {
+    return {
+      ...style,
+      display: 'inline-block',
+      backgroundColor: 'transparent',
+      backgroundClip: 'text',
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      backgroundRepeat: 'no-repeat',
+      backgroundSize: '100% 100%',
+      boxDecorationBreak: 'clone',
+      WebkitBoxDecorationBreak: 'clone',
+    }
+  }
+  return style
 }
 
 const googleFontLoads = new Map<string, Promise<void>>()
@@ -1106,7 +1123,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             {!selectedText ? <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select a text layer on the canvas to apply effects.</div> : <>
               <div className="rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/[0.06] p-3"><div className="flex items-center justify-between"><span className="text-[11px] font-bold text-white">Text effects</span><span className="text-[9px] text-fuchsia-200">50 styles</span></div><p className="mt-1 text-[9px] text-slate-400">Choose a style, then adjust its strength and colours below.</p></div>
               <button type="button" onClick={() => updateTextLayer(selectedText.id,{effect:'None'})} className={'rounded-lg border px-3 py-2 text-left text-[10px] font-semibold '+(!selectedText.effect || selectedText.effect==='None'?'border-fuchsia-400/50 bg-fuchsia-500/10 text-fuchsia-100':'border-white/10 bg-white/[0.03] text-slate-300')}>No effect</button>
-              {EFFECT_CATEGORIES.map(category => <section key={category}><h3 className="mb-2 text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{category}</h3><div className="grid grid-cols-2 gap-2">{TEXT_EFFECTS.filter(effect=>effect.category===category).map(effect=><button key={effect.name} type="button" onClick={()=>updateTextLayer(selectedText.id,{effect:effect.name,effectIntensity:selectedText.effectIntensity??60})} aria-pressed={selectedText.effect===effect.name} className={'group flex min-w-0 flex-col overflow-hidden rounded-xl border p-1.5 text-left transition '+(selectedText.effect===effect.name?'border-fuchsia-400/60 bg-fuchsia-500/10 ring-1 ring-fuchsia-400/20':'border-white/10 bg-white/[0.025] hover:border-fuchsia-300/30 hover:bg-white/[0.06]')}><span className="flex h-[54px] w-full items-center justify-center overflow-hidden rounded-lg border border-white/[0.07] bg-[#101525] px-1"><span aria-hidden="true" className="inline-block max-w-full truncate text-center text-[23px] font-black leading-none tracking-tight" style={{display:'inline-block',width:'fit-content',maxWidth:'100%',...getTextEffectStyle(effect.name,65,selectedText.effectColor||'#a855f7',selectedText.effectSecondaryColor||'#22d3ee',selectedText.effectBlur??8,selectedText.effectDistance??4,selectedText.effectAngle??45)}}>Aa</span></span><span className="mt-1.5 block w-full truncate px-0.5 text-center text-[9px] font-semibold leading-4 text-slate-200">{effect.name}</span></button>)}</div></section>)}
+              {EFFECT_CATEGORIES.map(category => <section key={category}><h3 className="mb-2 text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{category}</h3><div className="grid grid-cols-2 gap-2">{TEXT_EFFECTS.filter(effect=>effect.category===category).map(effect=><button key={effect.name} type="button" onClick={()=>updateTextLayer(selectedText.id,{effect:effect.name,effectIntensity:selectedText.effectIntensity??60})} aria-pressed={selectedText.effect===effect.name} className={'group flex min-w-0 flex-col overflow-hidden rounded-xl border p-1.5 text-left transition '+(selectedText.effect===effect.name?'border-fuchsia-400/60 bg-fuchsia-500/10 ring-1 ring-fuchsia-400/20':'border-white/10 bg-white/[0.025] hover:border-fuchsia-300/30 hover:bg-white/[0.06]')}><span className="flex h-[54px] w-full items-center justify-center overflow-hidden rounded-lg border border-white/[0.07] bg-[#101525] px-1"><span aria-hidden="true" className="inline-block max-w-full whitespace-nowrap text-center text-[23px] leading-none tracking-tight" style={{display:'inline-block',width:'fit-content',maxWidth:'100%',fontFamily:selectedText.fontFamily&&selectedText.fontFamily!=='Default' ? '"'+selectedText.fontFamily+'", sans-serif' : 'Arial, Helvetica, sans-serif',fontWeight:selectedText.bold?900:400,fontStyle:selectedText.italic?'italic':'normal',color:selectedText.color,...getTextEffectStyle(effect.name,selectedText.effectIntensity??60,selectedText.effectColor||'#a855f7',selectedText.effectSecondaryColor||'#22d3ee',selectedText.effectBlur??8,selectedText.effectDistance??4,selectedText.effectAngle??45)}}>Aa</span></span><span className="mt-1.5 block w-full truncate px-0.5 text-center text-[9px] font-semibold leading-4 text-slate-200">{effect.name}</span></button>)}</div></section>)}
               <div className="h-px bg-white/10" />
               <label className="block text-[9px] font-semibold text-slate-300">Effect intensity · {selectedText.effectIntensity ?? 60}%<input type="range" min="0" max="100" value={selectedText.effectIntensity ?? 60} onChange={event=>updateTextLayer(selectedText.id,{effectIntensity:Number(event.target.value)})} className="mt-2 w-full accent-fuchsia-500" /></label>
               <label className="block text-[9px] font-semibold text-slate-300">Blur / softness · {selectedText.effectBlur ?? 8}<input type="range" min="0" max="40" value={selectedText.effectBlur ?? 8} onChange={event=>updateTextLayer(selectedText.id,{effectBlur:Number(event.target.value)})} className="mt-2 w-full accent-fuchsia-500" /></label>
