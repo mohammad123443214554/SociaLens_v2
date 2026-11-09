@@ -168,14 +168,6 @@ const TEXT_EFFECTS = [
   },
   {
     "category": "Texture & Material",
-    "name": "Chrome"
-  },
-  {
-    "category": "Texture & Material",
-    "name": "Foil"
-  },
-  {
-    "category": "Texture & Material",
     "name": "Emboss"
   },
   {
@@ -188,31 +180,7 @@ const TEXT_EFFECTS = [
   },
   {
     "category": "Texture & Material",
-    "name": "Liquid"
-  },
-  {
-    "category": "Texture & Material",
     "name": "Grunge"
-  },
-  {
-    "category": "Premium Artistic",
-    "name": "Gradient Fill"
-  },
-  {
-    "category": "Premium Artistic",
-    "name": "Rainbow Fill"
-  },
-  {
-    "category": "Premium Artistic",
-    "name": "Fire"
-  },
-  {
-    "category": "Premium Artistic",
-    "name": "Ice"
-  },
-  {
-    "category": "Premium Artistic",
-    "name": "Water"
   },
   {
     "category": "Premium Artistic",
@@ -234,14 +202,6 @@ const TEXT_EFFECTS = [
     "category": "Premium Artistic",
     "name": "Hologram"
   },
-  {
-    "category": "Premium Artistic",
-    "name": "Glitter"
-  },
-  {
-    "category": "Premium Artistic",
-    "name": "Texture Fill"
-  }
 ] as const
 const EFFECT_CATEGORIES = [...new Set(TEXT_EFFECTS.map(effect => effect.category))]
 type TextEffect = typeof TEXT_EFFECTS[number]['name']
@@ -283,25 +243,15 @@ function getTextEffectStyle(effect: string | undefined, intensity = 60, color = 
     'Motion Blur': { textShadow: `5px 0 5px rgba(255,255,255,.5), 10px 0 12px ${color}`, filter: 'blur(.35px)' },
     'Ghost': { textShadow: `4px 0 0 rgba(180,220,255,.35), 8px 0 0 rgba(180,220,255,.2), -4px 0 0 rgba(180,220,255,.2)`, opacity: .88 },
     'Metallic': { color: 'transparent', background: 'linear-gradient(180deg,#fff 0%,#9ca3af 22%,#f8fafc 38%,#4b5563 52%,#e5e7eb 72%,#6b7280 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', filter: 'drop-shadow(1px 2px 1px rgba(0,0,0,.65))' },
-    'Chrome': { color: 'transparent', background: 'linear-gradient(180deg,#fff 0%,#64748b 18%,#fff 35%,#334155 50%,#f8fafc 65%,#475569 82%,#fff 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', filter: 'drop-shadow(0 2px 2px #000)' },
-    'Foil': { color: 'transparent', background: `linear-gradient(120deg,#fff,${color},#fef3c7,${secondary},#fff)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', filter: 'saturate(1.4)' },
     'Emboss': { textShadow: '1px 1px 0 rgba(255,255,255,.8), -1px -1px 1px rgba(0,0,0,.75)' },
     'Engrave': { color: '#9ca3af', textShadow: '1px 1px 1px rgba(255,255,255,.45), -1px -1px 1px rgba(0,0,0,.8)' },
     'Glass': { color: 'rgba(220,245,255,.78)', WebkitTextStroke: '1px rgba(255,255,255,.65)', textShadow: '0 1px 8px rgba(255,255,255,.8), 0 4px 12px rgba(80,180,255,.45)', filter: 'blur(.12px)' },
-    'Liquid': { color: 'transparent', background: `linear-gradient(160deg,#fff 0%,${secondary} 25%,${color} 48%,#fff 62%,#64748b 80%,#fff 100%)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', filter: 'saturate(1.3)' },
     'Grunge': { textShadow: `1px 1px 0 ${color}, -1px 0 0 rgba(0,0,0,.6)`, filter: 'contrast(1.55) saturate(.8)' },
-    'Gradient Fill': { color: 'transparent', background: `linear-gradient(110deg,${color},${secondary})`, WebkitBackgroundClip: 'text', backgroundClip: 'text' },
-    'Rainbow Fill': { color: 'transparent', background: 'linear-gradient(90deg,#ff4d6d,#ffb703,#80ed99,#4cc9f0,#9b5de5,#ff4d6d)', WebkitBackgroundClip: 'text', backgroundClip: 'text' },
-    'Fire': { color: 'transparent', background: 'linear-gradient(0deg,#991b1b,#f97316,#fde047,#fff7ed)', WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 0 12px rgba(249,115,22,.65)' },
-    'Ice': { color: 'transparent', background: 'linear-gradient(180deg,#fff,#bae6fd,#38bdf8,#e0f2fe)', WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 0 8px #7dd3fc' },
-    'Water': { color: 'transparent', background: 'linear-gradient(180deg,#e0f2fe,#38bdf8,#0369a1,#bae6fd)', WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 2px 7px rgba(14,165,233,.65)' },
     'Pixel': { textShadow: `2px 0 0 ${color}, -2px 2px 0 ${secondary}`, filter: 'contrast(1.5)' },
     'Halftone': { textShadow: `1px 1px 0 ${color}, -1px -1px 0 ${color}`, filter: 'contrast(1.7)' },
     'Comic': { WebkitTextStroke: '1.5px #111827', textShadow: `3px 3px 0 ${color}, 5px 5px 0 #111827`, filter: 'saturate(1.4)' },
     'Retro': { textShadow: `3px 3px 0 ${color}, 6px 6px 0 ${secondary}`, filter: 'sepia(.25) saturate(1.25)' },
     'Hologram': { color: 'transparent', background: 'linear-gradient(100deg,#f0abfc,#67e8f9,#fde68a,#c4b5fd,#f0abfc)', WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 0 8px rgba(103,232,249,.55)' },
-    'Glitter': { color: 'transparent', background: `linear-gradient(120deg,#fff,${color},#fff,${secondary},#fff)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 0 6px rgba(255,255,255,.7)', filter: 'brightness(1.2)' },
-    'Texture Fill': { color: 'transparent', background: `repeating-linear-gradient(135deg,${color} 0 4px,${secondary} 4px 7px,#fff 7px 8px)`, WebkitBackgroundClip: 'text', backgroundClip: 'text' },
   }
   const style = styles[effect || ''] || {}
   // Gradient/material fills must paint through the glyph mask, never the text layer's
@@ -919,7 +869,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             if (effect === 'Double Outline' || effect === 'Triple Stroke') { ctx.lineWidth = Math.max(1, scale); ctx.strokeStyle = secondEffectColor; ctx.strokeText(line, textX, y + index * lineHeight, maxWidth) }
             if (effect === 'Hollow Text') { ctx.shadowBlur = 0; return }
           }
-          if (['Gradient Fill','Rainbow Fill','Metallic','Chrome','Foil','Liquid','Fire','Ice','Water','Hologram','Glitter','Texture Fill'].includes(effect)) {
+          if (['Metallic','Hologram'].includes(effect) {
             const gradient = ctx.createLinearGradient(x, y, x + maxWidth, y + lineHeight)
             if (effect === 'Rainbow Fill' || effect === 'Hologram') { gradient.addColorStop(0,'#ff4d6d'); gradient.addColorStop(.22,'#ffb703'); gradient.addColorStop(.45,'#80ed99'); gradient.addColorStop(.68,'#4cc9f0'); gradient.addColorStop(.85,'#9b5de5'); gradient.addColorStop(1,'#ff4d6d') }
             else if (effect === 'Fire') { gradient.addColorStop(0,'#fff7ed'); gradient.addColorStop(.4,'#f97316'); gradient.addColorStop(1,'#991b1b') }
