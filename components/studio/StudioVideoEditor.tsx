@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import {
-  ArrowLeft, AudioLines, Check, ChevronLeft, ChevronRight, Clapperboard,
+  ArrowLeft, AudioLines, Check, Clapperboard,
   Bold, CaseUpper, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
   Palette, Pause, Play, Plus, Strikethrough, Trash2, Type, Underline, Video,
   Volume2, VolumeX, X
@@ -84,6 +84,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [playhead, setPlayhead] = useState(0)
+  const playbackFrame = useRef<number | null>(null)
+  const playbackStartedAt = useRef(0)
   const [aspect, setAspect] = useState<'9:16' | '16:9' | '1:1'>('9:16')
   const [titleText, setTitleText] = useState('')
   const [subtitleText, setSubtitleText] = useState('')
@@ -110,6 +112,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     return value
   }
   const totalDuration = useMemo(() => clips.reduce((sum, item) => sum + Math.max(0.1, item.trimEnd - item.trimStart), 0), [clips])
+  const projectEnd = useMemo(() => Math.min(60, Math.max(0, ...clips.map(item => item.timelineStart + item.trimEnd - item.trimStart), ...textLayers.map(item => item.timelineStart + item.timelineDuration), audio ? audio.timelineStart + audio.trimEnd - audio.trimStart : 0)), [clips, textLayers, audio])
+  const activeTimelineClip = useMemo(() => [...clips].filter(item => playhead >= item.timelineStart && playhead < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1) || null, [clips, playhead])
   const currentDuration = selected ? Math.max(0, selected.trimEnd - selected.trimStart) : 0
 
   useEffect(() => () => {
@@ -232,28 +236,25 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
 
   useEffect(() => {
     const video = previewRef.current
-    if (!video || !selected || selected.kind !== 'video') return
-    video.currentTime = Math.min(selected.trimStart, Math.max(0, selected.duration - 0.05))
+    if (!video || !activeTimelineClip || activeTimelineClip.kind !== 'video') return
+    const localTime = activeTimelineClip.trimStart + Math.max(0, playhead - activeTimelineClip.timelineStart)
+    if (!playing && Math.abs(video.currentTime - localTime) > 0.08) video.currentTime = Math.min(activeTimelineClip.trimEnd, localTime)
     video.volume = muted ? 0 : volume / 100
     video.muted = muted
-    setPlaying(false)
-    setPlayhead(selected.trimStart)
-  }, [selectedId, selected?.url, selected?.trimStart, muted, volume])
+    if (playing && video.paused) void video.play().catch(() => setError('The browser could not play this video clip.'))
+    if (!playing && !video.paused) video.pause()
+  }, [activeTimelineClip?.id, playhead, playing, muted, volume])
 
   useEffect(() => {
     const video = previewRef.current
-    if (!video || !selected || selected.kind !== 'video') return
-    const update = () => {
-      setPlayhead(video.currentTime)
-      if (video.currentTime >= selected.trimEnd) {
-        video.pause()
-        video.currentTime = selected.trimStart
-        setPlaying(false)
-      }
-    }
-    video.addEventListener('timeupdate', update)
-    return () => video.removeEventListener('timeupdate', update)
-  }, [selectedId, selected?.trimEnd, selected?.trimStart, selected?.kind])
+    if (!video || !activeTimelineClip || activeTimelineClip.kind !== 'video') return
+    const localTime = activeTimelineClip.trimStart + Math.max(0, playhead - activeTimelineClip.timelineStart)
+    if (Math.abs(video.currentTime - localTime) > 0.35) video.currentTime = Math.min(activeTimelineClip.trimEnd, localTime)
+  }, [activeTimelineClip?.id])
+
+  useEffect(() => () => {
+    if (playbackFrame.current !== null) cancelAnimationFrame(playbackFrame.current)
+  }, [])
 
   const addMedia = async (files: FileList | null, kind: ClipKind) => {
     if (!files?.length) return
@@ -438,16 +439,65 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     ;[next[index], next[target]] = [next[target], next[index]]
     return next
   })
-  const togglePlayback = async () => {
-    const video = previewRef.current
-    if (!video || !selected || selected.kind !== 'video') {
-      setNotice('Select a video clip to play its preview.')
+  const togglePlayback = () => {
+    if (playing) {
+      if (playbackFrame.current !== null) cancelAnimationFrame(playbackFrame.current)
+      playbackFrame.current = null
+      previewRef.current?.pause()
+      audioRef.current?.pause()
+      setPlaying(false)
       return
     }
-    if (playing) { video.pause(); audioRef.current?.pause(); setPlaying(false); return }
-    if (video.currentTime < selected.trimStart || video.currentTime >= selected.trimEnd) video.currentTime = selected.trimStart
-    try { await video.play(); if (audioRef.current && audio) { audioRef.current.currentTime = audio.trimStart; audioRef.current.volume = audioVolume / 100; void audioRef.current.play().catch(() => setNotice('Video is playing; browser blocked automatic music preview. Press play again after interacting with the page.')) }; setPlaying(true); setError('') }
-    catch { setError('The browser could not play this video. Try another supported file or format.') }
+    if (!clips.length || projectEnd <= 0) { setNotice('Add a video or photo to the timeline before playing.'); return }
+    const startAt = playhead >= projectEnd ? 0 : playhead
+    setPlayhead(startAt)
+    playbackStartedAt.current = performance.now() - startAt * 1000
+    setPlaying(true)
+    setError('')
+    const tick = (now: number) => {
+      const time = Math.min(projectEnd, Math.max(0, (now - playbackStartedAt.current) / 1000))
+      setPlayhead(time)
+      const active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
+      const video = previewRef.current
+      if (active?.kind === 'video' && video) {
+        const localTime = active.trimStart + time - active.timelineStart
+        if (Math.abs(video.currentTime - localTime) > 0.45) video.currentTime = Math.min(active.trimEnd, localTime)
+        video.volume = muted ? 0 : volume / 100
+        video.muted = muted
+        if (video.paused) void video.play().catch(() => setError('The browser could not play this video clip.'))
+      } else if (video && !video.paused) video.pause()
+      if (audioRef.current && audio) {
+        const elapsed = time - audio.timelineStart
+        const audioActive = elapsed >= 0 && elapsed < audio.trimEnd - audio.trimStart
+        if (audioActive) {
+          const target = audio.trimStart + elapsed
+          if (Math.abs(audioRef.current.currentTime - target) > 0.4) audioRef.current.currentTime = target
+          audioRef.current.volume = audioVolume / 100
+          if (audioRef.current.paused) void audioRef.current.play().catch(() => setNotice('Browser blocked background audio preview.'))
+        } else if (!audioRef.current.paused) audioRef.current.pause()
+      }
+      if (time >= projectEnd) {
+        playbackFrame.current = null
+        previewRef.current?.pause()
+        audioRef.current?.pause()
+        setPlaying(false)
+        return
+      }
+      playbackFrame.current = requestAnimationFrame(tick)
+    }
+    playbackFrame.current = requestAnimationFrame(tick)
+  }
+  const seekTimeline = (event: ReactPointerEvent<HTMLElement>) => {
+    if (playing) {
+      if (playbackFrame.current !== null) cancelAnimationFrame(playbackFrame.current)
+      playbackFrame.current = null
+      previewRef.current?.pause()
+      audioRef.current?.pause()
+      setPlaying(false)
+    }
+    const rect = event.currentTarget.getBoundingClientRect()
+    const localX = Math.max(0, Math.min(TIMELINE_WIDTH, event.clientX - rect.left))
+    setPlayhead(localX / TIMELINE_PX_PER_SECOND)
   }
   useEffect(() => { if (audioRef.current) audioRef.current.volume = audioVolume / 100 }, [audioVolume, audio?.url])
 
@@ -673,14 +723,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     }
   }
 
-  const jumpClip = (direction: number) => {
-    if (!clips.length) return
-    const index = clips.findIndex(item => item.id === selectedId)
-    const next = clips[Math.min(clips.length - 1, Math.max(0, index + direction))]
-    if (next) setSelectedId(next.id)
-  }
-
-  return (
+remove clip-only navigation  return (
     <main className="fixed inset-0 z-[70] flex min-h-0 flex-col overflow-hidden bg-[#080a13] pt-[env(safe-area-inset-top)] text-white">
       <header className="z-30 flex h-[62px] min-h-[62px] shrink-0 items-center justify-between border-b border-white/[0.09] bg-[#0c0f1d] px-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
@@ -749,15 +792,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           {activePanel === 'audio' && <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-white/[0.07] bg-[#101426] px-3 py-2 md:hidden">
             {audio ? <><span className="max-w-[140px] truncate text-[9px] text-cyan-100">{audio.name}</span><label className="flex min-w-[120px] flex-1 items-center gap-2 text-[9px] text-slate-400">Volume<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="w-full accent-cyan-400" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="text-[9px] text-red-300">Remove</button></> : <span className="text-[9px] text-slate-500">No audio track added yet.</span>}
           </div>}
-          <div className="flex h-[48px] min-h-[48px] shrink-0 items-center justify-between border-b border-white/[0.07] bg-[#0c0f1c]/85 px-3 sm:px-5">
-            <div className="flex items-center gap-2"><span className="text-[10px] font-semibold text-slate-200">Preview</span><span className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1 text-[9px] text-slate-500">{aspect}</span><span className="hidden text-[9px] text-slate-600 sm:inline">{selected ? selected.kind === 'video' ? 'Video clip' : 'Photo clip' : 'No clip selected'}</span></div>
-            <div className="flex items-center gap-1.5">
-              <button type="button" onClick={() => jumpClip(-1)} disabled={!selected || clips.findIndex(item => item.id === selected.id) <= 0} aria-label="Previous clip" className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-white/[0.06] disabled:opacity-25"><ChevronLeft className="h-4 w-4" /></button>
-              <button type="button" onClick={() => void togglePlayback()} disabled={!selected || selected.kind !== 'video'} aria-label={playing ? 'Pause preview' : 'Play preview'} className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md shadow-violet-950/40 disabled:opacity-30">{playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}</button>
-              <button type="button" onClick={() => jumpClip(1)} disabled={!selected || clips.findIndex(item => item.id === selected.id) >= clips.length - 1} aria-label="Next clip" className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-white/[0.06] disabled:opacity-25"><ChevronRight className="h-4 w-4" /></button>
-            </div>
-          </div>
-
           {selectedText && <div data-text-toolbar="true" className="sticky top-0 z-40 flex min-h-[48px] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-fuchsia-400/20 bg-[#111629] px-3 py-2 shadow-xl sm:px-5" role="toolbar" aria-label="Selected text formatting">
             <button type="button" onClick={() => removeTextLayer(selectedText.id)} title="Delete text" aria-label="Delete text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-300 transition hover:bg-red-400/10"><Trash2 className="h-4 w-4" /></button>
             <button type="button" onClick={() => duplicateTextLayer(selectedText.id)} title="Duplicate text" aria-label="Duplicate text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-200 transition hover:bg-white/10"><Copy className="h-4 w-4" /></button>
@@ -777,9 +811,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3 sm:p-5">
             <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-xl border border-white/[0.07] bg-[#05060d] shadow-[0_20px_70px_rgba(0,0,0,0.42)]">
               <div ref={canvasRef} onPointerDown={event => { const target = event.target as HTMLElement; if (!target.closest("[data-text-layer-id], [data-text-toolbar]")) { setSelectedTextId(null); setEditingTextId(null) } }} className={'relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-md bg-black ring-1 ring-violet-400/20 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-5xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(72dvh, 720px)' }}>
-                {selected?.kind === 'video' ? <video key={selected.id} ref={previewRef} src={selected.url} playsInline preload="metadata" className="h-full w-full object-contain" onEnded={() => { audioRef.current?.pause(); setPlaying(false) }} /> : selected?.kind === 'image' ? <img src={selected.url} alt={selected.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">Your video canvas</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">Import a video or photo to start editing your project.</p><button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button></div>}
+                {activeTimelineClip?.kind === 'video' ? <video key={activeTimelineClip.id} ref={previewRef} src={activeTimelineClip.url} playsInline preload="auto" className="h-full w-full object-contain" /> : activeTimelineClip?.kind === 'image' ? <img src={activeTimelineClip.url} alt={activeTimelineClip.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">{clips.length ? 'Timeline gap' : 'Your video canvas'}</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">{clips.length ? 'No media clip is placed at this point in the timeline.' : 'Import a video or photo to start editing your project.'}</p>{!clips.length && <button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button>}</div>}
                 {audio && <audio ref={audioRef} src={audio.url} preload="metadata" />}
-                {textLayers.map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : layer.strikethrough ? 'line-through' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: 'rotate(' + layer.rotation + 'deg)', transformOrigin: 'center center' }}>
+                {textLayers.filter(layer => playhead >= layer.timelineStart && playhead < layer.timelineStart + layer.timelineDuration).map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : layer.strikethrough ? 'line-through' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: 'rotate(' + layer.rotation + 'deg)', transformOrigin: 'center center' }}>
                   <div dir="auto" contentEditable={editingTextId === layer.id} suppressContentEditableWarning onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); if (editingTextId !== layer.id) { const node = event.currentTarget; setEditingTextId(layer.id); window.requestAnimationFrame(() => { node.focus(); const selection = window.getSelection(); const range = document.createRange(); range.selectNodeContents(node); range.collapse(false); selection?.removeAllRanges(); selection?.addRange(range) }) } }} onInput={event => { textDrafts.current.set(layer.id, event.currentTarget.innerText.split(/\n/).map(line => layer.listStyle === 'bullet' ? line.replace(/^•\s?/, '') : layer.listStyle === 'number' ? line.replace(/^\d+\\.\s?/, '') : line).join('\n')) }} onBlur={event => { const value = textDrafts.current.get(layer.id); if (value !== undefined) { updateTextLayer(layer.id,{text:value}); textDrafts.current.delete(layer.id) } setEditingTextId(current => current === layer.id ? null : current) }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.blur() } }} className="min-h-[24px] whitespace-pre-wrap break-words outline-none">{getFormattedText(layer)}</div>
                   {selectedTextId === layer.id && <>
                     <button type="button" aria-label="Move text" title="Drag to move" onPointerDown={event => beginTextDrag(event,layer,'move')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -top-7 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-white bg-slate-900 text-[11px] text-white shadow-md cursor-move touch-none">✥</button>
@@ -787,7 +821,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                     <button type="button" aria-label="Resize text" title="Drag to resize" onPointerDown={event => beginTextDrag(event,layer,'resize')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-fuchsia-500 shadow-md cursor-nwse-resize touch-none" />
                   </>}
                 </div>)}
-                {selected?.kind === 'video' && <div className="absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-1 text-[9px] tabular-nums text-white">{formatTime(playhead)} / {formatTime(selected.duration)}</div>}
+                <div className="absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-1 text-[9px] tabular-nums text-white">{formatTime(playhead)} / {formatTime(projectEnd)}</div>
               </div>
             </div>
           </div>
@@ -798,13 +832,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           </div>
 
           <section className="z-10 shrink-0 border-t border-white/[0.09] bg-[#0b0e1a] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 sm:px-4">
-            <div className="mb-2 flex items-center justify-between gap-2"><div className="flex items-center gap-2"><AudioLines className="h-3.5 w-3.5 text-fuchsia-300" /><h2 className="text-[10px] font-bold text-slate-200">Timeline</h2><span className="hidden text-[9px] text-slate-600 sm:inline">60-second editing range · drag strips to move, drag edges to trim</span></div><span className="text-[9px] tabular-nums text-slate-500">01:00</span></div>
+            <div className="mb-2 flex items-center justify-between gap-2"><div className="flex items-center gap-2"><AudioLines className="h-3.5 w-3.5 text-fuchsia-300" /><h2 className="text-[10px] font-bold text-slate-200">Timeline</h2><span className="hidden text-[9px] text-slate-600 sm:inline">60-second editing range · drag strips to move, drag edges to trim</span></div><div className="flex items-center gap-3"><span className="text-[9px] tabular-nums text-slate-500">{formatTime(playhead)} / 01:00</span><button type="button" onClick={() => void togglePlayback()} disabled={!clips.length} aria-label={playing ? 'Pause timeline' : 'Play timeline'} className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md shadow-violet-950/40 disabled:opacity-30">{playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}</button></div></div>
             <div className="overflow-x-auto overscroll-x-contain rounded-md">
-              <div style={{ width: TIMELINE_WIDTH + 72 }}>
+              <div className="relative" style={{ width: TIMELINE_WIDTH + 72 }}>
                 <div className="flex h-6 items-end border-b border-white/10">
                   <div className="w-[72px] shrink-0" />
-                  <div className="relative h-full" style={{ width: TIMELINE_WIDTH }}>
-                    {Array.from({ length: 13 }, (_, index) => <div key={index} className="absolute bottom-0 h-3 border-l border-white/20 pl-1 text-[8px] tabular-nums text-slate-500" style={{ left: index * 5 * TIMELINE_PX_PER_SECOND }}>{formatTime(index * 5)}</div>)}
+                  <div className="relative h-full cursor-crosshair" style={{ width: TIMELINE_WIDTH }} onPointerDown={seekTimeline}>
+                    {Array.from({ length: 13 }, (_, index) => <div key={index} className="absolute bottom-0 h-3 border-l border-white/20 pl-1 text-[8px] tabular-nums text-slate-500 pointer-events-none" style={{ left: index * 5 * TIMELINE_PX_PER_SECOND }}>{formatTime(index * 5)}</div>)}
                   </div>
                 </div>
                 {[
@@ -814,7 +848,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   { key: 'audio', label: 'Audio', icon: <Music2 className="h-3 w-3" />, tone: 'emerald' },
                 ].map(track => <div key={track.key} className="flex min-h-[34px] border-b border-white/[0.045]">
                   <div className={'flex w-[72px] shrink-0 items-center gap-1.5 border-r px-2 text-[9px] font-semibold ' + (track.tone === 'fuchsia' ? 'border-fuchsia-400/10 bg-[#21152b] text-fuchsia-100' : track.tone === 'sky' ? 'border-sky-400/10 bg-[#10212b] text-sky-100' : track.tone === 'violet' ? 'border-violet-400/10 bg-[#1b1830] text-violet-100' : 'border-emerald-400/10 bg-[#10271f] text-emerald-100')}>{track.icon}{track.label}</div>
-                  <div className="relative min-h-[34px] shrink-0" style={{ width: TIMELINE_WIDTH, height: track.key === 'text' ? Math.max(34, textLayers.length * 30 + 4) : 34 }}>
+                  <div className="relative min-h-[34px] shrink-0 cursor-crosshair" style={{ width: TIMELINE_WIDTH, height: track.key === 'text' ? Math.max(34, textLayers.length * 30 + 4) : 34 }} onPointerDown={seekTimeline}>
                     {track.key === 'text' && textLayers.map(layer => <div key={layer.id} onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => { setSelectedTextId(layer.id); setActivePanel('text') }} title={layer.text} className={'absolute flex h-[22px] min-w-[12px] items-center overflow-visible rounded bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[8px] font-semibold text-white shadow-sm cursor-grab touch-none ' + (selectedTextId === layer.id ? 'ring-1 ring-fuchsia-200' : '')} style={{ top: 6 + textLayers.findIndex(item => item.id === layer.id) * 30, left: layer.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(12, layer.timelineDuration * TIMELINE_PX_PER_SECOND) }}>
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/30" />
                       <span className="min-w-0 flex-1 truncate px-2">{layer.text || 'Untitled text'}</span>
@@ -833,6 +867,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                     {((track.key === 'text' && !textLayers.length) || (track.key === 'image' && !clips.some(item => item.kind === 'image')) || (track.key === 'video' && !clips.some(item => item.kind === 'video')) || (track.key === 'audio' && !audio)) && <span className="absolute left-2 top-[11px] text-[8px] text-slate-600">+ Add {track.key === 'text' ? 'text' : track.key === 'audio' ? 'audio' : track.key}</span>}
                   </div>
                 </div>)}
+                <div className="pointer-events-none absolute bottom-0 top-6 z-30 border-l-2 border-rose-400 shadow-[0_0_8px_rgba(251,113,133,.65)]" style={{ left: 72 + playhead * TIMELINE_PX_PER_SECOND }}><div className="-ml-[5px] -mt-1 h-2.5 w-2.5 rounded-full bg-rose-400 shadow" /></div>
               </div>
             </div>
           </section>
