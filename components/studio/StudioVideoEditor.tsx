@@ -158,7 +158,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               width: Math.min(100, Math.max(12, Number(item.width) || 80)), fontSize: Math.min(160, Math.max(10, Number(item.fontSize) || 24)),
               color: typeof item.color === 'string' ? item.color : '#ffffff', bold: item.bold !== false, italic: item.italic === true,
               underline: item.underline === true, align: item.align === 'left' || item.align === 'right' ? item.align : 'center', rotation: typeof item.rotation === 'number' && Number.isFinite(item.rotation) ? item.rotation : 0,
-              timelineStart: Math.max(0, Number(item.timelineStart) || 0), timelineDuration: Math.max(0.1, Math.min(60, Number(item.timelineDuration) || 5)),
+              timelineStart: Math.max(0, Number(item.timelineStart) || 0), timelineDuration: Math.max(0.1, Number(item.timelineDuration) || 5),
             }))
             setTextLayers(restoredText)
             if (typeof data.selectedTextId === 'string') setSelectedTextId(data.selectedTextId)
