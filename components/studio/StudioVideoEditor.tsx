@@ -430,7 +430,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     }
     if (playing) { video.pause(); audioRef.current?.pause(); setPlaying(false); return }
     if (video.currentTime < selected.trimStart || video.currentTime >= selected.trimEnd) video.currentTime = selected.trimStart
-    try { await video.play(); if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.volume = audioVolume / 100; void audioRef.current.play().catch(() => setNotice('Video is playing; browser blocked automatic music preview. Press play again after interacting with the page.')) }; setPlaying(true); setError('') }
+    try { await video.play(); if (audioRef.current && audio) { audioRef.current.currentTime = audio.trimStart; audioRef.current.volume = audioVolume / 100; void audioRef.current.play().catch(() => setNotice('Video is playing; browser blocked automatic music preview. Press play again after interacting with the page.')) }; setPlaying(true); setError('') }
     catch { setError('The browser could not play this video. Try another supported file or format.') }
   }
   useEffect(() => { if (audioRef.current) audioRef.current.volume = audioVolume / 100 }, [audioVolume, audio?.url])
@@ -496,11 +496,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         recorder!.onstop = () => resolve(new Blob(chunks, { type: recorder!.mimeType || mimeType }))
         recorder!.onerror = () => reject(new Error('The browser stopped recording unexpectedly.'))
       })
-      const drawTitle = () => {
-        if (!textLayers.length) return
+      const drawTitle = (timelineTime: number) => {
+        const visibleLayers = textLayers.filter(layer => timelineTime >= layer.timelineStart && timelineTime < layer.timelineStart + layer.timelineDuration)
+        if (!visibleLayers.length) return
         ctx.save()
         const scale = canvas.width / 420
-        for (const layer of textLayers) {
+        for (const layer of visibleLayers) {
           ctx.save()
           ctx.fillStyle = layer.color
           ctx.textAlign = layer.align
@@ -527,19 +528,50 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         }
         ctx.restore()
       }
-      const drawVideoFrame = (video: HTMLVideoElement) => {
+      const drawVideoFrame = (video: HTMLVideoElement, timelineTime: number) => {
         ctx.fillStyle = '#000000'
         ctx.fillRect(0, 0, canvas.width, canvas.height)
         const scale = Math.min(canvas.width / video.videoWidth, canvas.height / video.videoHeight)
         const width = video.videoWidth * scale
         const height = video.videoHeight * scale
         ctx.drawImage(video, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
-        drawTitle()
+        drawTitle(timelineTime)
       }
       recorder.start(1000)
-      if (musicElement) { musicElement.currentTime = 0; await musicElement.play() }
-      for (let index = 0; index < clips.length; index++) {
-        const clip = clips[index]
+      let timelineCursor = 0
+      const orderedClips = [...clips].sort((a, b) => a.timelineStart - b.timelineStart)
+      const syncMusic = (timelineTime: number) => {
+        if (!musicElement || !audio) return
+        const elapsed = timelineTime - audio.timelineStart
+        const active = elapsed >= 0 && elapsed < audio.trimEnd - audio.trimStart
+        if (active) {
+          const target = audio.trimStart + elapsed
+          if (Math.abs(musicElement.currentTime - target) > 0.35) musicElement.currentTime = target
+          if (musicElement.paused) void musicElement.play().catch(() => undefined)
+        } else if (!musicElement.paused) musicElement.pause()
+      }
+      for (let index = 0; index < orderedClips.length; index++) {
+        const clip = orderedClips[index]
+        if (clip.timelineStart > timelineCursor) {
+          const gapStart = timelineCursor
+          const gapDuration = clip.timelineStart - gapStart
+          const gapStartedAt = performance.now()
+          await new Promise<void>(resolve => {
+            const frame = (now: number) => {
+              const elapsed = Math.min(gapDuration, (now - gapStartedAt) / 1000)
+              const timelineTime = gapStart + elapsed
+              ctx.fillStyle = '#000000'
+              ctx.fillRect(0, 0, canvas.width, canvas.height)
+              drawTitle(timelineTime)
+              syncMusic(timelineTime)
+              setExportProgress(Math.min(99, Math.round((timelineTime / 60) * 100)))
+              if (elapsed >= gapDuration) resolve()
+              else animationFrame = requestAnimationFrame(frame)
+            }
+            animationFrame = requestAnimationFrame(frame)
+          })
+          timelineCursor = clip.timelineStart
+        }
         if (clip.kind === 'image') {
           const image = new Image()
           image.src = clip.url
@@ -554,9 +586,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               const width = image.width * scale
               const height = image.height * scale
               ctx.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
-              drawTitle()
-              setExportProgress(Math.min(99, Math.round(((index + (now - start) / durationMs) / clips.length) * 100)))
-              if (now - start >= durationMs) resolve()
+              const timelineTime = clip.timelineStart + Math.min(durationMs / 1000, (now - start) / 1000)
+              drawTitle(timelineTime)
+              syncMusic(timelineTime)
+              setExportProgress(Math.min(99, Math.round((timelineTime / 60) * 100)))
+              if (now - start >= durationMs) { timelineCursor = Math.max(timelineCursor, clip.timelineStart + durationMs / 1000); resolve() }
               else animationFrame = requestAnimationFrame(frame)
             }
             animationFrame = requestAnimationFrame(frame)
@@ -579,8 +613,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           await video.play()
           await new Promise<void>((resolve, reject) => {
             const frame = () => {
-              if (video.readyState >= 2 && video.videoWidth > 0) drawVideoFrame(video)
-              setExportProgress(Math.min(99, Math.round(((index + Math.min(1, (video.currentTime - clip.trimStart) / Math.max(0.1, clip.trimEnd - clip.trimStart))) / clips.length) * 100)))
+              const timelineTime = clip.timelineStart + Math.min(clip.trimEnd - clip.trimStart, video.currentTime - clip.trimStart)
+              if (video.readyState >= 2 && video.videoWidth > 0) drawVideoFrame(video, timelineTime)
+              syncMusic(timelineTime)
+              setExportProgress(Math.min(99, Math.round((timelineTime / 60) * 100)))
               if (video.currentTime >= clip.trimEnd || video.ended) { video.pause(); resolve(); return }
               animationFrame = requestAnimationFrame(frame)
             }
@@ -588,6 +624,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             animationFrame = requestAnimationFrame(frame)
           })
           video.pause()
+          timelineCursor = Math.max(timelineCursor, clip.timelineStart + clip.trimEnd - clip.trimStart)
           video.removeAttribute('src')
           video.load()
         }
