@@ -3,6 +3,7 @@
 import { Pause, Play, RotateCcw, Search, Sparkles, Type, CheckCircle2 } from 'lucide-react'
 import { BASIC_ENTRANCE_ANIMATIONS } from '@/lib/studio/basic-entrance-animations'
 import { EXIT_ANIMATIONS } from '@/lib/studio/exit-animations'
+import { BOUNCE_ELASTIC_ANIMATIONS } from '@/lib/studio/bounce-elastic-animations'
 
 const ANIMATION_CATEGORIES = [
   { name: 'Basic Entrance', range: '01–25', description: 'Clean, polished ways for text to appear' },
@@ -42,8 +43,9 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
   )
   const isBasicEntrance = selectedCategory === 'Basic Entrance'
   const isExit = selectedCategory === 'Exit'
-  const isPresetCategory = isBasicEntrance || isExit
-  const categoryAnimations = isBasicEntrance ? BASIC_ENTRANCE_ANIMATIONS : isExit ? EXIT_ANIMATIONS : []
+  const isBounceElastic = selectedCategory === 'Bounce & Elastic'
+  const isPresetCategory = isBasicEntrance || isExit || isBounceElastic
+  const categoryAnimations = isBasicEntrance ? BASIC_ENTRANCE_ANIMATIONS : isExit ? EXIT_ANIMATIONS : isBounceElastic ? BOUNCE_ELASTIC_ANIMATIONS : []
   const animations = categoryAnimations.filter(item => (item.name + ' ' + (item.description || '')).toLowerCase().includes(search.trim().toLowerCase()))
 
   return (
@@ -55,7 +57,7 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
         </div>
         <div className="mt-3 flex items-center justify-between">
           <span className="text-[9px] font-bold uppercase tracking-[.13em] text-slate-500">Animation library</span>
-          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-2 py-1 text-[9px] font-semibold text-emerald-200">50 ready · 250 upcoming</span>
+          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-2 py-1 text-[9px] font-semibold text-emerald-200">75 ready · 225 upcoming</span>
         </div>
       </div>
 
@@ -90,14 +92,14 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
         </div>
 
         {isPresetCategory ? <>
-          <div className="mb-2 flex items-center justify-between"><h3 className="px-1 text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{isExit ? 'Exit · 26–50' : 'Basic Entrance · 01–25'}</h3><span className="text-[8px] text-emerald-300">All {categoryAnimations.length} available</span></div>
+          <div className="mb-2 flex items-center justify-between"><h3 className="px-1 text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{isBounceElastic ? 'Bounce & Elastic · 51–75' : isExit ? 'Exit · 26–50' : 'Basic Entrance · 01–25'}</h3><span className="text-[8px] text-emerald-300">All {categoryAnimations.length} available</span></div>
           <div className="grid grid-cols-2 gap-2">{animations.map((animation, index) => <button key={animation.id} type="button" disabled={!selectedText} onClick={() => onSelectAnimation?.(animation.id)} aria-pressed={selectedAnimationId === animation.id} className={'group flex min-w-0 flex-col rounded-xl border p-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ' + (selectedAnimationId === animation.id ? 'border-fuchsia-400/60 bg-fuchsia-500/10 ring-1 ring-fuchsia-400/20' : 'border-white/10 bg-white/[0.025] hover:border-fuchsia-300/35 hover:bg-white/[0.06]')}>
             <span className="relative flex h-12 w-full items-center justify-center overflow-hidden rounded-lg border border-white/[0.07] bg-[#101525]"><span className="text-[21px] font-black tracking-tight text-white transition-transform group-hover:scale-110">Aa</span>{selectedAnimationId === animation.id && <CheckCircle2 className="absolute right-1 top-1 h-3.5 w-3.5 text-fuchsia-300" />}</span>
-            <span className="mt-2 block w-full truncate text-[9px] font-semibold text-slate-100">{String((isExit ? 26 : 1) + index).padStart(2, '0')}. {animation.name}</span>
+            <span className="mt-2 block w-full truncate text-[9px] font-semibold text-slate-100">{String((isBounceElastic ? 51 : isExit ? 26 : 1) + index).padStart(2, '0')}. {animation.name}</span>
             <span className="mt-1 line-clamp-2 min-h-[24px] text-[8px] leading-3 text-slate-500">{animation.description}</span>
           </button>)}</div>
           {!animations.length && <p className="py-6 text-center text-[9px] text-slate-500">No matching animations found.</p>}
-        </> : <div className="rounded-xl border border-dashed border-white/10 px-3 py-6 text-center"><Sparkles className="mx-auto h-5 w-5 text-slate-600" /><p className="mt-2 text-[10px] font-semibold text-slate-300">{selectedCategory}</p><p className="mt-1 text-[9px] leading-4 text-slate-500">This animation family will be implemented in its scheduled stage. The 50 Basic Entrance and Exit presets are ready now.</p></div>}
+        </> : <div className="rounded-xl border border-dashed border-white/10 px-3 py-6 text-center"><Sparkles className="mx-auto h-5 w-5 text-slate-600" /><p className="mt-2 text-[10px] font-semibold text-slate-300">{selectedCategory}</p><p className="mt-1 text-[9px] leading-4 text-slate-500">This animation family will be implemented in its scheduled stage. The 75 Basic Entrance, Exit and Bounce & Elastic presets are ready now.</p></div>}
       </div>
     </div>
   )
