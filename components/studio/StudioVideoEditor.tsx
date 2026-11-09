@@ -145,9 +145,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             if (typeof data.selectedTextId === 'string') setSelectedTextId(data.selectedTextId)
           } else {
             const legacy: TextLayer[] = []
-            if (data.showTitle && typeof data.titleText === 'string' && data.titleText) legacy.push({ id: makeId(), kind: 'heading', text: data.titleText, x: 8, y: 12, width: 84, fontSize: 42, color: '#ffffff', bold: true, italic: false, underline: false, align: 'center' })
-            if (data.showTitle && typeof data.subtitleText === 'string' && data.subtitleText) legacy.push({ id: makeId(), kind: 'subheading', text: data.subtitleText, x: 8, y: 25, width: 84, fontSize: 25, color: '#ffffff', bold: false, italic: false, underline: false, align: 'center' })
-            if (data.showTitle && typeof data.ctaText === 'string' && data.ctaText) legacy.push({ id: makeId(), kind: 'body', text: data.ctaText, x: 25, y: 80, width: 50, fontSize: 18, color: '#111827', bold: true, italic: false, underline: false, align: 'center' })
+            if (data.showTitle && typeof data.titleText === 'string' && data.titleText) legacy.push({ id: makeId(), kind: 'heading', text: data.titleText, x: 8, y: 12, width: 84, fontSize: 42, color: '#ffffff', bold: true, italic: false, underline: false, align: 'center', rotation: 0 })
+            if (data.showTitle && typeof data.subtitleText === 'string' && data.subtitleText) legacy.push({ id: makeId(), kind: 'subheading', text: data.subtitleText, x: 8, y: 25, width: 84, fontSize: 25, color: '#ffffff', bold: false, italic: false, underline: false, align: 'center', rotation: 0 })
+            if (data.showTitle && typeof data.ctaText === 'string' && data.ctaText) legacy.push({ id: makeId(), kind: 'body', text: data.ctaText, x: 25, y: 80, width: 50, fontSize: 18, color: '#111827', bold: true, italic: false, underline: false, align: 'center', rotation: 0 })
             setTextLayers(legacy)
             if (legacy[0]) setSelectedTextId(legacy[0].id)
           }
@@ -163,9 +163,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             setCtaText('WATCH NOW')
             setShowTitle(true)
             const templateLayers: TextLayer[] = [
-              { id: makeId(), kind: 'heading', text: 'MAKE IT MATTER', x: 8, y: 18, width: 84, fontSize: 42, color: '#ffffff', bold: true, italic: false, underline: false, align: 'center' },
-              { id: makeId(), kind: 'subheading', text: 'Your story. Your style. Your next big moment.', x: 8, y: 31, width: 84, fontSize: 25, color: '#ffffff', bold: false, italic: false, underline: false, align: 'center' },
-              { id: makeId(), kind: 'body', text: 'WATCH NOW', x: 25, y: 80, width: 50, fontSize: 18, color: '#ffffff', bold: true, italic: false, underline: false, align: 'center' },
+              { id: makeId(), kind: 'heading', text: 'MAKE IT MATTER', x: 8, y: 18, width: 84, fontSize: 42, color: '#ffffff', bold: true, italic: false, underline: false, align: 'center', rotation: 0 },
+              { id: makeId(), kind: 'subheading', text: 'Your story. Your style. Your next big moment.', x: 8, y: 31, width: 84, fontSize: 25, color: '#ffffff', bold: false, italic: false, underline: false, align: 'center', rotation: 0 },
+              { id: makeId(), kind: 'body', text: 'WATCH NOW', x: 25, y: 80, width: 50, fontSize: 18, color: '#ffffff', bold: true, italic: false, underline: false, align: 'center', rotation: 0 },
             ]
             setTextLayers(templateLayers)
             setSelectedTextId(templateLayers[0].id)
