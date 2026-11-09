@@ -9,6 +9,7 @@ import {
 } from '../lib/studio/animation-engine.ts'
 import { BASIC_ENTRANCE_ANIMATIONS } from '../lib/studio/basic-entrance-animations.ts'
 import { EXIT_ANIMATIONS } from '../lib/studio/exit-animations.ts'
+import { BOUNCE_ELASTIC_ANIMATIONS } from '../lib/studio/bounce-elastic-animations.ts'
 
 const entrance: TextAnimationDefinition = {
   id: 'test-fade-in',
@@ -230,5 +231,65 @@ test('each Exit preset stays neutral before its exit window and reaches its auth
     assert.equal(end.opacity, 0, definition.name + ' terminal opacity')
     assert.equal(end.phase, 'after', definition.name + ' phase end')
     assert.equal(end.visible, true, definition.name + ' terminal visibility')
+  }
+})
+
+
+test('Bounce & Elastic catalog contains exactly 25 valid, uniquely named and visually distinct presets', () => {
+  assert.equal(BOUNCE_ELASTIC_ANIMATIONS.length, 25)
+  assert.deepEqual(validateTextAnimationRegistry(BOUNCE_ELASTIC_ANIMATIONS), [])
+  assert.equal(new Set(BOUNCE_ELASTIC_ANIMATIONS.map(item => item.id)).size, 25)
+  assert.equal(new Set(BOUNCE_ELASTIC_ANIMATIONS.map(item => item.name)).size, 25)
+  assert.equal(new Set(BOUNCE_ELASTIC_ANIMATIONS.map(item => JSON.stringify(item.keyframes))).size, 25)
+  for (const item of BOUNCE_ELASTIC_ANIMATIONS) {
+    assert.equal(item.category, 'Bounce & Elastic')
+    assert.equal(item.mode, 'entrance')
+    assert.ok(item.description && item.description.length > 8)
+  }
+})
+
+test('each Bounce & Elastic preset starts hidden and settles to a neutral visible state', () => {
+  for (const definition of BOUNCE_ELASTIC_ANIMATIONS) {
+    const duration = definition.defaultDurationMs / 1000
+    const start = 3
+    const before = sampleTextAnimation({
+      definition,
+      settings: { animationId: definition.id, durationMs: definition.defaultDurationMs, enabled: true },
+      timelineTimeSeconds: start - 0.001,
+      layerStartSeconds: start,
+      layerDurationSeconds: 6,
+    })
+    const first = sampleTextAnimation({
+      definition,
+      settings: { animationId: definition.id, durationMs: definition.defaultDurationMs, enabled: true },
+      timelineTimeSeconds: start,
+      layerStartSeconds: start,
+      layerDurationSeconds: 6,
+    })
+    const middle = sampleTextAnimation({
+      definition,
+      settings: { animationId: definition.id, durationMs: definition.defaultDurationMs, enabled: true },
+      timelineTimeSeconds: start + duration * 0.5,
+      layerStartSeconds: start,
+      layerDurationSeconds: 6,
+    })
+    const end = sampleTextAnimation({
+      definition,
+      settings: { animationId: definition.id, durationMs: definition.defaultDurationMs, enabled: true },
+      timelineTimeSeconds: start + duration,
+      layerStartSeconds: start,
+      layerDurationSeconds: 6,
+    })
+    assert.equal(before.visible, false, definition.name + ' before visibility')
+    assert.equal(first.phase, 'running', definition.name + ' start phase')
+    assert.equal(middle.phase, 'running', definition.name + ' middle phase')
+    assert.equal(end.phase, 'after', definition.name + ' end phase')
+    assert.equal(end.visible, true, definition.name + ' end visibility')
+    assert.equal(end.opacity, 1, definition.name + ' end opacity')
+    assert.ok(Math.abs(end.translateX) < 0.0001, definition.name + ' end x')
+    assert.ok(Math.abs(end.translateY) < 0.0001, definition.name + ' end y')
+    assert.ok(Math.abs(end.scaleX - 1) < 0.0001, definition.name + ' end scale x')
+    assert.ok(Math.abs(end.scaleY - 1) < 0.0001, definition.name + ' end scale y')
+    assert.ok(Math.abs(end.rotate) < 0.0001, definition.name + ' end rotation')
   }
 })
