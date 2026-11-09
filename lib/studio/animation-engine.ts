@@ -43,6 +43,7 @@ export type TextAnimationFrame = {
 export type TextAnimationDefinition = {
   id: string
   name: string
+  description?: string
   category: string
   mode: TextAnimationMode
   /** Normalized keyframes must start at 0 and end at 1. */
