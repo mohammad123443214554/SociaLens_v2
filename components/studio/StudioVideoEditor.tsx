@@ -133,7 +133,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           if (typeof data.subtitleText === 'string') setSubtitleText(data.subtitleText)
           if (typeof data.ctaText === 'string') setCtaText(data.ctaText)
           if (Array.isArray(data.textLayers)) {
-            const restoredText = (data.textLayers as Array<Record<string, unknown>>).filter(item => typeof item.id === 'string' && typeof item.text === 'string').map(item => ({
+            const restoredText: TextLayer[] = (data.textLayers as Array<Record<string, unknown>>).filter(item => typeof item.id === 'string' && typeof item.text === 'string').map((item): TextLayer => ({
               id: String(item.id), kind: (item.kind === 'heading' || item.kind === 'subheading' ? item.kind : 'body') as TextLayer['kind'],
               text: String(item.text), x: Math.min(95, Math.max(0, Number(item.x) || 0)), y: Math.min(95, Math.max(0, Number(item.y) || 0)),
               width: Math.min(100, Math.max(12, Number(item.width) || 80)), fontSize: Math.min(160, Math.max(10, Number(item.fontSize) || 24)),
