@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import { StudioAnimationPanel } from './StudioAnimationPanel'
+import { sampleTextAnimation, type TextAnimationDefinition, type TextAnimationSettings } from '@/lib/studio/animation-engine'
 import {
   ArrowLeft, AudioLines, Check, Clapperboard,
   Bold, CaseUpper, ChevronDown, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
@@ -24,10 +25,11 @@ type Clip = {
   storagePath?: string
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
-type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; opacity?: number; effect?: TextEffect; effectIntensity?: number; effectBlur?: number; effectDistance?: number; effectAngle?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
+type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; opacity?: number; animation?: Partial<TextAnimationSettings>; effect?: TextEffect; effectIntensity?: number; effectBlur?: number; effectDistance?: number; effectAngle?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
 type TextDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'rotate'; startX: number; startY: number; startAngle: number; originX: number; originY: number; originWidth: number; originFontSize: number; originRotation: number }
 type TimelineDrag = { id: string; kind: 'clip' | 'text' | 'audio'; mode: 'move' | 'left' | 'right'; pointerId: number; startX: number; startAt: number; trimStart: number; trimEnd: number; duration: number }
 const MIN_TIMELINE_SECONDS = 60
+const STUDIO_ANIMATION_PREVIEW: TextAnimationDefinition = { id: '__studio_engine_preview__', name: 'Engine Preview', category: 'Preview', mode: 'entrance', defaultDurationMs: 850, defaultEasing: 'ease-out', keyframes: [{ at: 0, opacity: 0, translateY: 24, scaleX: 0.86, scaleY: 0.86, blur: 7 }, { at: 1, opacity: 1, translateY: 0, scaleX: 1, scaleY: 1, blur: 0 }] }
 const TIMELINE_PX_PER_SECOND = 16
 
 const MAX_VIDEO_BYTES = 250 * 1024 * 1024
@@ -365,11 +367,15 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects' | 'animation'>('media')
   const [animationCategory, setAnimationCategory] = useState('Basic Entrance')
   const [animationSearch, setAnimationSearch] = useState('')
+  const [isAnimationPreviewing, setIsAnimationPreviewing] = useState(false)
+  const [animationPreviewTime, setAnimationPreviewTime] = useState(0)
+  const animationPreviewStart = useRef(0)
   const [hydrated, setHydrated] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveSequence = useRef(0)
   const selected = clips.find(item => item.id === selectedId) || clips[0] || null
   const selectedText = textLayers.find(item => item.id === selectedTextId) || null
+  const animationPreviewSample = selectedText && isAnimationPreviewing ? sampleTextAnimation({ definition: STUDIO_ANIMATION_PREVIEW, settings: { animationId: STUDIO_ANIMATION_PREVIEW.id, durationMs: STUDIO_ANIMATION_PREVIEW.defaultDurationMs, easing: 'ease-out', intensity: 1, enabled: true }, timelineTimeSeconds: animationPreviewTime / 1000, layerStartSeconds: 0, layerDurationSeconds: 2 }) : null
   const getFormattedText = (layer: TextLayer) => {
     const value = layer.uppercase ? layer.text.toLocaleUpperCase() : layer.text
     if (layer.listStyle === 'bullet') return value.split(/\n/).map(line => line ? '• ' + line : line).join('\n')
@@ -773,6 +779,47 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   }
   useEffect(() => { if (audioRef.current) audioRef.current.volume = audioVolume / 100 }, [audioVolume, audio?.url])
 
+  useEffect(() => {
+    if (!isAnimationPreviewing) return
+    let frame = 0
+    const tick = (now: number) => {
+      const elapsed = Math.max(0, now - animationPreviewStart.current)
+      setAnimationPreviewTime(Math.min(STUDIO_ANIMATION_PREVIEW.defaultDurationMs, elapsed))
+      if (elapsed >= STUDIO_ANIMATION_PREVIEW.defaultDurationMs) {
+        setIsAnimationPreviewing(false)
+        return
+      }
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [isAnimationPreviewing])
+
+  useEffect(() => { setIsAnimationPreviewing(false); setAnimationPreviewTime(0) }, [selectedTextId])
+
+  const startAnimationPreview = () => {
+    if (!selectedText) { setNotice('Select a text layer on the canvas or timeline to preview motion.'); return }
+    if (playing) {
+      if (playbackFrame.current !== null) cancelAnimationFrame(playbackFrame.current)
+      playbackFrame.current = null
+      previewRef.current?.pause()
+      audioRef.current?.pause()
+      setPlaying(false)
+    }
+    setPlayhead(selectedText.timelineStart)
+    animationPreviewStart.current = performance.now()
+    setAnimationPreviewTime(0)
+    setIsAnimationPreviewing(true)
+    setNotice('Previewing the animation engine on the selected text. This is a temporary preview, not a saved preset.')
+  }
+  const resetTextAnimation = () => {
+    if (!selectedText) return
+    setIsAnimationPreviewing(false)
+    setAnimationPreviewTime(0)
+    updateTextLayer(selectedText.id, { animation: undefined })
+    setNotice('Animation settings reset for the selected text layer.')
+  }
+
   const exportVideo = async () => {
     if (!clips.length) { setError('Add at least one video or photo clip before exporting.'); return }
     if (typeof MediaRecorder === 'undefined') { setError('Video export is not supported by this browser. Try the latest Chrome or Edge.'); return }
@@ -1089,7 +1136,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               <button type="button" onClick={()=>updateTextLayer(selectedText.id,{effect:'Simple',effectIntensity:60,effectBlur:8,effectDistance:4,effectAngle:45,effectColor:'#a855f7',effectSecondaryColor:'#22d3ee'})} className="rounded-lg border border-white/10 py-2 text-[9px] font-semibold text-slate-400 hover:bg-white/[0.05]">Reset effect settings</button>
             </>}
           </div>}
-          {activePanel === 'animation' && <StudioAnimationPanel selectedCategory={animationCategory} onSelectCategory={setAnimationCategory} search={animationSearch} onSearchChange={setAnimationSearch} />}
+          {activePanel === 'animation' && <StudioAnimationPanel selectedCategory={animationCategory} onSelectCategory={setAnimationCategory} search={animationSearch} onSearchChange={setAnimationSearch} selectedText={selectedText} isPreviewing={isAnimationPreviewing} previewProgress={animationPreviewTime / STUDIO_ANIMATION_PREVIEW.defaultDurationMs} onPreview={startAnimationPreview} onStopPreview={() => setIsAnimationPreviewing(false)} onReset={resetTextAnimation} />}
           {activePanel === 'audio' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <button type="button" onClick={() => audioInput.current?.click()} className="flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[10px] font-bold"><Music2 className="h-4 w-4" /> {audio ? 'Replace audio track' : 'Import audio'}</button>
             {audio ? <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.04] p-3"><div className="flex items-center gap-2"><Music2 className="h-4 w-4 shrink-0 text-cyan-300" /><div className="min-w-0"><p className="truncate text-[10px] font-semibold text-cyan-100">{audio.name}</p><p className="text-[9px] text-cyan-100/50">{formatTime(audio.duration)} duration</p></div></div><label className="mt-4 block text-[9px] text-slate-400">Track volume · {audioVolume}%<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="mt-2 w-full accent-cyan-400" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="mt-3 w-full rounded-lg border border-red-400/20 py-2 text-[9px] font-semibold text-red-300 hover:bg-red-400/[0.06]">Remove audio track</button></div> : <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center"><Music2 className="mx-auto h-7 w-7 text-slate-600" /><p className="mt-2 text-[10px] font-semibold text-slate-300">No audio track</p><p className="mt-1 text-[9px] text-slate-500">Import a music or audio file to add it to your project.</p></div>}
@@ -1187,7 +1234,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               <div ref={canvasRef} onPointerDown={event => { const target = event.target as HTMLElement; if (!target.closest("[data-text-layer-id], [data-text-toolbar]")) { setSelectedTextId(null); setEditingTextId(null) } }} className={'relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-md bg-black ring-1 ring-violet-400/20 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-5xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(72dvh, 720px)' }}>
                 {activeTimelineClip?.kind === 'video' ? <video key={activeTimelineClip.id} ref={previewRef} src={activeTimelineClip.url} playsInline preload="auto" className="h-full w-full object-contain" /> : activeTimelineClip?.kind === 'image' ? <img src={activeTimelineClip.url} alt={activeTimelineClip.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">{clips.length ? 'Timeline gap' : 'Your video canvas'}</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">{clips.length ? 'No media clip is placed at this point in the timeline.' : 'Import a video or photo to start editing your project.'}</p>{!clips.length && <button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button>}</div>}
                 {audio && <audio ref={audioRef} src={audio.url} preload="metadata" />}
-                {textLayers.filter(layer => playhead >= layer.timelineStart && playhead < layer.timelineStart + layer.timelineDuration).map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontFamily: layer.fontFamily && layer.fontFamily !== 'Default' ? '"' + layer.fontFamily + '", sans-serif' : 'Arial, Helvetica, sans-serif', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : layer.strikethrough ? 'line-through' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: 'rotate(' + layer.rotation + 'deg)', transformOrigin: 'center center' }}>
+                {textLayers.filter(layer => (playhead >= layer.timelineStart && playhead < layer.timelineStart + layer.timelineDuration) || (isAnimationPreviewing && selectedTextId === layer.id)).map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontFamily: layer.fontFamily && layer.fontFamily !== 'Default' ? '"' + layer.fontFamily + '", sans-serif' : 'Arial, Helvetica, sans-serif', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : layer.strikethrough ? 'line-through' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: (isAnimationPreviewing && selectedTextId === layer.id && animationPreviewSample ? 'translate(' + animationPreviewSample.translateX + 'px, ' + animationPreviewSample.translateY + 'px) scale(' + animationPreviewSample.scaleX + ', ' + animationPreviewSample.scaleY + ') rotate(' + (layer.rotation + animationPreviewSample.rotate) + 'deg) skew(' + animationPreviewSample.skewX + 'deg, ' + animationPreviewSample.skewY + 'deg)' : 'rotate(' + layer.rotation + 'deg)'), filter: isAnimationPreviewing && selectedTextId === layer.id && animationPreviewSample ? 'blur(' + animationPreviewSample.blur + 'px)' : undefined, transformOrigin: 'center center', opacity: isAnimationPreviewing && selectedTextId === layer.id && animationPreviewSample ? animationPreviewSample.opacity : 1 }}>
                   <div dir="auto" contentEditable={editingTextId === layer.id} suppressContentEditableWarning onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); if (editingTextId !== layer.id) { const node = event.currentTarget; setEditingTextId(layer.id); window.requestAnimationFrame(() => { node.focus(); const selection = window.getSelection(); const range = document.createRange(); range.selectNodeContents(node); range.collapse(false); selection?.removeAllRanges(); selection?.addRange(range) }) } }} onInput={event => { textDrafts.current.set(layer.id, event.currentTarget.innerText.split(/\n/).map(line => layer.listStyle === 'bullet' ? line.replace(/^•\s?/, '') : layer.listStyle === 'number' ? line.replace(/^\d+\\.\s?/, '') : line).join('\n')) }} onBlur={event => { const value = textDrafts.current.get(layer.id); if (value !== undefined) { updateTextLayer(layer.id,{text:value}); textDrafts.current.delete(layer.id) } setEditingTextId(current => current === layer.id ? null : current) }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.blur() } }} className="inline-block min-h-[24px] max-w-full whitespace-pre-wrap break-words outline-none" style={{ display:'inline-block', width:'fit-content', maxWidth:'100%', opacity: (layer.opacity ?? 100) / 100 }}><span style={{ display:'inline', color:layer.color, ...getTextEffectStyle(layer.effect, layer.effectIntensity ?? 60, layer.effectColor || '#a855f7', layer.effectSecondaryColor || '#22d3ee', layer.effectBlur ?? 8, layer.effectDistance ?? 4, layer.effectAngle ?? 45) }}>{getFormattedText(layer)}</span></div>
                   {selectedTextId === layer.id && <>
                     <button type="button" aria-label="Move text" title="Drag to move" onPointerDown={event => beginTextDrag(event,layer,'move')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -top-7 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-white bg-slate-900 text-[11px] text-white shadow-md cursor-move touch-none">✥</button>
