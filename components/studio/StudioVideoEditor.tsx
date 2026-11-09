@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import {
   ArrowLeft, AudioLines, Check, ChevronLeft, ChevronRight, Clapperboard,
-  FolderOpen, ImagePlus, Music2, Pause, Play, Plus, Trash2, Type, Video,
+  Bold, CaseUpper, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
+  Palette, Pause, Play, Plus, Strikethrough, Trash2, Type, Underline, Video,
   Volume2, VolumeX, X
 } from 'lucide-react'
 
@@ -22,7 +23,7 @@ type Clip = {
   storagePath?: string
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
-type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; bold: boolean; italic: boolean; underline: boolean; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number }
+type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number }
 type TextDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'rotate'; startX: number; startY: number; startAngle: number; originX: number; originY: number; originWidth: number; originFontSize: number; originRotation: number }
 type TimelineDrag = { id: string; kind: 'clip' | 'text' | 'audio'; mode: 'move' | 'left' | 'right'; pointerId: number; startX: number; startAt: number; trimStart: number; trimEnd: number; duration: number }
 const TIMELINE_SECONDS = 60
@@ -102,6 +103,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const saveSequence = useRef(0)
   const selected = clips.find(item => item.id === selectedId) || clips[0] || null
   const selectedText = textLayers.find(item => item.id === selectedTextId) || null
+  const getFormattedText = (layer: TextLayer) => {
+    const value = layer.uppercase ? layer.text.toLocaleUpperCase() : layer.text
+    if (layer.listStyle === 'bullet') return value.split(/\\n/).map(line => line ? '• ' + line : line).join('\\n')
+    if (layer.listStyle === 'number') return value.split(/\\n/).map((line, index) => line ? (index + 1) + '. ' + line : line).join('\\n')
+    return value
+  }
   const totalDuration = useMemo(() => clips.reduce((sum, item) => sum + Math.max(0.1, item.trimEnd - item.trimStart), 0), [clips])
   const currentDuration = selected ? Math.max(0, selected.trimEnd - selected.trimStart) : 0
 
@@ -325,6 +332,15 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setNotice('Text added. Edit it directly on the canvas.')
   }
   const updateTextLayer = (id: string, patch: Partial<TextLayer>) => setTextLayers(items => items.map(item => item.id === id ? { ...item, ...patch } : item))
+  const duplicateTextLayer = (id: string) => {
+    const layer = textLayers.find(item => item.id === id)
+    if (!layer) return
+    const copy: TextLayer = { ...layer, id: makeId(), x: Math.min(100 - layer.width, layer.x + 4), y: Math.min(96, layer.y + 4) }
+    setTextLayers(items => [...items, copy])
+    setSelectedTextId(copy.id)
+    setEditingTextId(null)
+    setNotice('Text duplicated.')
+  }
   const beginTimelineDrag = (event: ReactPointerEvent<HTMLElement>, kind: TimelineDrag['kind'], id: string, mode: TimelineDrag['mode']) => {
     event.preventDefault()
     event.stopPropagation()
@@ -515,13 +531,15 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           const x = -maxWidth / 2
           const y = -Math.round(layer.fontSize * scale) / 2
           const lineHeight = Math.round(layer.fontSize * scale * 1.2)
-          layer.text.split(/\\n/).forEach((line, index) => {
+          getFormattedText(layer).split(/\\n/).forEach((line, index) => {
             const textX = layer.align === 'left' ? x : layer.align === 'right' ? x + maxWidth : x + maxWidth / 2
             ctx.fillText(line, textX, y + index * lineHeight, maxWidth)
-            if (layer.underline) {
+            if (layer.underline || layer.strikethrough) {
               const measured = Math.min(maxWidth, ctx.measureText(line).width)
               const startX = layer.align === 'left' ? x : layer.align === 'right' ? x + maxWidth - measured : x + (maxWidth - measured) / 2
-              ctx.fillRect(startX, y + index * lineHeight + lineHeight - Math.max(1, scale), measured, Math.max(1, scale))
+              const thickness = Math.max(1, scale)
+              if (layer.underline) ctx.fillRect(startX, y + index * lineHeight + lineHeight - thickness, measured, thickness)
+              if (layer.strikethrough) ctx.fillRect(startX, y + index * lineHeight + lineHeight * 0.55, measured, thickness)
             }
           })
           ctx.restore()
@@ -707,7 +725,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             <button type="button" onClick={() => addTextLayer('heading')} className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-fuchsia-400/40 hover:bg-fuchsia-500/[0.07]"><span className="block text-[19px] font-extrabold text-white">Add a heading</span><span className="mt-1 block text-[9px] text-slate-500">Large title text</span></button>
             <button type="button" onClick={() => addTextLayer('subheading')} className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-fuchsia-400/40 hover:bg-fuchsia-500/[0.07]"><span className="block text-[15px] font-bold text-white">Add a subheading</span><span className="mt-1 block text-[9px] text-slate-500">Medium supporting text</span></button>
             <button type="button" onClick={() => addTextLayer('body')} className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-fuchsia-400/40 hover:bg-fuchsia-500/[0.07]"><span className="block text-[11px] font-medium text-white">Add a little bit of body text</span><span className="mt-1 block text-[9px] text-slate-500">Small body text</span></button>
-            {selectedText && <div className="mt-2 rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/[0.05] p-3"><div className="mb-2 flex items-center justify-between"><span className="text-[10px] font-semibold text-fuchsia-100">Selected text</span><button type="button" onClick={() => removeTextLayer(selectedText.id)} className="text-[9px] text-red-300">Delete</button></div><label className="block text-[9px] text-slate-400">Font size · {Math.round(selectedText.fontSize)}px<input type="range" min="10" max="160" value={selectedText.fontSize} onChange={event => updateTextLayer(selectedText.id,{fontSize:Number(event.target.value)})} className="mt-2 w-full accent-fuchsia-500" /></label><label className="mt-3 flex items-center justify-between text-[9px] text-slate-400">Text color<input type="color" value={selectedText.color} onChange={event => updateTextLayer(selectedText.id,{color:event.target.value})} className="h-8 w-12 cursor-pointer rounded border border-white/10 bg-transparent" /></label><div className="mt-3 grid grid-cols-3 gap-1"><button type="button" onClick={() => updateTextLayer(selectedText.id,{bold:!selectedText.bold})} className={'rounded-md border py-2 text-xs font-bold ' + (selectedText.bold ? 'border-fuchsia-400/40 bg-fuchsia-500/15 text-white' : 'border-white/10 text-slate-400')}>B</button><button type="button" onClick={() => updateTextLayer(selectedText.id,{italic:!selectedText.italic})} className={'rounded-md border py-2 text-xs italic ' + (selectedText.italic ? 'border-fuchsia-400/40 bg-fuchsia-500/15 text-white' : 'border-white/10 text-slate-400')}>I</button><button type="button" onClick={() => updateTextLayer(selectedText.id,{underline:!selectedText.underline})} className={'rounded-md border py-2 text-xs underline ' + (selectedText.underline ? 'border-fuchsia-400/40 bg-fuchsia-500/15 text-white' : 'border-white/10 text-slate-400')}>U</button></div></div>}
           </div>}
           {activePanel === 'audio' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <button type="button" onClick={() => audioInput.current?.click()} className="flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[10px] font-bold"><Music2 className="h-4 w-4" /> {audio ? 'Replace audio track' : 'Import audio'}</button>
@@ -741,13 +758,29 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             </div>
           </div>
 
+          {selectedText && <div className="z-20 flex min-h-[48px] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-white/[0.08] bg-[#111629] px-3 py-2 shadow-lg sm:px-5" role="toolbar" aria-label="Selected text formatting">
+            <button type="button" onClick={() => removeTextLayer(selectedText.id)} title="Delete text" aria-label="Delete text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-300 transition hover:bg-red-400/10"><Trash2 className="h-4 w-4" /></button>
+            <button type="button" onClick={() => duplicateTextLayer(selectedText.id)} title="Duplicate text" aria-label="Duplicate text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-200 transition hover:bg-white/10"><Copy className="h-4 w-4" /></button>
+            <span className="mx-1 h-6 w-px shrink-0 bg-white/10" />
+            <label title="Text color" className="relative flex h-8 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-100 transition hover:bg-white/10"><Palette className="h-4 w-4" /><span className="absolute bottom-1 left-2 right-2 h-1 rounded-full" style={{ backgroundColor: selectedText.color }} /><input aria-label="Text color" type="color" value={selectedText.color} onChange={event => updateTextLayer(selectedText.id,{color:event.target.value})} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" /></label>
+            <span className="mx-1 h-6 w-px shrink-0 bg-white/10" />
+            <button type="button" onClick={() => updateTextLayer(selectedText.id,{bold:!selectedText.bold})} aria-label="Bold" aria-pressed={selectedText.bold} title="Bold" className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ' + (selectedText.bold ? 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30' : 'text-slate-200 hover:bg-white/10')}><Bold className="h-4 w-4" /></button>
+            <button type="button" onClick={() => updateTextLayer(selectedText.id,{italic:!selectedText.italic})} aria-label="Italic" aria-pressed={selectedText.italic} title="Italic" className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ' + (selectedText.italic ? 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30' : 'text-slate-200 hover:bg-white/10')}><Italic className="h-4 w-4" /></button>
+            <button type="button" onClick={() => updateTextLayer(selectedText.id,{underline:!selectedText.underline})} aria-label="Underline" aria-pressed={selectedText.underline} title="Underline" className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ' + (selectedText.underline ? 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30' : 'text-slate-200 hover:bg-white/10')}><Underline className="h-4 w-4" /></button>
+            <button type="button" onClick={() => updateTextLayer(selectedText.id,{strikethrough:!selectedText.strikethrough})} aria-label="Strikethrough" aria-pressed={!!selectedText.strikethrough} title="Strikethrough" className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ' + (selectedText.strikethrough ? 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30' : 'text-slate-200 hover:bg-white/10')}><Strikethrough className="h-4 w-4" /></button>
+            <button type="button" onClick={() => updateTextLayer(selectedText.id,{uppercase:!selectedText.uppercase})} aria-label="Uppercase" aria-pressed={!!selectedText.uppercase} title="Uppercase" className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ' + (selectedText.uppercase ? 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30' : 'text-slate-200 hover:bg-white/10')}><CaseUpper className="h-4 w-4" /></button>
+            <span className="mx-1 h-6 w-px shrink-0 bg-white/10" />
+            <button type="button" onClick={() => updateTextLayer(selectedText.id,{listStyle:selectedText.listStyle === 'bullet' ? 'none' : 'bullet'})} aria-label="Bullet list" aria-pressed={selectedText.listStyle === 'bullet'} title="Bullet list" className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ' + (selectedText.listStyle === 'bullet' ? 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30' : 'text-slate-200 hover:bg-white/10')}><List className="h-4 w-4" /></button>
+            <button type="button" onClick={() => updateTextLayer(selectedText.id,{listStyle:selectedText.listStyle === 'number' ? 'none' : 'number'})} aria-label="Numbered list" aria-pressed={selectedText.listStyle === 'number'} title="Numbered list" className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ' + (selectedText.listStyle === 'number' ? 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30' : 'text-slate-200 hover:bg-white/10')}><ListOrdered className="h-4 w-4" /></button>
+          </div>}
+
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3 sm:p-5">
             <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-xl border border-white/[0.07] bg-[#05060d] shadow-[0_20px_70px_rgba(0,0,0,0.42)]">
               <div ref={canvasRef} onPointerDown={event => { if (event.target === event.currentTarget) { setSelectedTextId(null); setEditingTextId(null) } }} className={'relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-md bg-black ring-1 ring-violet-400/20 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-5xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(72dvh, 720px)' }}>
                 {selected?.kind === 'video' ? <video key={selected.id} ref={previewRef} src={selected.url} playsInline preload="metadata" className="h-full w-full object-contain" onEnded={() => { audioRef.current?.pause(); setPlaying(false) }} /> : selected?.kind === 'image' ? <img src={selected.url} alt={selected.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">Your video canvas</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">Import a video or photo to start editing your project.</p><button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button></div>}
                 {audio && <audio ref={audioRef} src={audio.url} preload="metadata" />}
-                {textLayers.map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline ? 'underline' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: 'rotate(' + layer.rotation + 'deg)', transformOrigin: 'center center' }}>
-                  <div dir="auto" contentEditable={editingTextId === layer.id} suppressContentEditableWarning onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); if (editingTextId !== layer.id) { const node = event.currentTarget; setEditingTextId(layer.id); window.requestAnimationFrame(() => { node.focus(); const selection = window.getSelection(); const range = document.createRange(); range.selectNodeContents(node); range.collapse(false); selection?.removeAllRanges(); selection?.addRange(range) }) } }} onInput={event => { textDrafts.current.set(layer.id,event.currentTarget.innerText) }} onBlur={event => { const value = textDrafts.current.get(layer.id); if (value !== undefined) { updateTextLayer(layer.id,{text:value}); textDrafts.current.delete(layer.id) } setEditingTextId(current => current === layer.id ? null : current) }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.blur() } }} className="min-h-[24px] whitespace-pre-wrap break-words outline-none">{layer.text}</div>
+                {textLayers.map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : layer.strikethrough ? 'line-through' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: 'rotate(' + layer.rotation + 'deg)', transformOrigin: 'center center' }}>
+                  <div dir="auto" contentEditable={editingTextId === layer.id} suppressContentEditableWarning onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); if (editingTextId !== layer.id) { const node = event.currentTarget; setEditingTextId(layer.id); window.requestAnimationFrame(() => { node.focus(); const selection = window.getSelection(); const range = document.createRange(); range.selectNodeContents(node); range.collapse(false); selection?.removeAllRanges(); selection?.addRange(range) }) } }} onInput={event => { textDrafts.current.set(layer.id, event.currentTarget.innerText.split(/\\n/).map(line => layer.listStyle === 'bullet' ? line.replace(/^•\\s?/, '') : layer.listStyle === 'number' ? line.replace(/^\\d+\\.\\s?/, '') : line).join('\\n')) }} onBlur={event => { const value = textDrafts.current.get(layer.id); if (value !== undefined) { updateTextLayer(layer.id,{text:value}); textDrafts.current.delete(layer.id) } setEditingTextId(current => current === layer.id ? null : current) }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.blur() } }} className="min-h-[24px] whitespace-pre-wrap break-words outline-none">{getFormattedText(layer)}</div>
                   {selectedTextId === layer.id && editingTextId !== layer.id && <>
                     <button type="button" aria-label="Move text" title="Drag to move" onPointerDown={event => beginTextDrag(event,layer,'move')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -top-7 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-white bg-slate-900 text-[11px] text-white shadow-md cursor-move touch-none">✥</button>
                     <button type="button" aria-label="Rotate text" title="Drag to rotate" onPointerDown={event => beginTextDrag(event,layer,'rotate')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -bottom-7 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-white bg-slate-900 text-[12px] text-white shadow-md cursor-grab touch-none">↻</button>
