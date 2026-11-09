@@ -1,6 +1,6 @@
 'use client'
 
-import { Search, Sparkles, X } from 'lucide-react'
+import { Pause, Play, RotateCcw, Search, Sparkles, Type, X } from 'lucide-react'
 
 const ANIMATION_CATEGORIES = [
   { name: 'Basic Entrance', range: '01–25', description: 'Clean, polished ways for text to appear' },
@@ -24,9 +24,15 @@ type Props = {
   onSearchChange: (value: string) => void
   onClose?: () => void
   mobile?: boolean
+  selectedText?: { text: string; kind: string; animation?: { animationId?: string | null } } | null
+  isPreviewing?: boolean
+  previewProgress?: number
+  onPreview?: () => void
+  onStopPreview?: () => void
+  onReset?: () => void
 }
 
-export function StudioAnimationPanel({ selectedCategory, onSelectCategory, search, onSearchChange, onClose, mobile = false }: Props) {
+export function StudioAnimationPanel({ selectedCategory, onSelectCategory, search, onSearchChange, onClose, mobile = false, selectedText = null, isPreviewing = false, previewProgress = 0, onPreview, onStopPreview, onReset }: Props) {
   const filtered = ANIMATION_CATEGORIES.filter(category =>
     (category.name + ' ' + category.description).toLowerCase().includes(search.trim().toLowerCase())
   )
@@ -45,6 +51,25 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+        <section className="mb-3 rounded-xl border border-white/[0.08] bg-white/[0.025] p-3" aria-label="Selected text animation preview controls">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[9px] font-bold uppercase tracking-[.12em] text-slate-400">Selected text</span>
+            {selectedText ? <span className="rounded-md bg-emerald-400/10 px-2 py-1 text-[8px] font-semibold text-emerald-200">Layer selected</span> : <span className="rounded-md bg-amber-400/10 px-2 py-1 text-[8px] font-semibold text-amber-200">No selection</span>}
+          </div>
+          {selectedText ? <div className="flex min-w-0 items-center gap-2 rounded-lg border border-white/[0.06] bg-[#080c18]/70 p-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-fuchsia-400/10 text-fuchsia-200"><Type className="h-4 w-4" /></span>
+            <span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-semibold text-white">{selectedText.text.trim() || 'Untitled text'}</span><span className="mt-0.5 block text-[8px] capitalize text-slate-500">{selectedText.kind} layer</span></span>
+          </div> : <p className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-[9px] leading-4 text-slate-500">Select a text layer directly on the canvas or from the Text timeline track to enable preview controls.</p>}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" disabled={!selectedText || isPreviewing} onClick={onPreview} className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[9px] font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"><Play className="h-3.5 w-3.5" /> Preview motion</button>
+            <button type="button" disabled={!selectedText} onClick={onReset} className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-white/10 text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"><RotateCcw className="h-3.5 w-3.5" /> Reset</button>
+          </div>
+          {isPreviewing && <div className="mt-3">
+            <div className="mb-1.5 flex items-center justify-between"><span className="flex items-center gap-1 text-[8px] font-semibold text-fuchsia-200"><Sparkles className="h-3 w-3" /> Preview playing</span><button type="button" onClick={onStopPreview} className="flex items-center gap-1 text-[8px] text-slate-400 hover:text-white"><Pause className="h-3 w-3" /> Stop</button></div>
+            <div className="h-1 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-400 transition-[width]" style={{ width: Math.max(0, Math.min(1, previewProgress)) * 100 + '%' }} /></div>
+          </div>}
+          <p className="mt-2 text-[8px] leading-4 text-slate-500">This stage uses a temporary engine demonstration to verify selection and preview behaviour. Final named presets will be connected in the animation-family stages.</p>
+        </section>
         <div className="mb-3 rounded-xl border border-violet-400/15 bg-gradient-to-br from-violet-500/[0.10] to-fuchsia-500/[0.06] p-3">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-fuchsia-400/10 text-fuchsia-200"><Sparkles className="h-4 w-4" /></span>
@@ -73,7 +98,7 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
 
       <div className="border-t border-white/[0.07] p-3">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[8px] leading-4 text-slate-500">Animation selection and live preview are added in the next stage.</p>
+          <p className="text-[8px] leading-4 text-slate-500">Preview controls are ready. Preset selection will be enabled as the 300-animation library is built.</p>
           {mobile && onClose && <button type="button" onClick={onClose} aria-label="Close animation panel" className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-white/10 px-2 text-[9px] text-slate-300"><X className="h-3.5 w-3.5" /> Close</button>}
         </div>
       </div>
