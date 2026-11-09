@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
+import { StudioAnimationPanel } from './StudioAnimationPanel'
 import {
   ArrowLeft, AudioLines, Check, Clapperboard,
   Bold, CaseUpper, ChevronDown, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
@@ -1056,8 +1057,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
 
         <aside className="hidden w-[260px] shrink-0 flex-col border-r border-white/[0.08] bg-[#0d1020] lg:flex">
           <div className="border-b border-white/[0.07] px-4 py-4">
-            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : 'Audio library'}</h2><span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : '3 text styles'}</span></div>
-            <p className="mt-1 text-[9px] text-slate-500">{activePanel === 'media' ? 'Import and manage your video and photo clips.' : activePanel === 'text' ? 'Edit the text currently shown on your canvas.' : 'Add a music track and control its volume.'}</p>
+            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : activePanel === 'audio' ? 'Audio library' : activePanel === 'effects' ? 'Text effects' : 'Text animations'}</h2><span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : activePanel === 'animation' ? '300 planned' : activePanel === 'effects' ? '40 effects' : '3 text styles'}</span></div>
+            <p className="mt-1 text-[9px] text-slate-500">{activePanel === 'media' ? 'Import and manage your video and photo clips.' : activePanel === 'text' ? 'Edit the text currently shown on your canvas.' : activePanel === 'audio' ? 'Add a music track and control its volume.' : activePanel === 'animation' ? 'Explore motion families for the selected text layer.' : 'Style the appearance of your selected text.'}</p>
           </div>
 
           {activePanel === 'media' && <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3">
@@ -1261,6 +1262,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           </div>
         </aside>
       </div>
+
+      {activePanel === 'animation' && <div className="fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] top-[calc(58px+env(safe-area-inset-top))] z-[90] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0d1020] shadow-2xl lg:hidden"><div className="flex h-11 shrink-0 items-center justify-between border-b border-white/[0.07] px-3"><span className="text-[11px] font-bold text-white">Text animations</span><button type="button" onClick={() => setActivePanel('text')} aria-label="Close animation panel" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10"><X className="h-4 w-4" /></button></div><StudioAnimationPanel selectedCategory={animationCategory} onSelectCategory={setAnimationCategory} search={animationSearch} onSearchChange={setAnimationSearch} mobile onClose={() => setActivePanel('text')} /></div>}
 
       <input ref={videoInput} type="file" accept="video/*" multiple className="hidden" onChange={event => { void addMedia(event.target.files,'video'); event.currentTarget.value = '' }} />
       <input ref={imageInput} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif" multiple className="hidden" onChange={event => { void addMedia(event.target.files,'image'); event.currentTarget.value = '' }} />
