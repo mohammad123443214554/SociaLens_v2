@@ -23,7 +23,7 @@ type Clip = {
   storagePath?: string
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
-type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; opacity?: number; effect?: TextEffect | 'None'; effectIntensity?: number; effectBlur?: number; effectDistance?: number; effectAngle?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
+type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; opacity?: number; effect?: TextEffect; effectIntensity?: number; effectBlur?: number; effectDistance?: number; effectAngle?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
 type TextDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'rotate'; startX: number; startY: number; startAngle: number; originX: number; originY: number; originWidth: number; originFontSize: number; originRotation: number }
 type TimelineDrag = { id: string; kind: 'clip' | 'text' | 'audio'; mode: 'move' | 'left' | 'right'; pointerId: number; startX: number; startAt: number; trimStart: number; trimEnd: number; duration: number }
 const MIN_TIMELINE_SECONDS = 60
@@ -42,6 +42,7 @@ const makeId = () => typeof crypto !== 'undefined' && 'randomUUID' in crypto ? c
 
 type FontOption = { family: string; category: string }
 const TEXT_EFFECTS = [
+  { category: "Basic & Clean", name: "Simple" },
   {
     "category": "Shadow & Depth",
     "name": "Drop Shadow"
@@ -206,12 +207,14 @@ const TEXT_EFFECTS = [
 const EFFECT_CATEGORIES = [...new Set(TEXT_EFFECTS.map(effect => effect.category))]
 type TextEffect = typeof TEXT_EFFECTS[number]['name']
 function getTextEffectStyle(effect: string | undefined, intensity = 60, color = '#a855f7', secondary = '#22d3ee', blur = 8, distance = 4, angle = 45): Record<string, string | number> {
-  const n = Math.max(0.1, intensity / 60)
+  const n = Math.max(0, Math.min(100, intensity) / 60)
+  if (n === 0) return {}
   const dx = Math.round(Math.cos(angle * Math.PI / 180) * distance * n)
   const dy = Math.round(Math.sin(angle * Math.PI / 180) * distance * n)
   const soft = Math.max(0, Math.round(blur * n))
   const glow = Math.max(0, Math.round(blur * n))
   const styles: Record<string, Record<string, string | number>> = {
+    'Simple': { textShadow: `${dx}px ${dy}px ${soft}px rgba(0,0,0,.28)` },
     'Drop Shadow': { textShadow: `${dx}px ${dy}px ${soft}px rgba(0,0,0,.75)` },
     'Long Shadow': { textShadow: Array.from({length:Math.min(12,Math.max(3,Math.round(8*n)))},(_,i)=>`${i+1}px ${i+1}px 0 ${color}`).join(',') },
     'Hard Shadow': { textShadow: `${dx}px ${dy}px 0 ${color}` },
@@ -253,12 +256,14 @@ function getTextEffectStyle(effect: string | undefined, intensity = 60, color = 
     'Retro': { textShadow: `3px 3px 0 ${color}, 6px 6px 0 ${secondary}`, filter: 'sepia(.25) saturate(1.25)' },
     'Hologram': { color: 'transparent', background: 'linear-gradient(100deg,#f0abfc,#67e8f9,#fde68a,#c4b5fd,#f0abfc)', WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 0 8px rgba(103,232,249,.55)' },
   }
-  const style = styles[effect || ''] || {}
+  const style = styles[effect || 'Simple'] || {}
+  const directionalShadow = `${dx}px ${dy}px ${soft}px ${color}66`
+  const combinedStyle = { ...style, textShadow: style.textShadow ? `${style.textShadow}, ${directionalShadow}` : directionalShadow }
   // Gradient/material fills must paint through the glyph mask, never the text layer's
   // full-width editing box. WebKit needs text-fill-color explicitly transparent.
   if (style.WebkitBackgroundClip === 'text' || style.backgroundClip === 'text') {
     return {
-      ...style,
+      ...combinedStyle,
       color: 'transparent',
       backgroundColor: 'transparent',
       backgroundClip: 'text',
@@ -269,7 +274,7 @@ function getTextEffectStyle(effect: string | undefined, intensity = 60, color = 
       WebkitBoxDecorationBreak: 'clone',
     }
   }
-  return style
+  return combinedStyle
 }
 
 const googleFontLoads = new Map<string, Promise<void>>()
@@ -419,7 +424,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               id: String(item.id), kind: (item.kind === 'heading' || item.kind === 'subheading' ? item.kind : 'body') as TextLayer['kind'],
               text: String(item.text), x: Math.min(95, Math.max(0, Number(item.x) || 0)), y: Math.min(95, Math.max(0, Number(item.y) || 0)),
               width: Math.min(100, Math.max(12, Number(item.width) || 80)), fontSize: Math.min(160, Math.max(10, Number(item.fontSize) || 24)),
-              color: typeof item.color === 'string' ? item.color : '#ffffff', effect: TEXT_EFFECTS.some(effect => effect.name === item.effect) ? item.effect as TextEffect : 'None', effectIntensity: Number.isFinite(Number(item.effectIntensity)) ? Math.min(100, Math.max(0, Number(item.effectIntensity))) : 60, effectBlur: Number.isFinite(Number(item.effectBlur)) ? Math.min(40, Math.max(0, Number(item.effectBlur))) : 8, effectDistance: Number.isFinite(Number(item.effectDistance)) ? Math.min(40, Math.max(0, Number(item.effectDistance))) : 4, effectAngle: Number.isFinite(Number(item.effectAngle)) ? Number(item.effectAngle) : 45, effectColor: typeof item.effectColor === 'string' ? item.effectColor : '#a855f7', effectSecondaryColor: typeof item.effectSecondaryColor === 'string' ? item.effectSecondaryColor : '#22d3ee', opacity: Number.isFinite(Number(item.opacity)) ? Math.min(100, Math.max(0, Number(item.opacity))) : 100, bold: item.bold !== false, italic: item.italic === true,
+              color: typeof item.color === 'string' ? item.color : '#ffffff', effect: TEXT_EFFECTS.some(effect => effect.name === item.effect) ? item.effect as TextEffect : 'Simple', effectIntensity: Number.isFinite(Number(item.effectIntensity)) ? Math.min(100, Math.max(0, Number(item.effectIntensity))) : 60, effectBlur: Number.isFinite(Number(item.effectBlur)) ? Math.min(40, Math.max(0, Number(item.effectBlur))) : 8, effectDistance: Number.isFinite(Number(item.effectDistance)) ? Math.min(40, Math.max(0, Number(item.effectDistance))) : 4, effectAngle: Number.isFinite(Number(item.effectAngle)) ? Number(item.effectAngle) : 45, effectColor: typeof item.effectColor === 'string' ? item.effectColor : '#a855f7', effectSecondaryColor: typeof item.effectSecondaryColor === 'string' ? item.effectSecondaryColor : '#22d3ee', opacity: Number.isFinite(Number(item.opacity)) ? Math.min(100, Math.max(0, Number(item.opacity))) : 100, bold: item.bold !== false, italic: item.italic === true,
               underline: item.underline === true, fontFamily: typeof item.fontFamily === 'string' ? item.fontFamily : 'Default', align: item.align === 'left' || item.align === 'right' ? item.align : 'center', rotation: typeof item.rotation === 'number' && Number.isFinite(item.rotation) ? item.rotation : 0,
               timelineStart: Math.max(0, Number(item.timelineStart) || 0), timelineDuration: Math.max(0.1, Number(item.timelineDuration) || 5),
             }))
@@ -589,7 +594,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       body: { text: 'Add a little bit of body text', fontSize: 20, bold: false, y: 45 },
     }
     const preset = presets[kind]
-    const layer: TextLayer = { id: makeId(), kind, text: preset.text, x: 10, y: preset.y, width: 80, fontSize: preset.fontSize, color: '#ffffff', effect: 'None', effectIntensity: 60, effectBlur: 8, effectDistance: 4, effectAngle: 45, effectColor: '#a855f7', effectSecondaryColor: '#22d3ee', bold: preset.bold, italic: false, underline: false, fontFamily: 'Default', align: 'center', rotation: 0, timelineStart: 0, timelineDuration: 5 }
+    const layer: TextLayer = { id: makeId(), kind, text: preset.text, x: 10, y: preset.y, width: 80, fontSize: preset.fontSize, color: '#ffffff', effect: 'Simple', effectIntensity: 60, effectBlur: 8, effectDistance: 4, effectAngle: 45, effectColor: '#a855f7', effectSecondaryColor: '#22d3ee', bold: preset.bold, italic: false, underline: false, fontFamily: 'Default', align: 'center', rotation: 0, timelineStart: 0, timelineDuration: 5 }
     setTextLayers(items => [...items, layer])
     setSelectedTextId(layer.id)
     setEditingTextId(null)
@@ -840,7 +845,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           ctx.textBaseline = 'top'
           const exportFontFamily = layer.fontFamily && layer.fontFamily !== 'Default' ? '"' + layer.fontFamily.replace(/["\\]/g, '') + '", sans-serif' : 'Arial, Helvetica, sans-serif'
           ctx.font = (layer.italic ? 'italic ' : '') + (layer.bold ? '700 ' : '400 ') + Math.round(layer.fontSize * scale) + 'px ' + exportFontFamily
-          const effect = layer.effect || 'None'
+          const effect = layer.effect || 'Simple'
           const strength = Math.max(0, Math.min(100, layer.effectIntensity ?? 60)) / 60
           const effectColor = layer.effectColor || '#a855f7'
           const secondEffectColor = layer.effectSecondaryColor || '#22d3ee'
@@ -1067,8 +1072,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           </div>}
           {activePanel === 'effects' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
             {!selectedText ? <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select a text layer on the canvas to apply effects.</div> : <>
-              <div className="rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/[0.06] p-3"><div className="flex items-center justify-between"><span className="text-[11px] font-bold text-white">Text effects</span><span className="text-[9px] text-fuchsia-200">50 styles</span></div><p className="mt-1 text-[9px] text-slate-400">Choose a style, then adjust its strength and colours below.</p></div>
-              <button type="button" onClick={() => updateTextLayer(selectedText.id,{effect:'None'})} className={'rounded-lg border px-3 py-2 text-left text-[10px] font-semibold '+(!selectedText.effect || selectedText.effect==='None'?'border-fuchsia-400/50 bg-fuchsia-500/10 text-fuchsia-100':'border-white/10 bg-white/[0.03] text-slate-300')}>No effect</button>
+              <div className="rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/[0.06] p-3"><div className="flex items-center justify-between"><span className="text-[11px] font-bold text-white">Text effects</span><span className="text-[9px] text-fuchsia-200">{TEXT_EFFECTS.length} styles</span></div><p className="mt-1 text-[9px] text-slate-400">Choose a style, then adjust its strength and colours below.</p></div>
+              <button type="button" onClick={() => updateTextLayer(selectedText.id,{effect:'Simple'})} className={'rounded-lg border px-3 py-2 text-left text-[10px] font-semibold '+(!selectedText.effect || selectedText.effect==='None'?'border-fuchsia-400/50 bg-fuchsia-500/10 text-fuchsia-100':'border-white/10 bg-white/[0.03] text-slate-300')}>No effect</button>
               {EFFECT_CATEGORIES.map(category => <section key={category}><h3 className="mb-2 text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{category}</h3><div className="grid grid-cols-2 gap-2">{TEXT_EFFECTS.filter(effect=>effect.category===category).map(effect=><button key={effect.name} type="button" onClick={()=>updateTextLayer(selectedText.id,{effect:effect.name,effectIntensity:selectedText.effectIntensity??60})} aria-pressed={selectedText.effect===effect.name} className={'group flex min-w-0 flex-col overflow-hidden rounded-xl border p-1.5 text-left transition '+(selectedText.effect===effect.name?'border-fuchsia-400/60 bg-fuchsia-500/10 ring-1 ring-fuchsia-400/20':'border-white/10 bg-white/[0.025] hover:border-fuchsia-300/30 hover:bg-white/[0.06]')}><span className="flex h-[54px] w-full items-center justify-center overflow-hidden rounded-lg border border-white/[0.07] bg-[#101525] px-1"><span aria-hidden="true" className="inline-block max-w-full whitespace-nowrap text-center text-[23px] leading-none tracking-tight" style={{display:'inline-block',width:'fit-content',maxWidth:'100%',fontFamily:selectedText.fontFamily&&selectedText.fontFamily!=='Default' ? '"'+selectedText.fontFamily+'", sans-serif' : 'Arial, Helvetica, sans-serif',fontWeight:selectedText.bold?900:400,fontStyle:selectedText.italic?'italic':'normal',color:selectedText.color,...getTextEffectStyle(effect.name,selectedText.effectIntensity??60,selectedText.effectColor||'#a855f7',selectedText.effectSecondaryColor||'#22d3ee',selectedText.effectBlur??8,selectedText.effectDistance??4,selectedText.effectAngle??45)}}>Aa</span></span><span className="mt-1.5 block w-full truncate px-0.5 text-center text-[9px] font-semibold leading-4 text-slate-200">{effect.name}</span></button>)}</div></section>)}
               <div className="h-px bg-white/10" />
               <label className="block text-[9px] font-semibold text-slate-300">Effect intensity · {selectedText.effectIntensity ?? 60}%<input type="range" min="0" max="100" value={selectedText.effectIntensity ?? 60} onChange={event=>updateTextLayer(selectedText.id,{effectIntensity:Number(event.target.value)})} className="mt-2 w-full accent-fuchsia-500" /></label>
