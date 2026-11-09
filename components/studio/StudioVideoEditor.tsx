@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import {
   ArrowLeft, AudioLines, Check, ChevronLeft, ChevronRight, Clapperboard,
@@ -21,6 +21,8 @@ type Clip = {
   storagePath?: string
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; fileSize: number; storagePath?: string }
+type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; bold: boolean; italic: boolean; underline: boolean; align: 'left' | 'center' | 'right' }
+type TextDrag = { id: string; pointerId: number; mode: 'move' | 'resize'; startX: number; startY: number; originX: number; originY: number; originWidth: number; originFontSize: number }
 
 const MAX_VIDEO_BYTES = 250 * 1024 * 1024
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
@@ -61,6 +63,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const audioInput = useRef<HTMLInputElement>(null)
   const previewRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const textDrag = useRef<TextDrag | null>(null)
   const objectUrls = useRef<Set<string>>(new Set())
   const [clips, setClips] = useState<Clip[]>([])
   const [audio, setAudio] = useState<AudioTrack | null>(null)
@@ -77,6 +81,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [subtitleText, setSubtitleText] = useState('')
   const [ctaText, setCtaText] = useState('')
   const [showTitle, setShowTitle] = useState(false)
+  const [textLayers, setTextLayers] = useState<TextLayer[]>([])
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
+  const [editingTextId, setEditingTextId] = useState<string | null>(null)
   const [exportWidth, setExportWidth] = useState(1080)
   const [exportHeight, setExportHeight] = useState(1920)
   const [exporting, setExporting] = useState(false)
@@ -87,6 +94,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveSequence = useRef(0)
   const selected = clips.find(item => item.id === selectedId) || clips[0] || null
+  const selectedText = textLayers.find(item => item.id === selectedTextId) || null
   const totalDuration = useMemo(() => clips.reduce((sum, item) => sum + Math.max(0.1, item.trimEnd - item.trimStart), 0), [clips])
   const currentDuration = selected ? Math.max(0, selected.trimEnd - selected.trimStart) : 0
 
@@ -124,6 +132,24 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           if (typeof data.titleText === 'string') setTitleText(data.titleText)
           if (typeof data.subtitleText === 'string') setSubtitleText(data.subtitleText)
           if (typeof data.ctaText === 'string') setCtaText(data.ctaText)
+          if (Array.isArray(data.textLayers)) {
+            const restoredText = (data.textLayers as Array<Record<string, unknown>>).filter(item => typeof item.id === 'string' && typeof item.text === 'string').map(item => ({
+              id: String(item.id), kind: (item.kind === 'heading' || item.kind === 'subheading' ? item.kind : 'body') as TextLayer['kind'],
+              text: String(item.text), x: Math.min(95, Math.max(0, Number(item.x) || 0)), y: Math.min(95, Math.max(0, Number(item.y) || 0)),
+              width: Math.min(100, Math.max(12, Number(item.width) || 80)), fontSize: Math.min(160, Math.max(10, Number(item.fontSize) || 24)),
+              color: typeof item.color === 'string' ? item.color : '#ffffff', bold: item.bold !== false, italic: item.italic === true,
+              underline: item.underline === true, align: item.align === 'left' || item.align === 'right' ? item.align : 'center',
+            }))
+            setTextLayers(restoredText)
+            if (typeof data.selectedTextId === 'string') setSelectedTextId(data.selectedTextId)
+          } else {
+            const legacy: TextLayer[] = []
+            if (data.showTitle && typeof data.titleText === 'string' && data.titleText) legacy.push({ id: makeId(), kind: 'heading', text: data.titleText, x: 8, y: 12, width: 84, fontSize: 42, color: '#ffffff', bold: true, italic: false, underline: false, align: 'center' })
+            if (data.showTitle && typeof data.subtitleText === 'string' && data.subtitleText) legacy.push({ id: makeId(), kind: 'subheading', text: data.subtitleText, x: 8, y: 25, width: 84, fontSize: 25, color: '#ffffff', bold: false, italic: false, underline: false, align: 'center' })
+            if (data.showTitle && typeof data.ctaText === 'string' && data.ctaText) legacy.push({ id: makeId(), kind: 'body', text: data.ctaText, x: 25, y: 80, width: 50, fontSize: 18, color: '#111827', bold: true, italic: false, underline: false, align: 'center' })
+            setTextLayers(legacy)
+            if (legacy[0]) setSelectedTextId(legacy[0].id)
+          }
           if (typeof data.showTitle === 'boolean') setShowTitle(data.showTitle)
           if (typeof data.exportWidth === 'number') setExportWidth(data.exportWidth)
           if (typeof data.exportHeight === 'number') setExportHeight(data.exportHeight)
@@ -159,7 +185,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             clips: clips.map(({ id, kind, name, duration, trimStart, trimEnd, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, fileSize, storagePath })),
             audioPath: audio?.storagePath || null, audioId: audio?.id || null, audioName: audio?.name || null,
             audioDuration: audio?.duration || 0, audioFileSize: audio?.fileSize || 0, selectedId, muted, volume,
-            audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, exportWidth, exportHeight,
+            audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, textLayers, selectedTextId, exportWidth, exportHeight,
           },
         })
         if (sequence === saveSequence.current) setSaveStatus('All changes saved')
@@ -168,7 +194,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       }
     }, 1000)
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
-  }, [hydrated, projectId, projectName, templateId, clips, audio, selectedId, muted, volume, audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, exportWidth, exportHeight])
+  }, [hydrated, projectId, projectName, templateId, clips, audio, selectedId, muted, volume, audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, textLayers, selectedTextId, exportWidth, exportHeight])
 
 
   useEffect(() => {
@@ -257,6 +283,46 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   }
 
   const updateClip = (id: string, patch: Partial<Clip>) => setClips(items => items.map(item => item.id === id ? { ...item, ...patch } : item))
+  const addTextLayer = (kind: TextLayer['kind']) => {
+    const presets = {
+      heading: { text: 'Add a heading', fontSize: 42, bold: true, y: 18 },
+      subheading: { text: 'Add a subheading', fontSize: 30, bold: true, y: 32 },
+      body: { text: 'Add a little bit of body text', fontSize: 20, bold: false, y: 45 },
+    }
+    const preset = presets[kind]
+    const layer: TextLayer = { id: makeId(), kind, text: preset.text, x: 10, y: preset.y, width: 80, fontSize: preset.fontSize, color: '#ffffff', bold: preset.bold, italic: false, underline: false, align: 'center' }
+    setTextLayers(items => [...items, layer])
+    setSelectedTextId(layer.id)
+    setEditingTextId(layer.id)
+    setActivePanel('text')
+    setNotice('Text added. Edit it directly on the canvas.')
+  }
+  const updateTextLayer = (id: string, patch: Partial<TextLayer>) => setTextLayers(items => items.map(item => item.id === id ? { ...item, ...patch } : item))
+  const removeTextLayer = (id: string) => {
+    setTextLayers(items => items.filter(item => item.id !== id))
+    if (selectedTextId === id) setSelectedTextId(null)
+    if (editingTextId === id) setEditingTextId(null)
+  }
+  const beginTextDrag = (event: ReactPointerEvent<HTMLDivElement>, layer: TextLayer, mode: 'move' | 'resize') => {
+    if (editingTextId === layer.id && mode === 'move') return
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    textDrag.current = { id: layer.id, pointerId: event.pointerId, mode, startX: event.clientX, startY: event.clientY, originX: layer.x, originY: layer.y, originWidth: layer.width, originFontSize: layer.fontSize }
+    setSelectedTextId(layer.id)
+  }
+  const moveTextPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = textDrag.current
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!drag || drag.pointerId !== event.pointerId || !rect) return
+    const dx = event.clientX - drag.startX
+    const dy = event.clientY - drag.startY
+    if (drag.mode === 'move') updateTextLayer(drag.id, { x: Math.min(100, Math.max(0, drag.originX + dx / rect.width * 100)), y: Math.min(96, Math.max(0, drag.originY + dy / rect.height * 100)) })
+    else updateTextLayer(drag.id, { width: Math.min(100, Math.max(12, drag.originWidth + dx / rect.width * 100)), fontSize: Math.min(160, Math.max(10, drag.originFontSize + dy * 0.35)) })
+  }
+  const endTextPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (textDrag.current?.pointerId === event.pointerId) textDrag.current = null
+  }
   const removeClip = (id: string) => {
     const target = clips.find(item => item.id === id)
     if (!target) return
@@ -349,30 +415,27 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         recorder!.onerror = () => reject(new Error('The browser stopped recording unexpectedly.'))
       })
       const drawTitle = () => {
-        if (!showTitle || !titleText) return
+        if (!textLayers.length) return
         ctx.save()
-        ctx.fillStyle = 'rgba(0,0,0,.42)'
-        ctx.fillRect(canvas.width * 0.06, canvas.height * 0.09, canvas.width * 0.88, canvas.height * 0.16)
-        ctx.fillStyle = '#ffffff'
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.font = '900 ' + Math.round(canvas.width * 0.055) + 'px Arial'
-        ctx.fillText(titleText, canvas.width / 2, canvas.height * 0.17, canvas.width * 0.82)
-        if (subtitleText) {
-          ctx.font = '500 ' + Math.round(canvas.width * 0.026) + 'px Arial'
-          ctx.fillStyle = 'rgba(255,255,255,.82)'
-          ctx.fillText(subtitleText, canvas.width / 2, canvas.height * 0.235, canvas.width * 0.82)
-        }
-        if (ctaText) {
-          const buttonWidth = canvas.width * 0.38
-          const buttonHeight = canvas.height * 0.055
-          ctx.fillStyle = '#ffffff'
-          ctx.beginPath()
-          ctx.roundRect((canvas.width - buttonWidth) / 2, canvas.height * 0.82, buttonWidth, buttonHeight, buttonHeight / 2)
-          ctx.fill()
-          ctx.fillStyle = '#111827'
-          ctx.font = '800 ' + Math.round(canvas.width * 0.022) + 'px Arial'
-          ctx.fillText(ctaText, canvas.width / 2, canvas.height * 0.847, buttonWidth * .88)
+        const scale = canvas.width / 420
+        for (const layer of textLayers) {
+          ctx.fillStyle = layer.color
+          ctx.textAlign = layer.align
+          ctx.textBaseline = 'top'
+          ctx.font = (layer.italic ? 'italic ' : '') + (layer.bold ? '700 ' : '400 ') + Math.round(layer.fontSize * scale) + 'px Arial'
+          const x = canvas.width * layer.x / 100
+          const y = canvas.height * layer.y / 100
+          const maxWidth = canvas.width * layer.width / 100
+          const lineHeight = Math.round(layer.fontSize * scale * 1.2)
+          layer.text.split(/\\n/).forEach((line, index) => {
+            const textX = layer.align === 'left' ? x : layer.align === 'right' ? x + maxWidth : x + maxWidth / 2
+            ctx.fillText(line, textX, y + index * lineHeight, maxWidth)
+            if (layer.underline) {
+              const measured = Math.min(maxWidth, ctx.measureText(line).width)
+              const startX = layer.align === 'left' ? x : layer.align === 'right' ? x + maxWidth - measured : x + (maxWidth - measured) / 2
+              ctx.fillRect(startX, y + index * lineHeight + lineHeight - Math.max(1, scale), measured, Math.max(1, scale))
+            }
+          })
         }
         ctx.restore()
       }
@@ -493,14 +556,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <nav className="z-20 hidden w-[76px] shrink-0 flex-col items-center gap-2 border-r border-white/[0.08] bg-[#0d1020] py-3 md:flex">
           <button type="button" onClick={() => setActivePanel('media')} className={'flex w-[60px] flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-[9px] font-semibold transition ' + (activePanel === 'media' ? 'bg-gradient-to-b from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-950/40' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white')}><FolderOpen className="h-5 w-5" />Media</button>
-          <button type="button" onClick={() => { setActivePanel('text'); setShowTitle(true) }} className={'flex w-[60px] flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-[9px] font-semibold transition ' + (activePanel === 'text' ? 'bg-gradient-to-b from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-950/40' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white')}><Type className="h-5 w-5" />Text</button>
+          <button type="button" onClick={() => setActivePanel('text')} className={'flex w-[60px] flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-[9px] font-semibold transition ' + (activePanel === 'text' ? 'bg-gradient-to-b from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-950/40' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white')}><Type className="h-5 w-5" />Text</button>
           <button type="button" onClick={() => setActivePanel('audio')} className={'flex w-[60px] flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-[9px] font-semibold transition ' + (activePanel === 'audio' ? 'bg-gradient-to-b from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-950/40' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white')}><Music2 className="h-5 w-5" />Audio</button>
           <div className="mt-auto flex flex-col items-center gap-1 pb-2"><span className="text-[8px] text-slate-600">SOCIALENS</span><span className="h-1 w-1 rounded-full bg-fuchsia-400" /></div>
         </nav>
 
         <aside className="hidden w-[260px] shrink-0 flex-col border-r border-white/[0.08] bg-[#0d1020] lg:flex">
           <div className="border-b border-white/[0.07] px-4 py-4">
-            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : 'Audio library'}</h2><span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : '3 fields'}</span></div>
+            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : 'Audio library'}</h2><span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : '3 text styles'}</span></div>
             <p className="mt-1 text-[9px] text-slate-500">{activePanel === 'media' ? 'Import and manage your video and photo clips.' : activePanel === 'text' ? 'Edit the text currently shown on your canvas.' : 'Add a music track and control its volume.'}</p>
           </div>
 
@@ -515,12 +578,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           </div>}
 
           {activePanel === 'text' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-            <label className="text-[10px] font-medium text-slate-400">Main headline<input value={titleText} maxLength={100} onChange={event => setTitleText(event.target.value)} placeholder="Your main headline" className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[#080b16] px-3 text-[11px] text-white outline-none focus:border-fuchsia-400/60" /></label>
-            <label className="text-[10px] font-medium text-slate-400">Supporting text<input value={subtitleText} maxLength={140} onChange={event => setSubtitleText(event.target.value)} placeholder="Supporting message" className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[#080b16] px-3 text-[11px] text-white outline-none focus:border-fuchsia-400/60" /></label>
-            <label className="text-[10px] font-medium text-slate-400">Button / call to action<input value={ctaText} maxLength={32} onChange={event => setCtaText(event.target.value)} placeholder="WATCH NOW" className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[#080b16] px-3 text-[11px] text-white outline-none focus:border-fuchsia-400/60" /></label>
-            <label className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2.5 text-[10px] text-slate-300"><span>Show text on canvas</span><input type="checkbox" checked={showTitle} onChange={event => setShowTitle(event.target.checked)} className="h-4 w-4 accent-fuchsia-500" /></label>
+            <p className="text-[10px] leading-4 text-slate-500">Choose a text style. It will be added directly to your canvas, where you can edit, move and resize it.</p>
+            <button type="button" onClick={() => addTextLayer('heading')} className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-fuchsia-400/40 hover:bg-fuchsia-500/[0.07]"><span className="block text-[19px] font-extrabold text-white">Add a heading</span><span className="mt-1 block text-[9px] text-slate-500">Large title text</span></button>
+            <button type="button" onClick={() => addTextLayer('subheading')} className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-fuchsia-400/40 hover:bg-fuchsia-500/[0.07]"><span className="block text-[15px] font-bold text-white">Add a subheading</span><span className="mt-1 block text-[9px] text-slate-500">Medium supporting text</span></button>
+            <button type="button" onClick={() => addTextLayer('body')} className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-fuchsia-400/40 hover:bg-fuchsia-500/[0.07]"><span className="block text-[11px] font-medium text-white">Add a little bit of body text</span><span className="mt-1 block text-[9px] text-slate-500">Small body text</span></button>
+            {selectedText && <div className="mt-2 rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/[0.05] p-3"><div className="mb-2 flex items-center justify-between"><span className="text-[10px] font-semibold text-fuchsia-100">Selected text</span><button type="button" onClick={() => removeTextLayer(selectedText.id)} className="text-[9px] text-red-300">Delete</button></div><label className="block text-[9px] text-slate-400">Font size · {Math.round(selectedText.fontSize)}px<input type="range" min="10" max="160" value={selectedText.fontSize} onChange={event => updateTextLayer(selectedText.id,{fontSize:Number(event.target.value)})} className="mt-2 w-full accent-fuchsia-500" /></label><label className="mt-3 flex items-center justify-between text-[9px] text-slate-400">Text color<input type="color" value={selectedText.color} onChange={event => updateTextLayer(selectedText.id,{color:event.target.value})} className="h-8 w-12 cursor-pointer rounded border border-white/10 bg-transparent" /></label><div className="mt-3 grid grid-cols-3 gap-1"><button type="button" onClick={() => updateTextLayer(selectedText.id,{bold:!selectedText.bold})} className={'rounded-md border py-2 text-xs font-bold ' + (selectedText.bold ? 'border-fuchsia-400/40 bg-fuchsia-500/15 text-white' : 'border-white/10 text-slate-400')}>B</button><button type="button" onClick={() => updateTextLayer(selectedText.id,{italic:!selectedText.italic})} className={'rounded-md border py-2 text-xs italic ' + (selectedText.italic ? 'border-fuchsia-400/40 bg-fuchsia-500/15 text-white' : 'border-white/10 text-slate-400')}>I</button><button type="button" onClick={() => updateTextLayer(selectedText.id,{underline:!selectedText.underline})} className={'rounded-md border py-2 text-xs underline ' + (selectedText.underline ? 'border-fuchsia-400/40 bg-fuchsia-500/15 text-white' : 'border-white/10 text-slate-400')}>U</button></div></div>}
           </div>}
-
           {activePanel === 'audio' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <button type="button" onClick={() => audioInput.current?.click()} className="flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[10px] font-bold"><Music2 className="h-4 w-4" /> {audio ? 'Replace audio track' : 'Import audio'}</button>
             {audio ? <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.04] p-3"><div className="flex items-center gap-2"><Music2 className="h-4 w-4 shrink-0 text-cyan-300" /><div className="min-w-0"><p className="truncate text-[10px] font-semibold text-cyan-100">{audio.name}</p><p className="text-[9px] text-cyan-100/50">{formatTime(audio.duration)} duration</p></div></div><label className="mt-4 block text-[9px] text-slate-400">Track volume · {audioVolume}%<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="mt-2 w-full accent-cyan-400" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="mt-3 w-full rounded-lg border border-red-400/20 py-2 text-[9px] font-semibold text-red-300 hover:bg-red-400/[0.06]">Remove audio track</button></div> : <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center"><Music2 className="mx-auto h-7 w-7 text-slate-600" /><p className="mt-2 text-[10px] font-semibold text-slate-300">No audio track</p><p className="mt-1 text-[9px] text-slate-500">Import a music or audio file to add it to your project.</p></div>}
@@ -533,14 +596,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             <button type="button" onClick={() => videoInput.current?.click()} className="shrink-0 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2 text-[9px] font-bold">Import video</button>
             <button type="button" onClick={() => imageInput.current?.click()} className="shrink-0 rounded-md border border-white/10 px-3 py-2 text-[9px] font-semibold text-slate-200">Add photo</button>
             <button type="button" onClick={() => audioInput.current?.click()} className="shrink-0 rounded-md border border-white/10 px-3 py-2 text-[9px] font-semibold text-slate-200">Add audio</button>
-            <button type="button" onClick={() => { setActivePanel('text'); setShowTitle(true) }} className="shrink-0 rounded-md border border-white/10 px-3 py-2 text-[9px] font-semibold text-slate-200">Text</button>
+            <button type="button" onClick={() => setActivePanel('text')} className="shrink-0 rounded-md border border-white/10 px-3 py-2 text-[9px] font-semibold text-slate-200">Text</button>
             <button type="button" onClick={() => setActivePanel('audio')} className="shrink-0 rounded-md border border-white/10 px-3 py-2 text-[9px] font-semibold text-slate-200">Audio settings</button>
           </div>
-          {activePanel === 'text' && <div className="grid shrink-0 grid-cols-1 gap-2 border-b border-white/[0.07] bg-[#101426] p-3 sm:grid-cols-3 md:hidden">
-            <label className="text-[9px] text-slate-400">Headline<input value={titleText} maxLength={100} onChange={event => setTitleText(event.target.value)} placeholder="Main headline" className="mt-1 h-8 w-full rounded-md border border-white/10 bg-[#080b16] px-2 text-[10px] text-white outline-none focus:border-fuchsia-400/60" /></label>
-            <label className="text-[9px] text-slate-400">Supporting text<input value={subtitleText} maxLength={140} onChange={event => setSubtitleText(event.target.value)} placeholder="Supporting message" className="mt-1 h-8 w-full rounded-md border border-white/10 bg-[#080b16] px-2 text-[10px] text-white outline-none focus:border-fuchsia-400/60" /></label>
-            <label className="text-[9px] text-slate-400">Call to action<input value={ctaText} maxLength={32} onChange={event => setCtaText(event.target.value)} placeholder="WATCH NOW" className="mt-1 h-8 w-full rounded-md border border-white/10 bg-[#080b16] px-2 text-[10px] text-white outline-none focus:border-fuchsia-400/60" /></label>
-            <label className="col-span-full flex items-center gap-2 text-[9px] text-slate-300"><input type="checkbox" checked={showTitle} onChange={event => setShowTitle(event.target.checked)} className="h-3.5 w-3.5 accent-fuchsia-500" /> Show text on canvas</label>
+          {activePanel === 'text' && <div className="grid shrink-0 grid-cols-3 gap-2 border-b border-white/[0.07] bg-[#101426] p-3 md:hidden">
+            <button type="button" onClick={() => addTextLayer('heading')} className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-3 text-[10px] font-extrabold text-white">Heading</button>
+            <button type="button" onClick={() => addTextLayer('subheading')} className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-3 text-[10px] font-bold text-white">Subheading</button>
+            <button type="button" onClick={() => addTextLayer('body')} className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-3 text-[9px] font-medium text-white">Body text</button>
           </div>}
           {activePanel === 'audio' && <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-white/[0.07] bg-[#101426] px-3 py-2 md:hidden">
             {audio ? <><span className="max-w-[140px] truncate text-[9px] text-cyan-100">{audio.name}</span><label className="flex min-w-[120px] flex-1 items-center gap-2 text-[9px] text-slate-400">Volume<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="w-full accent-cyan-400" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="text-[9px] text-red-300">Remove</button></> : <span className="text-[9px] text-slate-500">No audio track added yet.</span>}
@@ -556,12 +618,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
 
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3 sm:p-5">
             <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-xl border border-white/[0.07] bg-[#05060d] shadow-[0_20px_70px_rgba(0,0,0,0.42)]">
-              <div className={'relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-md bg-black ring-1 ring-violet-400/20 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-5xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(72dvh, 720px)' }}>
+              <div ref={canvasRef} onPointerDown={event => { if (event.target === event.currentTarget) { setSelectedTextId(null); setEditingTextId(null) } }} className={'relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-md bg-black ring-1 ring-violet-400/20 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-5xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(72dvh, 720px)' }}>
                 {selected?.kind === 'video' ? <video key={selected.id} ref={previewRef} src={selected.url} playsInline preload="metadata" className="h-full w-full object-contain" onEnded={() => { audioRef.current?.pause(); setPlaying(false) }} /> : selected?.kind === 'image' ? <img src={selected.url} alt={selected.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">Your video canvas</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">Import a video or photo to start editing your project.</p><button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button></div>}
                 {audio && <audio ref={audioRef} src={audio.url} preload="metadata" />}
-                {showTitle && titleText && <div className="pointer-events-none absolute inset-x-3 top-[12%] rounded-lg bg-black/40 px-3 py-2 text-center text-xl font-black text-white drop-shadow-lg sm:text-3xl">{titleText}</div>}
-                {showTitle && subtitleText && <div className="pointer-events-none absolute inset-x-4 top-[23%] text-center text-xs font-medium text-white/85 drop-shadow-lg sm:text-base">{subtitleText}</div>}
-                {showTitle && ctaText && <div className="pointer-events-none absolute bottom-[12%] left-1/2 -translate-x-1/2 rounded-full bg-white px-5 py-2 text-[10px] font-extrabold text-slate-900 shadow-lg">{ctaText}</div>}
+                {textLayers.map(layer => <div key={layer.id} onPointerDown={event => beginTextDrag(event,layer,'move')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} onDoubleClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); setEditingTextId(layer.id) }} className={'absolute z-20 min-h-[28px] touch-none rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline ? 'underline' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere' }}>
+                  <div contentEditable={editingTextId === layer.id} suppressContentEditableWarning onInput={event => updateTextLayer(layer.id,{text:event.currentTarget.innerText})} onBlur={() => setEditingTextId(current => current === layer.id ? null : current)} className="min-h-[24px] whitespace-pre-wrap break-words outline-none">{layer.text}</div>
+                  {selectedTextId === layer.id && editingTextId !== layer.id && <button type="button" aria-label="Resize text" onPointerDown={event => beginTextDrag(event,layer,'resize')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-fuchsia-500 shadow-md" />}
+                </div>)}
                 {selected?.kind === 'video' && <div className="absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-1 text-[9px] tabular-nums text-white">{formatTime(playhead)} / {formatTime(selected.duration)}</div>}
               </div>
             </div>
@@ -575,7 +638,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           <section className="z-10 shrink-0 border-t border-white/[0.09] bg-[#0b0e1a] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 sm:px-4">
             <div className="mb-2 flex items-center justify-between gap-2"><div className="flex items-center gap-2"><AudioLines className="h-3.5 w-3.5 text-fuchsia-300" /><h2 className="text-[10px] font-bold text-slate-200">Timeline</h2><span className="hidden text-[9px] text-slate-600 sm:inline">Project tracks</span></div><span className="text-[9px] tabular-nums text-slate-500">{formatTime(totalDuration)}</span></div>
             <div className="space-y-1.5">
-              <div className="flex h-[30px] min-h-[30px] items-center overflow-hidden rounded-md border border-fuchsia-400/15 bg-fuchsia-400/[0.035]"><div className="flex h-full w-[72px] shrink-0 items-center gap-1.5 border-r border-fuchsia-400/10 bg-[#21152b] px-2 text-[9px] font-semibold text-fuchsia-100"><Type className="h-3 w-3" />Text</div><div className="flex h-full min-w-0 flex-1 items-center px-2">{showTitle && titleText ? <button type="button" onClick={() => setActivePanel('text')} className="h-[20px] max-w-full min-w-[90px] truncate rounded bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 px-2 text-left text-[9px] font-semibold text-white">{titleText}</button> : <button type="button" onClick={() => { setActivePanel('text'); setShowTitle(true) }} className="text-[9px] text-fuchsia-100/60 hover:text-fuchsia-100">+ Add text overlay</button>}</div></div>
+              <div className="flex h-[30px] min-h-[30px] items-center overflow-hidden rounded-md border border-fuchsia-400/15 bg-fuchsia-400/[0.035]"><div className="flex h-full w-[72px] shrink-0 items-center gap-1.5 border-r border-fuchsia-400/10 bg-[#21152b] px-2 text-[9px] font-semibold text-fuchsia-100"><Type className="h-3 w-3" />Text</div><div className="flex h-full min-w-0 flex-1 items-center px-2">{textLayers.length ? <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">{textLayers.map(layer => <button key={layer.id} type="button" onClick={() => { setSelectedTextId(layer.id); setActivePanel('text') }} className={'h-[20px] max-w-[180px] min-w-[70px] truncate rounded px-2 text-left text-[9px] font-semibold text-white ' + (selectedTextId === layer.id ? 'bg-fuchsia-500 ring-1 ring-fuchsia-300' : 'bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80')}>{layer.text || 'Untitled text'}</button>)}</div> : <button type="button" onClick={() => setActivePanel('text')} className="text-[9px] text-fuchsia-100/60 hover:text-fuchsia-100">+ Add text</button>}</div></div>
               <div className="flex h-[30px] min-h-[30px] items-center overflow-hidden rounded-md border border-sky-400/15 bg-sky-400/[0.035]"><div className="flex h-full w-[72px] shrink-0 items-center gap-1.5 border-r border-sky-400/10 bg-[#10212b] px-2 text-[9px] font-semibold text-sky-100"><ImagePlus className="h-3 w-3" />Image</div><div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1">{clips.filter(item => item.kind === 'image').length ? clips.filter(item => item.kind === 'image').map((item,index) => <button key={item.id} type="button" onClick={() => setSelectedId(item.id)} title={item.name} className={'h-[22px] min-w-[84px] max-w-[180px] flex-1 truncate rounded px-2 text-left text-[8px] ' + (selected?.id === item.id ? 'bg-sky-400/25 text-sky-100 ring-1 ring-sky-300/40' : 'bg-sky-400/10 text-sky-100/75')}>{item.name}</button>) : <button type="button" onClick={() => imageInput.current?.click()} className="text-[9px] text-sky-100/55">+ Add photo</button>}</div></div>
               <div className="flex h-[30px] min-h-[30px] items-center overflow-hidden rounded-md border border-violet-400/15 bg-violet-400/[0.035]"><div className="flex h-full w-[72px] shrink-0 items-center gap-1.5 border-r border-violet-400/10 bg-[#1b1830] px-2 text-[9px] font-semibold text-violet-100"><Video className="h-3 w-3" />Video</div><div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1">{clips.filter(item => item.kind === 'video').length ? clips.filter(item => item.kind === 'video').map((item,index) => <button key={item.id} type="button" onClick={() => setSelectedId(item.id)} title={item.name} className={'h-[22px] min-w-[84px] max-w-[180px] flex-1 truncate rounded px-2 text-left text-[8px] ' + (selected?.id === item.id ? 'bg-violet-400/25 text-violet-100 ring-1 ring-violet-300/40' : 'bg-violet-400/10 text-violet-100/75')}>{index+1}. {item.name}</button>) : <button type="button" onClick={() => videoInput.current?.click()} className="text-[9px] text-violet-100/55">+ Add video</button>}</div></div>
               <div className="flex h-[30px] min-h-[30px] items-center overflow-hidden rounded-md border border-emerald-400/15 bg-emerald-400/[0.035]"><div className="flex h-full w-[72px] shrink-0 items-center gap-1.5 border-r border-emerald-400/10 bg-[#10271f] px-2 text-[9px] font-semibold text-emerald-100"><Music2 className="h-3 w-3" />Audio</div><div className="flex h-full min-w-0 flex-1 items-center gap-2 overflow-hidden px-2">{audio ? <><span className="min-w-0 flex-1 truncate text-[9px] font-semibold text-emerald-100">{audio.name}</span><span className="shrink-0 text-[8px] text-emerald-100/55">{formatTime(audio.duration)}</span><button type="button" onClick={() => setActivePanel('audio')} className="shrink-0 text-[8px] text-emerald-200 hover:text-white">Edit</button></> : <button type="button" onClick={() => audioInput.current?.click()} className="text-[9px] text-emerald-100/55">+ Add audio</button>}</div></div>
@@ -590,7 +653,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             <div className="h-px bg-white/[0.07]" />
             <section><div className="mb-2 flex items-center justify-between"><h3 className="text-[10px] font-bold text-slate-200">Selected clip</h3><span className="text-[9px] text-slate-600">{selected ? selected.kind : 'None'}</span></div>{selected ? <><p className="truncate text-[10px] text-slate-400">{selected.name}</p><label className="mt-3 block text-[9px] text-slate-400">Trim start · {formatTime(selected.trimStart)}<input aria-label="Trim start" type="range" min="0" max={Math.max(0,selected.trimEnd-0.25)} step="0.1" value={selected.trimStart} onChange={event => updateClip(selected.id,{trimStart:Math.min(Number(event.target.value),selected.trimEnd-0.1)})} className="mt-2 w-full accent-fuchsia-500" /></label><label className="mt-3 block text-[9px] text-slate-400">Trim end · {formatTime(selected.trimEnd)}<input aria-label="Trim end" type="range" min={Math.min(selected.duration,selected.trimStart+0.1)} max={selected.duration} step="0.1" value={selected.trimEnd} onChange={event => updateClip(selected.id,{trimEnd:Math.max(Number(event.target.value),selected.trimStart+0.1)})} className="mt-2 w-full accent-fuchsia-500" /></label><button type="button" onClick={() => removeClip(selected.id)} className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-red-400/20 text-[9px] font-semibold text-red-300 hover:bg-red-400/[0.06]"><Trash2 className="h-3.5 w-3.5" /> Remove selected clip</button></> : <p className="text-[9px] leading-4 text-slate-600">Select a clip from the media list or timeline to edit its trim points.</p>}</section>
             <div className="h-px bg-white/[0.07]" />
-            <section><div className="mb-2 flex items-center justify-between"><h3 className="text-[10px] font-bold text-slate-200">Text overlay</h3><button type="button" onClick={() => { setShowTitle(value => !value); setActivePanel('text') }} className="text-[9px] text-fuchsia-300">{showTitle ? 'Hide' : 'Show'}</button></div><p className="text-[9px] text-slate-500">{showTitle ? 'Text is visible on the canvas.' : 'Text overlay is currently hidden.'}</p><button type="button" onClick={() => { setActivePanel('text'); setShowTitle(true) }} className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.03] py-2 text-[9px] font-semibold text-slate-300 hover:bg-white/[0.07]">Edit headline and message</button></section>
+            <section><div className="mb-2 flex items-center justify-between"><h3 className="text-[10px] font-bold text-slate-200">Text overlay</h3><button type="button" onClick={() => { setShowTitle(value => !value); setActivePanel('text') }} className="text-[9px] text-fuchsia-300">{showTitle ? 'Hide' : 'Show'}</button></div><p className="text-[9px] text-slate-500">{showTitle ? 'Text is visible on the canvas.' : 'Text overlay is currently hidden.'}</p><button type="button" onClick={() => setActivePanel('text')} className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.03] py-2 text-[9px] font-semibold text-slate-300 hover:bg-white/[0.07]">Edit headline and message</button></section>
             <div className="h-px bg-white/[0.07]" />
             <section><div className="mb-2 flex items-center justify-between"><h3 className="text-[10px] font-bold text-slate-200">Audio</h3><span className="text-[9px] text-slate-600">{audio ? 'Added' : 'Empty'}</span></div>{audio ? <><p className="truncate text-[9px] text-slate-400">{audio.name}</p><label className="mt-2 block text-[9px] text-slate-400">Track volume · {audioVolume}%<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="mt-2 w-full accent-emerald-400" /></label></> : <button type="button" onClick={() => audioInput.current?.click()} className="w-full rounded-lg border border-white/10 bg-white/[0.03] py-2 text-[9px] font-semibold text-slate-300 hover:bg-white/[0.07]">Import audio</button>}</section>
             <div className="h-px bg-white/[0.07]" />
