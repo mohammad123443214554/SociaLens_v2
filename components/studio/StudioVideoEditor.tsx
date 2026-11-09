@@ -153,8 +153,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           } else {
             const legacy: TextLayer[] = []
             if (data.showTitle && typeof data.titleText === 'string' && data.titleText) legacy.push({ id: makeId(), kind: 'heading', text: data.titleText, x: 8, y: 12, width: 84, fontSize: 42, color: '#ffffff', bold: true, italic: false, underline: false, align: 'center', rotation: 0, timelineStart: 0, timelineDuration: 5 })
-            if (data.showTitle && typeof data.subtitleText === 'string' && data.subtitleText) legacy.push({ id: makeId(), kind: 'subheading', text: data.subtitleText, x: 8, y: 25, width: 84, fontSize: 25, color: '#ffffff', bold: false, italic: false, underline: false, align: 'center', rotation: 0 })
-            if (data.showTitle && typeof data.ctaText === 'string' && data.ctaText) legacy.push({ id: makeId(), kind: 'body', text: data.ctaText, x: 25, y: 80, width: 50, fontSize: 18, color: '#111827', bold: true, italic: false, underline: false, align: 'center', rotation: 0 })
+            if (data.showTitle && typeof data.subtitleText === 'string' && data.subtitleText) legacy.push({ id: makeId(), kind: 'subheading', text: data.subtitleText, x: 8, y: 25, width: 84, fontSize: 25, color: '#ffffff', bold: false, italic: false, underline: false, align: 'center', rotation: 0, timelineStart: 0, timelineDuration: 5 })
+            if (data.showTitle && typeof data.ctaText === 'string' && data.ctaText) legacy.push({ id: makeId(), kind: 'body', text: data.ctaText, x: 25, y: 80, width: 50, fontSize: 18, color: '#111827', bold: true, italic: false, underline: false, align: 'center', rotation: 0, timelineStart: 0, timelineDuration: 5 })
             setTextLayers(legacy)
             if (legacy[0]) setSelectedTextId(legacy[0].id)
           }
@@ -346,8 +346,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (drag.mode === 'move') updateTextLayer(drag.id, { timelineStart: Math.max(0, Math.min(60 - layer.timelineDuration, drag.startAt + delta)) })
       else if (drag.mode === 'left') {
         const end = drag.startAt + drag.trimEnd
-        const start = Math.max(0, Math.min(drag.trimEnd - 0.1, -delta))
-        updateTextLayer(drag.id, { timelineStart: Math.max(0, Math.min(59.9, end - start)), timelineDuration: Math.max(0.1, Math.min(60, end - start)) })
+        const nextStart = Math.max(0, Math.min(end - 0.1, drag.startAt + delta))
+        updateTextLayer(drag.id, { timelineStart: nextStart, timelineDuration: Math.max(0.1, end - nextStart) })
       } else updateTextLayer(drag.id, { timelineDuration: Math.max(0.1, Math.min(60 - drag.startAt, drag.trimEnd + delta)) })
     } else if (drag.kind === 'clip') {
       const clip = clips.find(item => item.id === drag.id)
@@ -738,14 +738,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   </div>
                 </div>
                 {[
-                  { key: 'text', label: 'Text', icon: <Type className="h-3 w-3" />, tone: 'fuchsia', rows: textLayers.length ? textLayers : [null] },
-                  { key: 'image', label: 'Image', icon: <ImagePlus className="h-3 w-3" />, tone: 'sky', rows: clips.filter(item => item.kind === 'image').length ? clips.filter(item => item.kind === 'image') : [null] },
-                  { key: 'video', label: 'Video', icon: <Video className="h-3 w-3" />, tone: 'violet', rows: clips.filter(item => item.kind === 'video').length ? clips.filter(item => item.kind === 'video') : [null] },
-                  { key: 'audio', label: 'Audio', icon: <Music2 className="h-3 w-3" />, tone: 'emerald', rows: [audio] },
+                  { key: 'text', label: 'Text', icon: <Type className="h-3 w-3" />, tone: 'fuchsia' },
+                  { key: 'image', label: 'Image', icon: <ImagePlus className="h-3 w-3" />, tone: 'sky' },
+                  { key: 'video', label: 'Video', icon: <Video className="h-3 w-3" />, tone: 'violet' },
+                  { key: 'audio', label: 'Audio', icon: <Music2 className="h-3 w-3" />, tone: 'emerald' },
                 ].map(track => <div key={track.key} className="flex min-h-[34px] border-b border-white/[0.045]">
                   <div className={'flex w-[72px] shrink-0 items-center gap-1.5 border-r px-2 text-[9px] font-semibold ' + (track.tone === 'fuchsia' ? 'border-fuchsia-400/10 bg-[#21152b] text-fuchsia-100' : track.tone === 'sky' ? 'border-sky-400/10 bg-[#10212b] text-sky-100' : track.tone === 'violet' ? 'border-violet-400/10 bg-[#1b1830] text-violet-100' : 'border-emerald-400/10 bg-[#10271f] text-emerald-100')}>{track.icon}{track.label}</div>
-                  <div className="relative min-h-[34px] shrink-0" style={{ width: TIMELINE_WIDTH }}>
-                    {track.key === 'text' && textLayers.map(layer => <div key={layer.id} onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => { setSelectedTextId(layer.id); setActivePanel('text') }} title={layer.text} className={'absolute top-[6px] flex h-[22px] min-w-[12px] items-center overflow-visible rounded bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[8px] font-semibold text-white shadow-sm cursor-grab touch-none ' + (selectedTextId === layer.id ? 'ring-1 ring-fuchsia-200' : '')} style={{ left: layer.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(12, layer.timelineDuration * TIMELINE_PX_PER_SECOND) }}>
+                  <div className="relative min-h-[34px] shrink-0" style={{ width: TIMELINE_WIDTH, height: track.key === 'text' ? Math.max(34, textLayers.length * 30 + 4) : 34 }}>
+                    {track.key === 'text' && textLayers.map(layer => <div key={layer.id} onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => { setSelectedTextId(layer.id); setActivePanel('text') }} title={layer.text} className={'absolute flex h-[22px] min-w-[12px] items-center overflow-visible rounded bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[8px] font-semibold text-white shadow-sm cursor-grab touch-none ' + (selectedTextId === layer.id ? 'ring-1 ring-fuchsia-200' : '')} style={{ top: 6 + textLayers.findIndex(item => item.id === layer.id) * 30, left: layer.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(12, layer.timelineDuration * TIMELINE_PX_PER_SECOND) }}>
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/30" />
                       <span className="min-w-0 flex-1 truncate px-2">{layer.text || 'Untitled text'}</span>
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/30" />
