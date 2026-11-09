@@ -851,8 +851,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               {fontMenuOpen && <div className="absolute left-0 top-10 z-[80] flex w-[min(300px,80vw)] max-h-[min(420px,65vh)] flex-col overflow-hidden rounded-xl border border-white/15 bg-[#111629] p-2 shadow-2xl">
                 <div className="mb-2 flex items-center gap-2 rounded-lg border border-white/10 bg-[#080c18] px-2">
                   <Search className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                  <input value={fontSearch} onChange={event => setFontSearch(event.target.value)} placeholder="Search 1,000+ fonts" aria-label="Search fonts" className="h-9 min-w-0 flex-1 bg-transparent text-[11px] text-white outline-none placeholder:text-slate-500" />
-                  <span className="text-[9px] text-slate-500">{fontCatalog.length ? fontCatalog.length.toLocaleString() + '+' : ''}</span>
+                  <input value={fontSearch} onChange={event => setFontSearch(event.target.value)} placeholder="Search fonts" aria-label="Search fonts" className="h-9 min-w-0 flex-1 bg-transparent text-[11px] text-white outline-none placeholder:text-slate-500" />
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                   <button type="button" onClick={() => { updateTextLayer(selectedText.id, { fontFamily: 'Default' }); setFontMenuOpen(false); setFontSearch('') }} className={'mb-1 flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[11px] transition hover:bg-white/10 ' + ((!selectedText.fontFamily || selectedText.fontFamily === 'Default') ? 'bg-fuchsia-500/15 text-fuchsia-100' : 'text-slate-200')}>
@@ -860,8 +859,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   </button>
                   {fontCatalogLoading && <p className="px-3 py-5 text-center text-[10px] text-slate-400">Loading Google Fonts…</p>}
                   {fontCatalogError && <p className="px-3 py-4 text-center text-[10px] text-rose-300">{fontCatalogError}</p>}
-                  {!fontCatalogLoading && fontCatalog.filter(font => font.family.toLowerCase().includes(fontSearch.trim().toLowerCase())).map(font => <button key={font.family} type="button" onClick={async () => { await loadGoogleFont(font.family); updateTextLayer(selectedText.id, { fontFamily: font.family }); setFontMenuOpen(false); setFontSearch('') }} className={'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[11px] transition hover:bg-white/10 ' + (selectedText.fontFamily === font.family ? 'bg-fuchsia-500/15 text-fuchsia-100' : 'text-slate-200')}>
-                    <span className="truncate">{font.family}</span><span className="shrink-0 text-[8px] capitalize text-slate-500">{font.category}</span>
+                  {!fontCatalogLoading && fontCatalog.filter(font => font.family.toLowerCase().includes(fontSearch.trim().toLowerCase())).map(font => <button key={font.family} type="button" onMouseEnter={() => { void loadGoogleFont(font.family) }} onFocus={() => { void loadGoogleFont(font.family) }} onClick={async () => { await loadGoogleFont(font.family); updateTextLayer(selectedText.id, { fontFamily: font.family }); setFontMenuOpen(false); setFontSearch('') }} style={{ fontFamily: '"' + font.family.replace(/["\\\\]/g, '') + '", sans-serif' }} className={'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[11px] transition hover:bg-white/10 ' + (selectedText.fontFamily === font.family ? 'bg-fuchsia-500/15 text-fuchsia-100' : 'text-slate-200')}>
+                    <span className="truncate">{font.family}</span><span className="shrink-0 font-sans text-[8px] capitalize text-slate-500">{font.category}</span>
                   </button>)}
                   {!fontCatalogLoading && !fontCatalogError && fontCatalog.length > 0 && fontCatalog.filter(font => font.family.toLowerCase().includes(fontSearch.trim().toLowerCase())).length === 0 && <p className="px-3 py-5 text-center text-[10px] text-slate-500">No fonts found.</p>}
                 </div>
