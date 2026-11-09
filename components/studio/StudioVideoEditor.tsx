@@ -826,7 +826,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           {activePanel === 'audio' && <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-white/[0.07] bg-[#101426] px-3 py-2 md:hidden">
             {audio ? <><span className="max-w-[140px] truncate text-[9px] text-cyan-100">{audio.name}</span><label className="flex min-w-[120px] flex-1 items-center gap-2 text-[9px] text-slate-400">Volume<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="w-full accent-cyan-400" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="text-[9px] text-red-300">Remove</button></> : <span className="text-[9px] text-slate-500">No audio track added yet.</span>}
           </div>}
-          {selectedText && <div data-text-toolbar="true" className="sticky top-0 z-50 flex min-h-[48px] shrink-0 flex-wrap items-center gap-1.5 overflow-visible border-b border-fuchsia-400/20 bg-[#111629] px-3 py-2 shadow-xl sm:px-5" role="toolbar" aria-label="Selected text formatting">
+          <div data-text-toolbar="true" className="sticky top-0 z-50 flex min-h-[48px] shrink-0 flex-wrap items-center gap-1.5 overflow-visible border-b border-fuchsia-400/20 bg-[#111629] px-3 py-2 shadow-xl sm:px-5" role="toolbar" aria-label="Selected text formatting">
+            {selectedText && <>
             <button type="button" onClick={() => removeTextLayer(selectedText.id)} title="Delete text" aria-label="Delete text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-300 transition hover:bg-red-400/10"><Trash2 className="h-4 w-4" /></button>
             <button type="button" onClick={() => duplicateTextLayer(selectedText.id)} title="Duplicate text" aria-label="Duplicate text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-200 transition hover:bg-white/10"><Copy className="h-4 w-4" /></button>
             <div className="relative shrink-0">
@@ -877,7 +878,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             <span className="mx-1 h-6 w-px shrink-0 bg-white/10" />
             <button type="button" onClick={() => updateTextLayer(selectedText.id,{listStyle:selectedText.listStyle === 'bullet' ? 'none' : 'bullet'})} aria-label="Bullet list" aria-pressed={selectedText.listStyle === 'bullet'} title="Bullet list" className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ' + (selectedText.listStyle === 'bullet' ? 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30' : 'text-slate-200 hover:bg-white/10')}><List className="h-4 w-4" /></button>
             <button type="button" onClick={() => updateTextLayer(selectedText.id,{listStyle:selectedText.listStyle === 'number' ? 'none' : 'number'})} aria-label="Numbered list" aria-pressed={selectedText.listStyle === 'number'} title="Numbered list" className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ' + (selectedText.listStyle === 'number' ? 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30' : 'text-slate-200 hover:bg-white/10')}><ListOrdered className="h-4 w-4" /></button>
-          </div>}
+            </>}
+          </div>
 
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3 sm:p-5">
             <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-xl border border-white/[0.07] bg-[#05060d] shadow-[0_20px_70px_rgba(0,0,0,0.42)]">
