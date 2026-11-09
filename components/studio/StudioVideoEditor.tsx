@@ -23,7 +23,7 @@ type Clip = {
   storagePath?: string
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
-type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; opacity?: number; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
+type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; fontSize: number; color: string; opacity?: number; effect?: TextEffect | 'None'; effectIntensity?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
 type TextDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'rotate'; startX: number; startY: number; startAngle: number; originX: number; originY: number; originWidth: number; originFontSize: number; originRotation: number }
 type TimelineDrag = { id: string; kind: 'clip' | 'text' | 'audio'; mode: 'move' | 'left' | 'right'; pointerId: number; startX: number; startAt: number; trimStart: number; trimEnd: number; duration: number }
 const MIN_TIMELINE_SECONDS = 60
@@ -41,6 +41,269 @@ const formatTime = (seconds: number) => {
 const makeId = () => typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : 'clip-' + Date.now() + '-' + Math.random().toString(36).slice(2)
 
 type FontOption = { family: string; category: string }
+const TEXT_EFFECTS = [
+  {
+    "category": "Shadow & Depth",
+    "name": "Drop Shadow"
+  },
+  {
+    "category": "Shadow & Depth",
+    "name": "Long Shadow"
+  },
+  {
+    "category": "Shadow & Depth",
+    "name": "Hard Shadow"
+  },
+  {
+    "category": "Shadow & Depth",
+    "name": "3D Extrude"
+  },
+  {
+    "category": "Shadow & Depth",
+    "name": "Layered Shadow"
+  },
+  {
+    "category": "Shadow & Depth",
+    "name": "Floating Shadow"
+  },
+  {
+    "category": "Shadow & Depth",
+    "name": "Ambient Shadow"
+  },
+  {
+    "category": "Shadow & Depth",
+    "name": "Perspective Depth"
+  },
+  {
+    "category": "Glow & Light",
+    "name": "Neon Glow"
+  },
+  {
+    "category": "Glow & Light",
+    "name": "Soft Glow"
+  },
+  {
+    "category": "Glow & Light",
+    "name": "Outer Glow"
+  },
+  {
+    "category": "Glow & Light",
+    "name": "Inner Glow"
+  },
+  {
+    "category": "Glow & Light",
+    "name": "Rainbow Glow"
+  },
+  {
+    "category": "Glow & Light",
+    "name": "Electric Glow"
+  },
+  {
+    "category": "Glow & Light",
+    "name": "Golden Glow"
+  },
+  {
+    "category": "Glow & Light",
+    "name": "Holographic Glow"
+  },
+  {
+    "category": "Outline & Stroke",
+    "name": "Outline"
+  },
+  {
+    "category": "Outline & Stroke",
+    "name": "Double Outline"
+  },
+  {
+    "category": "Outline & Stroke",
+    "name": "Triple Stroke"
+  },
+  {
+    "category": "Outline & Stroke",
+    "name": "Neon Outline"
+  },
+  {
+    "category": "Outline & Stroke",
+    "name": "Gradient Stroke"
+  },
+  {
+    "category": "Outline & Stroke",
+    "name": "Hollow Text"
+  },
+  {
+    "category": "Creative & Distortion",
+    "name": "Echo"
+  },
+  {
+    "category": "Creative & Distortion",
+    "name": "Glitch"
+  },
+  {
+    "category": "Creative & Distortion",
+    "name": "RGB Split"
+  },
+  {
+    "category": "Creative & Distortion",
+    "name": "Wave Distortion"
+  },
+  {
+    "category": "Creative & Distortion",
+    "name": "Warp"
+  },
+  {
+    "category": "Creative & Distortion",
+    "name": "Perspective Tilt"
+  },
+  {
+    "category": "Creative & Distortion",
+    "name": "Motion Blur"
+  },
+  {
+    "category": "Creative & Distortion",
+    "name": "Ghost"
+  },
+  {
+    "category": "Texture & Material",
+    "name": "Metallic"
+  },
+  {
+    "category": "Texture & Material",
+    "name": "Chrome"
+  },
+  {
+    "category": "Texture & Material",
+    "name": "Foil"
+  },
+  {
+    "category": "Texture & Material",
+    "name": "Emboss"
+  },
+  {
+    "category": "Texture & Material",
+    "name": "Engrave"
+  },
+  {
+    "category": "Texture & Material",
+    "name": "Glass"
+  },
+  {
+    "category": "Texture & Material",
+    "name": "Liquid"
+  },
+  {
+    "category": "Texture & Material",
+    "name": "Grunge"
+  },
+  {
+    "category": "Premium Artistic",
+    "name": "Gradient Fill"
+  },
+  {
+    "category": "Premium Artistic",
+    "name": "Rainbow Fill"
+  },
+  {
+    "category": "Premium Artistic",
+    "name": "Fire"
+  },
+  {
+    "category": "Premium Artistic",
+    "name": "Ice"
+  },
+  {
+    "category": "Premium Artistic",
+    "name": "Water"
+  },
+  {
+    "category": "Premium Artistic",
+    "name": "Pixel"
+  },
+  {
+    "category": "Premium Artistic",
+    "name": "Halftone"
+  },
+  {
+    "category": "Premium Artistic",
+    "name": "Comic"
+  },
+  {
+    "category": "Premium Artistic",
+    "name": "Retro"
+  },
+  {
+    "category": "Premium Artistic",
+    "name": "Hologram"
+  },
+  {
+    "category": "Premium Artistic",
+    "name": "Glitter"
+  },
+  {
+    "category": "Premium Artistic",
+    "name": "Texture Fill"
+  }
+] as const
+const EFFECT_CATEGORIES = [...new Set(TEXT_EFFECTS.map(effect => effect.category))]
+type TextEffect = typeof TEXT_EFFECTS[number]['name']
+function getTextEffectStyle(effect: string | undefined, intensity = 60, color = '#a855f7', secondary = '#22d3ee'): Record<string, string | number> {
+  const n = Math.max(0.1, intensity / 60)
+  const soft = Math.round(3 * n)
+  const glow = Math.round(8 * n)
+  const styles: Record<string, Record<string, string | number>> = {
+    'Drop Shadow': { textShadow: `3px 4px ${soft}px rgba(0,0,0,.75)` },
+    'Long Shadow': { textShadow: Array.from({length:Math.min(12,Math.max(3,Math.round(8*n)))},(_,i)=>`${i+1}px ${i+1}px 0 ${color}`).join(',') },
+    'Hard Shadow': { textShadow: `4px 4px 0 ${color}` },
+    '3D Extrude': { textShadow: Array.from({length:Math.min(10,Math.max(3,Math.round(6*n)))},(_,i)=>`${i+1}px ${i+1}px 0 ${color}`).join(',') },
+    'Layered Shadow': { textShadow: `2px 2px 2px ${color}, 5px 5px 8px rgba(0,0,0,.7), 0 0 14px ${secondary}` },
+    'Floating Shadow': { textShadow: `0 12px 10px rgba(0,0,0,.55), 0 2px 2px ${color}` },
+    'Ambient Shadow': { textShadow: `0 0 ${glow*2}px ${color}, 0 0 ${glow*3}px rgba(0,0,0,.55)` },
+    'Perspective Depth': { textShadow: `2px 2px 0 ${color}, 4px 4px 0 ${color}, 7px 7px 8px rgba(0,0,0,.55)`, transform: 'perspective(220px) rotateX(12deg)' },
+    'Neon Glow': { textShadow: `0 0 3px #fff, 0 0 ${glow}px ${color}, 0 0 ${glow*2}px ${color}, 0 0 ${glow*3}px ${color}` },
+    'Soft Glow': { textShadow: `0 0 ${glow*2}px ${color}, 0 0 ${glow*3}px ${color}` },
+    'Outer Glow': { textShadow: `0 0 ${glow}px ${color}, 0 0 ${glow*2}px ${color}` },
+    'Inner Glow': { textShadow: `0 0 2px #fff, 0 0 ${soft}px ${color}`, filter: 'brightness(1.25)' },
+    'Rainbow Glow': { textShadow: `0 0 8px #ff3b7a, 0 0 14px #ffd43b, 0 0 20px #36e5a1, 0 0 26px #6b8cff` },
+    'Electric Glow': { textShadow: `0 0 3px #fff, 0 0 ${glow}px #22d3ee, 0 0 ${glow*2}px #6366f1, 0 0 ${glow*3}px ${color}` },
+    'Golden Glow': { textShadow: `0 0 4px #fff1a8, 0 0 ${glow}px #f59e0b, 0 0 ${glow*2}px #d97706` },
+    'Holographic Glow': { textShadow: `0 0 ${glow}px #f0abfc, 0 0 ${glow*2}px #67e8f9, 0 0 ${glow*3}px #c4b5fd` },
+    'Outline': { WebkitTextStroke: `${Math.max(1,Math.round(n*1.5))}px ${color}` },
+    'Double Outline': { WebkitTextStroke: `${Math.max(1,Math.round(n*1.5))}px ${color}`, textShadow: `0 0 0 ${secondary}, 0 0 2px ${secondary}` },
+    'Triple Stroke': { WebkitTextStroke: `${Math.max(1,Math.round(n*2))}px ${color}`, textShadow: `1px 1px 0 ${secondary}, -1px -1px 0 #fff` },
+    'Neon Outline': { WebkitTextStroke: `1px ${color}`, textShadow: `0 0 4px ${color}, 0 0 12px ${color}` },
+    'Gradient Stroke': { color: 'transparent', WebkitTextStroke: `${Math.max(1,Math.round(n*1.5))}px ${color}`, textShadow: `0 0 4px ${secondary}` },
+    'Hollow Text': { color: 'transparent', WebkitTextStroke: `${Math.max(1,Math.round(n*2))}px ${color}` },
+    'Echo': { textShadow: `3px 0 ${color}, 6px 0 ${secondary}, 9px 0 rgba(255,255,255,.25)` },
+    'Glitch': { textShadow: `-2px 0 #ff1744, 2px 0 #00e5ff`, filter: 'contrast(1.25)' },
+    'RGB Split': { textShadow: `-2px 0 rgba(255,0,0,.9), 2px 0 rgba(0,220,255,.9)` },
+    'Wave Distortion': { textShadow: `0 2px 0 ${color}, 0 -2px 0 ${secondary}`, filter: 'url(#studio-wave-filter)' },
+    'Warp': { transform: 'skewX(-8deg) scaleX(1.08)', filter: 'contrast(1.15)' },
+    'Perspective Tilt': { transform: 'perspective(240px) rotateY(-18deg) skewY(-3deg)' },
+    'Motion Blur': { textShadow: `5px 0 5px rgba(255,255,255,.5), 10px 0 12px ${color}`, filter: 'blur(.35px)' },
+    'Ghost': { textShadow: `4px 0 0 rgba(180,220,255,.35), 8px 0 0 rgba(180,220,255,.2), -4px 0 0 rgba(180,220,255,.2)`, opacity: .88 },
+    'Metallic': { color: 'transparent', background: 'linear-gradient(180deg,#fff 0%,#9ca3af 22%,#f8fafc 38%,#4b5563 52%,#e5e7eb 72%,#6b7280 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', filter: 'drop-shadow(1px 2px 1px rgba(0,0,0,.65))' },
+    'Chrome': { color: 'transparent', background: 'linear-gradient(180deg,#fff 0%,#64748b 18%,#fff 35%,#334155 50%,#f8fafc 65%,#475569 82%,#fff 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', filter: 'drop-shadow(0 2px 2px #000)' },
+    'Foil': { color: 'transparent', background: `linear-gradient(120deg,#fff,${color},#fef3c7,${secondary},#fff)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', filter: 'saturate(1.4)' },
+    'Emboss': { textShadow: '1px 1px 0 rgba(255,255,255,.8), -1px -1px 1px rgba(0,0,0,.75)' },
+    'Engrave': { color: '#9ca3af', textShadow: '1px 1px 1px rgba(255,255,255,.45), -1px -1px 1px rgba(0,0,0,.8)' },
+    'Glass': { color: 'rgba(220,245,255,.78)', WebkitTextStroke: '1px rgba(255,255,255,.65)', textShadow: '0 1px 8px rgba(255,255,255,.8), 0 4px 12px rgba(80,180,255,.45)', filter: 'blur(.12px)' },
+    'Liquid': { color: 'transparent', background: `linear-gradient(160deg,#fff 0%,${secondary} 25%,${color} 48%,#fff 62%,#64748b 80%,#fff 100%)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', filter: 'saturate(1.3)' },
+    'Grunge': { textShadow: `1px 1px 0 ${color}, -1px 0 0 rgba(0,0,0,.6)`, filter: 'contrast(1.55) saturate(.8)' },
+    'Gradient Fill': { color: 'transparent', background: `linear-gradient(110deg,${color},${secondary})`, WebkitBackgroundClip: 'text', backgroundClip: 'text' },
+    'Rainbow Fill': { color: 'transparent', background: 'linear-gradient(90deg,#ff4d6d,#ffb703,#80ed99,#4cc9f0,#9b5de5,#ff4d6d)', WebkitBackgroundClip: 'text', backgroundClip: 'text' },
+    'Fire': { color: 'transparent', background: 'linear-gradient(0deg,#991b1b,#f97316,#fde047,#fff7ed)', WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 0 12px rgba(249,115,22,.65)' },
+    'Ice': { color: 'transparent', background: 'linear-gradient(180deg,#fff,#bae6fd,#38bdf8,#e0f2fe)', WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 0 8px #7dd3fc' },
+    'Water': { color: 'transparent', background: 'linear-gradient(180deg,#e0f2fe,#38bdf8,#0369a1,#bae6fd)', WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 2px 7px rgba(14,165,233,.65)' },
+    'Pixel': { textShadow: `2px 0 0 ${color}, -2px 2px 0 ${secondary}`, filter: 'contrast(1.5)' },
+    'Halftone': { textShadow: `1px 1px 0 ${color}, -1px -1px 0 ${color}`, filter: 'contrast(1.7)' },
+    'Comic': { WebkitTextStroke: '1.5px #111827', textShadow: `3px 3px 0 ${color}, 5px 5px 0 #111827`, filter: 'saturate(1.4)' },
+    'Retro': { textShadow: `3px 3px 0 ${color}, 6px 6px 0 ${secondary}`, filter: 'sepia(.25) saturate(1.25)' },
+    'Hologram': { color: 'transparent', background: 'linear-gradient(100deg,#f0abfc,#67e8f9,#fde68a,#c4b5fd,#f0abfc)', WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 0 8px rgba(103,232,249,.55)' },
+    'Glitter': { color: 'transparent', background: `linear-gradient(120deg,#fff,${color},#fff,${secondary},#fff)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', textShadow: '0 0 6px rgba(255,255,255,.7)', filter: 'brightness(1.2)' },
+    'Texture Fill': { color: 'transparent', background: `repeating-linear-gradient(135deg,${color} 0 4px,${secondary} 4px 7px,#fff 7px 8px)`, WebkitBackgroundClip: 'text', backgroundClip: 'text' },
+  }
+  return styles[effect || ''] || {}
+}
+
 const googleFontLoads = new Map<string, Promise<void>>()
 function loadGoogleFont(family: string): Promise<void> {
   if (!family || family === 'Default') return Promise.resolve()
@@ -125,7 +388,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
   const [saveStatus, setSaveStatus] = useState('Loading project…')
-  const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio'>('media')
+  const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects'>('media')
   const [hydrated, setHydrated] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveSequence = useRef(0)
@@ -188,7 +451,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               id: String(item.id), kind: (item.kind === 'heading' || item.kind === 'subheading' ? item.kind : 'body') as TextLayer['kind'],
               text: String(item.text), x: Math.min(95, Math.max(0, Number(item.x) || 0)), y: Math.min(95, Math.max(0, Number(item.y) || 0)),
               width: Math.min(100, Math.max(12, Number(item.width) || 80)), fontSize: Math.min(160, Math.max(10, Number(item.fontSize) || 24)),
-              color: typeof item.color === 'string' ? item.color : '#ffffff', opacity: Number.isFinite(Number(item.opacity)) ? Math.min(100, Math.max(0, Number(item.opacity))) : 100, bold: item.bold !== false, italic: item.italic === true,
+              color: typeof item.color === 'string' ? item.color : '#ffffff', effect: TEXT_EFFECTS.some(effect => effect.name === item.effect) ? item.effect as TextEffect : 'None', effectIntensity: Number.isFinite(Number(item.effectIntensity)) ? Math.min(100, Math.max(0, Number(item.effectIntensity))) : 60, effectColor: typeof item.effectColor === 'string' ? item.effectColor : '#a855f7', effectSecondaryColor: typeof item.effectSecondaryColor === 'string' ? item.effectSecondaryColor : '#22d3ee', opacity: Number.isFinite(Number(item.opacity)) ? Math.min(100, Math.max(0, Number(item.opacity))) : 100, bold: item.bold !== false, italic: item.italic === true,
               underline: item.underline === true, fontFamily: typeof item.fontFamily === 'string' ? item.fontFamily : 'Default', align: item.align === 'left' || item.align === 'right' ? item.align : 'center', rotation: typeof item.rotation === 'number' && Number.isFinite(item.rotation) ? item.rotation : 0,
               timelineStart: Math.max(0, Number(item.timelineStart) || 0), timelineDuration: Math.max(0.1, Number(item.timelineDuration) || 5),
             }))
@@ -358,7 +621,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       body: { text: 'Add a little bit of body text', fontSize: 20, bold: false, y: 45 },
     }
     const preset = presets[kind]
-    const layer: TextLayer = { id: makeId(), kind, text: preset.text, x: 10, y: preset.y, width: 80, fontSize: preset.fontSize, color: '#ffffff', bold: preset.bold, italic: false, underline: false, fontFamily: 'Default', align: 'center', rotation: 0, timelineStart: 0, timelineDuration: 5 }
+    const layer: TextLayer = { id: makeId(), kind, text: preset.text, x: 10, y: preset.y, width: 80, fontSize: preset.fontSize, color: '#ffffff', effect: 'None', effectIntensity: 60, effectColor: '#a855f7', effectSecondaryColor: '#22d3ee', bold: preset.bold, italic: false, underline: false, fontFamily: 'Default', align: 'center', rotation: 0, timelineStart: 0, timelineDuration: 5 }
     setTextLayers(items => [...items, layer])
     setSelectedTextId(layer.id)
     setEditingTextId(null)
@@ -609,6 +872,38 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           ctx.textBaseline = 'top'
           const exportFontFamily = layer.fontFamily && layer.fontFamily !== 'Default' ? '"' + layer.fontFamily.replace(/["\\]/g, '') + '", sans-serif' : 'Arial, Helvetica, sans-serif'
           ctx.font = (layer.italic ? 'italic ' : '') + (layer.bold ? '700 ' : '400 ') + Math.round(layer.fontSize * scale) + 'px ' + exportFontFamily
+          const effect = layer.effect || 'None'
+          const strength = Math.max(0, Math.min(100, layer.effectIntensity ?? 60)) / 60
+          const effectColor = layer.effectColor || '#a855f7'
+          const secondEffectColor = layer.effectSecondaryColor || '#22d3ee'
+          ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0
+          ctx.lineJoin = 'round'
+          if (['Drop Shadow','Floating Shadow','Ambient Shadow','Layered Shadow','Hard Shadow','Long Shadow','3D Extrude','Perspective Depth'].includes(effect)) {
+            ctx.shadowColor = effectColor; ctx.shadowBlur = effect === 'Hard Shadow' || effect === 'Long Shadow' || effect === '3D Extrude' ? 0 : 5 * strength; ctx.shadowOffsetX = 3 * strength; ctx.shadowOffsetY = 4 * strength
+          } else if (['Neon Glow','Soft Glow','Outer Glow','Inner Glow','Rainbow Glow','Electric Glow','Golden Glow','Holographic Glow','Neon Outline'].includes(effect)) {
+            ctx.shadowColor = effect === 'Golden Glow' ? '#f59e0b' : effect === 'Rainbow Glow' || effect === 'Holographic Glow' ? '#e879f9' : effectColor; ctx.shadowBlur = 12 * strength
+          } else if (['Echo','Ghost','Motion Blur','Glitch','RGB Split','Pixel','Retro','Comic'].includes(effect)) {
+            ctx.shadowColor = effectColor; ctx.shadowBlur = effect === 'Motion Blur' ? 7 * strength : 2 * strength; ctx.shadowOffsetX = effect === 'Motion Blur' ? 7 * strength : 3 * strength; ctx.shadowOffsetY = effect === 'Retro' || effect === 'Comic' ? 3 * strength : 0
+          }
+          if (['Outline','Double Outline','Triple Stroke','Neon Outline','Gradient Stroke','Hollow Text','Comic'].includes(effect)) {
+            ctx.lineWidth = Math.max(1, (effect === 'Triple Stroke' ? 3 : 1.8) * strength * scale); ctx.strokeStyle = effectColor
+            ctx.strokeText(line, textX, y + index * lineHeight, maxWidth)
+            if (effect === 'Double Outline' || effect === 'Triple Stroke') { ctx.lineWidth = Math.max(1, scale); ctx.strokeStyle = secondEffectColor; ctx.strokeText(line, textX, y + index * lineHeight, maxWidth) }
+            if (effect === 'Hollow Text') { ctx.shadowBlur = 0; ctx.restore(); return }
+          }
+          if (['Gradient Fill','Rainbow Fill','Metallic','Chrome','Foil','Liquid','Fire','Ice','Water','Hologram','Glitter','Texture Fill'].includes(effect)) {
+            const gradient = ctx.createLinearGradient(x, y, x + maxWidth, y + lineHeight)
+            if (effect === 'Rainbow Fill' || effect === 'Hologram') { gradient.addColorStop(0,'#ff4d6d'); gradient.addColorStop(.22,'#ffb703'); gradient.addColorStop(.45,'#80ed99'); gradient.addColorStop(.68,'#4cc9f0'); gradient.addColorStop(.85,'#9b5de5'); gradient.addColorStop(1,'#ff4d6d') }
+            else if (effect === 'Fire') { gradient.addColorStop(0,'#fff7ed'); gradient.addColorStop(.4,'#f97316'); gradient.addColorStop(1,'#991b1b') }
+            else if (effect === 'Ice' || effect === 'Water') { gradient.addColorStop(0,'#fff'); gradient.addColorStop(.5,'#38bdf8'); gradient.addColorStop(1,'#075985') }
+            else if (effect === 'Metallic' || effect === 'Chrome') { gradient.addColorStop(0,'#fff'); gradient.addColorStop(.25,'#64748b'); gradient.addColorStop(.48,'#f8fafc'); gradient.addColorStop(.7,'#475569'); gradient.addColorStop(1,'#fff') }
+            else { gradient.addColorStop(0,effectColor); gradient.addColorStop(.5,secondEffectColor); gradient.addColorStop(1,effectColor) }
+            ctx.fillStyle = gradient
+          }
+          if (effect === 'Emboss') { ctx.shadowColor = 'rgba(255,255,255,.8)'; ctx.shadowOffsetX = -1*scale; ctx.shadowOffsetY = -1*scale; ctx.shadowBlur = 1*scale }
+          if (effect === 'Engrave') { ctx.shadowColor = 'rgba(0,0,0,.8)'; ctx.shadowOffsetX = -1*scale; ctx.shadowOffsetY = -1*scale; ctx.shadowBlur = 1*scale }
+          if (effect === 'Glitch' || effect === 'RGB Split') { ctx.save(); ctx.globalAlpha *= .55; ctx.fillStyle = effect === 'Glitch' ? '#ff1744' : '#ff3030'; ctx.fillText(line, textX - 2*scale, y + index * lineHeight, maxWidth); ctx.fillStyle = '#00d9ff'; ctx.fillText(line, textX + 2*scale, y + index * lineHeight, maxWidth); ctx.restore() }
+          if (effect === 'Echo' || effect === 'Ghost' || effect === 'Long Shadow' || effect === '3D Extrude') { ctx.save(); ctx.globalAlpha *= .32; ctx.fillStyle = effectColor; for(let step=4;step>=1;step--) ctx.fillText(line,textX+step*scale,y+index*lineHeight+step*scale,maxWidth); ctx.restore() }
           const maxWidth = canvas.width * layer.width / 100
           const boxX = canvas.width * layer.x / 100
           const boxY = canvas.height * layer.y / 100
@@ -805,6 +1100,17 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             <button type="button" onClick={() => addTextLayer('subheading')} className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-fuchsia-400/40 hover:bg-fuchsia-500/[0.07]"><span className="block text-[15px] font-bold text-white">Add a subheading</span><span className="mt-1 block text-[9px] text-slate-500">Medium supporting text</span></button>
             <button type="button" onClick={() => addTextLayer('body')} className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-fuchsia-400/40 hover:bg-fuchsia-500/[0.07]"><span className="block text-[11px] font-medium text-white">Add a little bit of body text</span><span className="mt-1 block text-[9px] text-slate-500">Small body text</span></button>
           </div>}
+          {activePanel === 'effects' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+            {!selectedText ? <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select a text layer on the canvas to apply effects.</div> : <>
+              <div className="rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/[0.06] p-3"><div className="flex items-center justify-between"><span className="text-[11px] font-bold text-white">Text effects</span><span className="text-[9px] text-fuchsia-200">50 styles</span></div><p className="mt-1 text-[9px] text-slate-400">Choose a style, then adjust its strength and colours below.</p></div>
+              <button type="button" onClick={() => updateTextLayer(selectedText.id,{effect:'None'})} className={'rounded-lg border px-3 py-2 text-left text-[10px] font-semibold '+(!selectedText.effect || selectedText.effect==='None'?'border-fuchsia-400/50 bg-fuchsia-500/10 text-fuchsia-100':'border-white/10 bg-white/[0.03] text-slate-300')}>No effect</button>
+              {EFFECT_CATEGORIES.map(category => <section key={category}><h3 className="mb-2 text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{category}</h3><div className="grid grid-cols-2 gap-1.5">{TEXT_EFFECTS.filter(effect=>effect.category===category).map(effect=><button key={effect.name} type="button" onClick={()=>updateTextLayer(selectedText.id,{effect:effect.name,effectIntensity:selectedText.effectIntensity??60})} aria-pressed={selectedText.effect===effect.name} className={'min-h-[42px] rounded-lg border px-2 py-2 text-left text-[9px] font-semibold transition '+(selectedText.effect===effect.name?'border-fuchsia-400/60 bg-fuchsia-500/15 text-fuchsia-100 ring-1 ring-fuchsia-400/20':'border-white/10 bg-white/[0.025] text-slate-300 hover:border-white/20 hover:bg-white/[0.06]')}>{effect.name}</button>)}</div></section>)}
+              <div className="h-px bg-white/10" />
+              <label className="block text-[9px] font-semibold text-slate-300">Effect intensity · {selectedText.effectIntensity ?? 60}%<input type="range" min="0" max="100" value={selectedText.effectIntensity ?? 60} onChange={event=>updateTextLayer(selectedText.id,{effectIntensity:Number(event.target.value)})} className="mt-2 w-full accent-fuchsia-500" /></label>
+              <div className="grid grid-cols-2 gap-2"><label className="text-[9px] text-slate-400">Effect colour<input aria-label="Effect colour" type="color" value={selectedText.effectColor || '#a855f7'} onChange={event=>updateTextLayer(selectedText.id,{effectColor:event.target.value})} className="mt-1 h-9 w-full cursor-pointer rounded-md border border-white/10 bg-[#080b16] p-1" /></label><label className="text-[9px] text-slate-400">Second colour<input aria-label="Second effect colour" type="color" value={selectedText.effectSecondaryColor || '#22d3ee'} onChange={event=>updateTextLayer(selectedText.id,{effectSecondaryColor:event.target.value})} className="mt-1 h-9 w-full cursor-pointer rounded-md border border-white/10 bg-[#080b16] p-1" /></label></div>
+              <button type="button" onClick={()=>updateTextLayer(selectedText.id,{effect:'None',effectIntensity:60,effectColor:'#a855f7',effectSecondaryColor:'#22d3ee'})} className="rounded-lg border border-white/10 py-2 text-[9px] font-semibold text-slate-400 hover:bg-white/[0.05]">Reset effect settings</button>
+            </>}
+          </div>}
           {activePanel === 'audio' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <button type="button" onClick={() => audioInput.current?.click()} className="flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[10px] font-bold"><Music2 className="h-4 w-4" /> {audio ? 'Replace audio track' : 'Import audio'}</button>
             {audio ? <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.04] p-3"><div className="flex items-center gap-2"><Music2 className="h-4 w-4 shrink-0 text-cyan-300" /><div className="min-w-0"><p className="truncate text-[10px] font-semibold text-cyan-100">{audio.name}</p><p className="text-[9px] text-cyan-100/50">{formatTime(audio.duration)} duration</p></div></div><label className="mt-4 block text-[9px] text-slate-400">Track volume · {audioVolume}%<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="mt-2 w-full accent-cyan-400" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="mt-3 w-full rounded-lg border border-red-400/20 py-2 text-[9px] font-semibold text-red-300 hover:bg-red-400/[0.06]">Remove audio track</button></div> : <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center"><Music2 className="mx-auto h-7 w-7 text-slate-600" /><p className="mt-2 text-[10px] font-semibold text-slate-300">No audio track</p><p className="mt-1 text-[9px] text-slate-500">Import a music or audio file to add it to your project.</p></div>}
@@ -881,6 +1187,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               </div>}
             </div>
             <label title="Text color" className="relative flex h-8 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-100 transition hover:bg-white/10"><Palette className="h-4 w-4" /><span className="absolute bottom-1 left-2 right-2 h-1 rounded-full" style={{ backgroundColor: selectedText.color }} /><input aria-label="Text color" type="color" value={selectedText.color} onChange={event => updateTextLayer(selectedText.id,{color:event.target.value})} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" /></label>
+            <button type="button" onClick={() => { setActivePanel('effects'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Text effects" title="Text effects" className={'flex h-8 items-center gap-1.5 rounded-lg border px-2 text-[10px] font-semibold transition '+(activePanel==='effects'?'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100':'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10')}><span className="text-sm">✧</span> Effects</button>
+            <span className="mx-1 h-6 w-px shrink-0 bg-white/10" />
             <span className="mx-1 h-6 w-px shrink-0 bg-white/10" />
             <button type="button" onClick={() => updateTextLayer(selectedText.id,{bold:!selectedText.bold})} aria-label="Bold" aria-pressed={selectedText.bold} title="Bold" className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ' + (selectedText.bold ? 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30' : 'text-slate-200 hover:bg-white/10')}><Bold className="h-4 w-4" /></button>
             <button type="button" onClick={() => updateTextLayer(selectedText.id,{italic:!selectedText.italic})} aria-label="Italic" aria-pressed={selectedText.italic} title="Italic" className={'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ' + (selectedText.italic ? 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30' : 'text-slate-200 hover:bg-white/10')}><Italic className="h-4 w-4" /></button>
@@ -898,8 +1206,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               <div ref={canvasRef} onPointerDown={event => { const target = event.target as HTMLElement; if (!target.closest("[data-text-layer-id], [data-text-toolbar]")) { setSelectedTextId(null); setEditingTextId(null) } }} className={'relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-md bg-black ring-1 ring-violet-400/20 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-5xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(72dvh, 720px)' }}>
                 {activeTimelineClip?.kind === 'video' ? <video key={activeTimelineClip.id} ref={previewRef} src={activeTimelineClip.url} playsInline preload="auto" className="h-full w-full object-contain" /> : activeTimelineClip?.kind === 'image' ? <img src={activeTimelineClip.url} alt={activeTimelineClip.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">{clips.length ? 'Timeline gap' : 'Your video canvas'}</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">{clips.length ? 'No media clip is placed at this point in the timeline.' : 'Import a video or photo to start editing your project.'}</p>{!clips.length && <button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button>}</div>}
                 {audio && <audio ref={audioRef} src={audio.url} preload="metadata" />}
-                {textLayers.filter(layer => playhead >= layer.timelineStart && playhead < layer.timelineStart + layer.timelineDuration).map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontFamily: layer.fontFamily && layer.fontFamily !== 'Default' ? '"' + layer.fontFamily + '", sans-serif' : 'Arial, Helvetica, sans-serif', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : layer.strikethrough ? 'line-through' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: 'rotate(' + layer.rotation + 'deg)', transformOrigin: 'center center' }}>
-                  <div dir="auto" contentEditable={editingTextId === layer.id} suppressContentEditableWarning onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); if (editingTextId !== layer.id) { const node = event.currentTarget; setEditingTextId(layer.id); window.requestAnimationFrame(() => { node.focus(); const selection = window.getSelection(); const range = document.createRange(); range.selectNodeContents(node); range.collapse(false); selection?.removeAllRanges(); selection?.addRange(range) }) } }} onInput={event => { textDrafts.current.set(layer.id, event.currentTarget.innerText.split(/\n/).map(line => layer.listStyle === 'bullet' ? line.replace(/^•\s?/, '') : layer.listStyle === 'number' ? line.replace(/^\d+\\.\s?/, '') : line).join('\n')) }} onBlur={event => { const value = textDrafts.current.get(layer.id); if (value !== undefined) { updateTextLayer(layer.id,{text:value}); textDrafts.current.delete(layer.id) } setEditingTextId(current => current === layer.id ? null : current) }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.blur() } }} className="min-h-[24px] whitespace-pre-wrap break-words outline-none" style={{ opacity: (layer.opacity ?? 100) / 100 }}>{getFormattedText(layer)}</div>
+                {textLayers.filter(layer => playhead >= layer.timelineStart && playhead < layer.timelineStart + layer.timelineDuration).map(layer => <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ ...getTextEffectStyle(layer.effect, layer.effectIntensity ?? 60, layer.effectColor || '#a855f7', layer.effectSecondaryColor || '#22d3ee'), left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', color: layer.color, fontSize: layer.fontSize + 'px', fontFamily: layer.fontFamily && layer.fontFamily !== 'Default' ? '"' + layer.fontFamily + '", sans-serif' : 'Arial, Helvetica, sans-serif', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : layer.strikethrough ? 'line-through' : 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: 'rotate(' + layer.rotation + 'deg)', transformOrigin: 'center center' }}>
+                  <div dir="auto" contentEditable={editingTextId === layer.id} suppressContentEditableWarning onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); if (editingTextId !== layer.id) { const node = event.currentTarget; setEditingTextId(layer.id); window.requestAnimationFrame(() => { node.focus(); const selection = window.getSelection(); const range = document.createRange(); range.selectNodeContents(node); range.collapse(false); selection?.removeAllRanges(); selection?.addRange(range) }) } }} onInput={event => { textDrafts.current.set(layer.id, event.currentTarget.innerText.split(/\n/).map(line => layer.listStyle === 'bullet' ? line.replace(/^•\s?/, '') : layer.listStyle === 'number' ? line.replace(/^\d+\\.\s?/, '') : line).join('\n')) }} onBlur={event => { const value = textDrafts.current.get(layer.id); if (value !== undefined) { updateTextLayer(layer.id,{text:value}); textDrafts.current.delete(layer.id) } setEditingTextId(current => current === layer.id ? null : current) }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.blur() } }} className="min-h-[24px] whitespace-pre-wrap break-words outline-none" style={{ opacity: (layer.opacity ?? 100) / 100, ...getTextEffectStyle(layer.effect, layer.effectIntensity ?? 60, layer.effectColor || '#a855f7', layer.effectSecondaryColor || '#22d3ee') }}>{getFormattedText(layer)}</div>
                   {selectedTextId === layer.id && <>
                     <button type="button" aria-label="Move text" title="Drag to move" onPointerDown={event => beginTextDrag(event,layer,'move')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -top-7 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-white bg-slate-900 text-[11px] text-white shadow-md cursor-move touch-none">✥</button>
                     <button type="button" aria-label="Rotate text" title="Drag to rotate" onPointerDown={event => beginTextDrag(event,layer,'rotate')} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} className="absolute -bottom-7 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-white bg-slate-900 text-[12px] text-white shadow-md cursor-grab touch-none">↻</button>
