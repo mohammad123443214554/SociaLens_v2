@@ -723,7 +723,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     }
   }
 
-remove clip-only navigation  return (
+  return (
     <main className="fixed inset-0 z-[70] flex min-h-0 flex-col overflow-hidden bg-[#080a13] pt-[env(safe-area-inset-top)] text-white">
       <header className="z-30 flex h-[62px] min-h-[62px] shrink-0 items-center justify-between border-b border-white/[0.09] bg-[#0c0f1d] px-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
