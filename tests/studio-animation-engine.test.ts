@@ -7,6 +7,7 @@ import {
   validateTextAnimationRegistry,
   type TextAnimationDefinition,
 } from '../lib/studio/animation-engine.ts'
+import { BASIC_ENTRANCE_ANIMATIONS } from '../lib/studio/basic-entrance-animations.ts'
 
 const entrance: TextAnimationDefinition = {
   id: 'test-fade-in',
@@ -147,4 +148,37 @@ test('disabled and mismatched animation ids return a neutral sample', () => {
   assert.equal(disabled.opacity, 1)
   assert.equal(disabled.phase, 'inactive')
   assert.equal(sample(entrance, 2.5, { animationId: 'missing' }).opacity, 1)
+})
+
+test('Basic Entrance catalog contains exactly 25 uniquely named and visually distinct presets', () => {
+  assert.equal(BASIC_ENTRANCE_ANIMATIONS.length, 25)
+  assert.deepEqual(validateTextAnimationRegistry(BASIC_ENTRANCE_ANIMATIONS), [])
+  assert.equal(new Set(BASIC_ENTRANCE_ANIMATIONS.map(item => item.name)).size, 25)
+  assert.equal(new Set(BASIC_ENTRANCE_ANIMATIONS.map(item => JSON.stringify(item.keyframes))).size, 25)
+  for (const item of BASIC_ENTRANCE_ANIMATIONS) {
+    assert.equal(item.category, 'Basic Entrance')
+    assert.equal(item.mode, 'entrance')
+    assert.ok(item.description && item.description.length > 8)
+  }
+})
+
+test('each Basic Entrance preset samples to a visible neutral settled state at completion', () => {
+  for (const definition of BASIC_ENTRANCE_ANIMATIONS) {
+    const sample = sampleTextAnimation({
+      definition,
+      settings: { animationId: definition.id, durationMs: definition.defaultDurationMs, enabled: true },
+      timelineTimeSeconds: 2 + definition.defaultDurationMs / 1000,
+      layerStartSeconds: 2,
+      layerDurationSeconds: 5,
+    })
+    assert.equal(sample.visible, true, definition.name)
+    assert.equal(sample.phase, 'after', definition.name)
+    assert.equal(sample.opacity, 1, definition.name)
+    assert.ok(Math.abs(sample.translateX) < 0.0001, definition.name)
+    assert.ok(Math.abs(sample.translateY) < 0.0001, definition.name)
+    assert.ok(Math.abs(sample.scaleX - 1) < 0.0001, definition.name)
+    assert.ok(Math.abs(sample.scaleY - 1) < 0.0001, definition.name)
+    assert.ok(Math.abs(sample.rotate) < 0.0001, definition.name)
+    assert.ok(Math.abs(sample.blur) < 0.0001, definition.name)
+  }
 })
