@@ -13,6 +13,7 @@ import { BOUNCE_ELASTIC_ANIMATIONS } from '../lib/studio/bounce-elastic-animatio
 import { ROTATION_3D_ANIMATIONS } from '../lib/studio/rotation-3d-animations.ts'
 import { TYPING_CHARACTER_ANIMATIONS } from '../lib/studio/typing-character-animations.ts'
 import { sampleCharacterMotion, splitStudioGraphemes } from '../lib/studio/character-animation-engine.ts'
+import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameIndexAtTime, studioFrameTime, studioFrameTimeFromElapsedMs } from '../lib/studio/frame-clock.ts'
 
 const entrance: TextAnimationDefinition = {
   id: 'test-fade-in',
@@ -437,5 +438,41 @@ test('character motion returns exact neutral transforms at completion for every 
       { opacity: 1, translateX: 0, translateY: 0, scaleX: 1, scaleY: 1, rotate: 0, blur: 0, clipProgress: 1 },
       effect,
     )
+  }
+})
+
+
+test('Studio shared frame clock uses stable 30fps boundaries for preview and export', () => {
+  assert.equal(STUDIO_FRAME_RATE, 30)
+  assert.ok(Math.abs(STUDIO_FRAME_DURATION_SECONDS - 1 / 30) < 1e-12)
+  for (const frame of [0, 1, 2, 15, 30, 59, 300, 1800]) {
+    const seconds = studioFrameTime(frame)
+    assert.equal(studioFrameIndexAtTime(seconds), frame)
+    assert.equal(quantizeStudioTime(seconds), seconds)
+    assert.equal(studioFrameTimeFromElapsedMs(seconds * 1000), seconds)
+  }
+})
+
+test('Studio frame clock quantizes times consistently without going backwards', () => {
+  const samples = [0, 0.001, 0.016, 0.033, 0.034, 0.049, 0.066, 0.099, 1.001, 9.999]
+  let previous = -1
+  for (const time of samples) {
+    const quantized = quantizeStudioTime(time)
+    assert.ok(quantized <= time + 1e-8)
+    assert.ok(Math.abs(quantized * STUDIO_FRAME_RATE - Math.round(quantized * STUDIO_FRAME_RATE)) < 1e-8)
+    assert.ok(quantized >= previous)
+    previous = quantized
+  }
+  assert.equal(quantizeStudioTime(Number.NaN), 0)
+  assert.equal(quantizeStudioTime(-5), 0)
+  assert.equal(studioFrameTime(Number.POSITIVE_INFINITY), 0)
+  assert.equal(studioFrameTimeFromElapsedMs(Number.NaN), 0)
+})
+
+test('preview elapsed time and export timeline time resolve to identical animation frames', () => {
+  for (let frame = 0; frame < 600; frame++) {
+    const previewTime = studioFrameTimeFromElapsedMs(frame * 1000 / STUDIO_FRAME_RATE + 12)
+    const exportTime = quantizeStudioTime(frame / STUDIO_FRAME_RATE + 0.012)
+    assert.equal(previewTime, exportTime, 'frame ' + frame)
   }
 })
