@@ -1,6 +1,7 @@
 'use client'
 
-import { Pause, Play, RotateCcw, Search, Sparkles, Type, CheckCircle2 } from 'lucide-react'
+import { Pause, Play, RotateCcw, Search, Sparkles, Type, CheckCircle2, Gauge, Timer, Repeat2 } from 'lucide-react'
+import type { TextAnimationEasing, TextAnimationSettings } from '@/lib/studio/animation-engine'
 import { BASIC_ENTRANCE_ANIMATIONS } from '@/lib/studio/basic-entrance-animations'
 import { EXIT_ANIMATIONS } from '@/lib/studio/exit-animations'
 import { BOUNCE_ELASTIC_ANIMATIONS } from '@/lib/studio/bounce-elastic-animations'
@@ -36,7 +37,10 @@ type Props = {
   onSearchChange: (value: string) => void
   onClose?: () => void
   mobile?: boolean
-  selectedText?: { text: string; kind: string; animation?: { animationId?: string | null } } | null
+  selectedText?: { text: string; kind: string; animation?: Partial<TextAnimationSettings> } | null
+  animationSettings?: Partial<TextAnimationSettings>
+  animationMode?: 'entrance' | 'exit' | 'loop' | 'continuous'
+  onUpdateAnimationSettings?: (patch: Partial<TextAnimationSettings>) => void
   selectedAnimationId?: string | null
   isPreviewing?: boolean
   previewProgress?: number
@@ -46,7 +50,7 @@ type Props = {
   onSelectAnimation?: (id: string) => void
 }
 
-export function StudioAnimationPanel({ selectedCategory, onSelectCategory, search, onSearchChange, selectedText = null, selectedAnimationId = null, isPreviewing = false, previewProgress = 0, onPreview, onStopPreview, onReset, onSelectAnimation }: Props) {
+export function StudioAnimationPanel({ selectedCategory, onSelectCategory, search, onSearchChange, selectedText = null, animationSettings = {}, animationMode = 'entrance', onUpdateAnimationSettings, selectedAnimationId = null, isPreviewing = false, previewProgress = 0, onPreview, onStopPreview, onReset, onSelectAnimation }: Props) {
   const filteredCategories = ANIMATION_CATEGORIES.filter(category =>
     (category.name + ' ' + category.description).toLowerCase().includes(search.trim().toLowerCase())
   )
@@ -98,6 +102,21 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
             <div className="h-1 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-400 transition-[width]" style={{ width: Math.max(0, Math.min(1, previewProgress)) * 100 + '%' }} /></div>
           </div>}
           <p className="mt-2 text-[8px] leading-4 text-slate-500">{selectedAnimationId ? 'Selected preset is saved with this text layer and follows the project timeline.' : 'Choose an animation below to apply it to the selected text layer.'}</p>
+          {selectedText && selectedAnimationId && <section className="mt-3 space-y-3 rounded-lg border border-fuchsia-400/15 bg-[#090d19]/75 p-3" aria-label="Animation timing and motion controls">
+            <div className="flex items-center justify-between"><span className="text-[9px] font-bold uppercase tracking-[.12em] text-slate-300">Motion controls</span><span className="text-[8px] text-fuchsia-200">Per text layer</span></div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="min-w-0 rounded-lg bg-white/[0.035] p-2"><span className="flex items-center justify-between text-[8px] text-slate-400"><span className="flex items-center gap-1"><Timer className="h-3 w-3" /> Duration</span><strong className="text-slate-200">{((animationSettings.durationMs || 850) / 1000).toFixed(2)}s</strong></span><input aria-label="Animation duration" type="range" min="0.1" max="8" step="0.05" value={(animationSettings.durationMs || 850) / 1000} onChange={event => onUpdateAnimationSettings?.({ durationMs: Math.round(Number(event.target.value) * 1000) })} className="mt-2 w-full accent-fuchsia-400" /></label>
+              <label className="min-w-0 rounded-lg bg-white/[0.035] p-2"><span className="flex items-center justify-between text-[8px] text-slate-400"><span className="flex items-center gap-1"><Timer className="h-3 w-3" /> Delay</span><strong className="text-slate-200">{((animationSettings.delayMs || 0) / 1000).toFixed(2)}s</strong></span><input aria-label="Animation delay" type="range" min="0" max="5" step="0.05" value={(animationSettings.delayMs || 0) / 1000} onChange={event => onUpdateAnimationSettings?.({ delayMs: Math.round(Number(event.target.value) * 1000) })} className="mt-2 w-full accent-fuchsia-400" /></label>
+              <label className="min-w-0 rounded-lg bg-white/[0.035] p-2"><span className="flex items-center justify-between text-[8px] text-slate-400"><span className="flex items-center gap-1"><Gauge className="h-3 w-3" /> Speed</span><strong className="text-slate-200">{(animationSettings.speed || 1).toFixed(2)}×</strong></span><input aria-label="Animation speed" type="range" min="0.25" max="3" step="0.05" value={animationSettings.speed || 1} onChange={event => onUpdateAnimationSettings?.({ speed: Number(event.target.value) })} className="mt-2 w-full accent-fuchsia-400" /></label>
+              <label className="min-w-0 rounded-lg bg-white/[0.035] p-2"><span className="flex items-center justify-between text-[8px] text-slate-400"><span className="flex items-center gap-1"><Repeat2 className="h-3 w-3" /> Repeats</span><strong className="text-slate-200">{animationSettings.repeatCount === 0 ? '∞' : animationSettings.repeatCount || 1}</strong></span><input aria-label="Animation repeat count" type="range" min="1" max="10" step="1" disabled={animationMode === 'loop' || animationMode === 'continuous'} value={Math.max(1, animationSettings.repeatCount || 1)} onChange={event => onUpdateAnimationSettings?.({ repeatCount: Number(event.target.value) })} className="mt-2 w-full accent-fuchsia-400 disabled:opacity-35" /></label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-[8px] text-slate-400">Direction<select aria-label="Animation direction" value={animationSettings.direction || 'normal'} onChange={event => onUpdateAnimationSettings?.({ direction: event.target.value as TextAnimationSettings['direction'] })} className="mt-1 h-8 w-full rounded-md border border-white/10 bg-[#101525] px-2 text-[9px] text-white outline-none focus:border-fuchsia-400/50"><option value="normal">Normal</option><option value="reverse">Reverse</option><option value="alternate">Alternate</option><option value="alternate-reverse">Alternate reverse</option></select></label>
+              <label className="text-[8px] text-slate-400">Easing<select aria-label="Animation easing" value={animationSettings.easing || 'ease'} onChange={event => onUpdateAnimationSettings?.({ easing: event.target.value as TextAnimationEasing })} className="mt-1 h-8 w-full rounded-md border border-white/10 bg-[#101525] px-2 text-[9px] text-white outline-none focus:border-fuchsia-400/50">{(['linear','ease','ease-in','ease-out','ease-in-out','cubic-in','cubic-out','cubic-in-out','premium-out','premium-in','premium-in-out','back-out','back-in','elastic-out','bounce-out'] as const).map(value => <option key={value} value={value}>{value.replaceAll('-', ' ')}</option>)}</select></label>
+            </div>
+            <label className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.025] px-2.5 py-2 text-[9px] text-slate-300"><span>Loop continuously</span><input aria-label="Loop animation continuously" type="checkbox" checked={animationSettings.repeatCount === 0} disabled={animationMode !== 'loop' && animationMode !== 'continuous'} onChange={event => onUpdateAnimationSettings?.({ repeatCount: event.target.checked ? 0 : 1 })} className="h-3.5 w-3.5 accent-fuchsia-400 disabled:opacity-35" /></label>
+            <p className="text-[8px] leading-3 text-slate-500">Speed changes the animation clock in both canvas preview and export. Loop is available for loop-capable presets.</p>
+          </section>}
         </section>
 
         <div className="mb-3">
