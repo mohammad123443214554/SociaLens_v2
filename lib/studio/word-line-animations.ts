@@ -65,9 +65,10 @@ export function sampleWordMotion(input:{
   case 'line-cascade': m.opacity=o;m.y=travel(20*inv);m.scale=.99+.01*o;break
  }
  m.opacity=clamp(m.opacity,0,1);m.scale=clamp(m.scale,.2,2);m.blur=clamp(m.blur,0,24);m.clip=clamp(m.clip,0,1)
- // Normalize signed zero so strict consumers and CSS/canvas serializers receive a canonical neutral value.
+ // Canonicalize signed zero and floating-point residue (for example sin(2π) ≈ 1e-15).
+ // This keeps every completed effect at an exact, stable neutral transform.
  for (const key of Object.keys(m) as (keyof WordMotionSample)[]) {
-  if (Object.is(m[key], -0)) m[key] = 0
+  if (Math.abs(m[key]) < 1e-12) m[key] = 0
  }
  return m
 }
