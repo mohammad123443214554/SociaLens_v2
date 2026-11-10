@@ -12,6 +12,7 @@ import { LOOP_CONTINUOUS_ANIMATIONS } from '@/lib/studio/loop-continuous-animati
 import { MOTION_DYNAMIC_ANIMATIONS } from '@/lib/studio/motion-dynamic-animations'
 import { CINEMATIC_LIGHT_ANIMATIONS } from '@/lib/studio/cinematic-light-animations'
 import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-animations'
+import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
 
 const ANIMATION_CATEGORIES = [
   { name: 'Basic Entrance', range: '01–25', description: 'Clean, polished ways for text to appear' },
@@ -60,8 +61,9 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
   const isMotionDynamic = selectedCategory === 'Motion & Dynamic'
   const isCinematicLight = selectedCategory === 'Cinematic & Light'
   const isDigitalCreative = selectedCategory === 'Digital & Creative'
-  const isPresetCategory = isBasicEntrance || isExit || isBounceElastic || isRotation3D || isTypingCharacter || isWordLine || isWipeMaskReveal || isLoopContinuous || isMotionDynamic || isCinematicLight || isDigitalCreative
-  const categoryAnimations = isBasicEntrance ? BASIC_ENTRANCE_ANIMATIONS : isExit ? EXIT_ANIMATIONS : isBounceElastic ? BOUNCE_ELASTIC_ANIMATIONS : isRotation3D ? ROTATION_3D_ANIMATIONS : isTypingCharacter ? TYPING_CHARACTER_ANIMATIONS : isWordLine ? WORD_LINE_ANIMATIONS : isWipeMaskReveal ? WIPE_MASK_REVEAL_ANIMATIONS : isLoopContinuous ? LOOP_CONTINUOUS_ANIMATIONS : isMotionDynamic ? MOTION_DYNAMIC_ANIMATIONS : isCinematicLight ? CINEMATIC_LIGHT_ANIMATIONS : isDigitalCreative ? DIGITAL_CREATIVE_ANIMATIONS : []
+  const isArtisticAdvanced = selectedCategory === 'Artistic & Advanced'
+  const isPresetCategory = isBasicEntrance || isExit || isBounceElastic || isRotation3D || isTypingCharacter || isWordLine || isWipeMaskReveal || isLoopContinuous || isMotionDynamic || isCinematicLight || isDigitalCreative || isArtisticAdvanced
+  const categoryAnimations = isBasicEntrance ? BASIC_ENTRANCE_ANIMATIONS : isExit ? EXIT_ANIMATIONS : isBounceElastic ? BOUNCE_ELASTIC_ANIMATIONS : isRotation3D ? ROTATION_3D_ANIMATIONS : isTypingCharacter ? TYPING_CHARACTER_ANIMATIONS : isWordLine ? WORD_LINE_ANIMATIONS : isWipeMaskReveal ? WIPE_MASK_REVEAL_ANIMATIONS : isLoopContinuous ? LOOP_CONTINUOUS_ANIMATIONS : isMotionDynamic ? MOTION_DYNAMIC_ANIMATIONS : isCinematicLight ? CINEMATIC_LIGHT_ANIMATIONS : isDigitalCreative ? DIGITAL_CREATIVE_ANIMATIONS : isArtisticAdvanced ? ARTISTIC_ADVANCED_ANIMATIONS : []
   const animations = categoryAnimations.filter(item => (item.name + ' ' + (item.description || '')).toLowerCase().includes(search.trim().toLowerCase()))
 
   return (
@@ -73,7 +75,7 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
         </div>
         <div className="mt-3 flex items-center justify-between">
           <span className="text-[9px] font-bold uppercase tracking-[.13em] text-slate-500">Animation library</span>
-          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-2 py-1 text-[9px] font-semibold text-emerald-200">275 ready · 25 upcoming</span>
+          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-2 py-1 text-[9px] font-semibold text-emerald-200">300 ready · 0 upcoming</span>
         </div>
       </div>
 
@@ -108,7 +110,7 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
         </div>
 
         {isPresetCategory ? <>
-          <div className="mb-2 flex items-center justify-between"><h3 className="px-1 text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{isDigitalCreative ? 'Digital & Creative · 251–275' : isCinematicLight ? 'Cinematic & Light · 226–250' : isMotionDynamic ? 'Motion & Dynamic · 201–225' : isLoopContinuous ? 'Loop & Continuous · 176–200' : isWipeMaskReveal ? 'Wipe, Mask & Reveal · 151–175' : isWordLine ? 'Word & Line · 126–150' : isTypingCharacter ? 'Typing & Character · 101–125' : isRotation3D ? 'Rotation & 3D · 76–100' : isBounceElastic ? 'Bounce & Elastic · 51–75' : isExit ? 'Exit · 26–50' : 'Basic Entrance · 01–25'}</h3><span className="text-[8px] text-emerald-300">All {categoryAnimations.length} available</span></div>
+          <div className="mb-2 flex items-center justify-between"><h3 className="px-1 text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{isArtisticAdvanced ? 'Artistic & Advanced · 276–300' : isDigitalCreative ? 'Digital & Creative · 251–275' : isCinematicLight ? 'Cinematic & Light · 226–250' : isMotionDynamic ? 'Motion & Dynamic · 201–225' : isLoopContinuous ? 'Loop & Continuous · 176–200' : isWipeMaskReveal ? 'Wipe, Mask & Reveal · 151–175' : isWordLine ? 'Word & Line · 126–150' : isTypingCharacter ? 'Typing & Character · 101–125' : isRotation3D ? 'Rotation & 3D · 76–100' : isBounceElastic ? 'Bounce & Elastic · 51–75' : isExit ? 'Exit · 26–50' : 'Basic Entrance · 01–25'}</h3><span className="text-[8px] text-emerald-300">All {categoryAnimations.length} available</span></div>
           <div className="grid grid-cols-2 gap-2">{animations.map((animation, index) => <button key={animation.id} type="button" disabled={!selectedText} onClick={() => onSelectAnimation?.(animation.id)} aria-pressed={selectedAnimationId === animation.id} className={'group flex min-w-0 flex-col rounded-xl border p-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ' + (selectedAnimationId === animation.id ? 'border-fuchsia-400/60 bg-fuchsia-500/10 ring-1 ring-fuchsia-400/20' : 'border-white/10 bg-white/[0.025] hover:border-fuchsia-300/35 hover:bg-white/[0.06]')}>
             <span className="relative flex h-12 w-full items-center justify-center overflow-hidden rounded-lg border border-white/[0.07] bg-[#101525]"><span className="text-[21px] font-black tracking-tight text-white transition-transform group-hover:scale-110">Aa</span>{selectedAnimationId === animation.id && <CheckCircle2 className="absolute right-1 top-1 h-3.5 w-3.5 text-fuchsia-300" />}</span>
             <span className="mt-2 block w-full truncate text-[9px] font-semibold text-slate-100">{String((isLoopContinuous ? 176 : isWipeMaskReveal ? 151 : isWordLine ? 126 : isTypingCharacter ? 101 : isRotation3D ? 76 : isBounceElastic ? 51 : isExit ? 26 : 1) + categoryAnimations.indexOf(animation)).padStart(2, '0')}. {animation.name}</span>
