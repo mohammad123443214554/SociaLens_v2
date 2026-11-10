@@ -220,7 +220,10 @@ function interpolateFrame(
   const position = clamp(progress, 0, 1)
   let rightIndex = frames.findIndex(frame => frame.at >= position)
   if (rightIndex < 0) rightIndex = frames.length - 1
-  const leftIndex = Math.max(0, rightIndex - (frames[rightIndex].at === position ? 1 : 0))
+  // The left frame is always the preceding keyframe. The previous implementation
+  // accidentally selected the right frame for most in-between progress values,
+  // causing animations to jump directly to their next keyframe.
+  const leftIndex = Math.max(0, rightIndex - 1)
   const left = frames[leftIndex]
   const right = frames[rightIndex]
   const span = right.at - left.at

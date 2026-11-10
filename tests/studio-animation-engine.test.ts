@@ -108,11 +108,15 @@ test('entrance animation is deterministic and settles on its final frame', () =>
   assert.deepEqual(sample(entrance, 2.5), middle)
 })
 
-test('entrance delay is timeline-based and does not start early', () => {
-  const delayed = sample(entrance, 2.5, { delayMs: 500 })
-  assert.equal(delayed.phase, 'before')
-  assert.equal(delayed.opacity, 0)
-  assert.equal(sample(entrance, 3, { delayMs: 500 }).opacity, 0)
+test('entrance delay is timeline-based and starts exactly at its configured offset', () => {
+  const before = sample(entrance, 2.49, { delayMs: 500 })
+  const start = sample(entrance, 2.5, { delayMs: 500 })
+  const middle = sample(entrance, 3, { delayMs: 500 })
+  assert.equal(before.phase, 'before')
+  assert.equal(before.opacity, 0)
+  assert.equal(start.phase, 'running')
+  assert.equal(start.opacity, 0)
+  assert.equal(middle.opacity, 0.5)
 })
 
 test('exit animation is anchored to the end of the layer interval', () => {
@@ -231,7 +235,7 @@ test('each Exit preset stays neutral before its exit window and reaches its auth
     assert.equal(before.opacity, 1, definition.name + ' before')
     assert.equal(before.phase, 'before', definition.name + ' phase before')
     assert.equal(middle.phase, 'running', definition.name + ' phase middle')
-    assert.equal(end.opacity, 0, definition.name + ' terminal opacity')
+    assert.equal(end.opacity, definition.keyframes[definition.keyframes.length - 1].opacity ?? 1, definition.name + ' authored terminal opacity')
     assert.equal(end.phase, 'after', definition.name + ' phase end')
     assert.equal(end.visible, true, definition.name + ' terminal visibility')
   }
