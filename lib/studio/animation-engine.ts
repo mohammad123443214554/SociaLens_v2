@@ -325,34 +325,34 @@ export function sampleTextAnimation(input: {
   const duration = settings.durationMs! / 1000 / settings.speed!
   const delay = settings.delayMs! / 1000
   const layerEnd = layerStart + layerDuration
-  const animationStart = definition.mode === 'exit'
-    ? Math.max(layerStart, layerEnd - duration - delay)
-    : layerStart + delay
-  const animationEnd = animationStart + duration
   const isLoop = definition.mode === 'loop' || definition.mode === 'continuous'
+  const requestedRepeats = settings.repeatCount ?? 1
+  const infinite = isLoop && requestedRepeats === 0
+  const repeatTotal = infinite ? Infinity : Math.max(1, requestedRepeats)
+  const totalDuration = infinite ? duration : duration * repeatTotal
+  // Exit motion is fitted inside the layer's visible interval. Delay moves the
+  // start later where room permits; it never pushes the exit past the layer end.
+  const animationStart = definition.mode === 'exit'
+    ? Math.max(layerStart, Math.min(layerEnd - totalDuration, layerStart + delay))
+    : layerStart + delay
+  const animationEnd = animationStart + totalDuration
   const before = timelineTime < animationStart
-  const after = !isLoop && timelineTime >= animationEnd
+  const after = !infinite && timelineTime >= animationEnd
   let phaseProgress = 0
   let iteration = 0
   let phase: TextAnimationSample['phase'] = 'running'
 
   if (before) {
     phase = 'before'
-    phaseProgress = definition.mode === 'exit' ? 0 : 0
-  } else if (isLoop) {
-    const elapsed = Math.max(0, timelineTime - animationStart)
-    const totalIterations = settings.repeatCount === 0 ? Infinity : Math.max(1, settings.repeatCount!)
-    iteration = Math.floor(elapsed / duration)
-    if (iteration >= totalIterations) {
-      iteration = totalIterations - 1
-      phaseProgress = 1
-      phase = 'after'
-    } else {
-      phaseProgress = (elapsed % duration) / duration
-    }
+    phaseProgress = 0
+  } else if (after) {
+    iteration = repeatTotal - 1
+    phaseProgress = 1
+    phase = 'after'
   } else {
-    phaseProgress = after ? 1 : clamp((timelineTime - animationStart) / duration, 0, 1)
-    if (after) phase = 'after'
+    const elapsed = Math.max(0, timelineTime - animationStart)
+    iteration = Math.floor(elapsed / duration)
+    phaseProgress = (elapsed - iteration * duration) / duration
   }
 
   const directed = directedProgress(phaseProgress, settings.direction!, iteration)
