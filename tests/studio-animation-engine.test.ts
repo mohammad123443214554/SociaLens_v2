@@ -10,6 +10,7 @@ import {
 import { BASIC_ENTRANCE_ANIMATIONS } from '../lib/studio/basic-entrance-animations.ts'
 import { EXIT_ANIMATIONS } from '../lib/studio/exit-animations.ts'
 import { BOUNCE_ELASTIC_ANIMATIONS } from '../lib/studio/bounce-elastic-animations.ts'
+import { ROTATION_3D_ANIMATIONS } from '../lib/studio/rotation-3d-animations.ts'
 
 const entrance: TextAnimationDefinition = {
   id: 'test-fade-in',
@@ -291,5 +292,40 @@ test('each Bounce & Elastic preset starts hidden and settles to a neutral visibl
     assert.ok(Math.abs(end.scaleX - 1) < 0.0001, definition.name + ' end scale x')
     assert.ok(Math.abs(end.scaleY - 1) < 0.0001, definition.name + ' end scale y')
     assert.ok(Math.abs(end.rotate) < 0.0001, definition.name + ' end rotation')
+  }
+})
+
+
+test('Rotation & 3D catalog contains exactly 25 unique, valid and individually authored presets', () => {
+  assert.equal(ROTATION_3D_ANIMATIONS.length, 25)
+  assert.deepEqual(validateTextAnimationRegistry(ROTATION_3D_ANIMATIONS), [])
+  assert.equal(new Set(ROTATION_3D_ANIMATIONS.map(item => item.id)).size, 25)
+  assert.equal(new Set(ROTATION_3D_ANIMATIONS.map(item => item.name)).size, 25)
+  assert.equal(new Set(ROTATION_3D_ANIMATIONS.map(item => JSON.stringify(item.keyframes))).size, 25)
+  for (const item of ROTATION_3D_ANIMATIONS) {
+    assert.equal(item.category, 'Rotation & 3D')
+    assert.equal(item.mode, 'entrance')
+    assert.ok(item.description && item.description.length > 8)
+  }
+})
+
+test('Rotation & 3D presets produce visible dimensional motion and settle back to neutral transforms', () => {
+  for (const definition of ROTATION_3D_ANIMATIONS) {
+    const duration = definition.defaultDurationMs / 1000
+    const start = 4
+    const middle = sampleTextAnimation({ definition, settings: { animationId: definition.id, durationMs: definition.defaultDurationMs, enabled: true }, timelineTimeSeconds: start + duration * 0.5, layerStartSeconds: start, layerDurationSeconds: 6 })
+    const end = sampleTextAnimation({ definition, settings: { animationId: definition.id, durationMs: definition.defaultDurationMs, enabled: true }, timelineTimeSeconds: start + duration, layerStartSeconds: start, layerDurationSeconds: 6 })
+    const hasMotion = Math.abs(middle.rotate) > 0.01 || Math.abs(middle.rotateX) > 0.01 || Math.abs(middle.rotateY) > 0.01 || Math.abs(middle.translateX) > 0.01 || Math.abs(middle.translateY) > 0.01 || Math.abs(middle.scaleX - 1) > 0.01 || Math.abs(middle.scaleY - 1) > 0.01
+    assert.equal(hasMotion, true, definition.name + ' must move at midpoint')
+    assert.equal(end.phase, 'after', definition.name + ' completion')
+    assert.equal(end.opacity, 1, definition.name + ' opacity')
+    assert.ok(Math.abs(end.rotateX) < 0.0001, definition.name + ' rotateX reset')
+    assert.ok(Math.abs(end.rotateY) < 0.0001, definition.name + ' rotateY reset')
+    assert.ok(Math.abs(end.perspective) < 0.0001, definition.name + ' perspective reset')
+    assert.ok(Math.abs(end.translateX) < 0.0001, definition.name + ' x reset')
+    assert.ok(Math.abs(end.translateY) < 0.0001, definition.name + ' y reset')
+    assert.ok(Math.abs(end.scaleX - 1) < 0.0001, definition.name + ' scaleX reset')
+    assert.ok(Math.abs(end.scaleY - 1) < 0.0001, definition.name + ' scaleY reset')
+    assert.ok(Math.abs(end.rotate % 360) < 0.0001 || Math.abs(Math.abs(end.rotate % 360) - 360) < 0.0001, definition.name + ' planar rotation reset')
   }
 })

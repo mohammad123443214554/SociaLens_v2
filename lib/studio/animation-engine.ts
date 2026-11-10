@@ -34,6 +34,12 @@ export type TextAnimationFrame = {
   scaleX?: number
   scaleY?: number
   rotate?: number
+  /** 3D rotation in degrees around the horizontal axis. */
+  rotateX?: number
+  /** 3D rotation in degrees around the vertical axis. */
+  rotateY?: number
+  /** CSS perspective distance in pixels; zero disables perspective. */
+  perspective?: number
   skewX?: number
   skewY?: number
   blur?: number
@@ -73,6 +79,9 @@ export type TextAnimationSample = {
   scaleX: number
   scaleY: number
   rotate: number
+  rotateX: number
+  rotateY: number
+  perspective: number
   skewX: number
   skewY: number
   blur: number
@@ -89,6 +98,9 @@ export const NEUTRAL_TEXT_ANIMATION: Readonly<TextAnimationSample> = Object.free
   scaleX: 1,
   scaleY: 1,
   rotate: 0,
+  rotateX: 0,
+  rotateY: 0,
+  perspective: 0,
   skewX: 0,
   skewY: 0,
   blur: 0,
@@ -219,7 +231,7 @@ function interpolateFrame(
   }
   const neutral = {
     opacity: 1, translateX: 0, translateY: 0, scaleX: 1, scaleY: 1,
-    rotate: 0, skewX: 0, skewY: 0, blur: 0, letterSpacing: 0,
+    rotate: 0, rotateX: 0, rotateY: 0, perspective: 0, skewX: 0, skewY: 0, blur: 0, letterSpacing: 0,
   }
   const scale = (key: keyof TextAnimationFrame, fallback: number) => {
     const raw = value(key, fallback)
@@ -232,6 +244,9 @@ function interpolateFrame(
     scaleX: Math.max(0.001, scale('scaleX', 1)),
     scaleY: Math.max(0.001, scale('scaleY', 1)),
     rotate: scale('rotate', 0),
+    rotateX: scale('rotateX', 0),
+    rotateY: scale('rotateY', 0),
+    perspective: Math.max(0, scale('perspective', 0)),
     skewX: scale('skewX', 0),
     skewY: scale('skewY', 0),
     blur: Math.max(0, scale('blur', 0)),
