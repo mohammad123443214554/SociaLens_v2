@@ -14,6 +14,7 @@ import { ROTATION_3D_ANIMATIONS } from '../lib/studio/rotation-3d-animations.ts'
 import { TYPING_CHARACTER_ANIMATIONS } from '../lib/studio/typing-character-animations.ts'
 import { WORD_LINE_ANIMATIONS, sampleWordMotion } from '../lib/studio/word-line-animations.ts'
 import { WIPE_MASK_REVEAL_ANIMATIONS, sampleMaskReveal, clipCanvasForMask } from '../lib/studio/wipe-mask-reveal-animations.ts'
+import { LOOP_CONTINUOUS_ANIMATIONS } from '../lib/studio/loop-continuous-animations.ts'
 import { sampleCharacterMotion, splitStudioGraphemes } from '../lib/studio/character-animation-engine.ts'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameIndexAtTime, studioFrameTime, studioFrameTimeFromElapsedMs } from '../lib/studio/frame-clock.ts'
 
@@ -649,10 +650,47 @@ test('canvas mask clipping uses the same terminal reveal state without non-finit
   }
 })
 
-test('complete Studio animation catalog now contains 175 unique presets', () => {
-  const all=[...BASIC_ENTRANCE_ANIMATIONS,...EXIT_ANIMATIONS,...BOUNCE_ELASTIC_ANIMATIONS,...ROTATION_3D_ANIMATIONS,...TYPING_CHARACTER_ANIMATIONS,...WORD_LINE_ANIMATIONS,...WIPE_MASK_REVEAL_ANIMATIONS]
-  assert.equal(all.length,175)
-  assert.equal(new Set(all.map(item=>item.id)).size,175)
-  assert.equal(new Set(all.map(item=>item.name.toLowerCase())).size,175)
+test('Loop & Continuous category contains 25 unique presets numbered 176–200',()=>{
+  assert.equal(LOOP_CONTINUOUS_ANIMATIONS.length,25)
+  assert.deepEqual(validateTextAnimationRegistry(LOOP_CONTINUOUS_ANIMATIONS),[])
+  assert.deepEqual(LOOP_CONTINUOUS_ANIMATIONS.map(item=>item.id),Array.from({length:25},(_,i)=>'loop-'+(176+i)))
+  assert.equal(new Set(LOOP_CONTINUOUS_ANIMATIONS.map(item=>item.name.toLowerCase())).size,25)
+  for(const item of LOOP_CONTINUOUS_ANIMATIONS){
+    assert.equal(item.category,'Loop & Continuous')
+    assert.equal(item.mode,'loop')
+    assert.ok(item.description&&item.description.length>12)
+    assert.ok(item.defaultDurationMs>=1000&&item.defaultDurationMs<=5000)
+    const first=item.keyframes[0],last=item.keyframes[item.keyframes.length-1]
+    for(const key of ['opacity','translateX','translateY','scaleX','scaleY','rotate','rotateX','rotateY','skewX','skewY','blur','letterSpacing'] as const){
+      const neutral=key==='opacity'||key==='scaleX'||key==='scaleY'?1:0
+      assert.equal(first[key]??neutral,last[key]??neutral,item.id+' seamless '+key)
+    }
+  }
+})
+
+test('all 25 continuous presets loop indefinitely and produce repeatable finite frames',()=>{
+  for(const definition of LOOP_CONTINUOUS_ANIMATIONS){
+    const duration=definition.defaultDurationMs/1000
+    const settings={animationId:definition.id,durationMs:definition.defaultDurationMs,delayMs:0,repeatCount:0,direction:'normal' as const,easing:'linear' as const,enabled:true}
+    const firstCycle=sampleTextAnimation({definition,settings,timelineTimeSeconds:0.37,layerStartSeconds:0,layerDurationSeconds:12})
+    const secondCycle=sampleTextAnimation({definition,settings,timelineTimeSeconds:duration+0.37,layerStartSeconds:0,layerDurationSeconds:12})
+    const thirdCycle=sampleTextAnimation({definition,settings,timelineTimeSeconds:duration*2+0.37,layerStartSeconds:0,layerDurationSeconds:12})
+    assert.deepEqual(secondCycle,firstCycle,definition.id+' second cycle')
+    assert.deepEqual(thirdCycle,firstCycle,definition.id+' third cycle')
+    for(let frame=0;frame<=60;frame++){
+      const sample=sampleTextAnimation({definition,settings,timelineTimeSeconds:duration*2*frame/60,layerStartSeconds:0,layerDurationSeconds:12})
+      for(const [key,value] of Object.entries(sample)) if(typeof value==='number') assert.ok(Number.isFinite(value),definition.id+' finite '+key)
+      assert.ok(sample.scaleX>0&&sample.scaleY>0,definition.id+' positive scale')
+      assert.ok(sample.opacity>=0&&sample.opacity<=1,definition.id+' opacity range')
+    }
+    assert.equal(sampleTextAnimation({definition,settings,timelineTimeSeconds:duration*3,layerStartSeconds:0,layerDurationSeconds:12}).phase,'running',definition.id+' remains active')
+  }
+})
+
+test('complete Studio animation catalog now contains 200 unique presets', () => {
+  const all=[...BASIC_ENTRANCE_ANIMATIONS,...EXIT_ANIMATIONS,...BOUNCE_ELASTIC_ANIMATIONS,...ROTATION_3D_ANIMATIONS,...TYPING_CHARACTER_ANIMATIONS,...WORD_LINE_ANIMATIONS,...WIPE_MASK_REVEAL_ANIMATIONS,...LOOP_CONTINUOUS_ANIMATIONS]
+  assert.equal(all.length,200)
+  assert.equal(new Set(all.map(item=>item.id)).size,200)
+  assert.equal(new Set(all.map(item=>item.name.toLowerCase())).size,200)
   assert.deepEqual(validateTextAnimationRegistry(all),[])
 })
