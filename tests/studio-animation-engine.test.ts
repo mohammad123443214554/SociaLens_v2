@@ -11,6 +11,8 @@ import { BASIC_ENTRANCE_ANIMATIONS } from '../lib/studio/basic-entrance-animatio
 import { EXIT_ANIMATIONS } from '../lib/studio/exit-animations.ts'
 import { BOUNCE_ELASTIC_ANIMATIONS } from '../lib/studio/bounce-elastic-animations.ts'
 import { ROTATION_3D_ANIMATIONS } from '../lib/studio/rotation-3d-animations.ts'
+import { TYPING_CHARACTER_ANIMATIONS } from '../lib/studio/typing-character-animations.ts'
+import { sampleCharacterMotion, splitStudioGraphemes } from '../lib/studio/character-animation-engine.ts'
 
 const entrance: TextAnimationDefinition = {
   id: 'test-fade-in',
@@ -332,3 +334,9 @@ test('Rotation & 3D presets produce visible dimensional motion and settle back t
     assert.ok(Math.abs(end.rotate % 360) < 0.0001 || Math.abs(Math.abs(end.rotate % 360) - 360) < 0.0001, definition.name + ' planar rotation reset')
   }
 })
+
+
+test('Typing & Character catalog contains 25 unique valid per-grapheme presets',()=>{assert.equal(TYPING_CHARACTER_ANIMATIONS.length,25);assert.deepEqual(validateTextAnimationRegistry(TYPING_CHARACTER_ANIMATIONS),[]);assert.equal(new Set(TYPING_CHARACTER_ANIMATIONS.map(x=>x.id)).size,25);assert.equal(new Set(TYPING_CHARACTER_ANIMATIONS.map(x=>x.name)).size,25);assert.equal(new Set(TYPING_CHARACTER_ANIMATIONS.map(x=>x.characterEffect)).size,25);assert.equal(new Set(TYPING_CHARACTER_ANIMATIONS.map(x=>x.description)).size,25);for(const x of TYPING_CHARACTER_ANIMATIONS){assert.equal(x.category,'Typing & Character');assert.equal(x.mode,'entrance');assert.ok(x.characterEffect);assert.deepEqual(validateTextAnimationDefinition(x),[])}})
+test('all character effects are deterministic, bounded and settle to neutral',()=>{for(const item of TYPING_CHARACTER_ANIMATIONS)for(const index of [0,2,7]){const effect=item.characterEffect!,m=sampleCharacterMotion({effect,progress:.5,index,count:8}),end=sampleCharacterMotion({effect,progress:1,index,count:8});assert.deepEqual(sampleCharacterMotion({effect,progress:.5,index,count:8}),m);assert.ok(m.opacity>=0&&m.opacity<=1);assert.ok(Number.isFinite(m.translateX)&&Number.isFinite(m.translateY)&&Number.isFinite(m.rotate)&&Number.isFinite(m.blur));assert.equal(end.opacity,1);assert.equal(end.translateX,0);assert.equal(end.translateY,0);assert.equal(end.scaleX,1);assert.equal(end.scaleY,1);assert.equal(end.rotate,0);assert.equal(end.blur,0);assert.equal(end.clipProgress,1)}})
+test('grapheme splitting preserves joined emoji, skin tones and combining marks',()=>{assert.deepEqual(splitStudioGraphemes('A👩🏽‍💻éB'),['A','👩🏽‍💻','é','B']);assert.deepEqual(splitStudioGraphemes('Hello 👋'),['H','e','l','l','o',' ','👋'])})
+test('all character presets have distinct sampled motion signatures',()=>{const signatures=TYPING_CHARACTER_ANIMATIONS.map(x=>JSON.stringify([0,.2,.45,.7,.9].map(progress=>sampleCharacterMotion({effect:x.characterEffect!,progress,index:2,count:7}))));assert.equal(new Set(signatures).size,25)})
