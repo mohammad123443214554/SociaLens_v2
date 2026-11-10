@@ -38,7 +38,7 @@
 
 These migrations were applied to the connected SociaLens Supabase project and the mention table's RLS/policies, notification type constraint and trigger were read back for verification.
 
-## Verification and known limits
+## Verification and known limits.
 
 - Vercel production build for commit `a70bb1e9f75ff045f30df51e211a75df2178120f` reached `READY`; build logs showed successful compilation and proceeded through TypeScript and output generation.
 - Supabase schema/RLS/notification constraint checks were run after migration.
