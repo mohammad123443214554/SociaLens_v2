@@ -8,6 +8,7 @@ import { ROTATION_3D_ANIMATIONS } from '@/lib/studio/rotation-3d-animations'
 import { TYPING_CHARACTER_ANIMATIONS } from '@/lib/studio/typing-character-animations'
 import { WORD_LINE_ANIMATIONS } from '@/lib/studio/word-line-animations'
 import { WIPE_MASK_REVEAL_ANIMATIONS } from '@/lib/studio/wipe-mask-reveal-animations'
+import { LOOP_CONTINUOUS_ANIMATIONS } from '@/lib/studio/loop-continuous-animations'
 
 const ANIMATION_CATEGORIES = [
   { name: 'Basic Entrance', range: '01–25', description: 'Clean, polished ways for text to appear' },
@@ -52,8 +53,9 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
   const isTypingCharacter = selectedCategory === 'Typing & Character'
   const isWordLine = selectedCategory === 'Word & Line'
   const isWipeMaskReveal = selectedCategory === 'Wipe, Mask & Reveal'
-  const isPresetCategory = isBasicEntrance || isExit || isBounceElastic || isRotation3D || isTypingCharacter || isWordLine || isWipeMaskReveal
-  const categoryAnimations = isBasicEntrance ? BASIC_ENTRANCE_ANIMATIONS : isExit ? EXIT_ANIMATIONS : isBounceElastic ? BOUNCE_ELASTIC_ANIMATIONS : isRotation3D ? ROTATION_3D_ANIMATIONS : isTypingCharacter ? TYPING_CHARACTER_ANIMATIONS : isWordLine ? WORD_LINE_ANIMATIONS : isWipeMaskReveal ? WIPE_MASK_REVEAL_ANIMATIONS : []
+  const isLoopContinuous = selectedCategory === 'Loop & Continuous'
+  const isPresetCategory = isBasicEntrance || isExit || isBounceElastic || isRotation3D || isTypingCharacter || isWordLine || isWipeMaskReveal || isLoopContinuous
+  const categoryAnimations = isBasicEntrance ? BASIC_ENTRANCE_ANIMATIONS : isExit ? EXIT_ANIMATIONS : isBounceElastic ? BOUNCE_ELASTIC_ANIMATIONS : isRotation3D ? ROTATION_3D_ANIMATIONS : isTypingCharacter ? TYPING_CHARACTER_ANIMATIONS : isWordLine ? WORD_LINE_ANIMATIONS : isWipeMaskReveal ? WIPE_MASK_REVEAL_ANIMATIONS : isLoopContinuous ? LOOP_CONTINUOUS_ANIMATIONS : []
   const animations = categoryAnimations.filter(item => (item.name + ' ' + (item.description || '')).toLowerCase().includes(search.trim().toLowerCase()))
 
   return (
@@ -65,7 +67,7 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
         </div>
         <div className="mt-3 flex items-center justify-between">
           <span className="text-[9px] font-bold uppercase tracking-[.13em] text-slate-500">Animation library</span>
-          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-2 py-1 text-[9px] font-semibold text-emerald-200">175 ready · 125 upcoming</span>
+          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-2 py-1 text-[9px] font-semibold text-emerald-200">200 ready · 100 upcoming</span>
         </div>
       </div>
 
@@ -100,10 +102,10 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
         </div>
 
         {isPresetCategory ? <>
-          <div className="mb-2 flex items-center justify-between"><h3 className="px-1 text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{isWipeMaskReveal ? 'Wipe, Mask & Reveal · 151–175' : isWordLine ? 'Word & Line · 126–150' : isTypingCharacter ? 'Typing & Character · 101–125' : isRotation3D ? 'Rotation & 3D · 76–100' : isBounceElastic ? 'Bounce & Elastic · 51–75' : isExit ? 'Exit · 26–50' : 'Basic Entrance · 01–25'}</h3><span className="text-[8px] text-emerald-300">All {categoryAnimations.length} available</span></div>
+          <div className="mb-2 flex items-center justify-between"><h3 className="px-1 text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{isLoopContinuous ? 'Loop & Continuous · 176–200' : isWipeMaskReveal ? 'Wipe, Mask & Reveal · 151–175' : isWordLine ? 'Word & Line · 126–150' : isTypingCharacter ? 'Typing & Character · 101–125' : isRotation3D ? 'Rotation & 3D · 76–100' : isBounceElastic ? 'Bounce & Elastic · 51–75' : isExit ? 'Exit · 26–50' : 'Basic Entrance · 01–25'}</h3><span className="text-[8px] text-emerald-300">All {categoryAnimations.length} available</span></div>
           <div className="grid grid-cols-2 gap-2">{animations.map((animation, index) => <button key={animation.id} type="button" disabled={!selectedText} onClick={() => onSelectAnimation?.(animation.id)} aria-pressed={selectedAnimationId === animation.id} className={'group flex min-w-0 flex-col rounded-xl border p-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ' + (selectedAnimationId === animation.id ? 'border-fuchsia-400/60 bg-fuchsia-500/10 ring-1 ring-fuchsia-400/20' : 'border-white/10 bg-white/[0.025] hover:border-fuchsia-300/35 hover:bg-white/[0.06]')}>
             <span className="relative flex h-12 w-full items-center justify-center overflow-hidden rounded-lg border border-white/[0.07] bg-[#101525]"><span className="text-[21px] font-black tracking-tight text-white transition-transform group-hover:scale-110">Aa</span>{selectedAnimationId === animation.id && <CheckCircle2 className="absolute right-1 top-1 h-3.5 w-3.5 text-fuchsia-300" />}</span>
-            <span className="mt-2 block w-full truncate text-[9px] font-semibold text-slate-100">{String((isWipeMaskReveal ? 151 : isWordLine ? 126 : isTypingCharacter ? 101 : isRotation3D ? 76 : isBounceElastic ? 51 : isExit ? 26 : 1) + categoryAnimations.indexOf(animation)).padStart(2, '0')}. {animation.name}</span>
+            <span className="mt-2 block w-full truncate text-[9px] font-semibold text-slate-100">{String((isLoopContinuous ? 176 : isWipeMaskReveal ? 151 : isWordLine ? 126 : isTypingCharacter ? 101 : isRotation3D ? 76 : isBounceElastic ? 51 : isExit ? 26 : 1) + categoryAnimations.indexOf(animation)).padStart(2, '0')}. {animation.name}</span>
             <span className="mt-1 line-clamp-2 min-h-[24px] text-[8px] leading-3 text-slate-500">{animation.description}</span>
           </button>)}</div>
           {!animations.length && <p className="py-6 text-center text-[9px] text-slate-500">No matching animations found.</p>}
