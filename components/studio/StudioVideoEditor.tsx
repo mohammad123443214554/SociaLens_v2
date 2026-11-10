@@ -10,9 +10,11 @@ import { BOUNCE_ELASTIC_ANIMATIONS } from '@/lib/studio/bounce-elastic-animation
 import { ROTATION_3D_ANIMATIONS } from '@/lib/studio/rotation-3d-animations'
 import { TYPING_CHARACTER_ANIMATIONS } from '@/lib/studio/typing-character-animations'
 import { sampleCharacterMotion, splitStudioGraphemes } from '@/lib/studio/character-animation-engine'
+import { sampleWordMotion } from '@/lib/studio/word-line-animations'
+import { WORD_LINE_ANIMATIONS } from '@/lib/studio/word-line-animations'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs } from '@/lib/studio/frame-clock'
 
-const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS]
+const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS]
 const STUDIO_TEXT_ANIMATION_BY_ID = new Map(STUDIO_TEXT_ANIMATIONS.map(definition => [definition.id, definition]))
 import {
   ArrowLeft, AudioLines, Check, Clapperboard,
@@ -405,10 +407,29 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   }
   const getAnimatedTextContent = (layer: TextLayer, timelineTime: number) => {
     const definition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
-    if (!definition?.characterEffect) return getFormattedText(layer)
+    const formattedText = getFormattedText(layer)
+    if (definition?.wordEffect) {
+      const animationSample = getLayerAnimationSample(layer, timelineTime)
+      if (!animationSample) return formattedText
+      const tokens = formattedText.split(/(\\s+)/)
+      const words = tokens.filter(token => token && !/^\\s+$/.test(token))
+      const lineCount = Math.max(1, formattedText.split('\\n').length)
+      let wordIndex = 0
+      let lineIndex = 0
+      return tokens.map((token, tokenIndex) => {
+        if (!token || /^\\s+$/.test(token)) {
+          lineIndex += (token.match(/\\n/g) || []).length
+          return token
+        }
+        const currentWord = wordIndex++
+        const motion = sampleWordMotion({ effect: definition.wordEffect!, progress: animationSample.progress, index: currentWord, count: words.length, lineIndex, lineCount, intensity: layer.animation?.intensity ?? 1 })
+        return <span key={tokenIndex} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: motion.opacity, transform: 'translate3d(' + motion.x + 'px,' + motion.y + 'px,0) rotate(' + motion.rotate + 'deg) rotateX(' + motion.rotateX + 'deg) scale(' + motion.scale + ')', transformOrigin: 'center bottom', filter: motion.blur ? 'blur(' + motion.blur + 'px)' : undefined, clipPath: motion.clip < 1 ? 'inset(0 ' + ((1-motion.clip)*100) + '% 0 0)' : undefined, letterSpacing: motion.spacing ? motion.spacing + 'px' : undefined, willChange: (isAnimationPreviewing || playing) ? 'transform, opacity' : 'auto' }}>{token}</span>
+      })
+    }
+    if (!definition?.characterEffect) return formattedText
     const sample = getLayerAnimationSample(layer, timelineTime)
-    if (!sample) return getFormattedText(layer)
-    const glyphs = splitStudioGraphemes(getFormattedText(layer))
+    if (!sample) return formattedText
+    const glyphs = splitStudioGraphemes(formattedText)
     return glyphs.map((glyph, index) => {
       const motion = sampleCharacterMotion({ effect: definition.characterEffect!, progress: sample.progress, index, count: glyphs.length, intensity: layer.animation?.intensity ?? 1 })
       return <span key={index} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: motion.opacity, transform: 'translate3d(' + motion.translateX + 'px,' + motion.translateY + 'px,0) rotate(' + motion.rotate + 'deg) scale(' + motion.scaleX + ',' + motion.scaleY + ')', transformOrigin: 'left center', filter: motion.blur ? 'blur(' + motion.blur + 'px)' : undefined, clipPath: motion.clipProgress < 1 ? 'inset(0 ' + ((1 - motion.clipProgress) * 100) + '% 0 0)' : undefined, willChange: (isAnimationPreviewing || playing) ? 'transform, opacity' : 'auto' }}>{glyph}</span>
