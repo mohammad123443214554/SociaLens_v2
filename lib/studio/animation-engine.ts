@@ -77,6 +77,8 @@ export type TextAnimationSettings = {
   direction?: TextAnimationDirection
   easing?: TextAnimationEasing
   intensity?: number
+  /** Playback multiplier: 1 is the authored speed; values above 1 are faster. */
+  speed?: number
   enabled?: boolean
 }
 
@@ -176,6 +178,7 @@ export function normalizeTextAnimationSettings(
     direction: directions.includes(settings.direction as TextAnimationDirection) ? settings.direction : 'normal',
     easing: easings.includes(settings.easing as TextAnimationEasing) ? settings.easing : 'ease',
     intensity: clamp(finite(settings.intensity, 1), 0, 2),
+    speed: clamp(finite(settings.speed, 1), 0.1, 4),
     enabled: settings.enabled !== false && animationId !== null,
   }
 }
@@ -319,7 +322,7 @@ export function sampleTextAnimation(input: {
   const layerDuration = Math.max(0, finite(input.layerDurationSeconds, 0))
   if (layerDuration <= 0) return { ...neutral, visible: false, phase: 'before' }
 
-  const duration = settings.durationMs! / 1000
+  const duration = settings.durationMs! / 1000 / settings.speed!
   const delay = settings.delayMs! / 1000
   const layerEnd = layerStart + layerDuration
   const animationStart = definition.mode === 'exit'
