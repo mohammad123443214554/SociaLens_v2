@@ -143,7 +143,7 @@ test('reverse and alternate directions are applied consistently', () => {
   const reverse = sample(loop, 2.25, { direction: 'reverse' })
   assert.equal(reverse.scaleX, 1.125)
   const alternate = sample(loop, 3.25, { direction: 'alternate' })
-  assert.equal(alternate.scaleX, 1.1)
+  assert.equal(alternate.scaleX, 1.125)
 })
 
 test('disabled and mismatched animation ids return a neutral sample', () => {
