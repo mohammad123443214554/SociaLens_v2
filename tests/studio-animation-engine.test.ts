@@ -18,6 +18,7 @@ import { LOOP_CONTINUOUS_ANIMATIONS } from '../lib/studio/loop-continuous-animat
 import { MOTION_DYNAMIC_ANIMATIONS } from '../lib/studio/motion-dynamic-animations.ts'
 import { CINEMATIC_LIGHT_ANIMATIONS } from '../lib/studio/cinematic-light-animations.ts'
 import { DIGITAL_CREATIVE_ANIMATIONS } from '../lib/studio/digital-creative-animations.ts'
+import { ARTISTIC_ADVANCED_ANIMATIONS } from '../lib/studio/artistic-advanced-animations.ts'
 import { sampleCharacterMotion, splitStudioGraphemes } from '../lib/studio/character-animation-engine.ts'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameIndexAtTime, studioFrameTime, studioFrameTimeFromElapsedMs } from '../lib/studio/frame-clock.ts'
 
@@ -834,10 +835,54 @@ test('Digital & Creative presets sample deterministically across their full dura
   }
 })
 
-test('complete Studio animation catalog now contains 275 unique presets', () => {
-  const all=[...BASIC_ENTRANCE_ANIMATIONS,...EXIT_ANIMATIONS,...BOUNCE_ELASTIC_ANIMATIONS,...ROTATION_3D_ANIMATIONS,...TYPING_CHARACTER_ANIMATIONS,...WORD_LINE_ANIMATIONS,...WIPE_MASK_REVEAL_ANIMATIONS,...LOOP_CONTINUOUS_ANIMATIONS,...MOTION_DYNAMIC_ANIMATIONS,...CINEMATIC_LIGHT_ANIMATIONS,...DIGITAL_CREATIVE_ANIMATIONS]
-  assert.equal(all.length,275)
-  assert.equal(new Set(all.map(item=>item.id)).size,275)
-  assert.equal(new Set(all.map(item=>item.name.toLowerCase())).size,275)
+test('Artistic & Advanced category contains 25 unique presets numbered 276–300', () => {
+  assert.equal(ARTISTIC_ADVANCED_ANIMATIONS.length, 25)
+  assert.deepEqual(validateTextAnimationRegistry(ARTISTIC_ADVANCED_ANIMATIONS), [])
+  assert.deepEqual(ARTISTIC_ADVANCED_ANIMATIONS.map(item => item.id), Array.from({ length: 25 }, (_, index) => 'artistic-' + (276 + index)))
+  assert.equal(new Set(ARTISTIC_ADVANCED_ANIMATIONS.map(item => item.name.toLowerCase())).size, 25)
+  for (const item of ARTISTIC_ADVANCED_ANIMATIONS) {
+    assert.equal(item.category, 'Artistic & Advanced')
+    assert.ok(item.description && item.description.length > 12)
+    assert.ok(item.defaultDurationMs >= 900 && item.defaultDurationMs <= 4000)
+    assert.ok(item.keyframes.length >= 3, item.id + ' has authored keyframes')
+    if ([299, 300].includes(Number(item.id.slice(9)))) assert.equal(item.mode, 'exit', item.id + ' exit mode')
+    if ([293, 294].includes(Number(item.id.slice(9)))) assert.equal(item.mode, 'loop', item.id + ' loop mode')
+    for (const frame of item.keyframes) {
+      if (frame.blur !== undefined) assert.ok(frame.blur >= 0 && frame.blur <= 20, item.id + ' blur bounded')
+      if (frame.opacity !== undefined) assert.ok(frame.opacity >= 0 && frame.opacity <= 1, item.id + ' opacity bounded')
+      if (frame.scaleX !== undefined) assert.ok(frame.scaleX > 0 && frame.scaleX <= 1.2, item.id + ' scaleX bounded')
+      if (frame.scaleY !== undefined) assert.ok(frame.scaleY > 0 && frame.scaleY <= 1.2, item.id + ' scaleY bounded')
+    }
+    if (item.mode === 'loop') {
+      const first = item.keyframes[0], last = item.keyframes[item.keyframes.length - 1]
+      for (const key of ['opacity', 'translateX', 'translateY', 'scaleX', 'scaleY', 'rotate', 'rotateX', 'rotateY', 'skewX', 'skewY', 'blur', 'letterSpacing'] as const) {
+        const neutral = key === 'opacity' || key === 'scaleX' || key === 'scaleY' ? 1 : 0
+        assert.ok(Math.abs((first[key] ?? neutral) - (last[key] ?? neutral)) < 1e-9, item.id + ' seamless ' + key)
+      }
+    }
+  }
+})
+
+test('Artistic & Advanced presets sample deterministically throughout their duration', () => {
+  for (const definition of ARTISTIC_ADVANCED_ANIMATIONS) {
+    const settings = { animationId: definition.id, durationMs: definition.defaultDurationMs, delayMs: 0, repeatCount: definition.mode === 'loop' ? 0 : 1, direction: 'normal' as const, easing: 'premium-out' as const, enabled: true }
+    for (let frame = 0; frame <= 60; frame++) {
+      const time = definition.defaultDurationMs / 1000 * frame / 60
+      const sample = sampleTextAnimation({ definition, settings, timelineTimeSeconds: time, layerStartSeconds: 0, layerDurationSeconds: 15 })
+      const repeated = sampleTextAnimation({ definition, settings, timelineTimeSeconds: time, layerStartSeconds: 0, layerDurationSeconds: 15 })
+      assert.deepEqual(sample, repeated, definition.id + ' deterministic')
+      for (const [key, value] of Object.entries(sample)) if (typeof value === 'number') assert.ok(Number.isFinite(value), definition.id + ' finite ' + key)
+      assert.ok(sample.scaleX > 0 && sample.scaleY > 0, definition.id + ' positive scale')
+      assert.ok(sample.opacity >= 0 && sample.opacity <= 1, definition.id + ' opacity bounds')
+      assert.ok(sample.blur >= 0 && sample.blur <= 20, definition.id + ' blur bounds')
+    }
+  }
+})
+
+test('complete Studio animation catalog now contains 300 unique presets', () => {
+  const all=[...BASIC_ENTRANCE_ANIMATIONS,...EXIT_ANIMATIONS,...BOUNCE_ELASTIC_ANIMATIONS,...ROTATION_3D_ANIMATIONS,...TYPING_CHARACTER_ANIMATIONS,...WORD_LINE_ANIMATIONS,...WIPE_MASK_REVEAL_ANIMATIONS,...LOOP_CONTINUOUS_ANIMATIONS,...MOTION_DYNAMIC_ANIMATIONS,...CINEMATIC_LIGHT_ANIMATIONS,...DIGITAL_CREATIVE_ANIMATIONS,...ARTISTIC_ADVANCED_ANIMATIONS]
+  assert.equal(all.length,300)
+  assert.equal(new Set(all.map(item=>item.id)).size,300)
+  assert.equal(new Set(all.map(item=>item.name.toLowerCase())).size,300)
   assert.deepEqual(validateTextAnimationRegistry(all),[])
 })
