@@ -10,6 +10,7 @@
  */
 
 export type TextAnimationMode = 'entrance' | 'exit' | 'loop' | 'continuous'
+export type WordAnimationEffect = 'cascade' | 'rise' | 'drop' | 'fade' | 'slide-left' | 'slide-right' | 'zoom' | 'soft-zoom' | 'blur' | 'flip' | 'rotate' | 'wave' | 'stagger' | 'float' | 'sweep' | 'mask' | 'tracking' | 'focus' | 'pop' | 'drift' | 'fold' | 'glide' | 'spotlight' | 'line-reveal' | 'line-cascade'
 export type CharacterAnimationEffect = 'typewriter' | 'reverse-typewriter' | 'delete-typewriter' | 'fade' | 'rise' | 'drop' | 'pop' | 'bounce' | 'rotate' | 'flip' | 'zoom' | 'blur' | 'slide' | 'scatter' | 'assemble' | 'dissolve' | 'wave' | 'pulse' | 'stretch' | 'squeeze' | 'shuffle' | 'reveal' | 'mask-reveal' | 'spark' | 'stagger'
 export type TextAnimationDirection = 'normal' | 'reverse' | 'alternate' | 'alternate-reverse'
 export type TextAnimationEasing =
@@ -63,6 +64,7 @@ export type TextAnimationDefinition = {
   /** Describes whether this effect is safe to combine with other animation tracks. */
   compositing?: 'replace' | 'additive'
   characterEffect?: CharacterAnimationEffect
+  wordEffect?: WordAnimationEffect
 }
 
 export type TextAnimationSettings = {
