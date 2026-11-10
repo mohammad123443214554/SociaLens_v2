@@ -400,3 +400,42 @@ test('premium easing is monotonic and reaches exact endpoints', () => {
     assert.equal(previous, 1)
   }
 })
+
+
+test('character animation motion stays restrained and stagger timing is ordered', () => {
+  const effects = [
+    'typewriter','reverse-typewriter','delete-typewriter','fade','rise','drop','pop','bounce',
+    'rotate','flip','zoom','blur','slide','scatter','assemble','dissolve','wave','pulse',
+    'stretch','squeeze','shuffle','reveal','mask-reveal','spark','stagger',
+  ] as const
+  for (const effect of effects) {
+    for (let step = 1; step < 10; step++) {
+      const sample = sampleCharacterMotion({ effect, progress: step / 10, index: 3, count: 8 })
+      assert.ok(Math.abs(sample.translateX) <= 45, effect + ' horizontal travel')
+      assert.ok(Math.abs(sample.translateY) <= 35, effect + ' vertical travel')
+      assert.ok(Math.abs(sample.rotate) <= 60, effect + ' rotation')
+      assert.ok(sample.blur >= 0 && sample.blur <= 9, effect + ' blur')
+      assert.ok(sample.scaleX >= 0.04 && sample.scaleX <= 1.8, effect + ' horizontal scale')
+      assert.ok(sample.scaleY >= 0.04 && sample.scaleY <= 1.8, effect + ' vertical scale')
+    }
+  }
+
+  const first = sampleCharacterMotion({ effect: 'fade', progress: 0.25, index: 0, count: 8 })
+  const last = sampleCharacterMotion({ effect: 'fade', progress: 0.25, index: 7, count: 8 })
+  assert.ok(first.opacity > last.opacity, 'characters should reveal in a stable stagger order')
+})
+
+test('character motion returns exact neutral transforms at completion for every effect', () => {
+  const effects = [
+    'typewriter','reverse-typewriter','delete-typewriter','fade','rise','drop','pop','bounce',
+    'rotate','flip','zoom','blur','slide','scatter','assemble','dissolve','wave','pulse',
+    'stretch','squeeze','shuffle','reveal','mask-reveal','spark','stagger',
+  ] as const
+  for (const effect of effects) {
+    assert.deepEqual(
+      sampleCharacterMotion({ effect, progress: 1, index: 2, count: 8 }),
+      { opacity: 1, translateX: 0, translateY: 0, scaleX: 1, scaleY: 1, rotate: 0, blur: 0, clipProgress: 1 },
+      effect,
+    )
+  }
+})
