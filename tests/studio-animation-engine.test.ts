@@ -88,6 +88,42 @@ test('normalizes missing, invalid, and out-of-range settings safely', () => {
   assert.equal(normalized.easing, 'ease')
 })
 
+test('normalizes animation speed safely and clamps its supported range', () => {
+  assert.equal(normalizeTextAnimationSettings({ animationId: 'fade', speed: 0 }).speed, 0.1)
+  assert.equal(normalizeTextAnimationSettings({ animationId: 'fade', speed: 9 }).speed, 4)
+  assert.equal(normalizeTextAnimationSettings({ animationId: 'fade', speed: 2.5 }).speed, 2.5)
+})
+
+test('speed scales the animation clock without changing authored duration settings', () => {
+  const normal = sample(entrance, 2.25, { durationMs: 1000, speed: 1 })
+  const fast = sample(entrance, 2.125, { durationMs: 1000, speed: 2 })
+  assert.equal(normal.progress, fast.progress)
+  assert.equal(fast.progress, 0.25)
+})
+
+test('finite repeats restart the motion and hold the final state after the last repeat', () => {
+  const repeated = sample(entrance, 3.25, { durationMs: 1000, repeatCount: 2, direction: 'normal' })
+  assert.equal(repeated.progress, 0.25)
+  const completed = sample(entrance, 4.1, { durationMs: 1000, repeatCount: 2 })
+  assert.equal(completed.phase, 'after')
+  assert.equal(completed.progress, 1)
+  assert.equal(completed.opacity, 1)
+})
+
+test('alternate direction reverses every second finite repeat', () => {
+  const reversedSecond = sample(entrance, 3.25, { durationMs: 1000, repeatCount: 2, direction: 'alternate' })
+  assert.equal(reversedSecond.progress, 0.25)
+  assert.ok(reversedSecond.opacity > 0.7)
+})
+
+test('loop presets can run a finite number of cycles or indefinitely', () => {
+  const finite = sample(loop, 3.5, { durationMs: 1000, repeatCount: 2 })
+  assert.equal(finite.phase, 'after')
+  const infinite = sample(loop, 3.5, { durationMs: 1000, repeatCount: 0 })
+  assert.equal(infinite.phase, 'running')
+  assert.equal(infinite.progress, 0.5)
+})
+
 test('validates keyframe boundaries, ordering, and finite values', () => {
   assert.deepEqual(validateTextAnimationDefinition(entrance), [])
   const invalid = {
