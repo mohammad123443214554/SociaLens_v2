@@ -10,6 +10,7 @@
  */
 
 export type TextAnimationMode = 'entrance' | 'exit' | 'loop' | 'continuous'
+export type MaskRevealEffect = 'wipe-left' | 'wipe-right' | 'wipe-up' | 'wipe-down' | 'diagonal-down' | 'diagonal-up' | 'center-open' | 'center-close' | 'iris-circle' | 'iris-ellipse' | 'diamond' | 'radial-sweep' | 'clock-wipe' | 'venetian' | 'checkerboard' | 'box-reveal' | 'corner-sweep' | 'curtain' | 'shutter' | 'scanline' | 'pixel-grid' | 'feathered-wipe' | 'starburst' | 'spiral' | 'cross-reveal'
 export type WordAnimationEffect = 'cascade' | 'rise' | 'drop' | 'fade' | 'slide-left' | 'slide-right' | 'zoom' | 'soft-zoom' | 'blur' | 'flip' | 'rotate' | 'wave' | 'stagger' | 'float' | 'sweep' | 'mask' | 'tracking' | 'focus' | 'pop' | 'drift' | 'fold' | 'glide' | 'spotlight' | 'line-reveal' | 'line-cascade'
 export type CharacterAnimationEffect = 'typewriter' | 'reverse-typewriter' | 'delete-typewriter' | 'fade' | 'rise' | 'drop' | 'pop' | 'bounce' | 'rotate' | 'flip' | 'zoom' | 'blur' | 'slide' | 'scatter' | 'assemble' | 'dissolve' | 'wave' | 'pulse' | 'stretch' | 'squeeze' | 'shuffle' | 'reveal' | 'mask-reveal' | 'spark' | 'stagger'
 export type TextAnimationDirection = 'normal' | 'reverse' | 'alternate' | 'alternate-reverse'
@@ -65,6 +66,7 @@ export type TextAnimationDefinition = {
   compositing?: 'replace' | 'additive'
   characterEffect?: CharacterAnimationEffect
   wordEffect?: WordAnimationEffect
+  maskEffect?: MaskRevealEffect
 }
 
 export type TextAnimationSettings = {
