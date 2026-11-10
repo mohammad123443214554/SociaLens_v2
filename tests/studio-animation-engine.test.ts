@@ -344,3 +344,59 @@ test('Typing & Character catalog contains 25 unique valid per-grapheme presets',
 test('all character effects are deterministic, bounded and settle to neutral',()=>{for(const item of TYPING_CHARACTER_ANIMATIONS)for(const index of [0,2,7]){const effect=item.characterEffect!,m=sampleCharacterMotion({effect,progress:.5,index,count:8}),end=sampleCharacterMotion({effect,progress:1,index,count:8});assert.deepEqual(sampleCharacterMotion({effect,progress:.5,index,count:8}),m);assert.ok(m.opacity>=0&&m.opacity<=1);assert.ok(Number.isFinite(m.translateX)&&Number.isFinite(m.translateY)&&Number.isFinite(m.rotate)&&Number.isFinite(m.blur));assert.equal(end.opacity,1);assert.equal(end.translateX,0);assert.equal(end.translateY,0);assert.equal(end.scaleX,1);assert.equal(end.scaleY,1);assert.equal(end.rotate,0);assert.equal(end.blur,0);assert.equal(end.clipProgress,1)}})
 test('grapheme splitting preserves joined emoji, skin tones and combining marks',()=>{assert.deepEqual(splitStudioGraphemes('A👩🏽‍💻éB'),['A','👩🏽‍💻','é','B']);assert.deepEqual(splitStudioGraphemes('Hello 👋'),['H','e','l','l','o',' ','👋'])})
 test('all character presets have distinct sampled motion signatures',()=>{const signatures=TYPING_CHARACTER_ANIMATIONS.map(x=>JSON.stringify([0,.2,.45,.7,.9].map(progress=>sampleCharacterMotion({effect:x.characterEffect!,progress,index:2,count:7}))));assert.equal(new Set(signatures).size,25)})
+
+
+test('premium easing curves are recognized, bounded, and settle without discontinuous keyframe velocity', () => {
+  const smoothDefinition: TextAnimationDefinition = {
+    id: 'test-premium-spline',
+    name: 'Test Premium Spline',
+    category: 'Test',
+    mode: 'entrance',
+    defaultDurationMs: 1000,
+    keyframes: [
+      { at: 0, opacity: 0, translateY: 48 },
+      { at: 0.5, opacity: 0.72, translateY: -5 },
+      { at: 1, opacity: 1, translateY: 0 },
+    ],
+  }
+  const sampleAt = (time: number) => sampleTextAnimation({
+    definition: smoothDefinition,
+    settings: { animationId: smoothDefinition.id, durationMs: 1000, easing: 'premium-in-out' },
+    timelineTimeSeconds: 2 + time,
+    layerStartSeconds: 2,
+    layerDurationSeconds: 4,
+  })
+  const before = sampleAt(0.5 - 0.002)
+  const at = sampleAt(0.5)
+  const after = sampleAt(0.5 + 0.002)
+  const leftVelocity = (at.translateY - before.translateY) / 0.002
+  const rightVelocity = (after.translateY - at.translateY) / 0.002
+  assert.ok(Number.isFinite(leftVelocity) && Number.isFinite(rightVelocity))
+  assert.ok(Math.abs(leftVelocity - rightVelocity) < 4, 'keyframe velocity should remain continuous')
+  assert.ok(at.opacity >= 0 && at.opacity <= 1)
+  assert.equal(sampleAt(1).opacity, 1)
+  assert.equal(sampleAt(1).translateY, 0)
+})
+
+test('premium easing is monotonic and reaches exact endpoints', () => {
+  const definition: TextAnimationDefinition = {
+    ...entrance,
+    id: 'test-premium-easing',
+    keyframes: [{ at: 0, opacity: 0 }, { at: 1, opacity: 1 }],
+  }
+  for (const easing of ['premium-out', 'premium-in', 'premium-in-out'] as const) {
+    let previous = -1
+    for (let step = 0; step <= 100; step++) {
+      const result = sampleTextAnimation({
+        definition,
+        settings: { animationId: definition.id, durationMs: 1000, easing },
+        timelineTimeSeconds: 2 + step / 100,
+        layerStartSeconds: 2,
+        layerDurationSeconds: 4,
+      })
+      assert.ok(result.opacity >= previous - 1e-9, easing + ' must be monotonic')
+      previous = result.opacity
+    }
+    assert.equal(previous, 1)
+  }
+})
