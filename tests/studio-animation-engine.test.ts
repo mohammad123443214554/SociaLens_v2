@@ -54,7 +54,7 @@ const loop: TextAnimationDefinition = {
 const sample = (definition: TextAnimationDefinition, time: number, overrides = {}) =>
   sampleTextAnimation({
     definition,
-    settings: { animationId: definition.id, durationMs: 1000, easing: 'linear', ...overrides },
+    settings: { animationId: definition.id, durationMs: 1000, easing: 'linear', repeatCount: definition.mode === 'loop' || definition.mode === 'continuous' ? 0 : 1, ...overrides },
     timelineTimeSeconds: time,
     layerStartSeconds: 2,
     layerDurationSeconds: 4,
