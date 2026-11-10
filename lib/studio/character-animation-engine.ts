@@ -97,7 +97,7 @@ export function sampleCharacterMotion(input: {
       break
     case 'pop':
       sample.opacity = localProgress
-      sample.scaleX = sample.scaleY = 0.72 + localProgress * 0.28
+      sample.scaleX = sample.scaleY = 0.68 + spring * 0.32
       break
     case 'bounce':
       sample.opacity = localProgress
@@ -106,7 +106,7 @@ export function sampleCharacterMotion(input: {
       break
     case 'rotate':
       sample.opacity = localProgress
-      sample.rotate = (1 - localProgress) * -82 * intensity
+      sample.rotate = (1 - localProgress) * -56 * intensity
       sample.scaleX = sample.scaleY = 0.88 + localProgress * 0.12
       break
     case 'flip':
