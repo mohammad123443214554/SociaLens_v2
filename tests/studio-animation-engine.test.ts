@@ -92,10 +92,10 @@ test('multiple text layers stay synchronized to one project playhead with indepe
 })
 
 test('overlapping entrance, exit and loop layers can be sampled at the exact same timeline timestamp', () => {
-  const sharedPlayhead = 3.25
+  const sharedPlayhead = 3.75
   const entranceLayer = sampleTextAnimation({
     definition: entrance,
-    settings: { animationId: entrance.id, durationMs: 1000, easing: 'linear', repeatCount: 1 },
+    settings: { animationId: entrance.id, durationMs: 2000, easing: 'linear', repeatCount: 1 },
     timelineTimeSeconds: sharedPlayhead,
     layerStartSeconds: 3,
     layerDurationSeconds: 4,
@@ -114,10 +114,10 @@ test('overlapping entrance, exit and loop layers can be sampled at the exact sam
     layerStartSeconds: 3,
     layerDurationSeconds: 4,
   })
-  assert.equal(entranceLayer.progress, 0.25)
+  assert.equal(entranceLayer.progress, 0.375)
   assert.equal(exitLayer.progress, 0.75)
   assert.equal(loopLayer.phase, 'running')
-  assert.equal(loopLayer.progress, 0.25)
+  assert.equal(loopLayer.progress, 0.75)
 })
 
 
