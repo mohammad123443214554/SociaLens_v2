@@ -12,6 +12,7 @@ import { EXIT_ANIMATIONS } from '../lib/studio/exit-animations.ts'
 import { BOUNCE_ELASTIC_ANIMATIONS } from '../lib/studio/bounce-elastic-animations.ts'
 import { ROTATION_3D_ANIMATIONS } from '../lib/studio/rotation-3d-animations.ts'
 import { TYPING_CHARACTER_ANIMATIONS } from '../lib/studio/typing-character-animations.ts'
+import { WORD_LINE_ANIMATIONS, sampleWordMotion } from '../lib/studio/word-line-animations.ts'
 import { sampleCharacterMotion, splitStudioGraphemes } from '../lib/studio/character-animation-engine.ts'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameIndexAtTime, studioFrameTime, studioFrameTimeFromElapsedMs } from '../lib/studio/frame-clock.ts'
 
@@ -539,4 +540,62 @@ test('grapheme segmentation is cached and preserves Unicode text without shared 
   assert.deepEqual(first, ['S','o','c','i','a','L','e','n','s',' ','👩🏽‍💻',' ','é',' ','✨'])
   assert.throws(() => { (first as unknown as string[]).push('corrupt') })
   assert.deepEqual(splitStudioGraphemes(text), first)
+})
+
+
+test('Word & Line category contains exactly 25 unique presets numbered 126–150', () => {
+  assert.equal(WORD_LINE_ANIMATIONS.length, 25)
+  assert.deepEqual(validateTextAnimationRegistry(WORD_LINE_ANIMATIONS), [])
+  assert.deepEqual(WORD_LINE_ANIMATIONS.map(item => item.id), Array.from({length:25},(_,index) => 'word-' + (126+index)))
+  assert.equal(new Set(WORD_LINE_ANIMATIONS.map(item => item.name.toLowerCase())).size, 25)
+  assert.equal(new Set(WORD_LINE_ANIMATIONS.map(item => item.wordEffect)).size, 25)
+  for (const item of WORD_LINE_ANIMATIONS) {
+    assert.equal(item.category, 'Word & Line')
+    assert.equal(item.mode, 'entrance')
+    assert.ok(item.description && item.description.length > 12)
+    assert.ok(item.defaultDurationMs >= 900 && item.defaultDurationMs <= 1300)
+  }
+})
+
+test('all 25 word and line effects are deterministic, finite and settle to neutral transforms', () => {
+  for (const definition of WORD_LINE_ANIMATIONS) {
+    for (let frame=0;frame<=60;frame++) {
+      const progress=frame/60
+      const input={effect:definition.wordEffect!,progress,index:2,count:7,intensity:1,lineIndex:1,lineCount:3}
+      const first=sampleWordMotion(input)
+      assert.deepEqual(sampleWordMotion(input),first,definition.id+' deterministic frame '+frame)
+      for (const value of Object.values(first)) assert.ok(Number.isFinite(value),definition.id+' finite sample')
+      assert.ok(first.opacity>=0&&first.opacity<=1)
+      assert.ok(first.scale>0&&first.scale<=2)
+      assert.ok(first.blur>=0&&first.blur<=24)
+      assert.ok(first.clip>=0&&first.clip<=1)
+      assert.ok(Math.abs(first.x)<100&&Math.abs(first.y)<100)
+    }
+    const end=sampleWordMotion({effect:definition.wordEffect!,progress:1,index:2,count:7,intensity:1,lineIndex:1,lineCount:3})
+    assert.equal(end.opacity,1,definition.id+' opacity settles')
+    assert.equal(end.x,0,definition.id+' x settles')
+    assert.equal(end.y,0,definition.id+' y settles')
+    assert.equal(end.scale,1,definition.id+' scale settles')
+    assert.equal(end.rotate,0,definition.id+' rotation settles')
+    assert.equal(end.blur,0,definition.id+' blur settles')
+    assert.equal(end.clip,1,definition.id+' mask settles')
+    assert.equal(end.spacing,0,definition.id+' spacing settles')
+  }
+})
+
+test('line reveal and line cascade sequence complete lines in order', () => {
+  const revealFirst=sampleWordMotion({effect:'line-reveal',progress:.2,index:0,count:4,lineIndex:0,lineCount:3})
+  const revealLast=sampleWordMotion({effect:'line-reveal',progress:.2,index:0,count:4,lineIndex:2,lineCount:3})
+  const cascadeFirst=sampleWordMotion({effect:'line-cascade',progress:.2,index:0,count:4,lineIndex:0,lineCount:3})
+  const cascadeLast=sampleWordMotion({effect:'line-cascade',progress:.2,index:0,count:4,lineIndex:2,lineCount:3})
+  assert.ok(revealFirst.opacity>revealLast.opacity)
+  assert.ok(cascadeFirst.opacity>cascadeLast.opacity)
+})
+
+test('complete Studio animation catalog now contains 150 unique presets', () => {
+  const all=[...BASIC_ENTRANCE_ANIMATIONS,...EXIT_ANIMATIONS,...BOUNCE_ELASTIC_ANIMATIONS,...ROTATION_3D_ANIMATIONS,...TYPING_CHARACTER_ANIMATIONS,...WORD_LINE_ANIMATIONS]
+  assert.equal(all.length,150)
+  assert.equal(new Set(all.map(item=>item.id)).size,150)
+  assert.equal(new Set(all.map(item=>item.name.toLowerCase())).size,150)
+  assert.deepEqual(validateTextAnimationRegistry(all),[])
 })
