@@ -61,7 +61,7 @@ export function StudioAnimationPanel({ selectedCategory, onSelectCategory, searc
         </div>
         <div className="mt-3 flex items-center justify-between">
           <span className="text-[9px] font-bold uppercase tracking-[.13em] text-slate-500">Animation library</span>
-          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-2 py-1 text-[9px] font-semibold text-emerald-200">100 ready · 200 upcoming</span>
+          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-2 py-1 text-[9px] font-semibold text-emerald-200">125 ready · 175 upcoming</span>
         </div>
       </div>
 
