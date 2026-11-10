@@ -13,6 +13,7 @@ import { sampleCharacterMotion, splitStudioGraphemes } from '@/lib/studio/charac
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS]
+const STUDIO_TEXT_ANIMATION_BY_ID = new Map(STUDIO_TEXT_ANIMATIONS.map(definition => [definition.id, definition]))
 import {
   ArrowLeft, AudioLines, Check, Clapperboard,
   Bold, CaseUpper, ChevronDown, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
@@ -353,6 +354,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [playhead, setPlayhead] = useState(0)
   const playbackFrame = useRef<number | null>(null)
   const playbackStartedAt = useRef(0)
+  const lastPlaybackTime = useRef(-1)
+  const lastAnimationPreviewTime = useRef(-1)
   const [aspect, setAspect] = useState<'9:16' | '16:9' | '1:1'>('9:16')
   const [titleText, setTitleText] = useState('')
   const [subtitleText, setSubtitleText] = useState('')
@@ -383,14 +386,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const saveSequence = useRef(0)
   const selected = clips.find(item => item.id === selectedId) || clips[0] || null
   const selectedText = textLayers.find(item => item.id === selectedTextId) || null
-  const selectedAnimation = selectedText?.animation?.animationId ? STUDIO_TEXT_ANIMATIONS.find(item => item.id === selectedText.animation?.animationId) : undefined
+  const selectedAnimation = selectedText?.animation?.animationId ? STUDIO_TEXT_ANIMATION_BY_ID.get(selectedText.animation.animationId) : undefined
   const selectedAnimationId = selectedText?.animation?.animationId || null
   const previewDurationMs = selectedAnimation ? (selectedText?.animation?.durationMs || selectedAnimation.defaultDurationMs) : 850
   const animationPreviewStartSeconds = selectedText && selectedAnimation?.mode === 'exit' ? Math.max(selectedText.timelineStart, selectedText.timelineStart + selectedText.timelineDuration - previewDurationMs / 1000) : selectedText?.timelineStart || 0
   const animationPreviewSample = selectedText && selectedAnimation && isAnimationPreviewing ? sampleTextAnimation({ definition: selectedAnimation, settings: { ...selectedText.animation, animationId: selectedAnimation.id, durationMs: previewDurationMs, delayMs: 0, enabled: true }, timelineTimeSeconds: animationPreviewStartSeconds + animationPreviewTime / 1000, layerStartSeconds: selectedText.timelineStart, layerDurationSeconds: selectedText.timelineDuration }) : null
   const getLayerAnimationSample = (layer: TextLayer, timelineTime: number) => {
     const animationId = layer.animation?.animationId
-    const definition = animationId ? STUDIO_TEXT_ANIMATIONS.find(item => item.id === animationId) : undefined
+    const definition = animationId ? STUDIO_TEXT_ANIMATION_BY_ID.get(animationId) : undefined
     if (!definition) return null
     return sampleTextAnimation({ definition, settings: { ...layer.animation, animationId: definition.id, durationMs: layer.animation?.durationMs || definition.defaultDurationMs, enabled: true }, timelineTimeSeconds: timelineTime, layerStartSeconds: layer.timelineStart, layerDurationSeconds: layer.timelineDuration })
   }
@@ -401,14 +404,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     return value
   }
   const getAnimatedTextContent = (layer: TextLayer, timelineTime: number) => {
-    const definition = STUDIO_TEXT_ANIMATIONS.find(item => item.id === layer.animation?.animationId)
+    const definition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
     if (!definition?.characterEffect) return getFormattedText(layer)
     const sample = getLayerAnimationSample(layer, timelineTime)
     if (!sample) return getFormattedText(layer)
     const glyphs = splitStudioGraphemes(getFormattedText(layer))
     return glyphs.map((glyph, index) => {
       const motion = sampleCharacterMotion({ effect: definition.characterEffect!, progress: sample.progress, index, count: glyphs.length, intensity: layer.animation?.intensity ?? 1 })
-      return <span key={index} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: motion.opacity, transform: 'translate3d(' + motion.translateX + 'px,' + motion.translateY + 'px,0) rotate(' + motion.rotate + 'deg) scale(' + motion.scaleX + ',' + motion.scaleY + ')', transformOrigin: 'left center', filter: motion.blur ? 'blur(' + motion.blur + 'px)' : undefined, clipPath: motion.clipProgress < 1 ? 'inset(0 ' + ((1 - motion.clipProgress) * 100) + '% 0 0)' : undefined, willChange: 'transform, opacity, filter' }}>{glyph}</span>
+      return <span key={index} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: motion.opacity, transform: 'translate3d(' + motion.translateX + 'px,' + motion.translateY + 'px,0) rotate(' + motion.rotate + 'deg) scale(' + motion.scaleX + ',' + motion.scaleY + ')', transformOrigin: 'left center', filter: motion.blur ? 'blur(' + motion.blur + 'px)' : undefined, clipPath: motion.clipProgress < 1 ? 'inset(0 ' + ((1 - motion.clipProgress) * 100) + '% 0 0)' : undefined, willChange: (isAnimationPreviewing || playing) ? 'transform, opacity' : 'auto' }}>{glyph}</span>
     })
   }
   const totalDuration = useMemo(() => clips.reduce((sum, item) => sum + Math.max(0.1, item.trimEnd - item.trimStart), 0), [clips])
@@ -759,13 +762,17 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (!clips.length || projectEnd <= 0) { setNotice('Add a video or photo to the timeline before playing.'); return }
     const startAt = playhead >= projectEnd ? 0 : playhead
     setPlayhead(startAt)
+    lastPlaybackTime.current = startAt
     playbackStartedAt.current = performance.now() - startAt * 1000
     setPlaying(true)
     setError('')
     const tick = (now: number) => {
       const elapsedMs = Math.max(0, now - playbackStartedAt.current)
       const time = Math.min(projectEnd, quantizeStudioTime(startAt + elapsedMs / 1000))
-      setPlayhead(time)
+      if (time !== lastPlaybackTime.current) {
+        lastPlaybackTime.current = time
+        setPlayhead(time)
+      }
       const active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
       const video = previewRef.current
       if (active?.kind === 'video' && video) {
@@ -817,7 +824,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const tick = (now: number) => {
       const elapsed = Math.max(0, now - animationPreviewStart.current)
       const duration = selectedAnimation ? (selectedText?.animation?.durationMs || selectedAnimation.defaultDurationMs) : 850
-      setAnimationPreviewTime(Math.min(duration, studioFrameTimeFromElapsedMs(elapsed) * 1000))
+      const nextPreviewTime = elapsed >= duration ? duration : studioFrameTimeFromElapsedMs(elapsed) * 1000
+      if (nextPreviewTime !== lastAnimationPreviewTime.current) {
+        lastAnimationPreviewTime.current = nextPreviewTime
+        setAnimationPreviewTime(nextPreviewTime)
+      }
       if (elapsed >= duration) {
         setIsAnimationPreviewing(false)
         return
@@ -843,6 +854,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const previewStart = selectedAnimation.mode === 'exit' ? Math.max(selectedText.timelineStart, selectedText.timelineStart + selectedText.timelineDuration - previewDurationMs / 1000) : selectedText.timelineStart
     setPlayhead(previewStart)
     animationPreviewStart.current = performance.now()
+    lastAnimationPreviewTime.current = 0
     setAnimationPreviewTime(0)
     setIsAnimationPreviewing(true)
     setNotice('Previewing ' + selectedAnimation.name + ' on the selected text layer.')
@@ -956,7 +968,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           const y = -Math.round(layer.fontSize * scale) / 2
           const lineHeight = Math.round(layer.fontSize * scale * 1.2)
           const formattedText = getFormattedText(layer)
-          const characterDefinition = STUDIO_TEXT_ANIMATIONS.find(item => item.id === layer.animation?.animationId)
+          const characterDefinition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
           const characterList = splitStudioGraphemes(formattedText)
           let characterOffset = 0
           formattedText.split(/\n/).forEach((line, index) => {
@@ -1107,6 +1119,27 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           video.load()
         }
       }
+      // Text layers and music may extend beyond the final media clip. Render that
+      // remaining project interval instead of truncating the export at the last clip.
+      if (projectEnd > timelineCursor + 1 / (STUDIO_FRAME_RATE * 2)) {
+        const tailStart = timelineCursor
+        const tailDuration = projectEnd - tailStart
+        const tailStartedAt = performance.now()
+        await new Promise<void>(resolve => {
+          const frame = (now: number) => {
+            const elapsed = Math.min(tailDuration, (now - tailStartedAt) / 1000)
+            const timelineTime = elapsed >= tailDuration ? projectEnd : quantizeStudioTime(tailStart + elapsed)
+            ctx.fillStyle = '#000000'
+            ctx.fillRect(0, 0, canvas.width, canvas.height)
+            drawTitle(timelineTime)
+            syncMusic(timelineTime)
+            setExportProgress(Math.min(99, Math.round((timelineTime / Math.max(1, projectEnd)) * 100)))
+            if (elapsed >= tailDuration) resolve()
+            else animationFrame = requestAnimationFrame(frame)
+          }
+          animationFrame = requestAnimationFrame(frame)
+        })
+      }
       if (recorder.state !== 'inactive') recorder.stop()
       const blob = await stopped
       if (!blob.size) throw new Error('The exported video was empty. Please try again.')
@@ -1192,7 +1225,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               <button type="button" onClick={()=>updateTextLayer(selectedText.id,{effect:'Simple',effectIntensity:60,effectBlur:8,effectDistance:4,effectAngle:45,effectColor:'#a855f7',effectSecondaryColor:'#22d3ee'})} className="rounded-lg border border-white/10 py-2 text-[9px] font-semibold text-slate-400 hover:bg-white/[0.05]">Reset effect settings</button>
             </>}
           </div>}
-          {activePanel === 'animation' && <StudioAnimationPanel selectedCategory={animationCategory} onSelectCategory={setAnimationCategory} search={animationSearch} onSearchChange={setAnimationSearch} selectedText={selectedText} selectedAnimationId={selectedAnimationId} isPreviewing={isAnimationPreviewing} previewProgress={animationPreviewTime / previewDurationMs} onPreview={startAnimationPreview} onStopPreview={() => setIsAnimationPreviewing(false)} onReset={resetTextAnimation} onSelectAnimation={(id) => { if (!selectedText) return; setIsAnimationPreviewing(false); setAnimationPreviewTime(0); updateTextLayer(selectedText.id, { animation: { animationId: id, durationMs: STUDIO_TEXT_ANIMATIONS.find(item => item.id === id)?.defaultDurationMs || 850, delayMs: 0, repeatCount: 1, direction: 'normal', easing: STUDIO_TEXT_ANIMATIONS.find(item => item.id === id)?.defaultEasing || 'ease', intensity: 1, enabled: true } }); setNotice('Animation applied to the selected text layer.') }} />}
+          {activePanel === 'animation' && <StudioAnimationPanel selectedCategory={animationCategory} onSelectCategory={setAnimationCategory} search={animationSearch} onSearchChange={setAnimationSearch} selectedText={selectedText} selectedAnimationId={selectedAnimationId} isPreviewing={isAnimationPreviewing} previewProgress={animationPreviewTime / previewDurationMs} onPreview={startAnimationPreview} onStopPreview={() => setIsAnimationPreviewing(false)} onReset={resetTextAnimation} onSelectAnimation={(id) => { if (!selectedText) return; setIsAnimationPreviewing(false); setAnimationPreviewTime(0); updateTextLayer(selectedText.id, { animation: { animationId: id, durationMs: STUDIO_TEXT_ANIMATION_BY_ID.get(id)?.defaultDurationMs || 850, delayMs: 0, repeatCount: 1, direction: 'normal', easing: STUDIO_TEXT_ANIMATION_BY_ID.get(id)?.defaultEasing || 'ease', intensity: 1, enabled: true } }); setNotice('Animation applied to the selected text layer.') }} />}
           {activePanel === 'audio' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <button type="button" onClick={() => audioInput.current?.click()} className="flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[10px] font-bold"><Music2 className="h-4 w-4" /> {audio ? 'Replace audio track' : 'Import audio'}</button>
             {audio ? <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.04] p-3"><div className="flex items-center gap-2"><Music2 className="h-4 w-4 shrink-0 text-cyan-300" /><div className="min-w-0"><p className="truncate text-[10px] font-semibold text-cyan-100">{audio.name}</p><p className="text-[9px] text-cyan-100/50">{formatTime(audio.duration)} duration</p></div></div><label className="mt-4 block text-[9px] text-slate-400">Track volume · {audioVolume}%<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="mt-2 w-full accent-cyan-400" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="mt-3 w-full rounded-lg border border-red-400/20 py-2 text-[9px] font-semibold text-red-300 hover:bg-red-400/[0.06]">Remove audio track</button></div> : <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center"><Music2 className="mx-auto h-7 w-7 text-slate-600" /><p className="mt-2 text-[10px] font-semibold text-slate-300">No audio track</p><p className="mt-1 text-[9px] text-slate-500">Import a music or audio file to add it to your project.</p></div>}
