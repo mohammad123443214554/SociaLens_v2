@@ -12,9 +12,11 @@ import { TYPING_CHARACTER_ANIMATIONS } from '@/lib/studio/typing-character-anima
 import { sampleCharacterMotion, splitStudioGraphemes } from '@/lib/studio/character-animation-engine'
 import { sampleWordMotion } from '@/lib/studio/word-line-animations'
 import { WORD_LINE_ANIMATIONS } from '@/lib/studio/word-line-animations'
+import { clipCanvasForMask, sampleMaskReveal } from '@/lib/studio/wipe-mask-reveal-animations'
+import { WIPE_MASK_REVEAL_ANIMATIONS } from '@/lib/studio/wipe-mask-reveal-animations'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs } from '@/lib/studio/frame-clock'
 
-const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS]
+const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS]
 const STUDIO_TEXT_ANIMATION_BY_ID = new Map(STUDIO_TEXT_ANIMATIONS.map(definition => [definition.id, definition]))
 import {
   ArrowLeft, AudioLines, Check, Clapperboard,
@@ -408,6 +410,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const getAnimatedTextContent = (layer: TextLayer, timelineTime: number) => {
     const definition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
     const formattedText = getFormattedText(layer)
+    if (definition?.maskEffect) {
+      const animationSample = getLayerAnimationSample(layer, timelineTime)
+      if (!animationSample) return formattedText
+      const mask = sampleMaskReveal({ effect: definition.maskEffect, progress: animationSample.progress, intensity: layer.animation?.intensity ?? 1 })
+      return <span style={{ display: 'block', width: '100%', clipPath: mask.maskImage ? undefined : mask.clipPath, maskImage: mask.maskImage, WebkitMaskImage: mask.maskImage, maskSize: '100% 100%', WebkitMaskSize: '100% 100%', willChange: isAnimationPreviewing || playing ? 'clip-path, mask-image' : 'auto' }}>{formattedText}</span>
+    }
     if (definition?.wordEffect) {
       const animationSample = getLayerAnimationSample(layer, timelineTime)
       if (!animationSample) return formattedText
@@ -989,6 +997,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           const y = -Math.round(layer.fontSize * scale) / 2
           const lineHeight = Math.round(layer.fontSize * scale * 1.2)
           const formattedText = getFormattedText(layer)
+          const animationDefinition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
+          if (animationDefinition?.maskEffect && animationSample) {
+            const mask = sampleMaskReveal({ effect: animationDefinition.maskEffect, progress: animationSample.progress, intensity: layer.animation?.intensity ?? 1 })
+            ctx.translate(x, y)
+            clipCanvasForMask(ctx, mask, maxWidth, Math.max(lineHeight, lineHeight * formattedText.split('\\n').length))
+            ctx.translate(-x, -y)
+          }
           const characterDefinition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
           const wordDefinition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
           const characterList = splitStudioGraphemes(formattedText)
