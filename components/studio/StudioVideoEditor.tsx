@@ -764,7 +764,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setError('')
     const tick = (now: number) => {
       const elapsedMs = Math.max(0, now - playbackStartedAt.current)
-      const time = Math.min(projectEnd, studioFrameTimeFromElapsedMs(elapsedMs))
+      const time = Math.min(projectEnd, quantizeStudioTime(startAt + elapsedMs / 1000))
       setPlayhead(time)
       const active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
       const video = previewRef.current
