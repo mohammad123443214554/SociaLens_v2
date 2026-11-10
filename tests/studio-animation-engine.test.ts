@@ -753,6 +753,8 @@ test('Cinematic & Light category contains 25 unique presets numbered 226–250',
     assert.ok(item.description&&item.description.length>12)
     assert.ok(item.defaultDurationMs>=1000&&item.defaultDurationMs<=4500)
     assert.ok(item.keyframes.length>=3,item.id+' has authored keyframes')
+    if(item.id==='cinematic-230'||item.id==='cinematic-237') assert.equal(item.mode,'exit',item.id+' uses exit timing')
+    if(item.id==='cinematic-249'||item.id==='cinematic-250') assert.equal(item.mode,'loop',item.id+' uses loop timing')
     for(const frame of item.keyframes){
       if(frame.blur!==undefined) assert.ok(frame.blur>=0&&frame.blur<=20,item.id+' blur stays controlled')
       if(frame.opacity!==undefined) assert.ok(frame.opacity>=0&&frame.opacity<=1,item.id+' opacity stays bounded')
@@ -777,7 +779,8 @@ test('Cinematic & Light presets sample deterministically without invalid visual 
     for(let frame=0;frame<=60;frame++){
       const time=definition.defaultDurationMs/1000*frame/60
       const sample=sampleTextAnimation({definition,settings,timelineTimeSeconds:time,layerStartSeconds:0,layerDurationSeconds:12})
-      assert.deepEqual(sample,sample,definition.id+' deterministic')
+      const repeated=sampleTextAnimation({definition,settings,timelineTimeSeconds:time,layerStartSeconds:0,layerDurationSeconds:12})
+      assert.deepEqual(sample,repeated,definition.id+' deterministic')
       for(const [key,value] of Object.entries(sample)) if(typeof value==='number') assert.ok(Number.isFinite(value),definition.id+' finite '+key)
       assert.ok(sample.scaleX>0&&sample.scaleY>0,definition.id+' positive scale')
       assert.ok(sample.opacity>=0&&sample.opacity<=1,definition.id+' opacity bounds')
