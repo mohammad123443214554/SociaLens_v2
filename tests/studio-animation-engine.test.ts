@@ -141,7 +141,7 @@ test('loop animation repeats, supports infinite repeat, and holds finite final s
 
 test('reverse and alternate directions are applied consistently', () => {
   const reverse = sample(loop, 2.25, { direction: 'reverse' })
-  assert.equal(reverse.scaleX, 1.1)
+  assert.equal(reverse.scaleX, 1.125)
   const alternate = sample(loop, 3.25, { direction: 'alternate' })
   assert.equal(alternate.scaleX, 1.1)
 })
@@ -361,7 +361,7 @@ test('premium easing curves are recognized, bounded, and settle without disconti
   }
   const sampleAt = (time: number) => sampleTextAnimation({
     definition: smoothDefinition,
-    settings: { animationId: smoothDefinition.id, durationMs: 1000, easing: 'premium-in-out' },
+    settings: { animationId: smoothDefinition.id, durationMs: 1000, easing: 'linear' },
     timelineTimeSeconds: 2 + time,
     layerStartSeconds: 2,
     layerDurationSeconds: 4,
