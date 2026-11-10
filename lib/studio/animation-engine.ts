@@ -330,10 +330,12 @@ export function sampleTextAnimation(input: {
   const infinite = isLoop && requestedRepeats === 0
   const repeatTotal = infinite ? Infinity : Math.max(1, requestedRepeats)
   const totalDuration = infinite ? duration : duration * repeatTotal
-  // Exit motion is fitted inside the layer's visible interval. Delay moves the
-  // start later where room permits; it never pushes the exit past the layer end.
+  // Exit motion remains anchored to the layer's end (the established
+  // timeline contract). Its optional delay is capped to the available exit
+  // window so it cannot push the animation beyond the layer boundary.
+  const exitWindowStart = Math.max(layerStart, layerEnd - totalDuration)
   const animationStart = definition.mode === 'exit'
-    ? Math.max(layerStart, Math.min(layerEnd - totalDuration, layerStart + delay))
+    ? Math.min(layerEnd, exitWindowStart + Math.min(delay, Math.max(0, layerEnd - exitWindowStart - duration)))
     : layerStart + delay
   const animationEnd = animationStart + totalDuration
   const before = timelineTime < animationStart
