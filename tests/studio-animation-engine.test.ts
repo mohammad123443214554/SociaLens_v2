@@ -17,6 +17,7 @@ import { WIPE_MASK_REVEAL_ANIMATIONS, sampleMaskReveal, clipCanvasForMask } from
 import { LOOP_CONTINUOUS_ANIMATIONS } from '../lib/studio/loop-continuous-animations.ts'
 import { MOTION_DYNAMIC_ANIMATIONS } from '../lib/studio/motion-dynamic-animations.ts'
 import { CINEMATIC_LIGHT_ANIMATIONS } from '../lib/studio/cinematic-light-animations.ts'
+import { DIGITAL_CREATIVE_ANIMATIONS } from '../lib/studio/digital-creative-animations.ts'
 import { sampleCharacterMotion, splitStudioGraphemes } from '../lib/studio/character-animation-engine.ts'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameIndexAtTime, studioFrameTime, studioFrameTimeFromElapsedMs } from '../lib/studio/frame-clock.ts'
 
@@ -789,10 +790,54 @@ test('Cinematic & Light presets sample deterministically without invalid visual 
   }
 })
 
-test('complete Studio animation catalog now contains 250 unique presets', () => {
-  const all=[...BASIC_ENTRANCE_ANIMATIONS,...EXIT_ANIMATIONS,...BOUNCE_ELASTIC_ANIMATIONS,...ROTATION_3D_ANIMATIONS,...TYPING_CHARACTER_ANIMATIONS,...WORD_LINE_ANIMATIONS,...WIPE_MASK_REVEAL_ANIMATIONS,...LOOP_CONTINUOUS_ANIMATIONS,...MOTION_DYNAMIC_ANIMATIONS,...CINEMATIC_LIGHT_ANIMATIONS]
-  assert.equal(all.length,250)
-  assert.equal(new Set(all.map(item=>item.id)).size,250)
-  assert.equal(new Set(all.map(item=>item.name.toLowerCase())).size,250)
+test('Digital & Creative category contains 25 unique presets numbered 251–275',()=>{
+  assert.equal(DIGITAL_CREATIVE_ANIMATIONS.length,25)
+  assert.deepEqual(validateTextAnimationRegistry(DIGITAL_CREATIVE_ANIMATIONS),[])
+  assert.deepEqual(DIGITAL_CREATIVE_ANIMATIONS.map(item=>item.id),Array.from({length:25},(_,i)=>'digital-'+(251+i)))
+  assert.equal(new Set(DIGITAL_CREATIVE_ANIMATIONS.map(item=>item.name.toLowerCase())).size,25)
+  for(const item of DIGITAL_CREATIVE_ANIMATIONS){
+    assert.equal(item.category,'Digital & Creative')
+    assert.ok(item.description&&item.description.length>12)
+    assert.ok(item.defaultDurationMs>=900&&item.defaultDurationMs<=4000)
+    assert.ok(item.keyframes.length>=3,item.id+' has authored keyframes')
+    if([264,265,266,267,268,269,270,271,272].includes(Number(item.id.slice(8)))) assert.equal(item.mode,'exit',item.id+' exit mode')
+    if(Number(item.id.slice(8))>=267&&Number(item.id.slice(8))<=273) assert.equal(item.mode,'loop',item.id+' loop mode')
+    for(const frame of item.keyframes){
+      if(frame.blur!==undefined) assert.ok(frame.blur>=0&&frame.blur<=20,item.id+' blur bounded')
+      if(frame.opacity!==undefined) assert.ok(frame.opacity>=0&&frame.opacity<=1,item.id+' opacity bounded')
+      if(frame.scaleX!==undefined) assert.ok(frame.scaleX>0&&frame.scaleX<=1.2,item.id+' scaleX bounded')
+      if(frame.scaleY!==undefined) assert.ok(frame.scaleY>0&&frame.scaleY<=1.2,item.id+' scaleY bounded')
+    }
+    if(item.mode==='loop'){
+      const first=item.keyframes[0],last=item.keyframes[item.keyframes.length-1]
+      for(const key of ['opacity','translateX','translateY','scaleX','scaleY','rotate','rotateX','rotateY','skewX','skewY','blur','letterSpacing'] as const){
+        const neutral=key==='opacity'||key==='scaleX'||key==='scaleY'?1:0
+        assert.ok(Math.abs((first[key]??neutral)-(last[key]??neutral))<1e-9,item.id+' seamless '+key)
+      }
+    }
+  }
+})
+
+test('Digital & Creative presets sample deterministically across their full duration',()=>{
+  for(const definition of DIGITAL_CREATIVE_ANIMATIONS){
+    const settings={animationId:definition.id,durationMs:definition.defaultDurationMs,delayMs:0,repeatCount:definition.mode==='loop'?0:1,direction:'normal' as const,easing:'premium-out' as const,enabled:true}
+    for(let frame=0;frame<=60;frame++){
+      const time=definition.defaultDurationMs/1000*frame/60
+      const sample=sampleTextAnimation({definition,settings,timelineTimeSeconds:time,layerStartSeconds:0,layerDurationSeconds:15})
+      const repeated=sampleTextAnimation({definition,settings,timelineTimeSeconds:time,layerStartSeconds:0,layerDurationSeconds:15})
+      assert.deepEqual(sample,repeated,definition.id+' deterministic')
+      for(const [key,value] of Object.entries(sample)) if(typeof value==='number') assert.ok(Number.isFinite(value),definition.id+' finite '+key)
+      assert.ok(sample.scaleX>0&&sample.scaleY>0,definition.id+' positive scale')
+      assert.ok(sample.opacity>=0&&sample.opacity<=1,definition.id+' opacity bounds')
+      assert.ok(sample.blur>=0&&sample.blur<=20,definition.id+' blur bounds')
+    }
+  }
+})
+
+test('complete Studio animation catalog now contains 275 unique presets', () => {
+  const all=[...BASIC_ENTRANCE_ANIMATIONS,...EXIT_ANIMATIONS,...BOUNCE_ELASTIC_ANIMATIONS,...ROTATION_3D_ANIMATIONS,...TYPING_CHARACTER_ANIMATIONS,...WORD_LINE_ANIMATIONS,...WIPE_MASK_REVEAL_ANIMATIONS,...LOOP_CONTINUOUS_ANIMATIONS,...MOTION_DYNAMIC_ANIMATIONS,...CINEMATIC_LIGHT_ANIMATIONS,...DIGITAL_CREATIVE_ANIMATIONS]
+  assert.equal(all.length,275)
+  assert.equal(new Set(all.map(item=>item.id)).size,275)
+  assert.equal(new Set(all.map(item=>item.name.toLowerCase())).size,275)
   assert.deepEqual(validateTextAnimationRegistry(all),[])
 })
