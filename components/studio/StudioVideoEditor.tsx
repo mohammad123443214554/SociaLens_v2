@@ -399,7 +399,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const selectedAnimationId = selectedText?.animation?.animationId || null
   const previewCycleDurationMs = selectedAnimation ? (selectedText?.animation?.durationMs || selectedAnimation.defaultDurationMs) / Math.max(0.1, selectedText?.animation?.speed || 1) : 850
   const previewRepeats = selectedAnimation ? (selectedText?.animation?.repeatCount ?? ((selectedAnimation.mode === 'loop' || selectedAnimation.mode === 'continuous') ? 0 : 1)) : 1
-  const previewDurationMs = selectedAnimation ? (selectedText?.animation?.delayMs || 0) + previewCycleDurationMs * (previewRepeats === 0 ? 2 : Math.max(1, previewRepeats)) : 850
+  const previewDurationMs = selectedAnimation ? (selectedAnimation.mode === 'exit' ? 0 : (selectedText?.animation?.delayMs || 0)) + previewCycleDurationMs * (previewRepeats === 0 ? 2 : Math.max(1, previewRepeats)) : 850
   const exitPreviewDurationSeconds = previewCycleDurationMs * (previewRepeats === 0 ? 2 : Math.max(1, previewRepeats)) / 1000
   const animationPreviewStartSeconds = selectedText && selectedAnimation?.mode === 'exit'
     ? Math.max(selectedText.timelineStart, Math.min(selectedText.timelineStart + selectedText.timelineDuration - exitPreviewDurationSeconds, selectedText.timelineStart + (selectedText.animation?.delayMs || 0) / 1000))
