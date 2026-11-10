@@ -68,6 +68,59 @@ const sample = (definition: TextAnimationDefinition, time: number, overrides = {
     layerDurationSeconds: 4,
   })
 
+test('multiple text layers stay synchronized to one project playhead with independent offsets', () => {
+  const sharedPlayhead = 2.5
+  const earlyLayer = sampleTextAnimation({
+    definition: entrance,
+    settings: { animationId: entrance.id, durationMs: 1000, easing: 'linear', repeatCount: 1 },
+    timelineTimeSeconds: sharedPlayhead,
+    layerStartSeconds: 0,
+    layerDurationSeconds: 8,
+  })
+  const laterLayer = sampleTextAnimation({
+    definition: entrance,
+    settings: { animationId: entrance.id, durationMs: 2000, easing: 'linear', repeatCount: 1 },
+    timelineTimeSeconds: sharedPlayhead,
+    layerStartSeconds: 2,
+    layerDurationSeconds: 5,
+  })
+  assert.equal(earlyLayer.phase, 'after')
+  assert.equal(earlyLayer.progress, 1)
+  assert.equal(laterLayer.phase, 'running')
+  assert.equal(laterLayer.progress, 0.25)
+  assert.notEqual(earlyLayer.opacity, laterLayer.opacity)
+})
+
+test('overlapping entrance, exit and loop layers can be sampled at the exact same timeline timestamp', () => {
+  const sharedPlayhead = 3.25
+  const entranceLayer = sampleTextAnimation({
+    definition: entrance,
+    settings: { animationId: entrance.id, durationMs: 1000, easing: 'linear', repeatCount: 1 },
+    timelineTimeSeconds: sharedPlayhead,
+    layerStartSeconds: 3,
+    layerDurationSeconds: 4,
+  })
+  const exitLayer = sampleTextAnimation({
+    definition: exit,
+    settings: { animationId: exit.id, durationMs: 1000, easing: 'linear', repeatCount: 1 },
+    timelineTimeSeconds: sharedPlayhead,
+    layerStartSeconds: 0,
+    layerDurationSeconds: 4,
+  })
+  const loopLayer = sampleTextAnimation({
+    definition: loop,
+    settings: { animationId: loop.id, durationMs: 1000, easing: 'linear', repeatCount: 0 },
+    timelineTimeSeconds: sharedPlayhead,
+    layerStartSeconds: 3,
+    layerDurationSeconds: 4,
+  })
+  assert.equal(entranceLayer.progress, 0.25)
+  assert.equal(exitLayer.progress, 0.75)
+  assert.equal(loopLayer.phase, 'running')
+  assert.equal(loopLayer.progress, 0.25)
+})
+
+
 test('normalizes missing, invalid, and out-of-range settings safely', () => {
   assert.deepEqual(normalizeTextAnimationSettings(null), { animationId: null, enabled: false })
   const normalized = normalizeTextAnimationSettings({
