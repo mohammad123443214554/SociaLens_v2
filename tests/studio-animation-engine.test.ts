@@ -666,7 +666,7 @@ test('Loop & Continuous category contains 25 unique presets numbered 176–200',
       const start=first[key]??neutral
       const end=last[key]??neutral
       // A full 360° spin is visually identical to 0° at the cycle boundary.
-      if(key==='rotate') assert.ok(Math.abs((((end-start)%360)+540)%360-180)===180 || Math.abs(end-start)<1e-9 || Math.abs(Math.abs(end-start)-360)<1e-9,item.id+' rotationally seamless '+key)
+      if(key==='rotate') assert.ok(Math.abs((((end-start+180)%360)+360)%360-180)<1e-9,item.id+' rotationally seamless '+key)
       else assert.ok(Math.abs(start-end)<1e-9,item.id+' seamless '+key)
     }
   }
@@ -681,7 +681,7 @@ test('all 25 continuous presets loop indefinitely and produce repeatable finite 
     const thirdCycle=sampleTextAnimation({definition,settings,timelineTimeSeconds:duration*2+0.37,layerStartSeconds:0,layerDurationSeconds:12})
     const assertSameVisualFrame=(actual:ReturnType<typeof sampleTextAnimation>,expected:ReturnType<typeof sampleTextAnimation>,label:string)=>{
       for(const key of ['opacity','translateX','translateY','scaleX','scaleY','rotate','rotateX','rotateY','perspective','skewX','skewY','blur','letterSpacing'] as const){
-        const delta=key==='rotate'?Math.abs((((actual[key]-expected[key])%360)+540)%360-180):Math.abs(actual[key]-expected[key])
+        const delta=key==='rotate'?Math.abs((((actual[key]-expected[key]+180)%360)+360)%360-180):Math.abs(actual[key]-expected[key])
         assert.ok(delta<1e-7,definition.id+' '+label+' '+key+' drift '+delta)
       }
       assert.equal(actual.phase,expected.phase,definition.id+' '+label+' phase')
