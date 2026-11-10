@@ -25,15 +25,35 @@ const springSettle = (progress: number) => {
   return clamp(1 - Math.exp(-6.5 * t) * (Math.cos(9 * t) + 0.12 * Math.sin(9 * t)), 0, 1.045)
 }
 
+const GraphemeSegmenter = (Intl as unknown as {
+  Segmenter?: new (locale?: string, options?: { granularity: 'grapheme' }) => {
+    segment: (input: string) => Iterable<{ segment: string }>
+  }
+}).Segmenter
+const graphemeSegmenter = GraphemeSegmenter ? new GraphemeSegmenter(undefined, { granularity: 'grapheme' }) : null
+const graphemeCache = new Map<string, string[]>()
+const GRAPHEME_CACHE_LIMIT = 256
+
+/**
+ * Split text into user-perceived characters. A small LRU cache avoids rebuilding
+ * Intl.Segmenter results on every animation frame and is shared by preview/export.
+ */
 export function splitStudioGraphemes(value: string): string[] {
-  const Segmenter = (Intl as unknown as {
-    Segmenter?: new (locale?: string, options?: { granularity: 'grapheme' }) => {
-      segment: (input: string) => Iterable<{ segment: string }>
-    }
-  }).Segmenter
-  return Segmenter
-    ? Array.from(new Segmenter(undefined, { granularity: 'grapheme' }).segment(value), item => item.segment)
+  const cached = graphemeCache.get(value)
+  if (cached) {
+    graphemeCache.delete(value)
+    graphemeCache.set(value, cached)
+    return cached
+  }
+  const result = graphemeSegmenter
+    ? Array.from(graphemeSegmenter.segment(value), item => item.segment)
     : Array.from(value)
+  if (graphemeCache.size >= GRAPHEME_CACHE_LIMIT) {
+    const oldest = graphemeCache.keys().next().value
+    if (oldest !== undefined) graphemeCache.delete(oldest)
+  }
+  graphemeCache.set(value, result)
+  return result
 }
 
 /** Samples restrained, deterministic per-grapheme motion for preview and export. */
