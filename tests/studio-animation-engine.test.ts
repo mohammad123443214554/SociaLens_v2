@@ -486,8 +486,6 @@ const COMPLETE_STUDIO_ANIMATION_CATALOG = [
   ...BOUNCE_ELASTIC_ANIMATIONS,
   ...ROTATION_3D_ANIMATIONS,
   ...TYPING_CHARACTER_ANIMATIONS,
-  ...WORD_LINE_ANIMATIONS,
-  ...WIPE_MASK_REVEAL_ANIMATIONS,
 ]
 
 test('previous Studio catalog QA validates the first 125 presets together with unique ids and names', () => {
