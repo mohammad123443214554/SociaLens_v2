@@ -13,6 +13,7 @@ import { BOUNCE_ELASTIC_ANIMATIONS } from '../lib/studio/bounce-elastic-animatio
 import { ROTATION_3D_ANIMATIONS } from '../lib/studio/rotation-3d-animations.ts'
 import { TYPING_CHARACTER_ANIMATIONS } from '../lib/studio/typing-character-animations.ts'
 import { WORD_LINE_ANIMATIONS, sampleWordMotion } from '../lib/studio/word-line-animations.ts'
+import { WIPE_MASK_REVEAL_ANIMATIONS, sampleMaskReveal, clipCanvasForMask } from '../lib/studio/wipe-mask-reveal-animations.ts'
 import { sampleCharacterMotion, splitStudioGraphemes } from '../lib/studio/character-animation-engine.ts'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameIndexAtTime, studioFrameTime, studioFrameTimeFromElapsedMs } from '../lib/studio/frame-clock.ts'
 
@@ -485,9 +486,11 @@ const COMPLETE_STUDIO_ANIMATION_CATALOG = [
   ...BOUNCE_ELASTIC_ANIMATIONS,
   ...ROTATION_3D_ANIMATIONS,
   ...TYPING_CHARACTER_ANIMATIONS,
+  ...WORD_LINE_ANIMATIONS,
+  ...WIPE_MASK_REVEAL_ANIMATIONS,
 ]
 
-test('final Studio catalog QA validates all 125 presets together with unique ids and names', () => {
+test('previous Studio catalog QA validates the first 125 presets together with unique ids and names', () => {
   assert.equal(BASIC_ENTRANCE_ANIMATIONS.length, 25)
   assert.equal(EXIT_ANIMATIONS.length, 25)
   assert.equal(BOUNCE_ELASTIC_ANIMATIONS.length, 25)
@@ -499,7 +502,7 @@ test('final Studio catalog QA validates all 125 presets together with unique ids
   assert.deepEqual(validateTextAnimationRegistry(COMPLETE_STUDIO_ANIMATION_CATALOG), [])
 })
 
-test('all 125 Studio presets sample deterministically across the complete animation interval', () => {
+test('first 125 Studio presets sample deterministically across the complete animation interval', () => {
   for (const definition of COMPLETE_STUDIO_ANIMATION_CATALOG) {
     const duration = definition.defaultDurationMs
     for (let frame = 0; frame <= 60; frame++) {
@@ -592,10 +595,66 @@ test('line reveal and line cascade sequence complete lines in order', () => {
   assert.ok(cascadeFirst.opacity>cascadeLast.opacity)
 })
 
-test('complete Studio animation catalog now contains 150 unique presets', () => {
-  const all=[...BASIC_ENTRANCE_ANIMATIONS,...EXIT_ANIMATIONS,...BOUNCE_ELASTIC_ANIMATIONS,...ROTATION_3D_ANIMATIONS,...TYPING_CHARACTER_ANIMATIONS,...WORD_LINE_ANIMATIONS]
-  assert.equal(all.length,150)
-  assert.equal(new Set(all.map(item=>item.id)).size,150)
-  assert.equal(new Set(all.map(item=>item.name.toLowerCase())).size,150)
+test('Wipe, Mask & Reveal category contains exactly 25 unique presets numbered 151–175',()=>{
+  assert.equal(WIPE_MASK_REVEAL_ANIMATIONS.length,25)
+  assert.deepEqual(validateTextAnimationRegistry(WIPE_MASK_REVEAL_ANIMATIONS),[])
+  assert.deepEqual(WIPE_MASK_REVEAL_ANIMATIONS.map(item=>item.id),Array.from({length:25},(_,i)=>'mask-'+(151+i)))
+  assert.equal(new Set(WIPE_MASK_REVEAL_ANIMATIONS.map(item=>item.name.toLowerCase())).size,25)
+  assert.equal(new Set(WIPE_MASK_REVEAL_ANIMATIONS.map(item=>item.maskEffect)).size,25)
+  for(const item of WIPE_MASK_REVEAL_ANIMATIONS){
+    assert.equal(item.category,'Wipe, Mask & Reveal')
+    assert.equal(item.mode,'entrance')
+    assert.ok(item.description && item.description.length>12)
+    assert.ok(item.defaultDurationMs>=850&&item.defaultDurationMs<=1250)
+  }
+})
+
+test('all mask reveal effects are deterministic, bounded, start hidden and finish fully revealed',()=>{
+  for(const definition of WIPE_MASK_REVEAL_ANIMATIONS){
+    const effect=definition.maskEffect!
+    let previous=-1
+    for(let frame=0;frame<=60;frame++){
+      const progress=frame/60
+      const sample=sampleMaskReveal({effect,progress,intensity:1})
+      assert.deepEqual(sample,sampleMaskReveal({effect,progress,intensity:1}),definition.id+' deterministic')
+      assert.ok(Number.isFinite(sample.progress)&&sample.progress>=previous-1e-12&&sample.progress>=0&&sample.progress<=1,definition.id+' monotonic progress')
+      assert.ok(sample.clipPath.length>0)
+      previous=sample.progress
+    }
+    const start=sampleMaskReveal({effect,progress:0})
+    const end=sampleMaskReveal({effect,progress:1})
+    assert.equal(start.progress,0,definition.id+' starts closed')
+    assert.equal(end.progress,1,definition.id+' ends open')
+    assert.equal(end.clipPath,'inset(0 0 0 0)',definition.id+' exact full reveal')
+    assert.equal(end.maskImage,'linear-gradient(#000,#000)',definition.id+' full opaque mask')
+  }
+})
+
+test('canvas mask clipping uses the same terminal reveal state without non-finite geometry',()=>{
+  const calls:Array<{method:string;values:number[]}>=[]
+  const ctx={
+    beginPath(){calls.push({method:'beginPath',values:[]})},
+    rect(...values:number[]){calls.push({method:'rect',values})},
+    clip(){calls.push({method:'clip',values:[]})},
+    arc(...values:number[]){calls.push({method:'arc',values})},
+    ellipse(...values:number[]){calls.push({method:'ellipse',values})},
+    moveTo(...values:number[]){calls.push({method:'moveTo',values})},
+    lineTo(...values:number[]){calls.push({method:'lineTo',values})},
+    closePath(){calls.push({method:'closePath',values:[]})},
+  } as unknown as CanvasRenderingContext2D
+  for(const definition of WIPE_MASK_REVEAL_ANIMATIONS){
+    calls.length=0
+    const sample=sampleMaskReveal({effect:definition.maskEffect!,progress:1})
+    clipCanvasForMask(ctx,sample,420,160)
+    assert.ok(calls.some(call=>call.method==='clip'),definition.id+' applies canvas clip')
+    assert.ok(calls.every(call=>call.values.every(Number.isFinite)),definition.id+' finite canvas geometry')
+  }
+})
+
+test('complete Studio animation catalog now contains 175 unique presets', () => {
+  const all=[...BASIC_ENTRANCE_ANIMATIONS,...EXIT_ANIMATIONS,...BOUNCE_ELASTIC_ANIMATIONS,...ROTATION_3D_ANIMATIONS,...TYPING_CHARACTER_ANIMATIONS,...WORD_LINE_ANIMATIONS,...WIPE_MASK_REVEAL_ANIMATIONS]
+  assert.equal(all.length,175)
+  assert.equal(new Set(all.map(item=>item.id)).size,175)
+  assert.equal(new Set(all.map(item=>item.name.toLowerCase())).size,175)
   assert.deepEqual(validateTextAnimationRegistry(all),[])
 })
