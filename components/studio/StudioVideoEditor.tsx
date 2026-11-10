@@ -990,6 +990,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           const lineHeight = Math.round(layer.fontSize * scale * 1.2)
           const formattedText = getFormattedText(layer)
           const characterDefinition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
+          const wordDefinition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
           const characterList = splitStudioGraphemes(formattedText)
           let characterOffset = 0
           formattedText.split(/\n/).forEach((line, index) => {
@@ -1022,7 +1023,33 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           if (effect === 'Engrave') { ctx.shadowColor = 'rgba(0,0,0,.8)'; ctx.shadowOffsetX = -1*scale; ctx.shadowOffsetY = -1*scale; ctx.shadowBlur = 1*scale }
           if (!characterDefinition?.characterEffect && (effect === 'Glitch' || effect === 'RGB Split')) { ctx.save(); ctx.globalAlpha *= .55; ctx.fillStyle = effect === 'Glitch' ? '#ff1744' : '#ff3030'; ctx.fillText(line, textX - 2*scale, y + index * lineHeight, maxWidth); ctx.fillStyle = '#00d9ff'; ctx.fillText(line, textX + 2*scale, y + index * lineHeight, maxWidth); ctx.restore() }
           if (!characterDefinition?.characterEffect && (effect === 'Echo' || effect === 'Ghost' || effect === 'Long Shadow' || effect === '3D Extrude')) { ctx.save(); ctx.globalAlpha *= .32; ctx.fillStyle = effectColor; for(let step=4;step>=1;step--) ctx.fillText(line,textX+step*scale,y+index*lineHeight+step*scale,maxWidth); ctx.restore() }
-            if (characterDefinition?.characterEffect && animationSample) {
+            if (wordDefinition?.wordEffect && animationSample) {
+              const tokens = line.match(/\\S+|\\s+/g) || []
+              const wordsInLayer = characterList.filter(token => !/^\\s+$/.test(token)).length
+              const measuredLine = ctx.measureText(line).width
+              let cursor = layer.align === 'left' ? textX : layer.align === 'right' ? textX + maxWidth - measuredLine : textX + (maxWidth - measuredLine) / 2
+              let wordIndex = 0
+              let lineIndex = index
+              tokens.forEach(token => {
+                if (/^\\s+$/.test(token)) { cursor += ctx.measureText(token).width; return }
+                const wordWidth = ctx.measureText(token).width
+                const motion = sampleWordMotion({ effect: wordDefinition.wordEffect!, progress: animationSample.progress, index: wordIndex++, count: Math.max(1, wordsInLayer), lineIndex, lineCount: formattedText.split('\\n').length, intensity: layer.animation?.intensity ?? 1 })
+                ctx.save()
+                ctx.globalAlpha *= motion.opacity
+                ctx.textAlign = 'left'
+                ctx.textBaseline = 'top'
+                ctx.translate(cursor + wordWidth / 2 + motion.x * scale, y + index * lineHeight + lineHeight / 2 + motion.y * scale)
+                ctx.rotate(motion.rotate * Math.PI / 180)
+                ctx.transform(1, 0, Math.tan(motion.rotateX * Math.PI / 180), 1, 0, 0)
+                ctx.scale(motion.scale, motion.scale)
+                if (typeof ctx.filter === 'string' && motion.blur > 0) ctx.filter = 'blur(' + motion.blur * scale + 'px)'
+                if (motion.clip < 1) { ctx.beginPath(); ctx.rect(-wordWidth / 2, -lineHeight / 2, wordWidth * motion.clip, lineHeight * 2); ctx.clip() }
+                if (motion.opacity > .001) ctx.fillText(token, -wordWidth / 2, lineHeight * .1)
+                ctx.restore()
+                cursor += wordWidth
+              })
+              characterOffset += splitStudioGraphemes(line).length + 1
+            } else if (characterDefinition?.characterEffect && animationSample) {
               const glyphs=splitStudioGraphemes(line),widths=glyphs.map(g=>ctx.measureText(g).width),natural=widths.reduce((s,w)=>s+w,0)+Math.max(0,glyphs.length-1)*animationSample.letterSpacing*scale,fit=natural>maxWidth&&natural>0?maxWidth/natural:1,lineWidth=natural*fit
               let cursor=layer.align==='left'?textX:layer.align==='right'?textX+maxWidth-lineWidth:textX+(maxWidth-lineWidth)/2
               glyphs.forEach((glyph,glyphIndex)=>{const motion=sampleCharacterMotion({effect:characterDefinition.characterEffect!,progress:animationSample.progress,index:characterOffset+glyphIndex,count:characterList.length,intensity:layer.animation?.intensity??1}),w=widths[glyphIndex]*fit;ctx.save();ctx.globalAlpha*=motion.opacity;ctx.textAlign='left';ctx.textBaseline='top';ctx.translate(cursor+w/2+motion.translateX*scale,y+index*lineHeight+lineHeight/2+motion.translateY*scale);ctx.rotate(motion.rotate*Math.PI/180);ctx.scale(motion.scaleX*fit,motion.scaleY);if(typeof ctx.filter==='string'&&motion.blur>0)ctx.filter='blur('+motion.blur*scale+'px)';if(motion.clipProgress<1){ctx.beginPath();ctx.rect(-widths[glyphIndex]/2,-lineHeight*.5,widths[glyphIndex]*motion.clipProgress,lineHeight*2);ctx.clip()}if(motion.opacity>.001){if(['Outline','Double Outline','Triple Stroke','Neon Outline','Gradient Stroke','Hollow Text','Comic'].includes(effect)){ctx.strokeStyle=effectColor;ctx.lineWidth=Math.max(1,(effect==='Triple Stroke'?3:1.8)*strength*scale);ctx.strokeText(glyph,-widths[glyphIndex]/2,lineHeight*.1)}ctx.fillText(glyph,-widths[glyphIndex]/2,lineHeight*.1)};ctx.restore();cursor+=w+animationSample.letterSpacing*scale*fit});characterOffset+=glyphs.length+1
