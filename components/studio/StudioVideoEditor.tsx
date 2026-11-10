@@ -10,6 +10,7 @@ import { BOUNCE_ELASTIC_ANIMATIONS } from '@/lib/studio/bounce-elastic-animation
 import { ROTATION_3D_ANIMATIONS } from '@/lib/studio/rotation-3d-animations'
 import { TYPING_CHARACTER_ANIMATIONS } from '@/lib/studio/typing-character-animations'
 import { sampleCharacterMotion, splitStudioGraphemes } from '@/lib/studio/character-animation-engine'
+import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS]
 import {
@@ -762,13 +763,15 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setPlaying(true)
     setError('')
     const tick = (now: number) => {
-      const time = Math.min(projectEnd, Math.max(0, (now - playbackStartedAt.current) / 1000))
+      const elapsedMs = Math.max(0, now - playbackStartedAt.current)
+      const time = Math.min(projectEnd, studioFrameTimeFromElapsedMs(elapsedMs))
       setPlayhead(time)
       const active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
       const video = previewRef.current
       if (active?.kind === 'video' && video) {
         const localTime = active.trimStart + time - active.timelineStart
-        if (Math.abs(video.currentTime - localTime) > 0.45) video.currentTime = Math.min(active.trimEnd, localTime)
+        const frameAlignedVideoTime = quantizeStudioTime(localTime)
+        if (Math.abs(video.currentTime - frameAlignedVideoTime) > STUDIO_FRAME_DURATION_SECONDS * 2.5) video.currentTime = Math.min(active.trimEnd, frameAlignedVideoTime)
         video.volume = muted ? 0 : volume / 100
         video.muted = muted
         if (video.paused) void video.play().catch(() => setError('The browser could not play this video clip.'))
@@ -777,8 +780,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         const elapsed = time - audio.timelineStart
         const audioActive = elapsed >= 0 && elapsed < audio.trimEnd - audio.trimStart
         if (audioActive) {
-          const target = audio.trimStart + elapsed
-          if (Math.abs(audioRef.current.currentTime - target) > 0.4) audioRef.current.currentTime = target
+          const target = quantizeStudioTime(audio.trimStart + elapsed)
+          if (Math.abs(audioRef.current.currentTime - target) > 0.1) audioRef.current.currentTime = target
           audioRef.current.volume = audioVolume / 100
           if (audioRef.current.paused) void audioRef.current.play().catch(() => setNotice('Browser blocked background audio preview.'))
         } else if (!audioRef.current.paused) audioRef.current.pause()
@@ -814,7 +817,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const tick = (now: number) => {
       const elapsed = Math.max(0, now - animationPreviewStart.current)
       const duration = selectedAnimation ? (selectedText?.animation?.durationMs || selectedAnimation.defaultDurationMs) : 850
-      setAnimationPreviewTime(Math.min(duration, elapsed))
+      setAnimationPreviewTime(Math.min(duration, studioFrameTimeFromElapsedMs(elapsed) * 1000))
       if (elapsed >= duration) {
         setIsAnimationPreviewing(false)
         return
@@ -873,7 +876,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       canvas.height = Math.min(1920, Math.max(240, Math.round(exportHeight)))
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Could not create the video rendering canvas.')
-      const stream = canvas.captureStream(30)
+      const stream = canvas.captureStream(STUDIO_FRAME_RATE)
       const AudioContextClass = window.AudioContext
       if (AudioContextClass && (audio || clips.some(item => item.kind === 'video'))) {
         audioContext = new AudioContextClass()
@@ -1034,7 +1037,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           await new Promise<void>(resolve => {
             const frame = (now: number) => {
               const elapsed = Math.min(gapDuration, (now - gapStartedAt) / 1000)
-              const timelineTime = gapStart + elapsed
+              const timelineTime = quantizeStudioTime(gapStart + elapsed)
               ctx.fillStyle = '#000000'
               ctx.fillRect(0, 0, canvas.width, canvas.height)
               drawTitle(timelineTime)
@@ -1061,7 +1064,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               const width = image.width * scale
               const height = image.height * scale
               ctx.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
-              const timelineTime = clip.timelineStart + Math.min(durationMs / 1000, (now - start) / 1000)
+              const timelineTime = quantizeStudioTime(clip.timelineStart + Math.min(durationMs / 1000, (now - start) / 1000))
               drawTitle(timelineTime)
               syncMusic(timelineTime)
               setExportProgress(Math.min(99, Math.round((timelineTime / Math.max(1, projectEnd)) * 100)))
@@ -1088,7 +1091,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           await video.play()
           await new Promise<void>((resolve, reject) => {
             const frame = () => {
-              const timelineTime = clip.timelineStart + Math.min(clip.trimEnd - clip.trimStart, video.currentTime - clip.trimStart)
+              const timelineTime = quantizeStudioTime(clip.timelineStart + Math.min(clip.trimEnd - clip.trimStart, video.currentTime - clip.trimStart))
               if (video.readyState >= 2 && video.videoWidth > 0) drawVideoFrame(video, timelineTime)
               syncMusic(timelineTime)
               setExportProgress(Math.min(99, Math.round((timelineTime / Math.max(1, projectEnd)) * 100)))
