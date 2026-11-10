@@ -1,12 +1,6 @@
-import type { TextAnimationDefinition } from './animation-engine'
+import type { MaskRevealEffect, TextAnimationDefinition } from './animation-engine'
 
-export type MaskRevealEffect =
-  | 'wipe-left' | 'wipe-right' | 'wipe-up' | 'wipe-down'
-  | 'diagonal-down' | 'diagonal-up' | 'center-open' | 'center-close'
-  | 'iris-circle' | 'iris-ellipse' | 'diamond' | 'radial-sweep'
-  | 'clock-wipe' | 'venetian' | 'checkerboard' | 'box-reveal'
-  | 'corner-sweep' | 'curtain' | 'shutter' | 'scanline'
-  | 'pixel-grid' | 'feathered-wipe' | 'starburst' | 'spiral' | 'cross-reveal'
+export type { MaskRevealEffect } from './animation-engine'
 
 export type MaskRevealSample = {
   progress: number
