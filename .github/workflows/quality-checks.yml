@@ -34,6 +34,9 @@ jobs:
       - name: TypeScript validation
         run: npm run typecheck
 
+      - name: Studio animation engine tests
+        run: npm run test:studio-animation
+
       - name: Recommendation scoring tests
         run: npm run test:recommendation
 
