@@ -800,8 +800,8 @@ test('Digital & Creative category contains 25 unique presets numbered 251–275'
     assert.ok(item.description&&item.description.length>12)
     assert.ok(item.defaultDurationMs>=900&&item.defaultDurationMs<=4000)
     assert.ok(item.keyframes.length>=3,item.id+' has authored keyframes')
-    if([264,265,266,267,268,269,270,271,272].includes(Number(item.id.slice(8)))) assert.equal(item.mode,'exit',item.id+' exit mode')
-    if(Number(item.id.slice(8))>=267&&Number(item.id.slice(8))<=273) assert.equal(item.mode,'loop',item.id+' loop mode')
+    if([264,265,266,267].includes(Number(item.id.slice(8)))) assert.equal(item.mode,'exit',item.id+' exit mode')
+    if(Number(item.id.slice(8))>=268&&Number(item.id.slice(8))<=274) assert.equal(item.mode,'loop',item.id+' loop mode')
     for(const frame of item.keyframes){
       if(frame.blur!==undefined) assert.ok(frame.blur>=0&&frame.blur<=20,item.id+' blur bounded')
       if(frame.opacity!==undefined) assert.ok(frame.opacity>=0&&frame.opacity<=1,item.id+' opacity bounded')
