@@ -32,5 +32,5 @@ const presets:readonly Preset[]=[
 ]
 export const CINEMATIC_LIGHT_ANIMATIONS:readonly TextAnimationDefinition[]=presets.map((preset,index)=>({
  id:'cinematic-'+(226+index),name:preset.name,description:preset.description,category:'Cinematic & Light',
- mode:index>=23?'loop':'entrance',defaultDurationMs:preset.duration,defaultEasing:'premium-out',compositing:'replace',keyframes:preset.frames,
+ mode:index===4||index===11?'exit':index>=23?'loop':'entrance',defaultDurationMs:preset.duration,defaultEasing:'premium-out',compositing:'replace',keyframes:preset.frames,
 }))
