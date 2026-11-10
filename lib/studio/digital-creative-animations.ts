@@ -27,7 +27,6 @@ const presets:readonly Preset[]=[
 {name:'Neon Signal Loop',description:'A gentle opacity and skew shimmer that cycles back to the exact starting state.',duration:2800,mode:'loop',frames:[{at:0,opacity:.9,skewX:0},{at:.5,opacity:1,skewX:1.2},{at:1,opacity:.9,skewX:0}]},
 {name:'Matrix Scroll',description:'A restrained vertical data-scroll motion that repeats without a visible jump.',duration:3000,mode:'loop',frames:[{at:0,translateY:-3,opacity:.9},{at:.5,translateY:3,opacity:1},{at:1,translateY:-3,opacity:.9}]},
 {name:'Quantum Shift',description:'A controlled micro displacement and scale pulse with a seamless cycle.',duration:2400,mode:'loop',frames:[{at:0,translateX:-2,scaleX:1,scaleY:1},{at:.5,translateX:2,scaleX:1.015,scaleY:1.015},{at:1,translateX:-2,scaleX:1,scaleY:1}]},
-{name:'Digital Fold',description:'A compact 3D fold opens into a front-facing title with a deliberate settle.',duration:1550,frames:[{at:0,opacity:0,rotateY:-75,scaleX:.82,blur:4},{at:.62,opacity:1,rotateY:5,scaleX:1.02,blur:1},{at:1,opacity:1,rotateY:0,scaleX:1,blur:0}]},
 {name:'Cybernetic Focus',description:'A precise digital focus transition that sharpens and aligns the title.',duration:1450,frames:[{at:0,opacity:.15,blur:12,letterSpacing:5,scaleX:1.04,scaleY:1.04},{at:.6,opacity:1,blur:1,letterSpacing:-.5,scaleX:1.01,scaleY:1.01},{at:1,opacity:1,blur:0,letterSpacing:0,scaleX:1,scaleY:1}]},
 ]
 export const DIGITAL_CREATIVE_ANIMATIONS:readonly TextAnimationDefinition[]=presets.map((preset,index)=>({
