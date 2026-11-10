@@ -21,6 +21,9 @@ export type TextAnimationEasing =
   | 'cubic-in'
   | 'cubic-out'
   | 'cubic-in-out'
+  | 'premium-out'
+  | 'premium-in'
+  | 'premium-in-out'
   | 'back-out'
   | 'back-in'
   | 'elastic-out'
@@ -120,6 +123,10 @@ const EASING: Record<TextAnimationEasing, (value: number) => number> = {
   'cubic-in': value => value * value * value,
   'cubic-out': value => 1 - Math.pow(1 - value, 3),
   'cubic-in-out': value => value < 0.5 ? 4 * value * value * value : 1 - Math.pow(-2 * value + 2, 3) / 2,
+  // Premium motion curves: quick, controlled travel with a long, gentle settle.
+  'premium-out': value => 1 - Math.pow(1 - value, 5),
+  'premium-in': value => Math.pow(value, 5),
+  'premium-in-out': value => value < 0.5 ? 16 * Math.pow(value, 5) : 1 - Math.pow(-2 * value + 2, 5) / 2,
   'back-out': value => {
     const c1 = 1.70158
     const c3 = c1 + 1
@@ -217,22 +224,43 @@ function interpolateFrame(
   intensity: number,
 ): Omit<TextAnimationSample, 'visible' | 'progress' | 'phase'> {
   const frames = definition.keyframes
-  const position = clamp(progress, 0, 1)
+  const rawProgress = clamp(progress, 0, 1)
+  // Overshooting curves intentionally retain their authored overshoot. All other
+  // curves remap the full animation clock once, then use a C1-continuous Hermite
+  // spline between keyframes so velocity does not abruptly restart at each stop.
+  const overshoots = easing === 'back-out' || easing === 'back-in' || easing === 'elastic-out' || easing === 'bounce-out'
+  const position = overshoots ? rawProgress : clamp(EASING[easing](rawProgress), 0, 1)
   let rightIndex = frames.findIndex(frame => frame.at >= position)
   if (rightIndex < 0) rightIndex = frames.length - 1
-  // The left frame is always the preceding keyframe. The previous implementation
-  // accidentally selected the right frame for most in-between progress values,
-  // causing animations to jump directly to their next keyframe.
   const leftIndex = Math.max(0, rightIndex - 1)
   const left = frames[leftIndex]
   const right = frames[rightIndex]
   const span = right.at - left.at
   const local = span <= 0 ? 1 : clamp((position - left.at) / span, 0, 1)
-  const eased = EASING[easing](local)
   const value = (key: keyof TextAnimationFrame, fallback: number) => {
-    const from = finite(left[key], fallback)
-    const to = finite(right[key], from)
-    return from + (to - from) * eased
+    const at = (index: number) => finite(frames[index][key], fallback)
+    const from = at(leftIndex)
+    const to = at(rightIndex)
+    if (overshoots) {
+      const eased = EASING[easing](local)
+      return from + (to - from) * eased
+    }
+    if (span <= 0 || leftIndex === rightIndex) return to
+    const previousIndex = Math.max(0, leftIndex - 1)
+    const nextIndex = Math.min(frames.length - 1, rightIndex + 1)
+    const leftSlope = leftIndex === 0
+      ? (at(1) - at(0)) / Math.max(1e-6, frames[1].at - frames[0].at)
+      : (at(rightIndex) - at(previousIndex)) / Math.max(1e-6, frames[rightIndex].at - frames[previousIndex].at)
+    const rightSlope = rightIndex === frames.length - 1
+      ? (at(rightIndex) - at(leftIndex)) / span
+      : (at(nextIndex) - at(leftIndex)) / Math.max(1e-6, frames[nextIndex].at - frames[leftIndex].at)
+    const t2 = local * local
+    const t3 = t2 * local
+    const h00 = 2 * t3 - 3 * t2 + 1
+    const h10 = t3 - 2 * t2 + local
+    const h01 = -2 * t3 + 3 * t2
+    const h11 = t3 - t2
+    return h00 * from + h10 * leftSlope * span + h01 * to + h11 * rightSlope * span
   }
   const neutral = {
     opacity: 1, translateX: 0, translateY: 0, scaleX: 1, scaleY: 1,
