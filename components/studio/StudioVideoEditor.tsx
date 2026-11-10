@@ -397,8 +397,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const selectedText = textLayers.find(item => item.id === selectedTextId) || null
   const selectedAnimation = selectedText?.animation?.animationId ? STUDIO_TEXT_ANIMATION_BY_ID.get(selectedText.animation.animationId) : undefined
   const selectedAnimationId = selectedText?.animation?.animationId || null
-  const previewDurationMs = selectedAnimation ? (selectedText?.animation?.delayMs || 0) + (selectedText?.animation?.durationMs || selectedAnimation.defaultDurationMs) / Math.max(0.1, selectedText?.animation?.speed || 1) : 850
-  const animationPreviewStartSeconds = selectedText && selectedAnimation?.mode === 'exit' ? Math.max(selectedText.timelineStart, selectedText.timelineStart + selectedText.timelineDuration - previewDurationMs / 1000) : selectedText?.timelineStart || 0
+  const previewCycleDurationMs = selectedAnimation ? (selectedText?.animation?.durationMs || selectedAnimation.defaultDurationMs) / Math.max(0.1, selectedText?.animation?.speed || 1) : 850
+  const previewRepeats = selectedAnimation ? (selectedText?.animation?.repeatCount ?? ((selectedAnimation.mode === 'loop' || selectedAnimation.mode === 'continuous') ? 0 : 1)) : 1
+  const previewDurationMs = selectedAnimation ? (selectedText?.animation?.delayMs || 0) + previewCycleDurationMs * (previewRepeats === 0 ? 2 : Math.max(1, previewRepeats)) : 850
+  const exitPreviewDurationSeconds = previewCycleDurationMs * (previewRepeats === 0 ? 2 : Math.max(1, previewRepeats)) / 1000
+  const animationPreviewStartSeconds = selectedText && selectedAnimation?.mode === 'exit'
+    ? Math.max(selectedText.timelineStart, Math.min(selectedText.timelineStart + selectedText.timelineDuration - exitPreviewDurationSeconds, selectedText.timelineStart + (selectedText.animation?.delayMs || 0) / 1000))
+    : selectedText?.timelineStart || 0
   const animationPreviewSample = selectedText && selectedAnimation && isAnimationPreviewing ? sampleTextAnimation({ definition: selectedAnimation, settings: { ...selectedText.animation, animationId: selectedAnimation.id, enabled: true }, timelineTimeSeconds: animationPreviewStartSeconds + animationPreviewTime / 1000, layerStartSeconds: selectedText.timelineStart, layerDurationSeconds: selectedText.timelineDuration }) : null
   const getLayerAnimationSample = (layer: TextLayer, timelineTime: number) => {
     const animationId = layer.animation?.animationId
@@ -857,7 +862,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     let frame = 0
     const tick = (now: number) => {
       const elapsed = Math.max(0, now - animationPreviewStart.current)
-      const duration = selectedAnimation ? (selectedText?.animation?.delayMs || 0) + (selectedText?.animation?.durationMs || selectedAnimation.defaultDurationMs) / Math.max(0.1, selectedText?.animation?.speed || 1) : 850
+      const duration = previewDurationMs
       const nextPreviewTime = elapsed >= duration ? duration : studioFrameTimeFromElapsedMs(elapsed) * 1000
       if (nextPreviewTime !== lastAnimationPreviewTime.current) {
         lastAnimationPreviewTime.current = nextPreviewTime
