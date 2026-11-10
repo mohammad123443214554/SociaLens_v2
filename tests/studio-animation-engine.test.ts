@@ -476,3 +476,67 @@ test('preview elapsed time and export timeline time resolve to identical animati
     assert.equal(previewTime, exportTime, 'frame ' + frame)
   }
 })
+
+
+const COMPLETE_STUDIO_ANIMATION_CATALOG = [
+  ...BASIC_ENTRANCE_ANIMATIONS,
+  ...EXIT_ANIMATIONS,
+  ...BOUNCE_ELASTIC_ANIMATIONS,
+  ...ROTATION_3D_ANIMATIONS,
+  ...TYPING_CHARACTER_ANIMATIONS,
+]
+
+test('final Studio catalog QA validates all 125 presets together with unique ids and names', () => {
+  assert.equal(BASIC_ENTRANCE_ANIMATIONS.length, 25)
+  assert.equal(EXIT_ANIMATIONS.length, 25)
+  assert.equal(BOUNCE_ELASTIC_ANIMATIONS.length, 25)
+  assert.equal(ROTATION_3D_ANIMATIONS.length, 25)
+  assert.equal(TYPING_CHARACTER_ANIMATIONS.length, 25)
+  assert.equal(COMPLETE_STUDIO_ANIMATION_CATALOG.length, 125)
+  assert.equal(new Set(COMPLETE_STUDIO_ANIMATION_CATALOG.map(item => item.id)).size, 125)
+  assert.equal(new Set(COMPLETE_STUDIO_ANIMATION_CATALOG.map(item => item.name.trim().toLocaleLowerCase())).size, 125)
+  assert.deepEqual(validateTextAnimationRegistry(COMPLETE_STUDIO_ANIMATION_CATALOG), [])
+})
+
+test('all 125 Studio presets sample deterministically across the complete animation interval', () => {
+  for (const definition of COMPLETE_STUDIO_ANIMATION_CATALOG) {
+    const duration = definition.defaultDurationMs
+    for (let frame = 0; frame <= 60; frame++) {
+      const time = 2 + duration / 1000 * frame / 60
+      const input = {
+        definition,
+        settings: {
+          animationId: definition.id,
+          durationMs: duration,
+          delayMs: 0,
+          repeatCount: definition.mode === 'loop' || definition.mode === 'continuous' ? 0 : 1,
+          easing: definition.defaultEasing || 'ease',
+          enabled: true,
+        },
+        timelineTimeSeconds: time,
+        layerStartSeconds: 2,
+        layerDurationSeconds: Math.max(4, duration / 1000 + 1),
+      }
+      const first = sampleTextAnimation(input)
+      const second = sampleTextAnimation(input)
+      assert.deepEqual(first, second, definition.id + ' deterministic frame ' + frame)
+      for (const [key, value] of Object.entries(first)) {
+        if (typeof value === 'number') assert.ok(Number.isFinite(value), definition.id + ' finite ' + key)
+      }
+      assert.ok(first.opacity >= 0 && first.opacity <= 1, definition.id + ' opacity bounds')
+      assert.ok(first.scaleX > 0 && first.scaleY > 0, definition.id + ' positive scale')
+      assert.ok(first.blur >= 0, definition.id + ' non-negative blur')
+      assert.ok(Math.abs(first.translateX) < 2000 && Math.abs(first.translateY) < 2000, definition.id + ' bounded travel')
+    }
+  }
+})
+
+test('grapheme segmentation is cached and preserves Unicode text without shared mutation', () => {
+  const text = 'SociaLens 👩🏽‍💻 é ✨'
+  const first = splitStudioGraphemes(text)
+  const second = splitStudioGraphemes(text)
+  assert.equal(first, second)
+  assert.deepEqual(first, ['S','o','c','i','a','L','e','n','s',' ','👩🏽‍💻',' ','é',' ','✨'])
+  assert.throws(() => { (first as unknown as string[]).push('corrupt') })
+  assert.deepEqual(splitStudioGraphemes(text), first)
+})
