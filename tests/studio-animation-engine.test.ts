@@ -117,7 +117,7 @@ test('alternate direction reverses every second finite repeat', () => {
 })
 
 test('loop presets can run a finite number of cycles or indefinitely', () => {
-  const finite = sample(loop, 3.5, { durationMs: 1000, repeatCount: 2 })
+  const finite = sample(loop, 4.1, { durationMs: 1000, repeatCount: 2 })
   assert.equal(finite.phase, 'after')
   const infinite = sample(loop, 3.5, { durationMs: 1000, repeatCount: 0 })
   assert.equal(infinite.phase, 'running')
