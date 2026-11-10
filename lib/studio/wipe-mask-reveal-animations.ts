@@ -37,16 +37,18 @@ export function sampleMaskReveal(input:{effect:MaskRevealEffect;progress:number;
     case 'venetian': maskImage=`repeating-linear-gradient(to bottom, #000 0 ${(amount*100/8).toFixed(3)}%, transparent ${(amount*100/8).toFixed(3)}% ${(100/8).toFixed(3)}%)`; break
     case 'checkerboard': maskImage=`repeating-conic-gradient(#000 0 25%, transparent 0 50%) 0 0 / ${Math.max(4,100* (1-amount)*.25).toFixed(2)}% ${Math.max(4,100*(1-amount)*.25).toFixed(2)}%`; break
     case 'box-reveal': clipPath=`inset(${(inv*50).toFixed(3)}% ${(inv*50).toFixed(3)}% ${(inv*50).toFixed(3)}% ${(inv*50).toFixed(3)}% round ${(inv*18).toFixed(2)}%)`; break
-    case 'corner-sweep': clipPath=polygon([[0,0],[amount*100,0],[0,amount*100]]); break
+    case 'corner-sweep': clipPath=polygon([[0,0],[amount*100,0],[100,amount*100],[100,100],[0,100]]); break
     case 'curtain': clipPath=polygon([[0,0],[50,0],[50+amount*50,50],[50,100],[0,100],[amount*50,50]]); break
     case 'shutter': maskImage=`repeating-linear-gradient(90deg, #000 0 ${(amount*100/6).toFixed(3)}%, transparent ${(amount*100/6).toFixed(3)}% ${(100/6).toFixed(3)}%)`; break
     case 'scanline': maskImage=`linear-gradient(to bottom, #000 0%, #000 ${(amount*100).toFixed(3)}%, transparent ${(amount*100).toFixed(3)}%, transparent 100%)`; break
     case 'pixel-grid': maskImage=`repeating-linear-gradient(0deg, #000 0 ${(amount*100).toFixed(3)}%, transparent ${(amount*100).toFixed(3)}% 12.5%), repeating-linear-gradient(90deg, #000 0 ${(amount*100).toFixed(3)}%, transparent ${(amount*100).toFixed(3)}% 12.5%)`; break
     case 'feathered-wipe': maskImage=`linear-gradient(90deg, #000 0%, #000 ${Math.max(0,amount*100-8).toFixed(3)}%, transparent ${(amount*100).toFixed(3)}%)`; break
-    case 'starburst': clipPath=polygon(Array.from({length:32},(_,i)=>{const a=-Math.PI/2+i*Math.PI/16;const r=(i%2===0?71:25)*amount;return [50+Math.cos(a)*r,50+Math.sin(a)*r]})); break
+    case 'starburst': clipPath=polygon(Array.from({length:32},(_,i)=>{const a=-Math.PI/2+i*Math.PI/16;const r=71*amount*(i%2===0?1:(.35+.65*amount));return [50+Math.cos(a)*r,50+Math.sin(a)*r]})); break
     case 'spiral': clipPath=polygon(Array.from({length:49},(_,i)=>{const t=i/48, a=t*Math.PI*4-Math.PI/2, r=amount*71*t;return [50+Math.cos(a)*r,50+Math.sin(a)*r]})); break
     case 'cross-reveal': clipPath=polygon([[50-amount*50,0],[50+amount*50,0],[50+amount*50,50-amount*50],[100,50-amount*50],[100,50+amount*50],[50+amount*50,50+amount*50],[50+amount*50,100],[50-amount*50,100],[50-amount*50,50+amount*50],[0,50+amount*50],[0,50-amount*50],[50-amount*50,50-amount*50]]); break
   }
+  if (amount >= 1) { clipPath='inset(0 0 0 0)'; maskImage='linear-gradient(#000,#000)' }
+  if (amount <= 0) { clipPath='inset(50% 50% 50% 50%)'; maskImage='linear-gradient(transparent,transparent)' }
   return {progress:amount,clipPath,maskImage,effect:input.effect}
 }
 
@@ -54,6 +56,8 @@ export function sampleMaskReveal(input:{effect:MaskRevealEffect;progress:number;
 export function clipCanvasForMask(ctx:CanvasRenderingContext2D,sample:MaskRevealSample,width:number,height:number) {
   const p=sample.progress, w=width, h=height, inset=(1-p)
   ctx.beginPath()
+  if (p >= 1) { ctx.rect(0,0,w,h); ctx.clip(); return }
+  if (p <= 0) { ctx.rect(0,0,0,0); ctx.clip(); return }
   switch(sample.effect){
     case 'wipe-left': ctx.rect(0,0,w*p,h); break
     case 'wipe-right': ctx.rect(w*(1-p),0,w*p,h); break
