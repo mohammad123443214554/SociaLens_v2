@@ -397,9 +397,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const selectedText = textLayers.find(item => item.id === selectedTextId) || null
   const selectedAnimation = selectedText?.animation?.animationId ? STUDIO_TEXT_ANIMATION_BY_ID.get(selectedText.animation.animationId) : undefined
   const selectedAnimationId = selectedText?.animation?.animationId || null
-  const previewDurationMs = selectedAnimation ? (selectedText?.animation?.durationMs || selectedAnimation.defaultDurationMs) : 850
+  const previewDurationMs = selectedAnimation ? (selectedText?.animation?.delayMs || 0) + (selectedText?.animation?.durationMs || selectedAnimation.defaultDurationMs) / Math.max(0.1, selectedText?.animation?.speed || 1) : 850
   const animationPreviewStartSeconds = selectedText && selectedAnimation?.mode === 'exit' ? Math.max(selectedText.timelineStart, selectedText.timelineStart + selectedText.timelineDuration - previewDurationMs / 1000) : selectedText?.timelineStart || 0
-  const animationPreviewSample = selectedText && selectedAnimation && isAnimationPreviewing ? sampleTextAnimation({ definition: selectedAnimation, settings: { ...selectedText.animation, animationId: selectedAnimation.id, durationMs: previewDurationMs, delayMs: 0, enabled: true }, timelineTimeSeconds: animationPreviewStartSeconds + animationPreviewTime / 1000, layerStartSeconds: selectedText.timelineStart, layerDurationSeconds: selectedText.timelineDuration }) : null
+  const animationPreviewSample = selectedText && selectedAnimation && isAnimationPreviewing ? sampleTextAnimation({ definition: selectedAnimation, settings: { ...selectedText.animation, animationId: selectedAnimation.id, enabled: true }, timelineTimeSeconds: animationPreviewStartSeconds + animationPreviewTime / 1000, layerStartSeconds: selectedText.timelineStart, layerDurationSeconds: selectedText.timelineDuration }) : null
   const getLayerAnimationSample = (layer: TextLayer, timelineTime: number) => {
     const animationId = layer.animation?.animationId
     const definition = animationId ? STUDIO_TEXT_ANIMATION_BY_ID.get(animationId) : undefined
@@ -857,7 +857,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     let frame = 0
     const tick = (now: number) => {
       const elapsed = Math.max(0, now - animationPreviewStart.current)
-      const duration = selectedAnimation ? (selectedText?.animation?.durationMs || selectedAnimation.defaultDurationMs) : 850
+      const duration = selectedAnimation ? (selectedText?.animation?.delayMs || 0) + (selectedText?.animation?.durationMs || selectedAnimation.defaultDurationMs) / Math.max(0.1, selectedText?.animation?.speed || 1) : 850
       const nextPreviewTime = elapsed >= duration ? duration : studioFrameTimeFromElapsedMs(elapsed) * 1000
       if (nextPreviewTime !== lastAnimationPreviewTime.current) {
         lastAnimationPreviewTime.current = nextPreviewTime
@@ -871,7 +871,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [isAnimationPreviewing, selectedAnimation, selectedText?.animation?.durationMs])
+  }, [isAnimationPreviewing, selectedAnimation, selectedText?.animation?.durationMs, selectedText?.animation?.delayMs, selectedText?.animation?.speed])
 
   useEffect(() => { setIsAnimationPreviewing(false); setAnimationPreviewTime(0) }, [selectedTextId])
 
@@ -900,6 +900,33 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     updateTextLayer(selectedText.id, { animation: undefined })
     setNotice('Animation settings reset for the selected text layer.')
   }
+
+  const updateSelectedAnimationSettings = (patch: Partial<TextAnimationSettings>) => {
+    if (!selectedText || !selectedAnimation) return
+    setIsAnimationPreviewing(false)
+    setAnimationPreviewTime(0)
+    updateTextLayer(selectedText.id, { animation: normalizeTextAnimationSettings({ ...selectedText.animation, ...patch, animationId: selectedAnimation.id, enabled: true }) })
+  }
+  const applyTextAnimation = (id: string) => {
+    if (!selectedText) return
+    const definition = STUDIO_TEXT_ANIMATION_BY_ID.get(id)
+    if (!definition) return
+    setIsAnimationPreviewing(false)
+    setAnimationPreviewTime(0)
+    updateTextLayer(selectedText.id, { animation: normalizeTextAnimationSettings({
+      animationId: id,
+      durationMs: definition.defaultDurationMs,
+      delayMs: 0,
+      repeatCount: definition.mode === 'loop' || definition.mode === 'continuous' ? 0 : 1,
+      direction: 'normal',
+      easing: definition.defaultEasing || 'ease',
+      speed: 1,
+      intensity: 1,
+      enabled: true,
+    }) })
+    setNotice('Animation applied to the selected text layer.')
+  }
+
 
   const exportVideo = async () => {
     if (!clips.length) { setError('Add at least one video or photo clip before exporting.'); return }
@@ -1293,7 +1320,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               <button type="button" onClick={()=>updateTextLayer(selectedText.id,{effect:'Simple',effectIntensity:60,effectBlur:8,effectDistance:4,effectAngle:45,effectColor:'#a855f7',effectSecondaryColor:'#22d3ee'})} className="rounded-lg border border-white/10 py-2 text-[9px] font-semibold text-slate-400 hover:bg-white/[0.05]">Reset effect settings</button>
             </>}
           </div>}
-          {activePanel === 'animation' && <StudioAnimationPanel selectedCategory={animationCategory} onSelectCategory={setAnimationCategory} search={animationSearch} onSearchChange={setAnimationSearch} selectedText={selectedText} selectedAnimationId={selectedAnimationId} isPreviewing={isAnimationPreviewing} previewProgress={animationPreviewTime / previewDurationMs} onPreview={startAnimationPreview} onStopPreview={() => setIsAnimationPreviewing(false)} onReset={resetTextAnimation} onSelectAnimation={(id) => { if (!selectedText) return; setIsAnimationPreviewing(false); setAnimationPreviewTime(0); updateTextLayer(selectedText.id, { animation: { animationId: id, durationMs: STUDIO_TEXT_ANIMATION_BY_ID.get(id)?.defaultDurationMs || 850, delayMs: 0, repeatCount: (STUDIO_TEXT_ANIMATION_BY_ID.get(id)?.mode === 'loop' || STUDIO_TEXT_ANIMATION_BY_ID.get(id)?.mode === 'continuous') ? 0 : 1, direction: 'normal', easing: STUDIO_TEXT_ANIMATION_BY_ID.get(id)?.defaultEasing || 'ease', intensity: 1, enabled: true } }); setNotice('Animation applied to the selected text layer.') }} />}
+          {activePanel === 'animation' && <StudioAnimationPanel selectedCategory={animationCategory} onSelectCategory={setAnimationCategory} search={animationSearch} onSearchChange={setAnimationSearch} selectedText={selectedText} animationSettings={selectedText?.animation || {}} animationMode={selectedAnimation?.mode || 'entrance'} onUpdateAnimationSettings={updateSelectedAnimationSettings} selectedAnimationId={selectedAnimationId} isPreviewing={isAnimationPreviewing} previewProgress={animationPreviewTime / previewDurationMs} onPreview={startAnimationPreview} onStopPreview={() => setIsAnimationPreviewing(false)} onReset={resetTextAnimation} onSelectAnimation={applyTextAnimation} />}
           {activePanel === 'audio' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <button type="button" onClick={() => audioInput.current?.click()} className="flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[10px] font-bold"><Music2 className="h-4 w-4" /> {audio ? 'Replace audio track' : 'Import audio'}</button>
             {audio ? <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.04] p-3"><div className="flex items-center gap-2"><Music2 className="h-4 w-4 shrink-0 text-cyan-300" /><div className="min-w-0"><p className="truncate text-[10px] font-semibold text-cyan-100">{audio.name}</p><p className="text-[9px] text-cyan-100/50">{formatTime(audio.duration)} duration</p></div></div><label className="mt-4 block text-[9px] text-slate-400">Track volume · {audioVolume}%<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="mt-2 w-full accent-cyan-400" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="mt-3 w-full rounded-lg border border-red-400/20 py-2 text-[9px] font-semibold text-red-300 hover:bg-red-400/[0.06]">Remove audio track</button></div> : <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center"><Music2 className="mx-auto h-7 w-7 text-slate-600" /><p className="mt-2 text-[10px] font-semibold text-slate-300">No audio track</p><p className="mt-1 text-[9px] text-slate-500">Import a music or audio file to add it to your project.</p></div>}
@@ -1467,7 +1494,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         </aside>
       </div>
 
-      {activePanel === 'animation' && <div className="fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] top-[calc(58px+env(safe-area-inset-top))] z-[90] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0d1020] shadow-2xl lg:hidden"><div className="flex h-11 shrink-0 items-center justify-between border-b border-white/[0.07] px-3"><span className="text-[11px] font-bold text-white">Text animations</span><button type="button" onClick={() => setActivePanel('text')} aria-label="Close animation panel" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10"><X className="h-4 w-4" /></button></div><StudioAnimationPanel selectedCategory={animationCategory} onSelectCategory={setAnimationCategory} search={animationSearch} onSearchChange={setAnimationSearch} mobile onClose={() => setActivePanel('text')} selectedText={selectedText} selectedAnimationId={selectedAnimationId} isPreviewing={isAnimationPreviewing} previewProgress={animationPreviewTime / previewDurationMs} onPreview={startAnimationPreview} onStopPreview={() => setIsAnimationPreviewing(false)} onReset={resetTextAnimation} onSelectAnimation={(id) => { if (!selectedText) return; setIsAnimationPreviewing(false); setAnimationPreviewTime(0); updateTextLayer(selectedText.id, { animation: { animationId: id, durationMs: STUDIO_TEXT_ANIMATION_BY_ID.get(id)?.defaultDurationMs || 850, delayMs: 0, repeatCount: 1, direction: 'normal', easing: STUDIO_TEXT_ANIMATION_BY_ID.get(id)?.defaultEasing || 'ease', intensity: 1, enabled: true } }); setNotice('Animation applied to the selected text layer.'); setActivePanel('text') }} /></div>}
+      {activePanel === 'animation' && <div className="fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] top-[calc(58px+env(safe-area-inset-top))] z-[90] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0d1020] shadow-2xl lg:hidden"><div className="flex h-11 shrink-0 items-center justify-between border-b border-white/[0.07] px-3"><span className="text-[11px] font-bold text-white">Text animations</span><button type="button" onClick={() => setActivePanel('text')} aria-label="Close animation panel" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10"><X className="h-4 w-4" /></button></div><StudioAnimationPanel selectedCategory={animationCategory} onSelectCategory={setAnimationCategory} search={animationSearch} onSearchChange={setAnimationSearch} mobile onClose={() => setActivePanel('text')} selectedText={selectedText} animationSettings={selectedText?.animation || {}} animationMode={selectedAnimation?.mode || 'entrance'} onUpdateAnimationSettings={updateSelectedAnimationSettings} selectedAnimationId={selectedAnimationId} isPreviewing={isAnimationPreviewing} previewProgress={animationPreviewTime / previewDurationMs} onPreview={startAnimationPreview} onStopPreview={() => setIsAnimationPreviewing(false)} onReset={resetTextAnimation} onSelectAnimation={(id) => { applyTextAnimation(id); setActivePanel('text') }} /></div>}
 
       <input ref={videoInput} type="file" accept="video/*" multiple className="hidden" onChange={event => { void addMedia(event.target.files,'video'); event.currentTarget.value = '' }} />
       <input ref={imageInput} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif" multiple className="hidden" onChange={event => { void addMedia(event.target.files,'image'); event.currentTarget.value = '' }} />
