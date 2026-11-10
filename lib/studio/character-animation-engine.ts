@@ -52,8 +52,8 @@ export function splitStudioGraphemes(value: string): string[] {
     const oldest = graphemeCache.keys().next().value
     if (oldest !== undefined) graphemeCache.delete(oldest)
   }
-  graphemeCache.set(value, result)
-  return result
+  graphemeCache.set(value, Object.freeze(result) as string[])
+  return graphemeCache.get(value)!
 }
 
 /** Samples restrained, deterministic per-grapheme motion for preview and export. */
