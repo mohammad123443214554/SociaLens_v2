@@ -421,7 +421,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (!animationSample) return formattedText
       const tokens = formattedText.split(/(\\s+)/)
       const words = tokens.filter(token => token && !/^\\s+$/.test(token))
-      const lineCount = Math.max(1, formattedText.split('\\n').length)
+      const lineCount = Math.max(1, formattedText.split(/\n/).length)
       let wordIndex = 0
       let lineIndex = 0
       return tokens.map((token, tokenIndex) => {
