@@ -146,7 +146,7 @@ async function processJob(job) {
 
     await runCommand('ffmpeg', buildFfmpegArgs(inputPath, outputPath, dimensions.width, dimensions.height))
     const outputInfo = await stat(outputPath)
-    if (!outputInfo.size || outputInfo.size > MAX_OUTPUT_BYTES) throw new Error('Converted video is empty or exceeds the 150 MB output limit')
+    if (!outputInfo.size || outputInfo.size > MAX_OUTPUT_BYTES) throw new Error('Converted video is empty or exceeds the 350 MB output limit')
 
     const outputProbe = await probe(outputPath)
     const validated = validateOutputProbe(outputProbe)
