@@ -7,6 +7,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { useAdminAccount, useAdminAccountPosts } from '@/lib/hooks/useAdminAccounts'
 import { formatCount, getPostPreviewText } from '@/lib/utils/helpers'
+import { ReelPreview } from '@/components/reels/ReelPreview'
 
 export default function AdminAccountPostsPage() {
   const params = useParams()
@@ -48,7 +49,7 @@ export default function AdminAccountPostsPage() {
               )}
               {post.media_url && post.media_type === 'video' && (
                 <>
-                  <video src={post.media_url} className="w-full h-full object-cover" muted preload="metadata" />
+                  <ReelPreview src={post.media_url} className="w-full h-full object-cover" />
                   <PlayCircle className="absolute top-1.5 right-1.5 h-4 w-4 text-white drop-shadow" />
                 </>
               )}

@@ -1,0 +1,74 @@
+name: SociaLens V2 video processing
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: Maximum number of jobs to claim (1-10)
+        required: false
+        default: "2"
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: socialens-v2-video-processing
+  cancel-in-progress: false
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RUN_ONCE: "true"
+      BATCH_SIZE: ${{ github.event.inputs.batch_size || '2' }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Verify required V2 secrets
+        shell: bash
+        run: |
+          if [[ -z "$SUPABASE_URL" || -z "$SUPABASE_SERVICE_ROLE_KEY" ]]; then
+            echo "::error::Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY with the SociaLens V2 project credentials."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install FFmpeg with retries
+        shell: bash
+        run: |
+          installed=false
+          for attempt in 1 2 3 4 5; do
+            if sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=120 \
+              && sudo apt-get install -y --no-install-recommends ffmpeg; then
+              installed=true
+              break
+            fi
+            echo "FFmpeg installation attempt $attempt failed; retrying..."
+            sleep $((attempt * 10))
+          done
+          if [[ "$installed" != "true" ]]; then
+            echo "::error::FFmpeg installation failed after five attempts."
+            exit 1
+          fi
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Install worker dependencies
+        working-directory: video-worker
+        run: npm install --no-audit --no-fund
+
+      - name: Process bounded queue batch
+        working-directory: video-worker
+        run: node worker.mjs

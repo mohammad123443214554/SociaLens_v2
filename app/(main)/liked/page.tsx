@@ -15,6 +15,8 @@ import { ShareModal } from '@/components/shared/ShareModal'
 import { PostCaption } from '@/components/shared/PostCaption'
 import { SaveButton } from '@/components/shared/SaveButton'
 import { getAvatarUrl, formatTimeAgo, formatCount } from '@/lib/utils/helpers'
+import { ReelPreview } from '@/components/reels/ReelPreview'
+import { useVideoPlaybackUrl } from '@/lib/hooks/useVideoPlaybackUrl'
 
 const LIKED_POST_SELECT = 'post_id, created_at, posts(*, profiles!posts_user_id_fkey(*))'
 
@@ -23,6 +25,7 @@ export default function LikedPage() {
   const supabase = createClient()
   const queryClient = useQueryClient()
   const [selectedPost, setSelectedPost] = useState<PostWithProfile | null>(null)
+  const selectedPostPlaybackUrl = useVideoPlaybackUrl(selectedPost?.media_url, selectedPost?.media_type === 'video')
   const [sharePost, setSharePost] = useState<PostWithProfile | null>(null)
   const [liked, setLiked] = useState(false)
   const [likesCount, setLikesCount] = useState(0)
@@ -120,7 +123,7 @@ export default function LikedPage() {
         <div className="p-4 space-y-6">
           {videos.length > 0 && (
             <div><h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Videos ({videos.length})</h2><div className="grid grid-cols-2 gap-2">
-              {videos.map(post => <button key={post.id} onClick={() => openPost(post)} className="relative rounded-xl overflow-hidden bg-black aspect-[9/16] group"><video src={post.media_url ?? ''} className="w-full h-full object-cover" preload="metadata" muted /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /><div className="absolute inset-0 flex items-center justify-center opacity-70 group-hover:opacity-100 transition-opacity"><div className="bg-black/40 rounded-full p-3"><Play className="h-6 w-6 text-white fill-white" /></div></div><div className="absolute bottom-2 left-2 right-2"><p className="text-white text-xs font-medium truncate">@{post.profiles?.username}</p></div><Heart className="absolute top-2 right-2 h-4 w-4 fill-red-500 text-red-500 drop-shadow" /></button>)}
+              {videos.map(post => <button key={post.id} onClick={() => openPost(post)} className="relative rounded-xl overflow-hidden bg-black aspect-[9/16] group"><ReelPreview src={post.media_url ?? ''} className="w-full h-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /><div className="absolute inset-0 flex items-center justify-center opacity-70 group-hover:opacity-100 transition-opacity"><div className="bg-black/40 rounded-full p-3"><Play className="h-6 w-6 text-white fill-white" /></div></div><div className="absolute bottom-2 left-2 right-2"><p className="text-white text-xs font-medium truncate">@{post.profiles?.username}</p></div><Heart className="absolute top-2 right-2 h-4 w-4 fill-red-500 text-red-500 drop-shadow" /></button>)}
             </div></div>
           )}
           {images.length > 0 && (
@@ -134,7 +137,7 @@ export default function LikedPage() {
       {selectedPost && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center" onClick={() => setSelectedPost(null)}>
           <div className="flex flex-col md:flex-row w-full max-w-3xl max-h-[90vh] bg-card rounded-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="flex-1 bg-black flex items-center justify-center min-h-[300px]">{selectedPost.media_type === 'video' ? <video src={selectedPost.media_url ?? ''} controls autoPlay className="w-full max-h-[60vh] md:max-h-[90vh]" style={{ objectFit: 'contain' }} /> : selectedPost.media_url ? <Image src={selectedPost.media_url} alt="" width={500} height={500} className="w-full object-contain max-h-[60vh] md:max-h-[90vh]" /> : <div className="p-6 w-full">{selectedPost.content && <PostCaption content={selectedPost.content} forceExpanded titleClassName="text-white text-base" captionClassName="text-white/90 text-sm" buttonClassName="text-white/70 text-xs hover:underline font-medium" />}</div>}</div>
+            <div className="flex-1 bg-black flex items-center justify-center min-h-[300px]">{selectedPost.media_type === 'video' ? <video src={selectedPostPlaybackUrl ?? selectedPost.media_url ?? ''} controls autoPlay className="w-full max-h-[60vh] md:max-h-[90vh]" style={{ objectFit: 'contain' }} /> : selectedPost.media_url ? <Image src={selectedPost.media_url} alt="" width={500} height={500} className="w-full object-contain max-h-[60vh] md:max-h-[90vh]" /> : <div className="p-6 w-full">{selectedPost.content && <PostCaption content={selectedPost.content} forceExpanded titleClassName="text-white text-base" captionClassName="text-white/90 text-sm" buttonClassName="text-white/70 text-xs hover:underline font-medium" />}</div>}</div>
             <div className="w-full md:w-80 flex flex-col bg-card">
               <div className="flex items-center justify-between p-4 border-b"><div className="flex items-center gap-3"><Link href={`/profile/${selectedPost.profiles?.username}`} onClick={() => setSelectedPost(null)}><Avatar className="h-8 w-8"><AvatarImage src={getAvatarUrl(selectedPost.profiles?.avatar_url)} /><AvatarFallback>{selectedPost.profiles?.username?.[0]?.toUpperCase()}</AvatarFallback></Avatar></Link><Link href={`/profile/${selectedPost.profiles?.username}`} onClick={() => setSelectedPost(null)} className="font-semibold text-sm hover:underline">@{selectedPost.profiles?.username}</Link></div><button onClick={() => setSelectedPost(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button></div>
               {selectedPost.content && <div className="px-4 py-3 border-b"><PostCaption content={selectedPost.content} forceExpanded={!selectedPost.media_url} titleClassName="text-sm" captionClassName="text-sm text-muted-foreground" /></div>}

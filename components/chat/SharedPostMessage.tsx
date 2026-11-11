@@ -12,6 +12,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { getAvatarUrl, formatCount, formatTimeAgo } from '@/lib/utils/helpers'
 import { PostWithProfile } from '@/lib/types/database.types'
+import { useVideoPlaybackUrl } from '@/lib/hooks/useVideoPlaybackUrl'
+import { ReelPreview } from '@/components/reels/ReelPreview'
 
 interface SharedPostMessageProps {
   postId: string
@@ -28,6 +30,7 @@ export function SharedPostMessage({ postId }: SharedPostMessageProps) {
   const [showShare, setShowShare] = useState(false)
   const { user } = useUser()
   const supabase = createClient()
+  const playbackUrl = useVideoPlaybackUrl(post?.media_url, showViewer && post?.media_type === 'video')
 
   useEffect(() => {
     const fetchPost = async () => {
@@ -111,7 +114,7 @@ export function SharedPostMessage({ postId }: SharedPostMessageProps) {
         )}
         {post.media_url && post.media_type === 'video' && (
           <div className="relative w-full aspect-video bg-black flex items-center justify-center">
-            <video src={post.media_url} className="w-full h-full object-cover" preload="metadata" muted />
+            <ReelPreview src={post.media_url} className="w-full h-full object-cover" />
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="bg-black/50 rounded-full p-2">
                 <Play className="h-5 w-5 text-white fill-white" />
@@ -148,7 +151,7 @@ export function SharedPostMessage({ postId }: SharedPostMessageProps) {
             {/* Media */}
             <div className="flex-1 bg-black flex items-center justify-center min-h-[250px]">
               {post.media_type === 'video' ? (
-                <video src={post.media_url ?? ''} controls autoPlay
+                <video src={playbackUrl ?? post.media_url ?? ''} controls autoPlay
                   className="w-full max-h-[60vh] md:max-h-[90vh]" style={{ objectFit: 'contain' }} />
               ) : post.media_url ? (
                 <Image src={post.media_url} alt="" width={500} height={500}

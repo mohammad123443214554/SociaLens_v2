@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getAvatarUrl, getPostPreviewText } from '@/lib/utils/helpers'
 import { VerifiedBadge } from '@/components/shared/VerifiedBadge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useVideoPlaybackUrl } from '@/lib/hooks/useVideoPlaybackUrl'
 
 // A public post/Reel page - no login required. Anyone with the link can
 // open this straight from WhatsApp, Messages, etc. It only ever shows
@@ -37,6 +38,8 @@ export default function PublicPostPage() {
     })()
     return () => { cancelled = true }
   }, [params.id])
+
+  const playbackUrl = useVideoPlaybackUrl(post?.media_url, status === 'ready' && post?.media_type === 'video')
 
   if (status === 'loading') {
     return (
@@ -88,7 +91,7 @@ export default function PublicPostPage() {
         {post.media_url && (
           isVideo ? (
             // eslint-disable-next-line jsx-a11y/media-has-caption
-            <video src={post.media_url} poster={post.cover_url || undefined} controls playsInline className="w-full rounded-xl bg-black max-h-[75vh] object-contain" />
+            <video src={playbackUrl ?? post.media_url} poster={post.cover_url || undefined} controls playsInline className="w-full rounded-xl bg-black max-h-[75vh] object-contain" />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={post.media_url} alt="Post" className="w-full rounded-xl object-contain max-h-[75vh] bg-muted" />

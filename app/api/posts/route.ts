@@ -2,6 +2,7 @@ import { after, NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { postSchema } from '@/lib/utils/validation'
 import { analyzeAndStorePostContent } from '@/lib/recommendation/contentUnderstanding'
+import { enqueuePublishedVideoForProcessing } from '@/lib/server/videoProcessing'
 
 export const maxDuration = 60
 
@@ -51,6 +52,9 @@ export async function POST(request: NextRequest) {
   // Analyse after returning the successful post response. AI/provider or
   // media-fetch failures must never block a user's post from being created.
   after(async () => {
+    if (media_type === 'video' && typeof media_url === 'string') {
+      await enqueuePublishedVideoForProcessing(user.id, media_url)
+    }
     try {
       await analyzeAndStorePostContent(data)
     } catch (analysisError) {

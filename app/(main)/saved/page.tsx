@@ -14,6 +14,8 @@ import { ShareModal } from '@/components/shared/ShareModal'
 import { PostCaption } from '@/components/shared/PostCaption'
 import { SaveButton } from '@/components/shared/SaveButton'
 import { getAvatarUrl, formatTimeAgo, formatCount } from '@/lib/utils/helpers'
+import { ReelPreview } from '@/components/reels/ReelPreview'
+import { useVideoPlaybackUrl } from '@/lib/hooks/useVideoPlaybackUrl'
 import {
   useSavedFolders,
   useSavedPostsInFolder,
@@ -32,6 +34,7 @@ export default function SavedPostsPage() {
   const [folderError, setFolderError] = useState('')
 
   const [selectedPost, setSelectedPost] = useState<PostWithProfile | null>(null)
+  const selectedPostPlaybackUrl = useVideoPlaybackUrl(selectedPost?.media_url, selectedPost?.media_type === 'video')
   const [sharePost, setSharePost] = useState<PostWithProfile | null>(null)
   const [liked, setLiked] = useState(false)
   const [likesCount, setLikesCount] = useState(0)
@@ -219,7 +222,7 @@ export default function SavedPostsPage() {
                 <button key={post.id} onClick={() => openPost(post)}
                   className="relative aspect-square rounded-lg overflow-hidden bg-muted group">
                   {post.media_type === 'video' && post.media_url ? (
-                    <video src={post.media_url} className="w-full h-full object-cover" preload="metadata" muted />
+                    <ReelPreview src={post.media_url} className="w-full h-full object-cover" />
                   ) : post.media_url ? (
                     <Image src={post.media_url} alt="" fill className="object-cover" />
                   ) : (
@@ -287,7 +290,7 @@ export default function SavedPostsPage() {
             onClick={e => e.stopPropagation()}>
             <div className="flex-1 bg-black flex items-center justify-center min-h-[300px]">
               {selectedPost.media_type === 'video' ? (
-                <video src={selectedPost.media_url ?? ''} controls autoPlay
+                <video src={selectedPostPlaybackUrl ?? selectedPost.media_url ?? ''} controls autoPlay
                   className="w-full max-h-[60vh] md:max-h-[90vh]" style={{ objectFit: 'contain' }} />
               ) : selectedPost.media_url ? (
                 <Image src={selectedPost.media_url} alt="" width={500} height={500}

@@ -11,6 +11,7 @@ import { formatCount } from '@/lib/utils/helpers'
 import { InfiniteScrollSentinel } from '@/components/shared/InfiniteScrollSentinel'
 import { PostCaption } from '@/components/shared/PostCaption'
 import { ReelViewer } from '@/components/shared/ReelViewer'
+import { ReelPreview } from '@/components/reels/ReelPreview'
 import { useUser } from '@/lib/hooks/useUser'
 import { getViewerContext } from '@/lib/recommendation/viewerContext'
 import { rankReels } from '@/lib/recommendation/rankReels'
@@ -170,7 +171,7 @@ export default function AllReelsPage() {
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
             {reels.map(reel => (
               <article key={reel.id} className="min-w-0 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm sm:rounded-2xl">
-<ReelViewer post={reel} onNotInterested={id => setHiddenReelIds(previous => [...previous, id])} trigger={<button type="button" aria-label={`Play reel by @${reel.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left">{reel.cover_url ? <img src={reel.cover_url} alt="Reel cover" loading="lazy" className="pointer-events-none h-full w-full object-cover" /> : <video src={reel.media_url ?? undefined} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" aria-label={`Video by @${reel.profiles?.username ?? 'user'}`} />}</button>} />
+<ReelViewer post={reel} onNotInterested={id => setHiddenReelIds(previous => [...previous, id])} trigger={<button type="button" aria-label={`Play reel by @${reel.profiles?.username ?? 'user'}`} className="relative block aspect-[3/4] w-full overflow-hidden bg-black text-left">{reel.cover_url ? <img src={reel.cover_url} alt="Reel cover" loading="lazy" className="pointer-events-none h-full w-full object-cover" /> : <ReelPreview src={reel.media_url ?? ''} className="pointer-events-none h-full w-full object-cover" ariaLabel={`Video by @${reel.profiles?.username ?? 'user'}`} />}</button>} />
                 <div className="p-2 sm:p-3">
                   <Link href={`/profile/${reel.profiles?.username ?? ''}`} className="block truncate text-[11px] font-semibold hover:text-pink-400 sm:text-xs">@{reel.profiles?.username ?? 'user'}</Link>
                   {reel.content?.trim() && <PostCaption content={reel.content} expandMode="dialog" titleClassName="text-[11px] leading-snug sm:text-xs" captionClassName="mt-1 text-[10px] text-muted-foreground whitespace-pre-wrap sm:text-[11px]" buttonClassName="mt-1 text-[10px] font-semibold text-pink-400 hover:underline sm:text-[11px]" />}

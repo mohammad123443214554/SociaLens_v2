@@ -17,6 +17,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useQueryClient } from '@tanstack/react-query'
 import { PostWithProfile } from '@/lib/types/database.types'
 import { formatCount } from '@/lib/utils/helpers'
+import { useVideoPlaybackUrl } from '@/lib/hooks/useVideoPlaybackUrl'
+import { getMediaProxyUrl } from '@/lib/utils/media'
 
 interface ReelViewerProps {
   post: PostWithProfile
@@ -32,6 +34,8 @@ export function ReelViewer({ post, trigger, onNotInterested, initialShowComments
   const [showComments, setShowComments] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const [usingMediaProxy, setUsingMediaProxy] = useState(false)
+  const [usingOriginalFallback, setUsingOriginalFallback] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
   const [optionsPosition, setOptionsPosition] = useState<{ top: number; right: number } | null>(null)
   const [portalReady, setPortalReady] = useState(false)
@@ -47,8 +51,18 @@ export function ReelViewer({ post, trigger, onNotInterested, initialShowComments
   const { data: isReposted = false } = useIsReposted(post.id, user?.id, post.is_reposted)
   const toggleRepost = useToggleRepost()
   const mediaLabel = post.media_type === 'video' ? 'reel' : 'post'
+  const playbackUrl = useVideoPlaybackUrl(post.media_url, open && post.media_type === 'video')
+  const selectedVideoUrl = usingOriginalFallback ? post.media_url : playbackUrl ?? post.media_url
+  const videoSrc = open && selectedVideoUrl
+    ? (usingMediaProxy ? getMediaProxyUrl(selectedVideoUrl) : selectedVideoUrl)
+    : undefined
 
   useEffect(() => setPortalReady(true), [])
+
+  useEffect(() => {
+    setUsingMediaProxy(false)
+    setUsingOriginalFallback(false)
+  }, [post.id, post.media_url])
 
   useEffect(() => {
     if (open && initialShowComments) setShowComments(true)
@@ -246,7 +260,7 @@ export function ReelViewer({ post, trigger, onNotInterested, initialShowComments
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               {post.media_type === 'video' && post.media_url ? (
                 <div className="flex w-full items-center justify-center bg-black">
-                  <video ref={videoRef} src={post.media_url} controls playsInline autoPlay preload="auto" onTimeUpdate={trackVideoProgress} onPause={flushVideoWatchTime} onEnded={handleVideoEnded} className="max-h-[58dvh] w-full object-contain sm:max-h-[62vh]" aria-label={`Video post by @${post.profiles?.username ?? 'user'}`} />
+                  <video ref={videoRef} src={videoSrc} controls playsInline autoPlay preload="auto" onError={() => { if (!usingMediaProxy) setUsingMediaProxy(true); else if (playbackUrl && playbackUrl !== post.media_url && !usingOriginalFallback) { setUsingOriginalFallback(true); setUsingMediaProxy(false) } }} onTimeUpdate={trackVideoProgress} onPause={flushVideoWatchTime} onEnded={handleVideoEnded} className="max-h-[58dvh] w-full object-contain sm:max-h-[62vh]" aria-label={`Video post by @${post.profiles?.username ?? 'user'}`} />
                 </div>
               ) : post.media_type === 'image' && post.media_url ? (
                 <div className="flex w-full items-center justify-center bg-background">

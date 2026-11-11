@@ -11,6 +11,7 @@ import { isRestricted } from '@/lib/utils/restrictionCheck'
 import { RestrictionPopup } from '@/components/shared/RestrictionPopup'
 import { compressImageIfNeeded, LONG_CACHE_CONTROL } from '@/lib/utils/imageCompression'
 import { StudioBrandLink } from '@/components/studio/StudioBrandLink'
+import { registerVideoForProcessing } from '@/lib/utils/videoProcessing'
 
 type ContentType = 'post' | 'reel'
 type MediaType = 'image' | 'video' | 'none'
@@ -437,6 +438,8 @@ export default function CreateEditorPage() {
     setSaveState('saving')
     setError('')
     let uploadedFinalPath: string | null = null
+    let publishedVideoPath: string | null = null
+    let publishedVideoBytes = 0
     let postCreated = false
     try {
       await saveQueueRef.current
@@ -460,6 +463,10 @@ export default function CreateEditorPage() {
         if (finalUploadError) throw finalUploadError
         uploadedFinalPath = finalPath
         publicMediaUrl = supabase.storage.from('posts').getPublicUrl(finalPath).data.publicUrl
+        if (mediaType === 'video') {
+          publishedVideoPath = finalPath
+          publishedVideoBytes = blob.size
+        }
       }
       if (mediaType === 'video' && mediaPath && previewUrl && !coverPath && videoRef.current) {
         const video = videoRef.current
@@ -516,6 +523,7 @@ export default function CreateEditorPage() {
       }).select('id').single()
       if (postError || !createdPost) throw postError || new Error('Publishing was not confirmed by the server.')
       postCreated = true
+      if (publishedVideoPath) await registerVideoForProcessing(publishedVideoPath, publishedVideoBytes)
 
       await supabase.rpc('increment_posts_count', { profile_id: user.id })
       setUploadProgress(100)

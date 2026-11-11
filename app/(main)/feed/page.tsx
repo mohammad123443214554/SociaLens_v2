@@ -6,6 +6,7 @@ import { HomeGreetingBanner } from '@/components/feed/HomeGreetingBanner'
 import { TextPostComposer } from '@/components/feed/TextPostComposer'
 import { HomePostEngagement } from '@/components/feed/HomePostEngagement'
 import { ReelViewer } from '@/components/shared/ReelViewer'
+import { ReelPreview } from '@/components/reels/ReelPreview'
 import { PostCaption } from '@/components/shared/PostCaption'
 import { useFeedPosts, useReelsPosts } from '@/lib/hooks/usePosts'
 import { useUser } from '@/lib/hooks/useUser'
@@ -94,7 +95,7 @@ export default function FeedPage() {
               const isImage = post.media_type === 'image' && !!post.media_url
               const trigger = (
                 <button type="button" aria-label={(isVideo ? 'Play reel: ' : 'Open post: ') + (title || (isVideo ? 'Reel' : 'Post'))} className="relative block aspect-[3/4] w-full overflow-hidden bg-muted text-left">
-                  {isVideo ? (post.cover_url ? <img src={post.cover_url} alt="Reel cover" loading="lazy" className="pointer-events-none h-full w-full object-cover" /> : <video src={post.media_url!} muted playsInline preload="metadata" className="pointer-events-none h-full w-full object-cover" />) : isImage ? <img src={post.media_url!} alt="" loading="lazy" className="pointer-events-none h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center overflow-y-auto bg-gradient-to-br from-pink-500/10 via-card to-violet-500/10 px-4 py-5 sm:px-6 sm:py-7"><p className={`w-full whitespace-pre-wrap break-words text-center leading-relaxed text-foreground ${content.length < 100 ? 'text-xl font-semibold sm:text-2xl' : content.length < 280 ? 'text-base font-medium sm:text-lg' : content.length < 800 ? 'text-sm sm:text-base' : 'text-xs sm:text-sm'}`}>{content}</p></div>}
+                  {isVideo ? (post.cover_url ? <img src={post.cover_url} alt="Reel cover" loading="lazy" className="pointer-events-none h-full w-full object-cover" /> : <ReelPreview src={post.media_url!} className="pointer-events-none h-full w-full object-cover" />) : isImage ? <img src={post.media_url!} alt="" loading="lazy" className="pointer-events-none h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center overflow-y-auto bg-gradient-to-br from-pink-500/10 via-card to-violet-500/10 px-4 py-5 sm:px-6 sm:py-7"><p className={`w-full whitespace-pre-wrap break-words text-center leading-relaxed text-foreground ${content.length < 100 ? 'text-xl font-semibold sm:text-2xl' : content.length < 280 ? 'text-base font-medium sm:text-lg' : content.length < 800 ? 'text-sm sm:text-base' : 'text-xs sm:text-sm'}`}>{content}</p></div>}
                 </button>
               )
               return (
