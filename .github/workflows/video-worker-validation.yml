@@ -1,0 +1,66 @@
+name: SociaLens V2 video worker validation
+
+on:
+  pull_request:
+    paths:
+      - "video-worker/**"
+      - "app/api/media/**"
+      - "lib/hooks/useVideoPlaybackUrl.ts"
+      - "supabase/migrations/**"
+      - "components/feed/PostCard.tsx"
+      - "components/reels/ReelCard.tsx"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: video-worker-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install worker dependencies
+        working-directory: video-worker
+        run: npm install --omit=dev --no-audit --no-fund
+
+      - name: Check worker syntax
+        working-directory: video-worker
+        run: node --check worker.mjs
+
+      - name: Install FFmpeg with retries
+        shell: bash
+        run: |
+          installed=false
+          for attempt in 1 2 3 4 5; do
+            if sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=120 \
+              && sudo apt-get install -y --no-install-recommends ffmpeg; then
+              installed=true
+              break
+            fi
+            echo "FFmpeg installation attempt $attempt failed; retrying..."
+            sleep $((attempt * 10))
+          done
+          if [[ "$installed" != "true" ]]; then
+            echo "::error::FFmpeg installation failed after five attempts."
+            exit 1
+          fi
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Run FFmpeg compatibility profile tests
+        run: bash video-worker/test-ffmpeg.sh

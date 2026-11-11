@@ -310,6 +310,8 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
 
     try {
       let media_url: string | null = null
+      let uploadedVideoPath: string | null = null
+      let uploadedVideoBytes = 0
       if (mediaFile) {
         setUploadProgress(20)
         const fileToUpload = await compressImageIfNeeded(mediaFile)
@@ -325,6 +327,10 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
         setUploadProgress(80)
         const { data: urlData } = supabase.storage.from('posts').getPublicUrl(path)
         media_url = urlData.publicUrl
+        if (mediaType === 'video') {
+          uploadedVideoPath = path
+          uploadedVideoBytes = fileToUpload.size
+        }
       }
 
       const content = buildContent()
@@ -341,6 +347,23 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
 
       if (postError) {
         throw new Error(`Post creation failed: ${postError.message}`)
+      }
+      if (uploadedVideoPath && Number.isSafeInteger(uploadedVideoBytes) && uploadedVideoBytes > 0) {
+        try {
+          const registration = await fetch('/api/media/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ objectPath: uploadedVideoPath, sourceBytes: uploadedVideoBytes }),
+          })
+          if (!registration.ok) {
+            console.warn('Video compatibility registration was not accepted:', registration.status)
+          }
+        } catch (registrationError) {
+          // A successful published post must remain available on its original URL
+          // even if the optional compatibility queue is temporarily unavailable.
+          console.warn('Video compatibility registration could not reach the server:', registrationError)
+        }
       }
       await supabase.rpc('increment_posts_count', { profile_id: user.id })
       setUploadProgress(100)
