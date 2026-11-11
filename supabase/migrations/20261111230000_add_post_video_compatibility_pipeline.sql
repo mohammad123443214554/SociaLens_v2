@@ -1,5 +1,5 @@
 -- V2-only Android-compatible public post video rendition queue.
--- Additive only: creates one internal queue table and one claim RPC.
+-- Additive only: creates one internal queue table, indexes and one claim RPC; existing application rows and policies are not modified.
 -- The backfill is restricted to verified V2 public post objects owned by each post author.
 
 create table if not exists public.video_processing_jobs (
