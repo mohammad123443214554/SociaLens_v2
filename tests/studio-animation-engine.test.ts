@@ -980,7 +980,7 @@ test('complete Studio animation catalog now contains 300 unique presets', () => 
 test('direction is applied to character, word, and mask renderer progress', () => {
   const normal = sample(entrance, 2.25, { direction: 'normal', easing: 'linear' })
   const reverse = sample(entrance, 2.25, { direction: 'reverse', easing: 'linear' })
-  const alternateReverse = sample(loop, 3.25, { direction: 'alternate-reverse', easing: 'linear', repeatCount: 0 })
+  const alternateReverse = sample(loop, 2.25, { direction: 'alternate-reverse', easing: 'linear', repeatCount: 0 })
   assert.equal(normal.motionProgress, 0.25)
   assert.equal(reverse.motionProgress, 0.75)
   assert.equal(alternateReverse.motionProgress, 0.75)
@@ -995,5 +995,25 @@ test('all supported easing curves produce renderer progress and honor their endp
     assert.equal(start.motionProgress, 0, easing + ' start')
     assert.ok(Number.isFinite(middle.motionProgress), easing + ' middle')
     assert.equal(end.motionProgress, 1, easing + ' end')
+  }
+})
+
+
+test('every registered Studio animation exposes finite direction- and easing-aware progress', () => {
+  const registry = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
+  assert.equal(registry.length, 300)
+  for (const definition of registry) {
+    for (const direction of ['normal', 'reverse', 'alternate', 'alternate-reverse'] as const) {
+      for (const easing of ['linear','ease','ease-in','ease-out','ease-in-out','cubic-in','cubic-out','cubic-in-out','premium-out','premium-in','premium-in-out','back-out','back-in','elastic-out','bounce-out'] as const) {
+        const result = sampleTextAnimation({
+          definition,
+          settings: { animationId: definition.id, durationMs: 1000, repeatCount: 2, direction, easing, enabled: true },
+          timelineTimeSeconds: 2.35,
+          layerStartSeconds: 2,
+          layerDurationSeconds: 5,
+        })
+        assert.ok(Number.isFinite(result.motionProgress), definition.id + ' / ' + direction + ' / ' + easing)
+      }
+    }
   }
 })
