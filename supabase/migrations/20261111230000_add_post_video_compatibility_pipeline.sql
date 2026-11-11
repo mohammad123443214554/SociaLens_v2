@@ -1,6 +1,6 @@
 -- V2-only Android-compatible public post video rendition queue.
--- Additive only: no existing tables, storage buckets, policies, or records are changed.
--- Existing videos are not bulk-enqueued; any backfill must be separately reviewed and batched.
+-- Additive only: creates one internal queue table and one claim RPC.
+-- The backfill is restricted to verified V2 public post objects owned by each post author.
 
 create table if not exists public.video_processing_jobs (
   id uuid primary key default gen_random_uuid(),
@@ -31,17 +31,16 @@ create index if not exists video_processing_jobs_claim_idx
 create index if not exists video_processing_jobs_owner_idx
   on public.video_processing_jobs (owner_id, created_at desc);
 
--- Backfill existing V2 public post videos only when the URL belongs to this
--- V2 project, the object path is owned by the post author, and the Storage
--- object still exists. At implementation review, 32/32 existing video posts
--- met these checks. This does not include private create-drafts or other buckets.
+-- Queue only existing V2 posts-bucket video objects whose path is owned by
+-- the author and whose Storage object still exists. Private drafts and all
+-- other buckets are deliberately excluded.
 insert into public.video_processing_jobs (owner_id, bucket, original_path, status)
 select
   p.user_id,
   'posts',
   regexp_replace(
     p.media_url,
-    '^https://zkqktomtynxrqcwpwmwu\.supabase\.co/storage/v1/object/public/posts/',
+    '^https://zkqktomtynxrqcwpwmwu\\.supabase\\.co/storage/v1/object/public/posts/',
     ''
   ),
   'queued'
@@ -50,67 +49,16 @@ where p.media_type = 'video'
   and p.media_url like 'https://zkqktomtynxrqcwpwmwu.supabase.co/storage/v1/object/public/posts/%'
   and regexp_replace(
     p.media_url,
-    '^https://zkqktomtynxrqcwpwmwu\.supabase\.co/storage/v1/object/public/posts/',
+    '^https://zkqktomtynxrqcwpwmwu\\.supabase\\.co/storage/v1/object/public/posts/',
     ''
-  ) ~ ('^' || p.user_id::text || '/[^/]+\.(mp4|m4v|mov|webm|mkv|3gp|avi|mpg|mpeg|ts)
-alter table public.video_processing_jobs enable row level security;
-revoke all on public.video_processing_jobs from public, anon, authenticated;
-grant select, insert, update, delete on public.video_processing_jobs to service_role;
-
-create or replace function public.claim_video_processing_jobs(p_limit integer default 2)
-returns setof public.video_processing_jobs
-language plpgsql
-security invoker
-set search_path = ''
-as $$
-begin
-  update public.video_processing_jobs
-  set status = 'failed',
-      locked_until = null,
-      lease_token = null,
-      updated_at = pg_catalog.now(),
-      last_error = coalesce(last_error, 'Worker lease expired after maximum attempts')
-  where status = 'processing'
-    and locked_until < pg_catalog.now()
-    and attempts >= max_attempts;
-
-  return query
-  with candidates as (
-    select jobs.id
-    from public.video_processing_jobs as jobs
-    where jobs.attempts < jobs.max_attempts
-      and jobs.available_at <= pg_catalog.now()
-      and (jobs.status = 'queued' or (jobs.status = 'processing' and jobs.locked_until < pg_catalog.now()))
-    order by jobs.created_at
-    for update skip locked
-    limit greatest(1, least(coalesce(p_limit, 2), 10))
-  )
-  update public.video_processing_jobs as jobs
-  set status = 'processing',
-      attempts = jobs.attempts + 1,
-      locked_until = pg_catalog.now() + interval '20 minutes',
-      lease_token = pg_catalog.gen_random_uuid(),
-      updated_at = pg_catalog.now(),
-      last_error = null
-  from candidates
-  where jobs.id = candidates.id
-  returning jobs.*;
-end;
-$$;
-
-revoke all on function public.claim_video_processing_jobs(integer) from public, anon, authenticated;
-grant execute on function public.claim_video_processing_jobs(integer) to service_role;
-
-comment on table public.video_processing_jobs is
-  'Internal queue for validated Android-oriented playback renditions of public post videos. Original uploads are retained unchanged.';
-)
+  ) ~ ('^' || p.user_id::text || '/[^/]+\\.(mp4|m4v|mov|webm|mkv|3gp|avi|mpg|mpeg|ts)$')
   and exists (
     select 1
     from storage.objects as objects
     where objects.bucket_id = 'posts'
       and objects.name = regexp_replace(
         p.media_url,
-        '^https://zkqktomtynxrqcwpwmwu\.supabase\.co/storage/v1/object/public/posts/',
+        '^https://zkqktomtynxrqcwpwmwu\\.supabase\\.co/storage/v1/object/public/posts/',
         ''
       )
   )
