@@ -945,6 +945,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     let audioContext: AudioContext | null = null
     let musicElement: HTMLAudioElement | null = null
     let audioDestination: MediaStreamAudioDestinationNode | null = null
+    let exportStream: MediaStream | null = null
     const exportVideos = new Map<string, HTMLVideoElement>()
     let animationFrame = 0
     try {
@@ -955,6 +956,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Could not create the video rendering canvas.')
       const stream = canvas.captureStream(STUDIO_FRAME_RATE)
+      exportStream = stream
       const AudioContextClass = window.AudioContext
       if (AudioContextClass && (audio || clips.some(item => item.kind === 'video'))) {
         audioContext = new AudioContextClass()
@@ -995,27 +997,17 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         recorder!.onstop = () => resolve(new Blob(chunks, { type: recorder!.mimeType || mimeType }))
         recorder!.onerror = () => reject(new Error('The browser stopped recording unexpectedly.'))
       })
+      const orderedExportTextLayers = [...textLayers].sort((a, b) => a.timelineStart - b.timelineStart)
       const drawTitle = (timelineTime: number) => {
-        const visibleLayers = textLayers.filter(layer => timelineTime >= layer.timelineStart && timelineTime < layer.timelineStart + layer.timelineDuration)
-        if (!visibleLayers.length) return
         ctx.save()
         const scale = canvas.width / 420
-        for (const layer of visibleLayers) {
+        for (const layer of orderedExportTextLayers) {
+          if (timelineTime < layer.timelineStart) break
+          if (timelineTime >= layer.timelineStart + layer.timelineDuration) continue
           ctx.save()
           const animationSample = getLayerAnimationSample(layer, timelineTime)
           if (animationSample && !animationSample.visible) { ctx.restore(); continue }
           ctx.globalAlpha = Math.min(100, Math.max(0, layer.opacity ?? 100)) / 100 * (animationSample?.opacity ?? 1)
-          if (animationSample) {
-            ctx.translate(animationSample.translateX * scale, animationSample.translateY * scale)
-            // Canvas 2D has no true perspective matrix; this affine projection preserves the same 3D tilt/foreshortening direction as the live CSS preview.
-            const rx = animationSample.rotateX * Math.PI / 180
-            const ry = animationSample.rotateY * Math.PI / 180
-            ctx.transform(Math.cos(ry), Math.sin(rx) * 0.35, Math.sin(ry) * 0.35, Math.cos(rx), 0, 0)
-            ctx.scale(animationSample.scaleX, animationSample.scaleY)
-            ctx.rotate(animationSample.rotate * Math.PI / 180)
-            ctx.transform(1, Math.tan(animationSample.skewY * Math.PI / 180), Math.tan(animationSample.skewX * Math.PI / 180), 1, 0, 0)
-            if (typeof ctx.filter === 'string' && animationSample.blur > 0) ctx.filter = 'blur(' + animationSample.blur * scale + 'px)'
-          }
           ctx.fillStyle = layer.color
           ctx.textAlign = layer.align
           ctx.textBaseline = 'top'
@@ -1030,6 +1022,17 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           const boxY = canvas.height * layer.y / 100
           ctx.translate(boxX + maxWidth / 2, boxY + Math.round(layer.fontSize * scale) / 2)
           ctx.rotate(layer.rotation * Math.PI / 180)
+          // Match the live editor: animation transforms pivot around this text layer's center.
+          if (animationSample) {
+            ctx.translate(animationSample.translateX * scale, animationSample.translateY * scale)
+            const rx = animationSample.rotateX * Math.PI / 180
+            const ry = animationSample.rotateY * Math.PI / 180
+            ctx.transform(Math.cos(ry), Math.sin(rx) * 0.35, Math.sin(ry) * 0.35, Math.cos(rx), 0, 0)
+            ctx.scale(animationSample.scaleX, animationSample.scaleY)
+            ctx.rotate(animationSample.rotate * Math.PI / 180)
+            ctx.transform(1, Math.tan(animationSample.skewY * Math.PI / 180), Math.tan(animationSample.skewX * Math.PI / 180), 1, 0, 0)
+            if (typeof ctx.filter === 'string' && animationSample.blur > 0) ctx.filter = 'blur(' + animationSample.blur * scale + 'px)'
+          }
           const x = -maxWidth / 2
           const y = -Math.round(layer.fontSize * scale) / 2
           const lineHeight = Math.round(layer.fontSize * scale * 1.2)
@@ -1044,6 +1047,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           const characterDefinition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
           const wordDefinition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
           const characterList = splitStudioGraphemes(formattedText)
+          const wordCount = (formattedText.match(/\\S+/g) || []).length
+          let wordOffset = 0
           let characterOffset = 0
           formattedText.split(/\n/).forEach((line, index) => {
             const textX = layer.align === 'left' ? x : layer.align === 'right' ? x + maxWidth : x + maxWidth / 2
@@ -1077,15 +1082,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           if (!characterDefinition?.characterEffect && (effect === 'Echo' || effect === 'Ghost' || effect === 'Long Shadow' || effect === '3D Extrude')) { ctx.save(); ctx.globalAlpha *= .32; ctx.fillStyle = effectColor; for(let step=4;step>=1;step--) ctx.fillText(line,textX+step*scale,y+index*lineHeight+step*scale,maxWidth); ctx.restore() }
             if (wordDefinition?.wordEffect && animationSample) {
               const tokens = line.match(/\\S+|\\s+/g) || []
-              const wordsInLayer = characterList.filter(token => !/^\\s+$/.test(token)).length
               const measuredLine = ctx.measureText(line).width
               let cursor = layer.align === 'left' ? textX : layer.align === 'right' ? textX + maxWidth - measuredLine : textX + (maxWidth - measuredLine) / 2
-              let wordIndex = 0
               let lineIndex = index
               tokens.forEach(token => {
                 if (/^\\s+$/.test(token)) { cursor += ctx.measureText(token).width; return }
                 const wordWidth = ctx.measureText(token).width
-                const motion = sampleWordMotion({ effect: wordDefinition.wordEffect!, progress: animationSample.progress, index: wordIndex++, count: Math.max(1, wordsInLayer), lineIndex, lineCount: formattedText.split('\\n').length, intensity: layer.animation?.intensity ?? 1 })
+                const motion = sampleWordMotion({ effect: wordDefinition.wordEffect!, progress: animationSample.progress, index: wordOffset++, count: Math.max(1, wordCount), lineIndex, lineCount: formattedText.split('\\n').length, intensity: layer.animation?.intensity ?? 1 })
                 ctx.save()
                 ctx.globalAlpha *= motion.opacity
                 ctx.textAlign = 'left'
@@ -1262,6 +1265,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (musicElement) { musicElement.pause(); musicElement.removeAttribute('src'); musicElement.load() }
       exportVideos.forEach(video => { video.pause(); video.removeAttribute('src'); video.load() })
       if (audioContext) await audioContext.close().catch(() => undefined)
+      exportStream?.getTracks().forEach(track => track.stop())
+      exportStream = null
       setExporting(false)
     }
   }
