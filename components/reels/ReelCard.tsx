@@ -18,6 +18,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { useIsReposted, useToggleRepost } from '@/lib/hooks/useRepost'
 import { useTrackEvent } from '@/lib/hooks/useTrackEvent'
 import { BLANK_VIDEO_POSTER, getMediaProxyUrl } from '@/lib/utils/media'
+import { useVideoPlaybackUrl } from '@/lib/hooks/useVideoPlaybackUrl'
 
 interface ReelCardProps {
   post: PostWithProfile
@@ -53,10 +54,12 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   const [progress, setProgress] = useState(0) // 0-100
   const [seeking, setSeeking] = useState(false)
   const [usingMediaProxy, setUsingMediaProxy] = useState(false)
+  const [usingOriginalFallback, setUsingOriginalFallback] = useState(false)
   const hasCountedViewRef = useRef(false)
   const { user, profile } = useUser()
   const supabase = createClient()
   const track = useTrackEvent()
+  const playbackUrl = useVideoPlaybackUrl(post.media_url, shouldLoad)
   const watchedSecondsRef = useRef(0)
   const watchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const loopCountRef = useRef(0)
@@ -125,7 +128,7 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   useEffect(() => {
     const videoEl = videoRef.current
     if (!videoEl) return
-    const directSrc = post.media_url ?? ''
+    const directSrc = usingOriginalFallback ? post.media_url ?? '' : playbackUrl ?? post.media_url ?? ''
     const src = usingMediaProxy && directSrc ? getMediaProxyUrl(directSrc) : directSrc
 
     if (shouldLoad && src) {
@@ -142,10 +145,11 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
       setProgress(0)
       setPaused(false)
     }
-  }, [shouldLoad, post.media_url, usingMediaProxy])
+  }, [shouldLoad, post.media_url, playbackUrl, usingMediaProxy, usingOriginalFallback])
 
   useEffect(() => {
     setUsingMediaProxy(false)
+    setUsingOriginalFallback(false)
   }, [post.id, post.media_url])
 
   useEffect(() => {
@@ -204,6 +208,11 @@ export function ReelCard({ post, isActive, shouldLoad, isMuted, onToggleMute }: 
   const handleVideoError = () => {
     if (!usingMediaProxy && post.media_url) {
       setUsingMediaProxy(true)
+      return
+    }
+    if (playbackUrl && playbackUrl !== post.media_url && !usingOriginalFallback) {
+      setUsingOriginalFallback(true)
+      setUsingMediaProxy(false)
     }
   }
 
