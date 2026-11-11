@@ -33,34 +33,31 @@ create index if not exists video_processing_jobs_owner_idx
 
 -- Queue only existing V2 posts-bucket video objects whose path is owned by
 -- the author and whose Storage object still exists. Private drafts and all
--- other buckets are deliberately excluded.
+-- other buckets are deliberately excluded. Literal replace avoids regex
+-- escaping ambiguity in the V2 project URL.
+with candidate_posts as (
+  select
+    p.user_id,
+    replace(
+      p.media_url,
+      'https://zkqktomtynxrqcwpwmwu.supabase.co/storage/v1/object/public/posts/',
+      ''
+    ) as original_path
+  from public.posts as p
+  where p.media_type = 'video'
+    and p.media_url like 'https://zkqktomtynxrqcwpwmwu.supabase.co/storage/v1/object/public/posts/%'
+)
 insert into public.video_processing_jobs (owner_id, bucket, original_path, status)
-select
-  p.user_id,
-  'posts',
-  regexp_replace(
-    p.media_url,
-    '^https://zkqktomtynxrqcwpwmwu\\.supabase\\.co/storage/v1/object/public/posts/',
-    ''
-  ),
-  'queued'
-from public.posts as p
-where p.media_type = 'video'
-  and p.media_url like 'https://zkqktomtynxrqcwpwmwu.supabase.co/storage/v1/object/public/posts/%'
-  and regexp_replace(
-    p.media_url,
-    '^https://zkqktomtynxrqcwpwmwu\\.supabase\\.co/storage/v1/object/public/posts/',
-    ''
-  ) ~ ('^' || p.user_id::text || '/[^/]+\\.(mp4|m4v|mov|webm|mkv|3gp|avi|mpg|mpeg|ts)$')
+select cp.user_id, 'posts', cp.original_path, 'queued'
+from candidate_posts as cp
+where cardinality(string_to_array(cp.original_path, '/')) = 2
+  and split_part(cp.original_path, '/', 1) = cp.user_id::text
+  and split_part(cp.original_path, '/', 2) ~* '[.](mp4|m4v|mov|webm|mkv|3gp|avi|mpg|mpeg|ts)$'
   and exists (
     select 1
     from storage.objects as objects
     where objects.bucket_id = 'posts'
-      and objects.name = regexp_replace(
-        p.media_url,
-        '^https://zkqktomtynxrqcwpwmwu\\.supabase\\.co/storage/v1/object/public/posts/',
-        ''
-      )
+      and objects.name = cp.original_path
   )
 on conflict (bucket, original_path) do nothing;
 
