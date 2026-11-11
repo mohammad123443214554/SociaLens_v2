@@ -975,3 +975,25 @@ test('complete Studio animation catalog now contains 300 unique presets', () => 
   assert.equal(new Set(all.map(item=>item.name.toLowerCase())).size,300)
   assert.deepEqual(validateTextAnimationRegistry(all),[])
 })
+
+
+test('direction is applied to character, word, and mask renderer progress', () => {
+  const normal = sample(entrance, 2.25, { direction: 'normal', easing: 'linear' })
+  const reverse = sample(entrance, 2.25, { direction: 'reverse', easing: 'linear' })
+  const alternateReverse = sample(loop, 3.25, { direction: 'alternate-reverse', easing: 'linear', repeatCount: 0 })
+  assert.equal(normal.motionProgress, 0.25)
+  assert.equal(reverse.motionProgress, 0.75)
+  assert.equal(alternateReverse.motionProgress, 0.75)
+})
+
+test('all supported easing curves produce renderer progress and honor their endpoints', () => {
+  const easings = ['linear','ease','ease-in','ease-out','ease-in-out','cubic-in','cubic-out','cubic-in-out','premium-out','premium-in','premium-in-out','back-out','back-in','elastic-out','bounce-out'] as const
+  for (const easing of easings) {
+    const start = sample(entrance, 2, { easing })
+    const middle = sample(entrance, 2.5, { easing })
+    const end = sample(entrance, 3, { easing })
+    assert.equal(start.motionProgress, 0, easing + ' start')
+    assert.ok(Number.isFinite(middle.motionProgress), easing + ' middle')
+    assert.equal(end.motionProgress, 1, easing + ' end')
+  }
+})
