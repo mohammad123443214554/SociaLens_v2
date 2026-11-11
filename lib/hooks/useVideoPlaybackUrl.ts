@@ -73,5 +73,7 @@ export function useVideoPlaybackUrl(originalUrl: string | null | undefined, enab
     }
   }, [originalUrl, enabled])
 
-  return playbackUrl
+  // Never expose a previous post's rendition during the render before the
+  // effect for a newly selected media URL runs.
+  return resolved.source === originalUrl ? resolved.url : originalUrl ?? null
 }
