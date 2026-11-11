@@ -98,6 +98,8 @@ export type TextAnimationSample = {
   blur: number
   letterSpacing: number
   progress: number
+  /** Direction- and easing-adjusted progress for character, word, and mask renderers. */
+  motionProgress: number
   phase: 'before' | 'running' | 'after' | 'inactive'
 }
 
@@ -117,6 +119,7 @@ export const NEUTRAL_TEXT_ANIMATION: Readonly<TextAnimationSample> = Object.free
   blur: 0,
   letterSpacing: 0,
   progress: 1,
+  motionProgress: 1,
   phase: 'inactive',
 })
 
@@ -358,12 +361,15 @@ export function sampleTextAnimation(input: {
   }
 
   const directed = directedProgress(phaseProgress, settings.direction!, iteration)
-  const visual = interpolateFrame(definition, directed, settings.easing || definition.defaultEasing || 'ease', settings.intensity ?? 1)
+  const easing = settings.easing || definition.defaultEasing || 'ease'
+  const motionProgress = EASING[easing](directed)
+  const visual = interpolateFrame(definition, directed, easing, settings.intensity ?? 1)
   const visible = definition.mode === 'entrance' ? timelineTime >= layerStart : true
   return {
     ...visual,
     visible,
     progress: phaseProgress,
+    motionProgress,
     phase,
   }
 }
