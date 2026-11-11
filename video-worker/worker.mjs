@@ -123,8 +123,6 @@ async function processJob(job) {
   const tempDir = await mkdtemp(join(tmpdir(), 'socialens-video-'))
   const inputPath = join(tempDir, 'source')
   const outputPath = join(tempDir, 'compatible.mp4')
-  const leaseHeartbeat = setInterval(() => { void renewLease(job) }, 5 * 60 * 1000)
-  leaseHeartbeat.unref?.()
 
   try {
     const downloaded = await supabase.storage.from('posts').download(job.original_path)
@@ -181,7 +179,6 @@ async function processJob(job) {
     if (!completed.data) throw new Error('Processing lease expired before completion; output will be safely retried')
     console.log('Video job ' + job.id + ' ready (' + validated.width + 'x' + validated.height + ', ' + outputInfo.size + ' bytes)')
   } finally {
-    clearInterval(leaseHeartbeat)
     await rm(tempDir, { recursive: true, force: true })
   }
 }
@@ -203,12 +200,25 @@ async function run() {
       await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
       continue
     }
-    for (const job of jobs) {
-      try {
-        await processJob(job)
-      } catch (error) {
-        await failJob(job, error)
+    // Renew every claimed lease immediately, including jobs waiting behind
+    // an earlier item in this sequential batch.
+    const leaseHeartbeats = new Map(jobs.map(job => {
+      const timer = setInterval(() => { void renewLease(job) }, 5 * 60 * 1000)
+      timer.unref?.()
+      return [job.id, timer]
+    }))
+    try {
+      for (const job of jobs) {
+        try {
+          await processJob(job)
+        } catch (error) {
+          await failJob(job, error)
+        } finally {
+          clearInterval(leaseHeartbeats.get(job.id))
+        }
       }
+    } finally {
+      for (const timer of leaseHeartbeats.values()) clearInterval(timer)
     }
     if (RUN_ONCE) return
   } while (true)
