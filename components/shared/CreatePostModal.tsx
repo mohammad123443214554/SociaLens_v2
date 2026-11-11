@@ -15,6 +15,7 @@ import { RestrictionPopup } from '@/components/shared/RestrictionPopup'
 import { LimitAlertDialog } from '@/components/shared/LimitAlertDialog'
 import { PostShareAdOverlay } from '@/components/ads/PostShareAdOverlay'
 import { useQueryClient } from '@tanstack/react-query'
+import { registerVideoForProcessing } from '@/lib/utils/videoProcessing'
 
 interface CreatePostModalProps {
   onClose: () => void
@@ -310,6 +311,8 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
 
     try {
       let media_url: string | null = null
+      let uploadedVideoPath: string | null = null
+      let uploadedVideoBytes = 0
       if (mediaFile) {
         setUploadProgress(20)
         const fileToUpload = await compressImageIfNeeded(mediaFile)
@@ -325,6 +328,10 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
         setUploadProgress(80)
         const { data: urlData } = supabase.storage.from('posts').getPublicUrl(path)
         media_url = urlData.publicUrl
+        if (mediaType === 'video') {
+          uploadedVideoPath = path
+          uploadedVideoBytes = fileToUpload.size
+        }
       }
 
       const content = buildContent()
@@ -342,6 +349,7 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
       if (postError) {
         throw new Error(`Post creation failed: ${postError.message}`)
       }
+      if (uploadedVideoPath) await registerVideoForProcessing(uploadedVideoPath, uploadedVideoBytes)
       await supabase.rpc('increment_posts_count', { profile_id: user.id })
       setUploadProgress(100)
 
