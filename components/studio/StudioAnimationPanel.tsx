@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Gauge, Repeat2, Search, Sparkles, Timer } from 'lucide-react'
 import type { TextAnimationEasing, TextAnimationSettings } from '@/lib/studio/animation-engine'
 import { BASIC_ENTRANCE_ANIMATIONS } from '@/lib/studio/basic-entrance-animations'
@@ -40,9 +40,6 @@ const FEATURED_ANIMATION_NAMES = [
   'Neon Edge Reveal', 'Film Fade In',
 ]
 
-const INITIAL_VISIBLE = 36
-const PAGE_SIZE = 36
-
 type Props = {
   search: string
   onSearchChange: (value: string) => void
@@ -66,12 +63,23 @@ export function StudioAnimationPanel({
   selectedAnimationId = null,
   onSelectAnimation,
 }: Props) {
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
+  const [visibleCount, setVisibleCount] = useState(36)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const orderedAnimations = useMemo(() => {
-    const rank = new Map(FEATURED_ANIMATION_NAMES.map((name, index) => [name, index]))
+    const characterFirst = new Map(TYPING_CHARACTER_ANIMATIONS.map((animation, index) => [animation.name, index]))
+    const featured = new Map(FEATURED_ANIMATION_NAMES.map((name, index) => [name, index]))
     return [...ALL_ANIMATIONS].sort((a, b) => {
-      const aRank = rank.get(a.name) ?? Number.MAX_SAFE_INTEGER
-      const bRank = rank.get(b.name) ?? Number.MAX_SAFE_INTEGER
+      const aCharacter = characterFirst.get(a.name)
+      const bCharacter = characterFirst.get(b.name)
+      if (aCharacter !== undefined || bCharacter !== undefined) {
+        if (aCharacter === undefined) return 1
+        if (bCharacter === undefined) return -1
+        return aCharacter - bCharacter
+      }
+      const aRank = featured.get(a.name) ?? Number.MAX_SAFE_INTEGER
+      const bRank = featured.get(b.name) ?? Number.MAX_SAFE_INTEGER
       return aRank - bRank || a.name.localeCompare(b.name)
     })
   }, [])
@@ -84,8 +92,30 @@ export function StudioAnimationPanel({
   }, [orderedAnimations, search])
 
   useEffect(() => {
-    setVisibleCount(INITIAL_VISIBLE)
+    setVisibleCount(36)
+    setIsLoadingMore(false)
+    if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0
   }, [search])
+
+  useEffect(() => {
+    const root = scrollContainerRef.current
+    const target = loadMoreRef.current
+    if (!root || !target || isLoadingMore || visibleCount >= filteredAnimations.length) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) setIsLoadingMore(true)
+    }, { root, rootMargin: '180px 0px', threshold: 0 })
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [filteredAnimations.length, isLoadingMore, visibleCount])
+
+  useEffect(() => {
+    if (!isLoadingMore) return
+    const timer = window.setTimeout(() => {
+      setVisibleCount(count => Math.min(filteredAnimations.length, count + 36))
+      setIsLoadingMore(false)
+    }, 260)
+    return () => window.clearTimeout(timer)
+  }, [filteredAnimations.length, isLoadingMore])
 
   const hasAnimation = Boolean(selectedText && selectedAnimationId)
   const duration = animationSettings.durationMs ?? 850
@@ -99,7 +129,7 @@ export function StudioAnimationPanel({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div ref={scrollContainerRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
       <div className="shrink-0 border-b border-white/[0.07] p-3">
         <section aria-label="Motion controls" className="rounded-xl border border-fuchsia-400/20 bg-gradient-to-br from-fuchsia-500/[0.09] to-violet-500/[0.05] p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
@@ -159,13 +189,12 @@ export function StudioAnimationPanel({
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
           <input value={search} onChange={event => onSearchChange(event.target.value)} placeholder="Search all animations" aria-label="Search all animations" className="h-9 w-full rounded-lg border border-white/10 bg-[#080c18] pl-9 pr-3 text-[10px] text-white outline-none placeholder:text-slate-500 focus:border-fuchsia-400/50" />
         </div>
-        <div className="mt-2 flex items-center justify-between">
+        <div className="mt-2">
           <span className="text-[9px] font-bold uppercase tracking-[.13em] text-slate-500">Animation library</span>
-          <span className="text-[9px] tabular-nums text-emerald-300">{filteredAnimations.length} animations</span>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+      <div className="shrink-0 p-3">
         <div className="grid grid-cols-2 gap-2">
           {filteredAnimations.slice(0, visibleCount).map(animation => (
             <button key={animation.id} type="button" disabled={!selectedText} onClick={() => onSelectAnimation?.(animation.id)} aria-pressed={selectedAnimationId === animation.id} className={'group flex min-w-0 flex-col rounded-xl border p-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ' + (selectedAnimationId === animation.id ? 'border-fuchsia-400/60 bg-fuchsia-500/10 ring-1 ring-fuchsia-400/20' : 'border-white/10 bg-white/[0.025] hover:border-fuchsia-300/35 hover:bg-white/[0.06]')}>
@@ -179,7 +208,9 @@ export function StudioAnimationPanel({
           ))}
         </div>
         {!filteredAnimations.length && <p className="py-8 text-center text-[9px] text-slate-500">No matching animations found.</p>}
-        {visibleCount < filteredAnimations.length && <button type="button" onClick={() => setVisibleCount(count => Math.min(filteredAnimations.length, count + PAGE_SIZE))} className="mt-3 flex h-9 w-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.025] text-[9px] font-semibold text-slate-300 transition hover:border-fuchsia-400/30 hover:bg-fuchsia-500/[0.06]">Load {Math.min(PAGE_SIZE, filteredAnimations.length - visibleCount)} more</button>}
+        {visibleCount < filteredAnimations.length && <div ref={loadMoreRef} aria-hidden="true" className="flex h-12 items-center justify-center">
+          {isLoadingMore && <span role="status" aria-label="Loading more animations" className="flex items-center gap-2 text-[9px] text-fuchsia-200"><span className="h-4 w-4 animate-spin rounded-full border-2 border-fuchsia-300/25 border-t-fuchsia-300" />Loading animations</span>}
+        </div>}
       </div>
     </div>
   )
