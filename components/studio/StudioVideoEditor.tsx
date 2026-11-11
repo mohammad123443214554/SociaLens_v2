@@ -428,14 +428,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (definition?.wordEffect) {
       const animationSample = getLayerAnimationSample(layer, timelineTime)
       if (!animationSample) return formattedText
-      const tokens = formattedText.split(/(\\s+)/)
-      const words = tokens.filter(token => token && !/^\\s+$/.test(token))
+      const tokens = formattedText.split(/(\s+)/)
+      const words = tokens.filter(token => token && !/^\s+$/.test(token))
       const lineCount = Math.max(1, formattedText.split(/\n/).length)
       let wordIndex = 0
       let lineIndex = 0
       return tokens.map((token, tokenIndex) => {
-        if (!token || /^\\s+$/.test(token)) {
-          lineIndex += (token.match(/\\n/g) || []).length
+        if (!token || /^\s+$/.test(token)) {
+          lineIndex += (token.match(/\n/g) || []).length
           return token
         }
         const currentWord = wordIndex++
@@ -1047,7 +1047,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           const characterDefinition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
           const wordDefinition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
           const characterList = splitStudioGraphemes(formattedText)
-          const wordCount = (formattedText.match(/\\S+/g) || []).length
+          const wordCount = (formattedText.match(/\S+/g) || []).length
           let wordOffset = 0
           let characterOffset = 0
           formattedText.split(/\n/).forEach((line, index) => {
@@ -1081,12 +1081,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           if (!characterDefinition?.characterEffect && (effect === 'Glitch' || effect === 'RGB Split')) { ctx.save(); ctx.globalAlpha *= .55; ctx.fillStyle = effect === 'Glitch' ? '#ff1744' : '#ff3030'; ctx.fillText(line, textX - 2*scale, y + index * lineHeight, maxWidth); ctx.fillStyle = '#00d9ff'; ctx.fillText(line, textX + 2*scale, y + index * lineHeight, maxWidth); ctx.restore() }
           if (!characterDefinition?.characterEffect && (effect === 'Echo' || effect === 'Ghost' || effect === 'Long Shadow' || effect === '3D Extrude')) { ctx.save(); ctx.globalAlpha *= .32; ctx.fillStyle = effectColor; for(let step=4;step>=1;step--) ctx.fillText(line,textX+step*scale,y+index*lineHeight+step*scale,maxWidth); ctx.restore() }
             if (wordDefinition?.wordEffect && animationSample) {
-              const tokens = line.match(/\\S+|\\s+/g) || []
+              const tokens = line.match(/\S+|\s+/g) || []
               const measuredLine = ctx.measureText(line).width
               let cursor = layer.align === 'left' ? textX : layer.align === 'right' ? textX + maxWidth - measuredLine : textX + (maxWidth - measuredLine) / 2
               let lineIndex = index
               tokens.forEach(token => {
-                if (/^\\s+$/.test(token)) { cursor += ctx.measureText(token).width; return }
+                if (/^\s+$/.test(token)) { cursor += ctx.measureText(token).width; return }
                 const wordWidth = ctx.measureText(token).width
                 const motion = sampleWordMotion({ effect: wordDefinition.wordEffect!, progress: animationSample.progress, index: wordOffset++, count: Math.max(1, wordCount), lineIndex, lineCount: formattedText.split('\\n').length, intensity: layer.animation?.intensity ?? 1 })
                 ctx.save()
