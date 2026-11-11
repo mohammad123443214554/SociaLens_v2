@@ -16,9 +16,10 @@ export function ReelPreview({ src, className, ariaLabel }: ReelPreviewProps) {
   const [nearViewport, setNearViewport] = useState(false)
   const [usingProxy, setUsingProxy] = useState(false)
   const [usingOriginal, setUsingOriginal] = useState(false)
+  const [fallbackExhausted, setFallbackExhausted] = useState(false)
   const playbackUrl = useVideoPlaybackUrl(src, nearViewport)
   const selectedUrl = usingOriginal ? src : playbackUrl ?? src
-  const videoSrc = nearViewport ? (usingProxy ? getMediaProxyUrl(selectedUrl) : selectedUrl) : undefined
+  const videoSrc = nearViewport && !fallbackExhausted ? (usingProxy ? getMediaProxyUrl(selectedUrl) : selectedUrl) : undefined
 
   useEffect(() => {
     const element = videoRef.current
@@ -37,6 +38,7 @@ export function ReelPreview({ src, className, ariaLabel }: ReelPreviewProps) {
   useEffect(() => {
     setUsingProxy(false)
     setUsingOriginal(false)
+    setFallbackExhausted(false)
   }, [src])
 
   return (
@@ -49,10 +51,13 @@ export function ReelPreview({ src, className, ariaLabel }: ReelPreviewProps) {
       className={className}
       aria-label={ariaLabel}
       onError={() => {
-        if (!usingProxy) setUsingProxy(true)
-        else if (playbackUrl && playbackUrl !== src && !usingOriginal) {
+        if (usingProxy && !usingOriginal) {
           setUsingOriginal(true)
           setUsingProxy(false)
+        } else if (!usingProxy && !usingOriginal) {
+          setUsingProxy(true)
+        } else {
+          setFallbackExhausted(true)
         }
       }}
     />
