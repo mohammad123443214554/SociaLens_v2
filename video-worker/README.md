@@ -24,7 +24,7 @@ This profile improves compatibility but cannot guarantee playback on every legac
 4. GitHub Actions claims jobs through a row-locking RPC and processes a bounded batch.
 5. The worker downloads the original, transcodes and validates a separate MP4, then uploads it to posts/video-renditions/{owner_id}/{job_id}.mp4.
 6. Only after the rendition is stored and validated does the worker mark the queue row ready.
-7. Feed, Reels and the post viewer poll GET /api/media/playback while the video is eligible to load. Original media remains the fallback for untracked, queued, failed or temporarily unavailable processing.
+7. Feed, Reels, Explore, liked/saved views, shared-post chat, public post-share pages and admin post previews resolve the compatible rendition while the video is eligible to load. Public playback-status lookups first apply the existing posts RLS visibility check, including for logged-out public-share visitors. Original media remains the fallback for untracked, queued, failed or temporarily unavailable processing.
 
 Private create-drafts media is not registered. Draft videos are only queued after they are copied into posts and a public post row has been created. Cover images, Stories, chat media and Studio assets are excluded.
 
