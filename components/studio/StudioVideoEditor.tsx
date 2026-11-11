@@ -907,9 +907,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       setPlaying(false)
     }
 
-    const repeatCount = definition.mode === 'loop' || definition.mode === 'continuous' ? 0 : 1
-    const cycleDurationMs = definition.defaultDurationMs
-    const previewDuration = cycleDurationMs * (repeatCount === 0 ? 2 : repeatCount)
+    const previousSettings = selectedText.animation || {}
+    const repeatCount = previousSettings.repeatCount ?? (definition.mode === 'loop' || definition.mode === 'continuous' ? 0 : 1)
+    const cycleDurationMs = previousSettings.durationMs ?? definition.defaultDurationMs
+    const previewDuration = cycleDurationMs / Math.max(0.1, previousSettings.speed ?? 1) * (repeatCount === 0 ? 2 : Math.max(1, repeatCount))
     const previewStartSeconds = definition.mode === 'exit'
       ? Math.max(selectedText.timelineStart, selectedText.timelineStart + selectedText.timelineDuration - previewDuration / 1000)
       : selectedText.timelineStart
@@ -917,14 +918,15 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setIsAnimationPreviewing(false)
     setAnimationPreviewTime(0)
     updateTextLayer(selectedText.id, { animation: normalizeTextAnimationSettings({
+      ...previousSettings,
       animationId: id,
       durationMs: cycleDurationMs,
-      delayMs: 0,
+      delayMs: previousSettings.delayMs ?? 0,
       repeatCount,
-      direction: 'normal',
-      easing: definition.defaultEasing || 'ease',
-      speed: 1,
-      intensity: 1,
+      direction: previousSettings.direction ?? 'normal',
+      easing: previousSettings.easing ?? definition.defaultEasing ?? 'ease',
+      speed: previousSettings.speed ?? 1,
+      intensity: previousSettings.intensity ?? 1,
       enabled: true,
     }) })
     setPlayhead(quantizeStudioTime(previewStartSeconds))
@@ -1306,7 +1308,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
 
         <aside className="hidden w-[260px] shrink-0 flex-col border-r border-white/[0.08] bg-[#0d1020] lg:flex">
           <div className="border-b border-white/[0.07] px-4 py-4">
-            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : activePanel === 'audio' ? 'Audio library' : activePanel === 'effects' ? 'Text effects' : 'Text animations'}</h2><span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : activePanel === 'animation' ? '75 ready' : activePanel === 'effects' ? '40 effects' : '3 text styles'}</span></div>
+            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : activePanel === 'audio' ? 'Audio library' : activePanel === 'effects' ? 'Text effects' : 'Text animations'}</h2><span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : activePanel === 'effects' ? '40 effects' : '3 text styles'}</span></div>
             <p className="mt-1 text-[9px] text-slate-500">{activePanel === 'media' ? 'Import and manage your video and photo clips.' : activePanel === 'text' ? 'Edit the text currently shown on your canvas.' : activePanel === 'audio' ? 'Add a music track and control its volume.' : activePanel === 'animation' ? 'Explore motion families for the selected text layer.' : 'Style the appearance of your selected text.'}</p>
           </div>
 
