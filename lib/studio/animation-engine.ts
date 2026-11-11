@@ -158,6 +158,10 @@ const EASING: Record<TextAnimationEasing, (value: number) => number> = {
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+// Preserve exact endpoints for every easing curve; polynomial overshoot formulas
+// can otherwise produce tiny floating-point residues such as 2.22e-16 at zero.
+const applyEasing = (easing: TextAnimationEasing, progress: number) =>
+  progress <= 0 ? 0 : progress >= 1 ? 1 : EASING[easing](progress)
 const finite = (value: unknown, fallback: number) =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback
 
@@ -239,7 +243,7 @@ function interpolateFrame(
   // curves remap the full animation clock once, then use a C1-continuous Hermite
   // spline between keyframes so velocity does not abruptly restart at each stop.
   const overshoots = easing === 'back-out' || easing === 'back-in' || easing === 'elastic-out' || easing === 'bounce-out'
-  const position = overshoots ? rawProgress : clamp(EASING[easing](rawProgress), 0, 1)
+  const position = overshoots ? rawProgress : clamp(applyEasing(easing, rawProgress), 0, 1)
   let rightIndex = frames.findIndex(frame => frame.at >= position)
   if (rightIndex < 0) rightIndex = frames.length - 1
   const leftIndex = Math.max(0, rightIndex - 1)
@@ -252,7 +256,7 @@ function interpolateFrame(
     const from = at(leftIndex)
     const to = at(rightIndex)
     if (overshoots) {
-      const eased = EASING[easing](local)
+      const eased = applyEasing(easing, local)
       return from + (to - from) * eased
     }
     if (span <= 0 || leftIndex === rightIndex) return to
@@ -362,7 +366,7 @@ export function sampleTextAnimation(input: {
 
   const directed = directedProgress(phaseProgress, settings.direction!, iteration)
   const easing = settings.easing || definition.defaultEasing || 'ease'
-  const motionProgress = EASING[easing](directed)
+  const motionProgress = applyEasing(easing, directed)
   const visual = interpolateFrame(definition, directed, easing, settings.intensity ?? 1)
   const visible = definition.mode === 'entrance' ? timelineTime >= layerStart : true
   return {
