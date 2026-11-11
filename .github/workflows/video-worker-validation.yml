@@ -6,6 +6,7 @@ on:
       - "video-worker/**"
       - "app/api/media/**"
       - "lib/hooks/useVideoPlaybackUrl.ts"
+      - "supabase/migrations/**"
       - "components/feed/PostCard.tsx"
       - "components/reels/ReelCard.tsx"
       - ".github/workflows/video-worker-validation.yml"
