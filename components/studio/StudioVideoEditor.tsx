@@ -930,7 +930,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       enabled: true,
     }) })
     setPlayhead(quantizeStudioTime(previewStartSeconds))
-    setNotice('Applied ' + definition.name + ' — preview playing on the canvas.')
 
     // Start after React commits the new layer settings so the preview clock
     // samples the newly selected definition on its very first frame.
