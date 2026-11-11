@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   })
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
 
-  // Only published-post media enters the video worker queue. Stories, chat,
+  // Only posts-bucket video uploads enter the video worker queue. Stories, chat,
   // avatars, covers and every other Storage bucket retain their existing flow.
   if (bucket === 'posts' && file.type.startsWith('video/')) {
     try {
