@@ -9,8 +9,7 @@ on:
       - "supabase/migrations/**"
       - "components/feed/PostCard.tsx"
       - "components/reels/ReelCard.tsx"
-      - ".github/workflows/video-worker-validation.yml"
-      - ".github/workflows/video-processing.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
@@ -34,6 +33,10 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
+
+      - name: Install worker dependencies
+        working-directory: video-worker
+        run: npm install --omit=dev --no-audit --no-fund
 
       - name: Check worker syntax
         working-directory: video-worker
