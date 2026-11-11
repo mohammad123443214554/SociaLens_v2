@@ -232,7 +232,7 @@ function interpolateFrame(
   progress: number,
   easing: TextAnimationEasing,
   intensity: number,
-): Omit<TextAnimationSample, 'visible' | 'progress' | 'phase'> {
+): Omit<TextAnimationSample, 'visible' | 'progress' | 'phase' | 'motionProgress'> {
   const frames = definition.keyframes
   const rawProgress = clamp(progress, 0, 1)
   // Overshooting curves intentionally retain their authored overshoot. All other
