@@ -47,9 +47,30 @@ export async function deleteAccountCompletely(userId: string) {
     })
     .filter((path): path is string => Boolean(path))
 
-  if (postPaths.length) {
-    const { error } = await admin.storage.from('posts').remove([...new Set(postPaths)])
-    assertOk('remove post media', error)
+  // Renditions live beside public post media but are stored under a
+  // dedicated owner-prefixed folder. Remove them before deleting the Auth
+  // identity so account deletion cannot leave public converted copies behind.
+  const renditionPaths: string[] = []
+  let renditionOffset = 0
+  while (true) {
+    const { data: renditionFiles, error: renditionListError } = await admin.storage
+      .from('posts')
+      .list('video-renditions/' + userId, { limit: 1000, offset: renditionOffset })
+    assertOk('list post video renditions', renditionListError)
+    const page = renditionFiles ?? []
+    renditionPaths.push(
+      ...page
+        .filter(file => file.name.toLowerCase().endsWith('.mp4'))
+        .map(file => 'video-renditions/' + userId + '/' + file.name)
+    )
+    if (page.length < 1000) break
+    renditionOffset += page.length
+  }
+
+  const allPostMediaPaths = [...new Set([...postPaths, ...renditionPaths])]
+  if (allPostMediaPaths.length) {
+    const { error } = await admin.storage.from('posts').remove(allPostMediaPaths)
+    assertOk('remove post media and video renditions', error)
   }
 
   // These are explicit user-footprint records. The schema also has cascading
