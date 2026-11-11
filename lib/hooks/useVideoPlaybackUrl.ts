@@ -8,11 +8,15 @@ import { useEffect, useState } from 'react'
  * terminal failure, and temporary status-endpoint errors.
  */
 export function useVideoPlaybackUrl(originalUrl: string | null | undefined, enabled: boolean) {
-  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null)
+  const [resolved, setResolved] = useState<{ originalUrl: string; playbackUrl: string } | null>(null)
+  // Never render a previous video's rendition for one frame after the source changes.
+  const playbackUrl = originalUrl && resolved?.originalUrl === originalUrl
+    ? resolved.playbackUrl
+    : originalUrl ?? null
 
   useEffect(() => {
     if (!enabled || !originalUrl) {
-      setPlaybackUrl(null)
+      setResolved(null)
       return
     }
 
@@ -20,7 +24,7 @@ export function useVideoPlaybackUrl(originalUrl: string | null | undefined, enab
     let timer: ReturnType<typeof setTimeout> | undefined
     let attempts = 0
     let consecutiveErrors = 0
-    setPlaybackUrl(originalUrl)
+    setResolved({ originalUrl, playbackUrl: originalUrl })
 
     const schedule = (delay: number) => {
       if (!cancelled) timer = setTimeout(check, delay)
@@ -38,25 +42,25 @@ export function useVideoPlaybackUrl(originalUrl: string | null | undefined, enab
         consecutiveErrors = 0
 
         if (result.status === 'ready' && result.playbackUrl) {
-          setPlaybackUrl(result.playbackUrl)
+          setResolved({ originalUrl, playbackUrl: result.playbackUrl })
           return
         }
         if (result.status === 'untracked' || result.status === 'failed') {
-          setPlaybackUrl(originalUrl)
+          setResolved({ originalUrl, playbackUrl: originalUrl })
           return
         }
         if (result.status !== 'queued' && result.status !== 'processing') {
-          setPlaybackUrl(originalUrl)
+          setResolved({ originalUrl, playbackUrl: originalUrl })
           return
         }
 
-        setPlaybackUrl(originalUrl)
+        setResolved({ originalUrl, playbackUrl: originalUrl })
         attempts += 1
         schedule(Math.min(15000, 3000 + attempts * 1000))
       } catch {
         if (cancelled) return
         consecutiveErrors += 1
-        if (consecutiveErrors >= 2) setPlaybackUrl(originalUrl)
+        if (consecutiveErrors >= 2) setResolved({ originalUrl, playbackUrl: originalUrl })
         if (consecutiveErrors >= 20) return
         schedule(Math.min(15000, 3000 * consecutiveErrors))
       }
