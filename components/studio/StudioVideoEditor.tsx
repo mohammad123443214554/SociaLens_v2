@@ -415,6 +415,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (layer.listStyle === 'number') return value.split(/\n/).map((line, index) => line ? (index + 1) + '. ' + line : line).join('\n')
     return value
   }
+  const getAnimatedGradientFill = (layer: TextLayer) => layer.effect === 'Metallic' || layer.effect === 'Hologram'
+    ? { ...getTextEffectStyle(layer.effect, layer.effectIntensity ?? 60, layer.effectColor || '#a855f7', layer.effectSecondaryColor || '#22d3ee', layer.effectBlur ?? 8, layer.effectDistance ?? 4, layer.effectAngle ?? 45), display: 'inline-block', backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', WebkitTextFillColor: 'transparent' }
+    : {}
   const getAnimatedTextContent = (layer: TextLayer, timelineTime: number) => {
     const definition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
     const formattedText = getFormattedText(layer)
@@ -422,7 +425,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const animationSample = getLayerAnimationSample(layer, timelineTime)
       if (!animationSample) return formattedText
       const mask = sampleMaskReveal({ effect: definition.maskEffect, progress: animationSample.motionProgress, intensity: layer.animation?.intensity ?? 1 })
-      return <span style={{ display: 'block', width: '100%', clipPath: mask.maskImage ? undefined : mask.clipPath, maskImage: mask.maskImage, WebkitMaskImage: mask.maskImage, maskSize: '100% 100%', WebkitMaskSize: '100% 100%', willChange: isAnimationPreviewing || playing ? 'clip-path, mask-image' : 'auto' }}>{formattedText}</span>
+      return <span style={{ display: 'block', width: '100%', ...getAnimatedGradientFill(layer), clipPath: mask.maskImage ? undefined : mask.clipPath, maskImage: mask.maskImage, WebkitMaskImage: mask.maskImage, maskSize: '100% 100%', WebkitMaskSize: '100% 100%', willChange: isAnimationPreviewing || playing ? 'clip-path, mask-image' : 'auto' }}>{formattedText}</span>
     }
     if (definition?.wordEffect) {
       const animationSample = getLayerAnimationSample(layer, timelineTime)
@@ -439,7 +442,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         }
         const currentWord = wordIndex++
         const motion = sampleWordMotion({ effect: definition.wordEffect!, progress: animationSample.motionProgress, index: currentWord, count: words.length, lineIndex, lineCount, intensity: layer.animation?.intensity ?? 1 })
-        return <span key={tokenIndex} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: motion.opacity, transform: 'translate3d(' + motion.x + 'px,' + motion.y + 'px,0) rotate(' + motion.rotate + 'deg) rotateX(' + motion.rotateX + 'deg) scale(' + motion.scale + ')', transformOrigin: 'center bottom', filter: motion.blur ? 'blur(' + motion.blur + 'px)' : undefined, clipPath: motion.clip < 1 ? 'inset(0 ' + ((1-motion.clip)*100) + '% 0 0)' : undefined, letterSpacing: motion.spacing ? motion.spacing + 'px' : undefined, willChange: (isAnimationPreviewing || playing) ? 'transform, opacity' : 'auto' }}>{token}</span>
+        return <span key={tokenIndex} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: motion.opacity, transform: 'translate3d(' + motion.x + 'px,' + motion.y + 'px,0) rotate(' + motion.rotate + 'deg) rotateX(' + motion.rotateX + 'deg) scale(' + motion.scale + ')', transformOrigin: 'center bottom', filter: motion.blur ? 'blur(' + motion.blur + 'px)' : undefined, clipPath: motion.clip < 1 ? 'inset(0 ' + ((1-motion.clip)*100) + '% 0 0)' : undefined, letterSpacing: motion.spacing ? motion.spacing + 'px' : undefined, ...getAnimatedGradientFill(layer), willChange: (isAnimationPreviewing || playing) ? 'transform, opacity' : 'auto' }}>{token}</span>
       })
     }
     if (!definition?.characterEffect) return formattedText
@@ -448,7 +451,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const glyphs = splitStudioGraphemes(formattedText)
     return glyphs.map((glyph, index) => {
       const motion = sampleCharacterMotion({ effect: definition.characterEffect!, progress: sample.motionProgress, index, count: glyphs.length, intensity: layer.animation?.intensity ?? 1 })
-      return <span key={index} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: motion.opacity, transform: 'translate3d(' + motion.translateX + 'px,' + motion.translateY + 'px,0) rotate(' + motion.rotate + 'deg) scale(' + motion.scaleX + ',' + motion.scaleY + ')', transformOrigin: 'left center', filter: motion.blur ? 'blur(' + motion.blur + 'px)' : undefined, clipPath: motion.clipProgress < 1 ? 'inset(0 ' + ((1 - motion.clipProgress) * 100) + '% 0 0)' : undefined, willChange: (isAnimationPreviewing || playing) ? 'transform, opacity' : 'auto' }}>{glyph}</span>
+      return <span key={index} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: motion.opacity, transform: 'translate3d(' + motion.translateX + 'px,' + motion.translateY + 'px,0) rotate(' + motion.rotate + 'deg) scale(' + motion.scaleX + ',' + motion.scaleY + ')', transformOrigin: 'left center', filter: motion.blur ? 'blur(' + motion.blur + 'px)' : undefined, clipPath: motion.clipProgress < 1 ? 'inset(0 ' + ((1 - motion.clipProgress) * 100) + '% 0 0)' : undefined, ...getAnimatedGradientFill(layer), willChange: (isAnimationPreviewing || playing) ? 'transform, opacity' : 'auto' }}>{glyph}</span>
     })
   }
   const totalDuration = useMemo(() => clips.reduce((sum, item) => sum + Math.max(0.1, item.trimEnd - item.trimStart), 0), [clips])
