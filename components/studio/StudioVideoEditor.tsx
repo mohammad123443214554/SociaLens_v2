@@ -422,10 +422,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   // the parent layer. Inline-block animation tracks do not reliably inherit a
   // parent's text-decoration, especially when the text fill is transparent.
   const getAnimatedDecorationStyle = (layer: TextLayer) => ({
-    textDecoration: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : layer.strikethrough ? 'line-through' : 'none',
+    textDecoration: (layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : layer.strikethrough ? 'line-through' : 'none') as const,
     textDecorationColor: layer.effect === 'Metallic' || layer.effect === 'Hologram' ? '#cbd5e1' : layer.effectColor || layer.color,
-    textDecorationThickness: 'from-font',
-    textUnderlineOffset: '0.12em',
+    textDecorationThickness: 'from-font' as const,
+    textUnderlineOffset: '0.12em' as const,
     textDecorationSkipInk: 'none' as const,
   })
   const getAnimatedTextContent = (layer: TextLayer, timelineTime: number) => {
