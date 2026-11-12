@@ -418,6 +418,16 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const getAnimatedGradientFill = (layer: TextLayer, guardLeadingGlyph = false) => layer.effect === 'Metallic' || layer.effect === 'Hologram'
     ? { ...getTextEffectStyle(layer.effect, layer.effectIntensity ?? 60, layer.effectColor || '#a855f7', layer.effectSecondaryColor || '#22d3ee', layer.effectBlur ?? 8, layer.effectDistance ?? 4, layer.effectAngle ?? 45), display: 'inline-block', backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundOrigin: 'border-box', WebkitTextFillColor: 'transparent', overflow: 'visible', ...(guardLeadingGlyph ? { paddingLeft: '0.14em', marginLeft: '-0.14em' } : {}) }
     : {}
+  // Decorations are applied to the actual animated glyph/word nodes as well as
+  // the parent layer. Inline-block animation tracks do not reliably inherit a
+  // parent's text-decoration, especially when the text fill is transparent.
+  const getAnimatedDecorationStyle = (layer: TextLayer) => ({
+    textDecoration: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : layer.strikethrough ? 'line-through' : 'none',
+    textDecorationColor: layer.effect === 'Metallic' || layer.effect === 'Hologram' ? '#cbd5e1' : layer.effectColor || layer.color,
+    textDecorationThickness: 'from-font',
+    textUnderlineOffset: '0.12em',
+    textDecorationSkipInk: 'none' as const,
+  })
   const getAnimatedTextContent = (layer: TextLayer, timelineTime: number) => {
     const definition = STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation?.animationId || '')
     const formattedText = getFormattedText(layer)
@@ -425,7 +435,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const animationSample = getLayerAnimationSample(layer, timelineTime)
       if (!animationSample) return formattedText
       const mask = sampleMaskReveal({ effect: definition.maskEffect, progress: animationSample.motionProgress, intensity: layer.animation?.intensity ?? 1 })
-      return <span style={{ display: 'block', width: '100%', ...getAnimatedGradientFill(layer), clipPath: mask.maskImage ? undefined : mask.clipPath, maskImage: mask.maskImage, WebkitMaskImage: mask.maskImage, maskSize: '100% 100%', WebkitMaskSize: '100% 100%', willChange: isAnimationPreviewing || playing ? 'clip-path, mask-image' : 'auto' }}>{formattedText}</span>
+      return <span style={{ display: 'block', width: '100%', ...getAnimatedGradientFill(layer), ...getAnimatedDecorationStyle(layer), clipPath: mask.maskImage ? undefined : mask.clipPath, maskImage: mask.maskImage, WebkitMaskImage: mask.maskImage, maskSize: '100% 100%', WebkitMaskSize: '100% 100%', willChange: isAnimationPreviewing || playing ? 'clip-path, mask-image' : 'auto' }}>{formattedText}</span>
     }
     if (definition?.wordEffect) {
       const animationSample = getLayerAnimationSample(layer, timelineTime)
@@ -442,7 +452,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         }
         const currentWord = wordIndex++
         const motion = sampleWordMotion({ effect: definition.wordEffect!, progress: animationSample.motionProgress, index: currentWord, count: words.length, lineIndex, lineCount, intensity: layer.animation?.intensity ?? 1 })
-        return <span key={tokenIndex} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: motion.opacity, transform: 'translate3d(' + motion.x + 'px,' + motion.y + 'px,0) rotate(' + motion.rotate + 'deg) rotateX(' + motion.rotateX + 'deg) scale(' + motion.scale + ')', transformOrigin: 'center bottom', filter: motion.blur ? 'blur(' + motion.blur + 'px)' : undefined, clipPath: motion.clip < 1 ? 'inset(0 ' + ((1-motion.clip)*100) + '% 0 0)' : undefined, letterSpacing: motion.spacing ? motion.spacing + 'px' : undefined, ...getAnimatedGradientFill(layer, tokenIndex === 0), willChange: (isAnimationPreviewing || playing) ? 'transform, opacity' : 'auto' }}>{token}</span>
+        return <span key={tokenIndex} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: motion.opacity, transform: 'translate3d(' + motion.x + 'px,' + motion.y + 'px,0) rotate(' + motion.rotate + 'deg) rotateX(' + motion.rotateX + 'deg) scale(' + motion.scale + ')', transformOrigin: 'center bottom', filter: motion.blur ? 'blur(' + motion.blur + 'px)' : undefined, clipPath: motion.clip < 1 ? 'inset(0 ' + ((1-motion.clip)*100) + '% 0 0)' : undefined, letterSpacing: motion.spacing ? motion.spacing + 'px' : undefined, ...getAnimatedGradientFill(layer, tokenIndex === 0), ...getAnimatedDecorationStyle(layer), willChange: (isAnimationPreviewing || playing) ? 'transform, opacity' : 'auto' }}>{token}</span>
       })
     }
     if (!definition?.characterEffect) return formattedText
@@ -451,7 +461,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const glyphs = splitStudioGraphemes(formattedText)
     return glyphs.map((glyph, index) => {
       const motion = sampleCharacterMotion({ effect: definition.characterEffect!, progress: sample.motionProgress, index, count: glyphs.length, intensity: layer.animation?.intensity ?? 1 })
-      return <span key={index} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: motion.opacity, transform: 'translate3d(' + motion.translateX + 'px,' + motion.translateY + 'px,0) rotate(' + motion.rotate + 'deg) scale(' + motion.scaleX + ',' + motion.scaleY + ')', transformOrigin: 'left center', filter: motion.blur ? 'blur(' + motion.blur + 'px)' : undefined, clipPath: motion.clipProgress < 1 ? 'inset(0 ' + ((1 - motion.clipProgress) * 100) + '% 0 0)' : undefined, ...getAnimatedGradientFill(layer, index === 0), willChange: (isAnimationPreviewing || playing) ? 'transform, opacity' : 'auto' }}>{glyph}</span>
+      return <span key={index} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: motion.opacity, transform: 'translate3d(' + motion.translateX + 'px,' + motion.translateY + 'px,0) rotate(' + motion.rotate + 'deg) scale(' + motion.scaleX + ',' + motion.scaleY + ')', transformOrigin: 'left center', filter: motion.blur ? 'blur(' + motion.blur + 'px)' : undefined, clipPath: motion.clipProgress < 1 ? 'inset(0 ' + ((1 - motion.clipProgress) * 100) + '% 0 0)' : undefined, ...getAnimatedGradientFill(layer, index === 0), ...getAnimatedDecorationStyle(layer), willChange: (isAnimationPreviewing || playing) ? 'transform, opacity' : 'auto' }}>{glyph}</span>
     })
   }
   const totalDuration = useMemo(() => clips.reduce((sum, item) => sum + Math.max(0.1, item.trimEnd - item.trimStart), 0), [clips])
@@ -1523,7 +1533,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   <div className="relative min-h-[34px] shrink-0 cursor-crosshair" style={{ width: timelineWidth, height: track.key === 'text' ? Math.max(34, textLayers.length * 30 + 4) : 34 }} onPointerDown={seekTimeline}>
                     {track.key === 'text' && textLayers.map(layer => <div key={layer.id} onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => { setSelectedTextId(layer.id); setActivePanel('text') }} title={layer.text + (layer.animation?.animationId ? ' · ' + (STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation.animationId)?.name || 'Animation') : '')} data-animation-id={layer.animation?.animationId || undefined} className={'absolute flex h-[22px] min-w-[12px] items-center overflow-visible rounded bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[8px] font-semibold text-white shadow-sm cursor-grab touch-none ' + (selectedTextId === layer.id ? 'ring-1 ring-fuchsia-200' : '')} style={{ top: 6 + textLayers.findIndex(item => item.id === layer.id) * 30, left: layer.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(12, layer.timelineDuration * TIMELINE_PX_PER_SECOND) }}>
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/30" />
-                      <span className="flex min-w-0 flex-1 items-center gap-1 truncate px-2"><span className="truncate">{layer.text || 'Untitled text'}</span>{layer.animation?.animationId && <span className="shrink-0 rounded bg-black/20 px-1 py-0.5 text-[7px] font-bold text-fuchsia-100" title={STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation.animationId)?.name || 'Text animation'}>{STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation.animationId)?.name || 'Animated'}</span>}</span>
+                      <span className="min-w-0 flex-1 truncate px-2 text-left">{layer.text || 'Untitled text'}</span>{layer.animation?.animationId && <span aria-hidden="true" className="mr-1 h-1.5 w-1.5 shrink-0 rounded-full bg-white/80 shadow-[0_0_5px_rgba(255,255,255,.65)]" title={STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation.animationId)?.name || 'Text animation'} />}
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/30" />
                     </div>)}
                     {(track.key === 'image' || track.key === 'video') && clips.filter(item => item.kind === track.key).map((clip, index) => <div key={clip.id} onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedId(clip.id)} title={clip.name} className={'absolute top-[6px] flex h-[22px] min-w-[14px] items-center overflow-visible rounded text-[8px] font-semibold cursor-grab touch-none ' + (track.key === 'image' ? 'bg-sky-500/35 text-sky-100' : 'bg-violet-500/40 text-violet-100') + (selected?.id === clip.id ? ' ring-1 ring-white/70' : '')} style={{ left: clip.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(14, (clip.trimEnd - clip.trimStart) * TIMELINE_PX_PER_SECOND) }}>
