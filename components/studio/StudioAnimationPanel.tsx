@@ -35,7 +35,7 @@ const FEATURED_ANIMATION_NAMES = [
   'Fade In', 'Fade Up', 'Rise', 'Slide Up', 'Pop In', 'Zoom In',
   'Focus In', 'Blur In', 'Soft Bounce', 'Spring In', 'Cinematic Focus Pull',
   'Soft Spotlight Reveal', 'Light Sweep Reveal', 'Word Cascade',
-  'Typewriter', 'Character Fade', 'Mask Reveal', 'Cinematic Push In',
+  'Character Fade', 'Mask Reveal', 'Cinematic Push In',
   'Orbit Drift', 'Ink Bloom', 'Brush Stroke Reveal', 'Golden Hour Glow',
   'Neon Edge Reveal', 'Film Fade In',
 ]
@@ -68,20 +68,25 @@ export function StudioAnimationPanel({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const orderedAnimations = useMemo(() => {
-    const characterFirst = new Map(TYPING_CHARACTER_ANIMATIONS.map((animation, index) => [animation.name, index]))
     const featured = new Map(FEATURED_ANIMATION_NAMES.map((name, index) => [name, index]))
-    return [...ALL_ANIMATIONS].sort((a, b) => {
-      const aCharacter = characterFirst.get(a.name)
-      const bCharacter = characterFirst.get(b.name)
-      if (aCharacter !== undefined || bCharacter !== undefined) {
-        if (aCharacter === undefined) return 1
-        if (bCharacter === undefined) return -1
-        return aCharacter - bCharacter
-      }
-      const aRank = featured.get(a.name) ?? Number.MAX_SAFE_INTEGER
-      const bRank = featured.get(b.name) ?? Number.MAX_SAFE_INTEGER
-      return aRank - bRank || a.name.localeCompare(b.name)
-    })
+    const typewriterNames = ['Typewriter', 'Reverse Typewriter', 'Delete Typewriter']
+    const typewriterSet = new Set(typewriterNames)
+    const regularAnimations = ALL_ANIMATIONS
+      .filter(animation => !typewriterSet.has(animation.name))
+      .sort((a, b) => {
+        const aRank = featured.get(a.name) ?? Number.MAX_SAFE_INTEGER
+        const bRank = featured.get(b.name) ?? Number.MAX_SAFE_INTEGER
+        return aRank - bRank || a.name.localeCompare(b.name)
+      })
+    const typewriterAnimations = typewriterNames
+      .map(name => ALL_ANIMATIONS.find(animation => animation.name === name))
+      .filter((animation): animation is (typeof ALL_ANIMATIONS)[number] => Boolean(animation))
+    const insertionIndex = Math.min(94, regularAnimations.length)
+    return [
+      ...regularAnimations.slice(0, insertionIndex),
+      ...typewriterAnimations,
+      ...regularAnimations.slice(insertionIndex),
+    ]
   }, [])
   const filteredAnimations = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
