@@ -942,7 +942,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       intensity: previousSettings.intensity ?? 1,
       enabled: true,
     }) })
-    setPlayhead(quantizeStudioTime(previewStartSeconds))
+    // Keep the visible timeline playhead at the text clip's leading edge.
+    // Exit animations still sample their final-window start through the private
+    // animation preview clock, so the playhead never cuts through the clip label.
+    setPlayhead(quantizeStudioTime(selectedText.timelineStart))
 
     // Start after React commits the new layer settings so the preview clock
     // samples the newly selected definition on its very first frame.
