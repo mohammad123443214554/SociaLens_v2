@@ -382,6 +382,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [fontCatalogError, setFontCatalogError] = useState('')
   const [exportWidth, setExportWidth] = useState(1080)
   const [exportHeight, setExportHeight] = useState(1920)
+  const [canvasScale, setCanvasScale] = useState(1)
 
   // Keep the canvas scale synchronized with its rendered size and export dimensions.
   // This effect must follow the dimension state declarations so TypeScript can resolve them.
@@ -397,7 +398,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     observer.observe(canvas)
     return () => observer.disconnect()
   }, [exportWidth, exportHeight])
-  const [canvasScale, setCanvasScale] = useState(1)
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
   const [saveStatus, setSaveStatus] = useState('Loading project…')
