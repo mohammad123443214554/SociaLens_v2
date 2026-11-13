@@ -352,15 +352,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const timelineDrag = useRef<TimelineDrag | null>(null)
   const textDrafts = useRef<Map<string, string>>(new Map())
   const objectUrls = useRef<Set<string>>(new Set())
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const updateScale = () => { const width = canvas.clientWidth; if (width > 0 && exportWidth > 0) setCanvasScale(width / exportWidth) }
-    updateScale()
-    const observer = new ResizeObserver(updateScale)
-    observer.observe(canvas)
-    return () => observer.disconnect()
-  }, [exportWidth, exportHeight])
   const [clips, setClips] = useState<Clip[]>([])
   const [audio, setAudio] = useState<AudioTrack | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -391,6 +382,21 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [fontCatalogError, setFontCatalogError] = useState('')
   const [exportWidth, setExportWidth] = useState(1080)
   const [exportHeight, setExportHeight] = useState(1920)
+
+  // Keep the canvas scale synchronized with its rendered size and export dimensions.
+  // This effect must follow the dimension state declarations so TypeScript can resolve them.
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const updateScale = () => {
+      const width = canvas.clientWidth
+      if (width > 0 && exportWidth > 0) setCanvasScale(width / exportWidth)
+    }
+    updateScale()
+    const observer = new ResizeObserver(updateScale)
+    observer.observe(canvas)
+    return () => observer.disconnect()
+  }, [exportWidth, exportHeight])
   const [canvasScale, setCanvasScale] = useState(1)
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
