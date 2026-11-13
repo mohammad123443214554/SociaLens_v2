@@ -719,7 +719,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const clip = kind === 'clip' ? clips.find(item => item.id === id) : null
     const layer = kind === 'text' ? textLayers.find(item => item.id === id) : null
     const track = kind === 'audio' && audio?.id === id ? audio : null
-    if (clip) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: clip.lane === 1 ? 1 : 0, startAt: clip.timelineStart, trimStart: clip.trimStart, trimEnd: clip.trimEnd, duration: clip.duration }
+    if (clip) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: Math.max(0, Math.min(7, clip.lane || 0)), startAt: clip.timelineStart, trimStart: clip.trimStart, trimEnd: clip.trimEnd, duration: clip.duration }
     else if (layer) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: 0, startAt: layer.timelineStart, trimStart: 0, trimEnd: layer.timelineDuration, duration: Math.max(MIN_TIMELINE_SECONDS, layer.timelineStart + layer.timelineDuration) }
     else if (track) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: 0, startAt: track.timelineStart, trimStart: track.trimStart, trimEnd: track.trimEnd, duration: track.duration }
   }
@@ -741,7 +741,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (!clip) return
       if (drag.mode === 'move') {
         // Lane 0 is the lower/main scene row. Dragging upward creates higher lanes.
-        const maxLane = Math.max(0, Math.min(7, clips.reduce((max, item) => Math.max(max, item.lane || 0), 0)))
         const desiredLane = Math.max(0, Math.min(7, drag.startLane - Math.round((event.clientY - drag.startY) / 30)))
         const duration = Math.max(0.1, drag.trimEnd - drag.trimStart)
         const nextStart = Math.max(0, drag.startAt + delta)
