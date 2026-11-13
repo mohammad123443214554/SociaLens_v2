@@ -410,6 +410,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveSequence = useRef(0)
   const selected = clips.find(item => item.id === selectedId) || clips[0] || null
+  const maxMediaLane = clips.reduce((max, item) => Math.max(max, item.lane || 0), 0)
+  const mediaTrackHeight = Math.max(68, (maxMediaLane + 1) * 30 + 8)
   const selectedText = textLayers.find(item => item.id === selectedTextId) || null
   const selectedAnimation = selectedText?.animation?.animationId ? STUDIO_TEXT_ANIMATION_BY_ID.get(selectedText.animation.animationId) : undefined
   const selectedAnimationId = selectedText?.animation?.animationId || null
@@ -738,15 +740,40 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const clip = clips.find(item => item.id === drag.id)
       if (!clip) return
       if (drag.mode === 'move') {
-        const desiredLane = Math.max(0, Math.min(1, drag.startLane + Math.round((event.clientY - drag.startY) / 30)))
-        let nextStart = Math.max(0, drag.startAt + delta)
-        const duration = drag.trimEnd - drag.trimStart
-        const peers = clips.filter(item => item.id !== drag.id && (item.lane === 1 ? 1 : 0) === desiredLane).sort((a,b) => a.timelineStart - b.timelineStart)
-        for (const peer of peers) {
-          const overlaps = nextStart < peer.timelineStart + peer.trimEnd - peer.trimStart - 0.02 && nextStart + duration > peer.timelineStart + 0.02
-          if (overlaps) nextStart = peer.timelineStart + peer.trimEnd - peer.trimStart
+        // Lane 0 is the lower/main scene row. Dragging upward creates higher lanes.
+        const maxLane = Math.max(0, Math.min(7, clips.reduce((max, item) => Math.max(max, item.lane || 0), 0)))
+        const desiredLane = Math.max(0, Math.min(7, drag.startLane - Math.round((event.clientY - drag.startY) / 30)))
+        const duration = Math.max(0.1, drag.trimEnd - drag.trimStart)
+        const nextStart = Math.max(0, drag.startAt + delta)
+        const peers = clips.filter(item => item.id !== drag.id)
+        const overlapsLane = (lane: number, start: number) => peers.some(peer => {
+          const peerLane = peer.lane || 0
+          const peerDuration = peer.trimEnd - peer.trimStart
+          return peerLane === lane && start < peer.timelineStart + peerDuration - 0.02 && start + duration > peer.timelineStart + 0.02
+        })
+        let targetLane = desiredLane
+        if (overlapsLane(targetLane, nextStart)) {
+          // Prefer a free row above the pointer target, then a free row below it.
+          const candidates = [
+            ...Array.from({ length: 8 - desiredLane - 1 }, (_, index) => desiredLane + index + 1),
+            ...Array.from({ length: desiredLane }, (_, index) => desiredLane - index - 1),
+          ]
+          const freeLane = candidates.find(lane => !overlapsLane(lane, nextStart))
+          if (freeLane !== undefined) targetLane = freeLane
+          else {
+            // If all eight lanes are occupied at this time, keep the clip distinct
+            // by snapping it to the nearest available edge in the requested lane.
+            const lanePeers = peers.filter(peer => (peer.lane || 0) === targetLane).sort((a, b) => a.timelineStart - b.timelineStart)
+            const conflict = lanePeers.find(peer => nextStart < peer.timelineStart + (peer.trimEnd - peer.trimStart) - 0.02 && nextStart + duration > peer.timelineStart + 0.02)
+            if (conflict) {
+              const before = Math.max(0, conflict.timelineStart - duration)
+              const after = conflict.timelineStart + conflict.trimEnd - conflict.trimStart
+              updateClip(drag.id, { timelineStart: delta < 0 ? before : after, lane: targetLane })
+              return
+            }
+          }
         }
-        updateClip(drag.id, { timelineStart: nextStart, lane: desiredLane })
+        updateClip(drag.id, { timelineStart: nextStart, lane: targetLane })
       }
       else if (drag.mode === 'left') {
         const nextStart = Math.max(0, Math.min(drag.trimEnd - 0.1, drag.trimStart + delta))
@@ -1548,13 +1575,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   { key: 'audio', label: 'Audio', icon: <Music2 className="h-3 w-3" />, tone: 'emerald' },
                 ].map(track => <div key={track.key} className="flex min-h-[34px] border-b border-white/[0.045]">
                   <div className={'flex w-[72px] shrink-0 items-center gap-1.5 border-r px-2 text-[9px] font-semibold ' + (track.tone === 'fuchsia' ? 'border-fuchsia-400/10 bg-[#21152b] text-fuchsia-100' : track.tone === 'violet' ? 'border-violet-400/10 bg-[#1b1830] text-violet-100' : 'border-emerald-400/10 bg-[#10271f] text-emerald-100')}>{track.icon}{track.label}</div>
-                  <div className="relative min-h-[34px] shrink-0 cursor-crosshair" style={{ width: timelineWidth, height: track.key === 'text' ? Math.max(34, textLayers.length * 30 + 4) : track.key === 'media' ? 68 : 34 }} onPointerDown={seekTimeline}>
+                  <div className="relative min-h-[34px] shrink-0 cursor-crosshair" style={{ width: timelineWidth, height: track.key === 'text' ? Math.max(34, textLayers.length * 30 + 4) : track.key === 'media' ? mediaTrackHeight : 34 }} onPointerDown={seekTimeline}>
                     {track.key === 'text' && textLayers.map(layer => <div key={layer.id} onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => { setSelectedTextId(layer.id); setActivePanel('text') }} title={layer.text + (layer.animation?.animationId ? ' · ' + (STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation.animationId)?.name || 'Animation') : '')} data-animation-id={layer.animation?.animationId || undefined} className={'absolute flex h-[22px] min-w-[12px] items-center overflow-visible rounded bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[8px] font-semibold text-white shadow-sm cursor-grab touch-none ' + (selectedTextId === layer.id ? 'ring-1 ring-fuchsia-200' : '')} style={{ top: 6 + textLayers.findIndex(item => item.id === layer.id) * 30, left: layer.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(12, layer.timelineDuration * TIMELINE_PX_PER_SECOND) }}>
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/30" />
                       <span className="min-w-0 flex-1 truncate px-2 text-left">{layer.text || 'Untitled text'}</span>{layer.animation?.animationId && <span aria-hidden="true" className="mr-1 h-1.5 w-1.5 shrink-0 rounded-full bg-white/80 shadow-[0_0_5px_rgba(255,255,255,.65)]" title={STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation.animationId)?.name || 'Text animation'} />}
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/30" />
                     </div>)}
-                    {track.key === 'media' && [...clips].sort((a,b) => a.timelineStart - b.timelineStart).map((clip, index) => <div key={clip.id} onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedId(clip.id)} title={(clip.kind === 'image' ? 'Photo · ' : 'Video · ') + clip.name} className={'absolute flex h-[22px] min-w-[14px] items-center overflow-visible rounded text-[8px] font-semibold cursor-grab touch-none ' + (clip.kind === 'image' ? 'bg-sky-500/35 text-sky-100' : 'bg-violet-500/40 text-violet-100') + (selected?.id === clip.id ? ' ring-1 ring-white/70' : '')} style={{ top: 6 + (clip.lane === 1 ? 30 : 0), left: clip.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(14, (clip.trimEnd - clip.trimStart) * TIMELINE_PX_PER_SECOND) }}>
+                    {track.key === 'media' && [...clips].sort((a,b) => a.timelineStart - b.timelineStart).map((clip, index) => <div key={clip.id} onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedId(clip.id)} title={(clip.kind === 'image' ? 'Photo · ' : 'Video · ') + clip.name} className={'absolute flex h-[22px] min-w-[14px] items-center overflow-visible rounded text-[8px] font-semibold cursor-grab touch-none ' + (clip.kind === 'image' ? 'bg-sky-500/35 text-sky-100' : 'bg-violet-500/40 text-violet-100') + (selected?.id === clip.id ? ' ring-1 ring-white/70' : '')} style={{ top: mediaTrackHeight - ((clip.lane || 0) + 1) * 30, left: clip.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(14, (clip.trimEnd - clip.trimStart) * TIMELINE_PX_PER_SECOND) }}>
                       <span onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/35" />
                       <span className="min-w-0 flex-1 truncate px-2">{index + 1}. {clip.kind === 'image' ? 'Photo' : 'Video'} · {clip.name}</span>
                       <span onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/35" />
