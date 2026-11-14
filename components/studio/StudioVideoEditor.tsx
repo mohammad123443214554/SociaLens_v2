@@ -604,23 +604,31 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     }
   }, [editingTextId])
 
+  const previewClipId = useRef<string | null>(null)
+
   useEffect(() => {
     const video = previewRef.current
-    if (!video || !activeTimelineClip || activeTimelineClip.kind !== 'video') return
+    if (!activeTimelineClip || activeTimelineClip.kind !== 'video') {
+      previewClipId.current = null
+      return
+    }
+    if (!video) return
+
+    // Seek only when entering a different video clip or when the editor is paused
+    // and the user scrubs. Never chase the playhead with currentTime while playing:
+    // repeated seeks interrupt decoding and create visible playback gaps.
+    const clipChanged = previewClipId.current !== activeTimelineClip.id
     const localTime = activeTimelineClip.trimStart + Math.max(0, playhead - activeTimelineClip.timelineStart)
-    if (Math.abs(video.currentTime - localTime) > 0.1) video.currentTime = Math.min(activeTimelineClip.trimEnd, localTime)
+    if (clipChanged || (!playing && Math.abs(video.currentTime - localTime) > 0.04)) {
+      video.currentTime = Math.min(activeTimelineClip.trimEnd, Math.max(activeTimelineClip.trimStart, localTime))
+      previewClipId.current = activeTimelineClip.id
+    }
+
     video.volume = muted ? 0 : volume / 100
     video.muted = muted
     if (playing && video.paused) void video.play().catch(() => setError('The browser could not play this video clip.'))
     if (!playing && !video.paused) video.pause()
   }, [activeTimelineClip?.id, playhead, playing, muted, volume])
-
-  useEffect(() => {
-    const video = previewRef.current
-    if (!video || !activeTimelineClip || activeTimelineClip.kind !== 'video') return
-    const localTime = activeTimelineClip.trimStart + Math.max(0, playhead - activeTimelineClip.timelineStart)
-    if (Math.abs(video.currentTime - localTime) > 0.35) video.currentTime = Math.min(activeTimelineClip.trimEnd, localTime)
-  }, [activeTimelineClip?.id])
 
   useEffect(() => () => {
     if (playbackFrame.current !== null) cancelAnimationFrame(playbackFrame.current)
@@ -869,21 +877,33 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setError('')
     const tick = (now: number) => {
       const elapsedMs = Math.max(0, now - playbackStartedAt.current)
-      const time = Math.min(projectEnd, quantizeStudioTime(startAt + elapsedMs / 1000))
+      let time = Math.min(projectEnd, quantizeStudioTime(startAt + elapsedMs / 1000))
+      let active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
+      const video = previewRef.current
+      if (active?.kind === 'video' && video) {
+        video.volume = muted ? 0 : volume / 100
+        video.muted = muted
+        if (video.paused) void video.play().catch(() => setError('The browser could not play this video clip.'))
+
+        // Once decoding is ready, let the media element be the playback clock.
+        // This prevents React/RAF timing drift from repeatedly seeking the video.
+        if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && !video.paused) {
+          time = Math.min(projectEnd, quantizeStudioTime(active.timelineStart + Math.max(0, video.currentTime - active.trimStart)))
+          playbackStartedAt.current = now - Math.max(0, time - startAt) * 1000
+        } else {
+          // Buffering must pause the project clock instead of allowing the playhead
+          // to run ahead and then forcing a catch-up seek when frames arrive.
+          playbackStartedAt.current = now - Math.max(0, lastPlaybackTime.current - startAt) * 1000
+        }
+        active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
+      } else if (video && !video.paused) {
+        video.pause()
+      }
+
       if (time !== lastPlaybackTime.current) {
         lastPlaybackTime.current = time
         setPlayhead(time)
       }
-      const active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
-      const video = previewRef.current
-      if (active?.kind === 'video' && video) {
-        const localTime = active.trimStart + time - active.timelineStart
-        const frameAlignedVideoTime = quantizeStudioTime(localTime)
-        if (Math.abs(video.currentTime - frameAlignedVideoTime) > STUDIO_FRAME_DURATION_SECONDS * 2.5) video.currentTime = Math.min(active.trimEnd, frameAlignedVideoTime)
-        video.volume = muted ? 0 : volume / 100
-        video.muted = muted
-        if (video.paused) void video.play().catch(() => setError('The browser could not play this video clip.'))
-      } else if (video && !video.paused) video.pause()
       if (audioRef.current && audio) {
         const elapsed = time - audio.timelineStart
         const audioActive = elapsed >= 0 && elapsed < audio.trimEnd - audio.trimStart
