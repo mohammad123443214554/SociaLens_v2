@@ -688,6 +688,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   }
 
   const updateClip = (id: string, patch: Partial<Clip>) => setClips(items => items.map(item => item.id === id ? { ...item, ...patch } : item))
+  const updateClipOnTimeline = (id: string, patch: Partial<Clip>) => setClips(items => {
+    const updated = items.map(item => item.id === id ? { ...item, ...patch } : item)
+    // Keep media lanes packed from the main row upward. This prevents a clip
+    // from landing in a visually empty row when the pointer jumps over a lane.
+    const occupiedLanes = [...new Set(updated.map(item => Math.max(0, item.lane || 0)))].sort((a, b) => a - b)
+    const compactLane = new Map(occupiedLanes.map((lane, index) => [lane, index]))
+    return updated.map(item => ({ ...item, lane: compactLane.get(Math.max(0, item.lane || 0)) ?? 0 }))
+  })
   const addTextLayer = (kind: TextLayer['kind']) => {
     const presets = {
       heading: { text: 'Add a heading', fontSize: 42, bold: true, y: 18 },
@@ -767,12 +775,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             if (conflict) {
               const before = Math.max(0, conflict.timelineStart - duration)
               const after = conflict.timelineStart + conflict.trimEnd - conflict.trimStart
-              updateClip(drag.id, { timelineStart: delta < 0 ? before : after, lane: targetLane })
+              updateClipOnTimeline(drag.id, { timelineStart: delta < 0 ? before : after, lane: targetLane })
               return
             }
           }
         }
-        updateClip(drag.id, { timelineStart: nextStart, lane: targetLane })
+        updateClipOnTimeline(drag.id, { timelineStart: nextStart, lane: targetLane })
       }
       else if (drag.mode === 'left') {
         const nextStart = Math.max(0, Math.min(drag.trimEnd - 0.1, drag.trimStart + delta))
