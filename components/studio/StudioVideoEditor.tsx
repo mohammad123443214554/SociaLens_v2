@@ -658,12 +658,21 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             video.addEventListener('seeked', onSeeked, { once: true })
             video.addEventListener('error', onError, { once: true })
             video.currentTime = localTime
-            if (!video.seeking) { cleanup(); resolve() }
+          })
+        }
+        if (video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+          await new Promise<void>((resolve, reject) => {
+            const cleanup = () => { video.removeEventListener('canplay', onReady); video.removeEventListener('error', onError) }
+            const onReady = () => { cleanup(); resolve() }
+            const onError = () => { cleanup(); reject(new Error('The selected video could not be decoded for playback.')) }
+            video.addEventListener('canplay', onReady, { once: true })
+            video.addEventListener('error', onError, { once: true })
+            if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) { cleanup(); resolve() }
           })
         }
         if (token !== previewSyncToken.current || previewRef.current !== video) return
         previewIsSeeking.current = false
-        if (playingRef.current && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) await video.play()
+        if (playingRef.current) await video.play()
       }
 
       void synchronizeFrame().catch(cause => {
@@ -930,19 +939,23 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       let time = Math.min(projectEnd, quantizeStudioTime(startAt + elapsedMs / 1000))
       let active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
       const video = previewRef.current
-      if (active?.kind === 'video' && video) {
-        video.volume = muted ? 0 : volume / 100
-        video.muted = muted
-        if (video.paused && !previewIsSeeking.current && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) void video.play().catch(() => setError('The browser could not play this video clip.'))
-
-        // Once decoding is ready, let the media element be the playback clock.
-        // This prevents React/RAF timing drift from repeatedly seeking the video.
-        if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && !video.paused) {
-          time = Math.min(projectEnd, quantizeStudioTime(active.timelineStart + Math.max(0, video.currentTime - active.trimStart)))
-          playbackStartedAt.current = now - Math.max(0, time - startAt) * 1000
+      if (active?.kind === 'video') {
+        // React may still be replacing the preview element after a clip transition.
+        // Never read the previous clip's currentTime as if it belonged to this clip.
+        const previewMatchesActiveClip = !!video && video.dataset.previewClipId === active.id
+        if (previewMatchesActiveClip) {
+          video.volume = muted ? 0 : volume / 100
+          video.muted = muted
+          // The media element is the playback clock. The preview effect alone owns play().
+          if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && !video.paused && !previewIsSeeking.current) {
+            time = Math.min(projectEnd, quantizeStudioTime(active.timelineStart + Math.max(0, video.currentTime - active.trimStart)))
+            playbackStartedAt.current = now - Math.max(0, time - startAt) * 1000
+          } else {
+            // Hold the project clock until this exact clip has a decoded, playing frame.
+            playbackStartedAt.current = now - Math.max(0, lastPlaybackTime.current - startAt) * 1000
+          }
         } else {
-          // Buffering must pause the project clock instead of allowing the playhead
-          // to run ahead and then forcing a catch-up seek when frames arrive.
+          if (video && !video.paused) video.pause()
           playbackStartedAt.current = now - Math.max(0, lastPlaybackTime.current - startAt) * 1000
         }
         active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
@@ -1616,7 +1629,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3 sm:p-5">
             <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-xl border border-white/[0.07] bg-[#05060d] shadow-[0_20px_70px_rgba(0,0,0,0.42)]">
               <div ref={canvasRef} onPointerDown={event => { const target = event.target as HTMLElement; if (!target.closest("[data-text-layer-id], [data-text-toolbar]")) { setSelectedTextId(null); setEditingTextId(null) } }} className={'relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-md bg-black ring-1 ring-violet-400/20 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-5xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(72dvh, 720px)' }}>
-                {activeTimelineClip?.kind === 'video' ? <video key={activeTimelineClip.id} ref={previewRef} src={activeTimelineClip.url} playsInline preload="auto" className="h-full w-full object-contain" /> : activeTimelineClip?.kind === 'image' ? <img src={activeTimelineClip.url} alt={activeTimelineClip.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">{clips.length ? 'Timeline gap' : 'Your video canvas'}</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">{clips.length ? 'No media clip is placed at this point in the timeline.' : 'Import a video or photo to start editing your project.'}</p>{!clips.length && <button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button>}</div>}
+                {activeTimelineClip?.kind === 'video' ? <video key={activeTimelineClip.id} ref={previewRef} data-preview-clip-id={activeTimelineClip.id} src={activeTimelineClip.url} playsInline preload="auto" className="h-full w-full object-contain" /> : activeTimelineClip?.kind === 'image' ? <img src={activeTimelineClip.url} alt={activeTimelineClip.name} className="h-full w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">{clips.length ? 'Timeline gap' : 'Your video canvas'}</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">{clips.length ? 'No media clip is placed at this point in the timeline.' : 'Import a video or photo to start editing your project.'}</p>{!clips.length && <button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button>}</div>}
                 {audio && <audio ref={audioRef} src={audio.url} preload="metadata" />}
                 {textLayers.filter(layer => (playhead >= layer.timelineStart && playhead < layer.timelineStart + layer.timelineDuration) || (isAnimationPreviewing && selectedTextId === layer.id)).map(layer => { const layerTimelineTime = isAnimationPreviewing && selectedTextId === layer.id ? animationPreviewStartSeconds + animationPreviewTime / 1000 : playhead; return <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] box-border rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', overflow: 'visible', height: layer.height ? layer.height * (canvasRef.current?.clientHeight || exportHeight) / exportHeight + 'px' : undefined, color: layer.color, fontSize: (layer.fontSize * canvasScale) + 'px', fontFamily: layer.fontFamily && layer.fontFamily !== 'Default' ? '"' + layer.fontFamily + '", sans-serif' : 'Arial, Helvetica, sans-serif', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: (() => { const sample = getLayerAnimationSample(layer, layerTimelineTime); return sample ? (sample.perspective > 0 ? 'perspective(' + sample.perspective + 'px) ' : '') + 'rotateX(' + sample.rotateX + 'deg) rotateY(' + sample.rotateY + 'deg) translate(' + (sample.translateX * canvasScale) + 'px, ' + (sample.translateY * canvasScale) + 'px) scale(' + sample.scaleX + ', ' + sample.scaleY + ') rotate(' + (layer.rotation + sample.rotate) + 'deg) skew(' + sample.skewX + 'deg, ' + sample.skewY + 'deg)' : 'rotate(' + layer.rotation + 'deg)' })(), filter: (() => { const sample = getLayerAnimationSample(layer, layerTimelineTime); return sample?.blur ? 'blur(' + (sample.blur * canvasScale) + 'px)' : undefined })(), transformOrigin: 'center center', transformStyle: 'preserve-3d', backfaceVisibility: 'hidden', opacity: (() => { const sample = getLayerAnimationSample(layer, layerTimelineTime); return sample ? sample.opacity : 1 })() }}>
                   <div dir="auto" contentEditable={editingTextId === layer.id} suppressContentEditableWarning onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); if (editingTextId !== layer.id) { const node = event.currentTarget; setEditingTextId(layer.id); window.requestAnimationFrame(() => { node.focus(); const selection = window.getSelection(); const range = document.createRange(); range.selectNodeContents(node); range.collapse(false); selection?.removeAllRanges(); selection?.addRange(range) }) } }} onInput={event => { textDrafts.current.set(layer.id, event.currentTarget.innerText.split(/\n/).map(line => layer.listStyle === 'bullet' ? line.replace(/^•\s?/, '') : layer.listStyle === 'number' ? line.replace(/^\d+\\.\s?/, '') : line).join('\n')) }} onBlur={event => { const value = textDrafts.current.get(layer.id); if (value !== undefined) { updateTextLayer(layer.id,{text:value}); textDrafts.current.delete(layer.id) } setEditingTextId(current => current === layer.id ? null : current) }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.blur() } }} className="inline-block min-h-[24px] max-w-full whitespace-pre-wrap break-words outline-none" style={{ display:'inline-block', position:'relative', width:'fit-content', maxWidth:'100%', caretColor: '#f0abfc', opacity: (layer.opacity ?? 100) / 100, color: layer.effect === 'Metallic' || layer.effect === 'Hologram' ? '#cbd5e1' : layer.effectColor || layer.color, textShadow: 'none' }}><span style={{ display:'inline-block', boxSizing:'border-box', maxWidth:'100%', minWidth: editingTextId === layer.id ? '1px' : undefined, minHeight: editingTextId === layer.id ? '1em' : undefined, whiteSpace:'pre-wrap', verticalAlign:'top', backgroundSize:'100% 100%', backgroundPosition:'center', color: layer.color, overflow:'visible', ...getTextEffectStyle(layer.effect, layer.effectIntensity ?? 60, layer.effectColor || '#a855f7', layer.effectSecondaryColor || '#22d3ee', layer.effectBlur ?? 8, layer.effectDistance ?? 4, layer.effectAngle ?? 45) }}>{editingTextId === layer.id ? getFormattedText(layer) : getAnimatedTextContent(layer, layerTimelineTime)}</span>{(layer.underline || layer.strikethrough) && <span aria-hidden="true" className="pointer-events-none absolute left-0 top-0 z-10 inline-block" style={{ whiteSpace:'pre-wrap', overflowWrap:'anywhere', lineHeight:1.15, fontFamily:'inherit', fontSize:'inherit', fontWeight:'inherit', fontStyle:'inherit', letterSpacing:'inherit', textAlign:'inherit', color:'transparent', WebkitTextFillColor:'transparent', textShadow:'none', userSelect:'none', WebkitUserSelect:'none', textDecorationLine: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : 'line-through', textDecorationColor: layer.effect === 'Metallic' || layer.effect === 'Hologram' ? '#cbd5e1' : layer.effectColor || layer.color, textDecorationThickness:'from-font', textDecorationSkipInk:'none', textUnderlineOffset:'0.12em' }}>{getFormattedText(layer)}</span>}</div>
