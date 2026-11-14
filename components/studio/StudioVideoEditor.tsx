@@ -364,6 +364,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [playhead, setPlayhead] = useState(0)
   const playbackFrame = useRef<number | null>(null)
   const playbackStartedAt = useRef(0)
+  const previewSyncToken = useRef(0)
+  const previewIsSeeking = useRef(false)
+  const playingRef = useRef(playing)
+  playingRef.current = playing
   const lastPlaybackTime = useRef(-1)
   const lastAnimationPreviewTime = useRef(-1)
   const [aspect, setAspect] = useState<'9:16' | '16:9' | '1:1'>('9:16')
@@ -609,25 +613,71 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   useEffect(() => {
     const video = previewRef.current
     if (!activeTimelineClip || activeTimelineClip.kind !== 'video') {
+      previewSyncToken.current += 1
+      previewIsSeeking.current = false
       previewClipId.current = null
+      if (video && !video.paused) video.pause()
       return
     }
     if (!video) return
 
-    // Seek only when entering a different video clip or when the editor is paused
-    // and the user scrubs. Never chase the playhead with currentTime while playing:
-    // repeated seeks interrupt decoding and create visible playback gaps.
-    const clipChanged = previewClipId.current !== activeTimelineClip.id
-    const localTime = activeTimelineClip.trimStart + Math.max(0, playhead - activeTimelineClip.timelineStart)
-    if (clipChanged || (!playing && Math.abs(video.currentTime - localTime) > 0.04)) {
-      video.currentTime = Math.min(activeTimelineClip.trimEnd, Math.max(activeTimelineClip.trimStart, localTime))
-      previewClipId.current = activeTimelineClip.id
-    }
+    const clipId = activeTimelineClip.id
+    const clipChanged = previewClipId.current !== clipId
+    const localTime = Math.min(activeTimelineClip.trimEnd, Math.max(activeTimelineClip.trimStart, activeTimelineClip.trimStart + playhead - activeTimelineClip.timelineStart))
+    const needsSeek = clipChanged || (!playing && Math.abs(video.currentTime - localTime) > 0.04)
 
     video.volume = muted ? 0 : volume / 100
     video.muted = muted
-    if (playing && video.paused) void video.play().catch(() => setError('The browser could not play this video clip.'))
+
+    if (needsSeek) {
+      const token = ++previewSyncToken.current
+      previewClipId.current = clipId
+      previewIsSeeking.current = true
+      video.pause()
+
+      // Wait for metadata and the requested frame before starting playback.
+      // Setting currentTime and calling play() in the same task races the browser's seek.
+      const synchronizeFrame = async () => {
+        if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
+          await new Promise((resolve, reject) => {
+            const cleanup = () => { video.removeEventListener('loadedmetadata', onReady); video.removeEventListener('error', onError) }
+            const onReady = () => { cleanup(); resolve() }
+            const onError = () => { cleanup(); reject(new Error('The selected video could not be loaded.')) }
+            video.addEventListener('loadedmetadata', onReady, { once: true })
+            video.addEventListener('error', onError, { once: true })
+            if (video.readyState >= HTMLMediaElement.HAVE_METADATA) { cleanup(); resolve() }
+          })
+        }
+        if (token !== previewSyncToken.current || previewRef.current !== video) return
+
+        if (Math.abs(video.currentTime - localTime) > 0.04) {
+          await new Promise((resolve, reject) => {
+            const cleanup = () => { video.removeEventListener('seeked', onSeeked); video.removeEventListener('error', onError) }
+            const onSeeked = () => { cleanup(); resolve() }
+            const onError = () => { cleanup(); reject(new Error('The selected video frame could not be decoded.')) }
+            video.addEventListener('seeked', onSeeked, { once: true })
+            video.addEventListener('error', onError, { once: true })
+            video.currentTime = localTime
+            if (!video.seeking) { cleanup(); resolve() }
+          })
+        }
+        if (token !== previewSyncToken.current || previewRef.current !== video) return
+        previewIsSeeking.current = false
+        if (playingRef.current && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) await video.play()
+      }
+
+      void synchronizeFrame().catch(cause => {
+        if (token !== previewSyncToken.current) return
+        previewIsSeeking.current = false
+        setError(cause instanceof Error ? cause.message : 'The selected video could not be prepared for playback.')
+      })
+      return
+    }
+
     if (!playing && !video.paused) video.pause()
+    if (playing && !previewIsSeeking.current && video.paused && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+      void video.play().catch(() => setError('The browser could not play this video clip.'))
+    }
   }, [activeTimelineClip?.id, playhead, playing, muted, volume])
 
   useEffect(() => () => {
@@ -883,7 +933,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (active?.kind === 'video' && video) {
         video.volume = muted ? 0 : volume / 100
         video.muted = muted
-        if (video.paused) void video.play().catch(() => setError('The browser could not play this video clip.'))
+        if (video.paused && !previewIsSeeking.current && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) void video.play().catch(() => setError('The browser could not play this video clip.'))
 
         // Once decoding is ready, let the media element be the playback clock.
         // This prevents React/RAF timing drift from repeatedly seeking the video.
