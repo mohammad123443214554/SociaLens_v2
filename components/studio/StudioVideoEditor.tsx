@@ -382,6 +382,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const playingRef = useRef(playing)
   playingRef.current = playing
   const lastPlaybackTime = useRef(-1)
+  // Background audio must only be hard-synchronized when playback resumes or a clip changes.
+  // Re-seeking it on every animation frame causes audible stutter while video buffering stalls.
+  const audioNeedsSync = useRef(true)
   const lastAnimationPreviewTime = useRef(-1)
   const [aspect, setAspect] = useState<'9:16' | '16:9' | '1:1'>('9:16')
   const [titleText, setTitleText] = useState('')
@@ -975,16 +978,21 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           video.volume = muted ? 0 : volume / 100
           video.muted = muted
           // The media element is the playback clock. The preview effect alone owns play().
-          if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && !video.paused && !previewIsSeeking.current) {
+          if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && !video.paused && !previewIsSeeking.current) {
             time = Math.min(projectEnd, quantizeStudioTime(active.timelineStart + Math.max(0, video.currentTime - active.trimStart)))
             playbackStartedAt.current = now - Math.max(0, time - startAt) * 1000
           } else {
-            // Hold the project clock until this exact clip has a decoded, playing frame.
+            // A current frame alone is not enough: wait for future decoded data before
+            // advancing the project clock, otherwise buffering can make the timeline jump.
             playbackStartedAt.current = now - Math.max(0, lastPlaybackTime.current - startAt) * 1000
+            if (audioRef.current && !audioRef.current.paused) audioRef.current.pause()
+            audioNeedsSync.current = true
           }
         } else {
           if (video && !video.paused) video.pause()
           playbackStartedAt.current = now - Math.max(0, lastPlaybackTime.current - startAt) * 1000
+          if (audioRef.current && !audioRef.current.paused) audioRef.current.pause()
+          audioNeedsSync.current = true
         }
         active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
       } else if (video && !video.paused) {
@@ -1000,10 +1008,18 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         const audioActive = elapsed >= 0 && elapsed < audio.trimEnd - audio.trimStart
         if (audioActive) {
           const target = quantizeStudioTime(audio.trimStart + elapsed)
-          if (Math.abs(audioRef.current.currentTime - target) > 0.1) audioRef.current.currentTime = target
+          // Seek once after a pause/buffer/clip hand-off. During normal playback let
+          // the audio element run on its own clock instead of resetting it every RAF.
+          if (audioNeedsSync.current || Math.abs(audioRef.current.currentTime - target) > 0.35) {
+            audioRef.current.currentTime = target
+            audioNeedsSync.current = false
+          }
           audioRef.current.volume = audioVolume / 100
           if (audioRef.current.paused) void audioRef.current.play().catch(() => setNotice('Browser blocked background audio preview.'))
-        } else if (!audioRef.current.paused) audioRef.current.pause()
+        } else {
+          if (!audioRef.current.paused) audioRef.current.pause()
+          audioNeedsSync.current = true
+        }
       }
       if (time >= projectEnd) {
         playbackFrame.current = null
