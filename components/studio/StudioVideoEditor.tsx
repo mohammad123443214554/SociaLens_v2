@@ -639,7 +639,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       // Setting currentTime and calling play() in the same task races the browser's seek.
       const synchronizeFrame = async () => {
         if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
-          await new Promise((resolve, reject) => {
+          await new Promise<void>((resolve, reject) => {
             const cleanup = () => { video.removeEventListener('loadedmetadata', onReady); video.removeEventListener('error', onError) }
             const onReady = () => { cleanup(); resolve() }
             const onError = () => { cleanup(); reject(new Error('The selected video could not be loaded.')) }
@@ -651,7 +651,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         if (token !== previewSyncToken.current || previewRef.current !== video) return
 
         if (Math.abs(video.currentTime - localTime) > 0.04) {
-          await new Promise((resolve, reject) => {
+          await new Promise<void>((resolve, reject) => {
             const cleanup = () => { video.removeEventListener('seeked', onSeeked); video.removeEventListener('error', onError) }
             const onSeeked = () => { cleanup(); resolve() }
             const onError = () => { cleanup(); reject(new Error('The selected video frame could not be decoded.')) }
