@@ -978,8 +978,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           video.volume = muted ? 0 : volume / 100
           video.muted = muted
           // The media element is the playback clock. The preview effect alone owns play().
-          if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && !video.paused && !previewIsSeeking.current) {
-            time = Math.min(projectEnd, quantizeStudioTime(active.timelineStart + Math.max(0, video.currentTime - active.trimStart)))
+          const activeClipEnd = active.timelineStart + active.trimEnd - active.trimStart
+          const clipHasReachedTrimEnd = video.currentTime >= active.trimEnd - STUDIO_FRAME_DURATION_SECONDS || video.ended
+          if (((video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && !video.paused) || clipHasReachedTrimEnd) && !previewIsSeeking.current) {
+            // Clamp to this clip's timeline boundary. A decoder frame arriving late must
+            // never let the previous clip's clock jump over the next clip's first frames.
+            time = Math.min(activeClipEnd, projectEnd, quantizeStudioTime(active.timelineStart + Math.max(0, video.currentTime - active.trimStart)))
             playbackStartedAt.current = now - Math.max(0, time - startAt) * 1000
           } else {
             // A current frame alone is not enough: wait for future decoded data before
