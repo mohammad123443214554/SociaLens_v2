@@ -37,6 +37,9 @@ jobs:
       - name: Studio animation engine tests
         run: npm run test:studio-animation
 
+      - name: Studio playback clock tests
+        run: npm run test:studio-playback
+
       - name: Recommendation scoring tests
         run: npm run test:recommendation
 
