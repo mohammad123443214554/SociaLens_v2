@@ -1013,7 +1013,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (audioRef.current && audio) {
         const elapsed = time - audio.timelineStart
         const audioActive = elapsed >= 0 && elapsed < audio.trimEnd - audio.trimStart
-        const audioMayAdvance = canAdvanceStudioAudio(active?.kind === 'video', videoPlaybackReady)
+        const audioMayAdvance = canAdvanceStudioAudio(active?.kind === 'video', videoPlaybackReady && !!video && video.dataset.previewClipId === active?.id && !video.paused && !video.seeking)
         if (audioActive && audioMayAdvance) {
           const target = quantizeStudioTime(audio.trimStart + elapsed)
           // Seek once after a pause/buffer/clip hand-off. During normal playback let
