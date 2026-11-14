@@ -636,6 +636,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
 
   useEffect(() => {
     const video = previewRef.current
+    // Only the active timeline clip may play; hidden preloaded clips stay paused.
+    previewVideoElements.current.forEach((candidate, clipId) => {
+      if (clipId !== activeTimelineClip?.id && !candidate.paused) candidate.pause()
+    })
     if (!activeTimelineClip || activeTimelineClip.kind !== 'video') {
       previewSyncToken.current += 1
       previewIsSeeking.current = false
