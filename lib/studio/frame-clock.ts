@@ -26,3 +26,8 @@ export function studioFrameTimeFromElapsedMs(elapsedMs: number, frameRate = STUD
   const safeElapsed = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0
   return studioFrameTime(Math.floor((safeElapsed * frameRate) / 1000 + 1e-7), frameRate)
 }
+
+/** Audio may advance over still images/gaps, but must wait for an active video decoder. */
+export function canAdvanceStudioAudio(activeVideo: boolean, videoReady: boolean): boolean {
+  return !activeVideo || videoReady
+}
