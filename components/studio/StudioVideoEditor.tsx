@@ -19,7 +19,7 @@ import { MOTION_DYNAMIC_ANIMATIONS } from '@/lib/studio/motion-dynamic-animation
 import { CINEMATIC_LIGHT_ANIMATIONS } from '@/lib/studio/cinematic-light-animations'
 import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-animations'
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
-import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs } from '@/lib/studio/frame-clock'
+import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
 const STUDIO_TEXT_ANIMATION_BY_ID = new Map(STUDIO_TEXT_ANIMATIONS.map(definition => [definition.id, definition]))
@@ -970,6 +970,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       let time = Math.min(projectEnd, quantizeStudioTime(startAt + elapsedMs / 1000))
       let active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
       const video = previewRef.current
+      let videoPlaybackReady = active?.kind !== 'video'
       if (active?.kind === 'video') {
         // React may still be replacing the preview element after a clip transition.
         // Never read the previous clip's currentTime as if it belonged to this clip.
@@ -979,24 +980,26 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           video.muted = muted
           // The media element is the playback clock. The preview effect alone owns play().
           const activeClipEnd = active.timelineStart + active.trimEnd - active.trimStart
-          const clipHasReachedTrimEnd = video.currentTime >= active.trimEnd - STUDIO_FRAME_DURATION_SECONDS || video.ended
-          if (((video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && !video.paused) || clipHasReachedTrimEnd) && !previewIsSeeking.current) {
-            // Clamp to this clip's timeline boundary. A decoder frame arriving late must
-            // never let the previous clip's clock jump over the next clip's first frames.
+          const hasFutureFrame = video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && !video.paused && !video.seeking && !previewIsSeeking.current
+          const reachedTrimBoundary = video.currentTime >= active.trimEnd - STUDIO_FRAME_DURATION_SECONDS / 2
+          if (video.ended || (hasFutureFrame && reachedTrimBoundary)) {
+            // Cross a trim boundary only after the media has ended or is still advancing.
+            // A stalled decoder must never cause the project clock to skip to the next clip.
+            time = Math.min(activeClipEnd, projectEnd, quantizeStudioTime(activeClipEnd))
+            videoPlaybackReady = true
+            playbackStartedAt.current = now - Math.max(0, time - startAt) * 1000
+          } else if (hasFutureFrame) {
             time = Math.min(activeClipEnd, projectEnd, quantizeStudioTime(active.timelineStart + Math.max(0, video.currentTime - active.trimStart)))
+            videoPlaybackReady = true
             playbackStartedAt.current = now - Math.max(0, time - startAt) * 1000
           } else {
-            // A current frame alone is not enough: wait for future decoded data before
-            // advancing the project clock, otherwise buffering can make the timeline jump.
+            videoPlaybackReady = false
             playbackStartedAt.current = now - Math.max(0, lastPlaybackTime.current - startAt) * 1000
-            if (audioRef.current && !audioRef.current.paused) audioRef.current.pause()
-            audioNeedsSync.current = true
           }
         } else {
+          videoPlaybackReady = false
           if (video && !video.paused) video.pause()
           playbackStartedAt.current = now - Math.max(0, lastPlaybackTime.current - startAt) * 1000
-          if (audioRef.current && !audioRef.current.paused) audioRef.current.pause()
-          audioNeedsSync.current = true
         }
         active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
       } else if (video && !video.paused) {
@@ -1010,7 +1013,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (audioRef.current && audio) {
         const elapsed = time - audio.timelineStart
         const audioActive = elapsed >= 0 && elapsed < audio.trimEnd - audio.trimStart
-        if (audioActive) {
+        const audioMayAdvance = canAdvanceStudioAudio(active?.kind === 'video', videoPlaybackReady)
+        if (audioActive && audioMayAdvance) {
           const target = quantizeStudioTime(audio.trimStart + elapsed)
           // Seek once after a pause/buffer/clip hand-off. During normal playback let
           // the audio element run on its own clock instead of resetting it every RAF.
@@ -1021,6 +1025,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           audioRef.current.volume = audioVolume / 100
           if (audioRef.current.paused) void audioRef.current.play().catch(() => setNotice('Browser blocked background audio preview.'))
         } else {
+          // Hold music at the frozen project playhead during video buffering; do not
+          // seek and restart it again in this same animation-frame tick.
           if (!audioRef.current.paused) audioRef.current.pause()
           audioNeedsSync.current = true
         }
