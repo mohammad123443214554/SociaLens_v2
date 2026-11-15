@@ -21,7 +21,7 @@ test('closes small accidental gaps between clips on the same lane', () => {
     { id: 'video', timelineStart: 0, trimStart: 0, trimEnd: 32.933333, lane: 0 },
     { id: 'photo', timelineStart: 33.198005, trimStart: 0, trimEnd: 5, lane: 0 },
   ]
-  const normalized = normalizeStudioClipGaps(clips)
+  const normalized = normalizeStudioClipGaps(clips, 0.3)
   assert.equal(normalized[1].timelineStart, 32.933333)
   assert.equal(normalized[1].timelineStart - (normalized[0].timelineStart + normalized[0].trimEnd), 0)
   assert.equal(clips[1].timelineStart, 33.198005, 'normalization must not mutate saved input')
