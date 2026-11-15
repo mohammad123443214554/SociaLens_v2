@@ -48,3 +48,25 @@ export function keepStudioTimeMonotonic(candidateSeconds: number, previousSecond
   const previous = Number.isFinite(previousSeconds) ? Math.max(0, previousSeconds) : 0
   return Math.max(candidate, previous)
 }
+
+/**
+ * Convert elapsed wall-clock time into the Studio timeline, anchored at the
+ * requested start position exactly once. The caller's monotonic clock must be
+ * initialized with performance.now(), not performance.now() - startAt.
+ */
+export function studioPlaybackTimeFromElapsedMs(startAtSeconds: number, elapsedMs: number, frameRate = STUDIO_FRAME_RATE): number {
+  const safeStart = Number.isFinite(startAtSeconds) ? Math.max(0, startAtSeconds) : 0
+  const safeElapsed = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0
+  return quantizeStudioTime(safeStart + safeElapsed / 1000, frameRate)
+}
+
+/**
+ * Restart from zero when playback is already on the final visible frame.
+ * projectEnd is exclusive, so the final frame itself is still below it.
+ */
+export function studioPlaybackStartTime(playheadSeconds: number, projectEndSeconds: number, frameRate = STUDIO_FRAME_RATE): number {
+  const playhead = Number.isFinite(playheadSeconds) ? Math.max(0, playheadSeconds) : 0
+  const projectEnd = Number.isFinite(projectEndSeconds) ? Math.max(0, projectEndSeconds) : 0
+  if (projectEnd <= 0) return 0
+  return playhead >= lastStudioFrameBeforeEnd(projectEnd, frameRate) ? 0 : playhead
+}
