@@ -20,7 +20,7 @@ import { MOTION_DYNAMIC_ANIMATIONS } from '@/lib/studio/motion-dynamic-animation
 import { CINEMATIC_LIGHT_ANIMATIONS } from '@/lib/studio/cinematic-light-animations'
 import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-animations'
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
-import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic } from '@/lib/studio/frame-clock'
+import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
 const STUDIO_TEXT_ANIMATION_BY_ID = new Map(STUDIO_TEXT_ANIMATIONS.map(definition => [definition.id, definition]))
@@ -963,15 +963,17 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       return
     }
     if (!clips.length || projectEnd <= 0) { setNotice('Add a video or photo to the timeline before playing.'); return }
-    const startAt = playhead >= projectEnd ? 0 : playhead
+    const startAt = studioPlaybackStartTime(playhead, projectEnd)
     setPlayhead(startAt)
     lastPlaybackTime.current = startAt
-    playbackStartedAt.current = performance.now() - startAt * 1000
+    // Keep the wall-clock origin at the actual start instant. startAt is added
+    // exactly once by studioPlaybackTimeFromElapsedMs() inside tick().
+    playbackStartedAt.current = performance.now()
     setPlaying(true)
     setError('')
     const tick = (now: number) => {
       const elapsedMs = Math.max(0, now - playbackStartedAt.current)
-      let time = Math.min(projectEnd, keepStudioTimeMonotonic(quantizeStudioTime(startAt + elapsedMs / 1000), lastPlaybackTime.current))
+      let time = Math.min(projectEnd, keepStudioTimeMonotonic(studioPlaybackTimeFromElapsedMs(startAt, elapsedMs), lastPlaybackTime.current))
       let active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
       const video = previewRef.current
       let videoPlaybackReady = active?.kind !== 'video'
