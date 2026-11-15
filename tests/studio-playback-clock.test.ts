@@ -84,5 +84,6 @@ test('pressing Play on the final visible frame restarts the project at zero', ()
 
 test('pressing Play before the final visible frame resumes from the playhead', () => {
   assert.equal(studioPlaybackStartTime(16, 37.933333), 16)
-  assert.equal(studioPlaybackStartTime(37.9, 37.933333), 37.9)
+  assert.equal(studioPlaybackStartTime(37.8, 37.933333), 37.8)
+  assert.equal(studioPlaybackStartTime(37.9, 37.933333), 0)
 })
