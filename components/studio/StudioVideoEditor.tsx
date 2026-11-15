@@ -47,8 +47,10 @@ type Clip = {
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
 type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; height?: number; fontSize: number; color: string; opacity?: number; animation?: Partial<TextAnimationSettings>; effect?: TextEffect; effectIntensity?: number; effectBlur?: number; effectDistance?: number; effectAngle?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
+type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; fileSize: number; storagePath?: string }
+type ElementDrag = { id: string; pointerId: number; mode: 'move' | 'resize'; startX: number; startY: number; x: number; y: number; width: number; height: number }
 type TextDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'rotate'; startX: number; startY: number; startAngle: number; originX: number; originY: number; originWidth: number; originFontSize: number; originRotation: number }
-type TimelineDrag = { id: string; kind: 'clip' | 'text' | 'audio'; mode: 'move' | 'left' | 'right'; pointerId: number; startX: number; startY: number; startLane: number; startAt: number; trimStart: number; trimEnd: number; duration: number }
+type TimelineDrag = { id: string; kind: 'clip' | 'text' | 'audio' | 'element'; mode: 'move' | 'left' | 'right'; pointerId: number; startX: number; startY: number; startLane: number; startAt: number; trimStart: number; trimEnd: number; duration: number }
 const MIN_TIMELINE_SECONDS = 60
 const TIMELINE_PX_PER_SECOND = 16
 
@@ -367,6 +369,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const textDrafts = useRef<Map<string, string>>(new Map())
   const objectUrls = useRef<Set<string>>(new Set())
   const [clips, setClips] = useState<Clip[]>([])
+  const [elements, setElements] = useState<ElementLayer[]>([])
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
+  const elementDrag = useRef<ElementDrag | null>(null)
   const [audio, setAudio] = useState<AudioTrack | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -431,6 +436,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveSequence = useRef(0)
   const selected = clips.find(item => item.id === selectedId) || clips[0] || null
+  const selectedElement = elements.find(item => item.id === selectedElementId) || null
   const maxMediaLane = clips.length <= 1 ? 0 : clips.reduce((max, item) => Math.max(max, item.lane || 0), 0)
   const mediaTrackHeight = 68 + maxMediaLane * 30
   const selectedText = textLayers.find(item => item.id === selectedTextId) || null
@@ -495,7 +501,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     })
   }
   const totalDuration = useMemo(() => clips.reduce((sum, item) => sum + Math.max(0.1, item.trimEnd - item.trimStart), 0), [clips])
-  const projectEnd = useMemo(() => Math.max(0, ...clips.map(item => item.timelineStart + item.trimEnd - item.trimStart), ...textLayers.map(item => item.timelineStart + item.timelineDuration), audio ? audio.timelineStart + audio.trimEnd - audio.trimStart : 0), [clips, textLayers, audio])
+  const projectEnd = useMemo(() => Math.max(0, ...clips.map(item => item.timelineStart + item.trimEnd - item.trimStart), ...textLayers.map(item => item.timelineStart + item.timelineDuration), ...elements.map(item => item.timelineStart + item.trimEnd - item.trimStart), audio ? audio.timelineStart + audio.trimEnd - audio.trimStart : 0), [clips, textLayers, audio])
   const timelineSeconds = Math.max(MIN_TIMELINE_SECONDS, Math.ceil(projectEnd / 5) * 5)
   const timelineWidth = timelineSeconds * TIMELINE_PX_PER_SECOND
   const activeTimelineClip = useMemo(() => [...clips].filter(item => playhead >= item.timelineStart && playhead < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1) || null, [clips, playhead])
@@ -534,6 +540,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           const closedAccidentalGaps = gapNormalizedClips.some((clip, index) => Math.abs(clip.timelineStart - restored[index].timelineStart) > 0.0001)
           setClips(gapNormalizedClips)
           if (closedAccidentalGaps) setNotice('Closed small accidental gaps between timeline clips.')
+          if (Array.isArray(data.elements)) {
+            const restoredElements: ElementLayer[] = await Promise.all((data.elements as Array<Record<string, unknown>>).filter(item => typeof item.storagePath === 'string' && (item.kind === 'image' || item.kind === 'video')).map(async item => ({ id: String(item.id || makeId()), kind: item.kind as ClipKind, name: String(item.name || 'Overlay'), url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration) || 5, trimStart: Math.max(0, Number(item.trimStart) || 0), trimEnd: Math.max(0.1, Number(item.trimEnd) || Number(item.duration) || 5), timelineStart: Math.max(0, Number(item.timelineStart) || 0), x: Math.min(95, Math.max(0, Number(item.x) || 25)), y: Math.min(95, Math.max(0, Number(item.y) || 25)), width: Math.min(100, Math.max(5, Number(item.width) || 50)), height: Math.min(100, Math.max(5, Number(item.height) || 50)), fileSize: Number(item.fileSize) || 0, storagePath: String(item.storagePath) })))
+            if (!active) return
+            setElements(restoredElements)
+            if (typeof data.selectedElementId === 'string') setSelectedElementId(data.selectedElementId)
+          }
           if (typeof data.audioPath === 'string' && data.audioPath) {
             const audioUrl = await createStudioAssetUrl(data.audioPath)
             if (!active) return
@@ -606,7 +618,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         await saveStudioProject({
           id: projectId, project_type: 'video', name: projectName, template_id: templateId || null,
           data: {
-            clips: clips.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane: lane === 1 ? 1 : 0, fileSize, storagePath })), 
+            clips: clips.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane: lane === 1 ? 1 : 0, fileSize, storagePath })),
+            elements: elements.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, fileSize, storagePath })), selectedElementId, 
             audioPath: audio?.storagePath || null, audioId: audio?.id || null, audioName: audio?.name || null,
             audioDuration: audio?.duration || 0, audioTrimStart: audio?.trimStart || 0, audioTrimEnd: audio?.trimEnd || 0, audioTimelineStart: audio?.timelineStart || 0, audioFileSize: audio?.fileSize || 0, selectedId, muted, volume,
             audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, textLayers, selectedTextId, exportWidth, exportHeight,
@@ -618,7 +631,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       }
     }, 1000)
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
-  }, [hydrated, projectId, projectName, templateId, clips, audio, selectedId, muted, volume, audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, textLayers, selectedTextId, exportWidth, exportHeight])
+  }, [hydrated, projectId, projectName, templateId, clips, elements, selectedElementId, audio, selectedId, muted, volume, audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, textLayers, selectedTextId, exportWidth, exportHeight])
 
 
   useEffect(() => {
@@ -633,6 +646,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   }, [editingTextId])
 
   const previewClipId = useRef<string | null>(null)
+
+  useEffect(() => {
+    const active = elements.filter(item => item.kind === 'video' && playhead >= item.timelineStart && playhead < item.timelineStart + item.trimEnd-item.trimStart)
+    document.querySelectorAll<HTMLVideoElement>('[data-element-video-id]').forEach(video => { const layer = active.find(item => item.id === video.dataset.elementVideoId); if (!layer) { if (!video.paused) video.pause(); return } const target = Math.min(layer.trimEnd,layer.trimStart+playhead-layer.timelineStart); if (Math.abs(video.currentTime-target)>0.2) video.currentTime=target; if (playing && video.paused) void video.play().catch(()=>undefined); else if (!playing && !video.paused) video.pause() })
+  }, [elements, playhead, playing])
 
   // Keep one mounted media element per clip so scene transitions reuse loaded media.
   useEffect(() => {
@@ -829,9 +847,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const clip = kind === 'clip' ? clips.find(item => item.id === id) : null
     const layer = kind === 'text' ? textLayers.find(item => item.id === id) : null
     const track = kind === 'audio' && audio?.id === id ? audio : null
+    const element = kind === 'element' ? elements.find(item => item.id === id) : null
     if (clip) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: Math.max(0, Math.min(7, clip.lane || 0)), startAt: clip.timelineStart, trimStart: clip.trimStart, trimEnd: clip.trimEnd, duration: clip.duration }
     else if (layer) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: 0, startAt: layer.timelineStart, trimStart: 0, trimEnd: layer.timelineDuration, duration: Math.max(MIN_TIMELINE_SECONDS, layer.timelineStart + layer.timelineDuration) }
     else if (track) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: 0, startAt: track.timelineStart, trimStart: track.trimStart, trimEnd: track.trimEnd, duration: track.duration }
+    else if (element) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: 0, startAt: element.timelineStart, trimStart: element.trimStart, trimEnd: element.trimEnd, duration: element.duration }
   }
   const moveTimelineDrag = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = timelineDrag.current
@@ -888,6 +908,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         const nextStart = Math.max(0, Math.min(drag.trimEnd - 0.1, drag.trimStart + delta))
         updateClip(drag.id, { trimStart: nextStart, timelineStart: Math.max(0, drag.startAt + nextStart - drag.trimStart) })
       } else updateClip(drag.id, { trimEnd: Math.max(drag.trimStart + 0.1, Math.min(drag.duration, drag.trimEnd + delta)) })
+    } else if (drag.kind === 'element') {
+      const element = elements.find(item => item.id === drag.id)
+      if (!element) return
+      if (drag.mode === 'move') setElements(items => items.map(item => item.id === drag.id ? { ...item, timelineStart: Math.max(0, drag.startAt + delta) } : item))
+      else if (drag.mode === 'left') setElements(items => items.map(item => item.id === drag.id ? { ...item, trimStart: Math.min(drag.trimEnd - 0.1, Math.max(0, drag.trimStart + delta)), timelineStart: Math.max(0, drag.startAt + delta) } : item))
+      else setElements(items => items.map(item => item.id === drag.id ? { ...item, trimEnd: Math.max(item.trimStart + 0.1, Math.min(item.duration, drag.trimEnd + delta)) } : item))
     } else if (audio?.id === drag.id) {
       if (drag.mode === 'move') setAudio({ ...audio, timelineStart: Math.max(0, drag.startAt + delta) })
       else if (drag.mode === 'left') {
@@ -897,7 +923,18 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     }
   }
   const endTimelineDrag = (event: ReactPointerEvent<HTMLElement>) => {
-    if (timelineDrag.current?.pointerId === event.pointerId) timelineDrag.current = null
+    const drag = timelineDrag.current
+    if (drag?.pointerId === event.pointerId) {
+      if (drag.kind === 'clip' && drag.mode === 'move') {
+        const rect = document.querySelector<HTMLElement>('[data-element-dropzone="true"]')?.getBoundingClientRect()
+        const clip = clips.find(item => item.id === drag.id)
+        if (rect && clip && event.clientY >= rect.top && event.clientY <= rect.bottom) {
+          const element: ElementLayer = { id: clip.id, kind: clip.kind, name: clip.name, url: clip.url, duration: clip.duration, trimStart: clip.trimStart, trimEnd: clip.trimEnd, timelineStart: clip.timelineStart, x: 25, y: 25, width: 50, height: 50, fileSize: clip.fileSize, storagePath: clip.storagePath }
+          setElements(items => [...items, element]); setClips(items => items.filter(item => item.id !== clip.id)); setSelectedId(null); setSelectedElementId(element.id); setNotice('Media moved to a new Element layer.')
+        }
+      }
+      timelineDrag.current = null
+    }
   }
   const removeTextLayer = (id: string) => {
     textDrafts.current.delete(id)
@@ -936,6 +973,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const endTextPointer = (event: ReactPointerEvent<HTMLElement>) => {
     if (textDrag.current?.pointerId === event.pointerId) textDrag.current = null
   }
+  const beginElementDrag = (event: ReactPointerEvent<HTMLElement>, element: ElementLayer, mode: ElementDrag['mode']) => { event.preventDefault(); event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); elementDrag.current = { id: element.id, pointerId: event.pointerId, mode, startX: event.clientX, startY: event.clientY, x: element.x, y: element.y, width: element.width, height: element.height }; setSelectedElementId(element.id); setSelectedTextId(null); setSelectedId(null) }
+  const moveElementPointer = (event: ReactPointerEvent<HTMLElement>) => { const drag = elementDrag.current; const rect = canvasRef.current?.getBoundingClientRect(); if (!drag || drag.pointerId !== event.pointerId || !rect) return; const dx = (event.clientX-drag.startX)/rect.width*100; const dy = (event.clientY-drag.startY)/rect.height*100; setElements(items => items.map(item => item.id !== drag.id ? item : drag.mode === 'move' ? { ...item, x: Math.min(100-item.width,Math.max(0,drag.x+dx)), y: Math.min(100-item.height,Math.max(0,drag.y+dy)) } : { ...item, width: Math.min(100-drag.x,Math.max(5,drag.width+dx)), height: Math.min(100-drag.y,Math.max(5,drag.height+dy)) })) }
+  const endElementPointer = (event: ReactPointerEvent<HTMLElement>) => { if (elementDrag.current?.pointerId === event.pointerId) elementDrag.current = null }
+  const removeElement = (id: string) => { setElements(items => items.filter(item => item.id !== id)); if (selectedElementId === id) setSelectedElementId(null) }
   const removeClip = (id: string) => {
     const target = clips.find(item => item.id === id)
     if (!target) return
@@ -1608,7 +1649,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           </div>}
         </aside>
 
-        <section onPointerDown={event => { const target = event.target as HTMLElement; if (!target.closest("[data-text-layer-id], [data-text-toolbar]")) { setSelectedTextId(null); setEditingTextId(null) } }} className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(ellipse_at_50%_30%,rgba(88,54,160,0.15),transparent_55%),#080a13]">
+        <section onPointerDown={event => { const target = event.target as HTMLElement; if (!target.closest("[data-text-layer-id], [data-element-layer-id], [data-text-toolbar]")) { setSelectedTextId(null); setSelectedElementId(null); setEditingTextId(null) } }} className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(ellipse_at_50%_30%,rgba(88,54,160,0.15),transparent_55%),#080a13]">
           <div className="flex h-10 min-h-10 shrink-0 items-center gap-2 overflow-x-auto border-b border-white/[0.07] bg-[#0c0f1c] px-3 md:hidden">
             <button type="button" onClick={() => videoInput.current?.click()} className="shrink-0 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2 text-[9px] font-bold">Import video</button>
             <button type="button" onClick={() => imageInput.current?.click()} className="shrink-0 rounded-md border border-white/10 px-3 py-2 text-[9px] font-semibold text-slate-200">Add photo</button>
@@ -1703,7 +1744,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   return <video key={clip.id} ref={getPreviewVideoRef(clip.id)} data-preview-clip-id={clip.id} src={clip.url} playsInline preload={shouldPreload ? 'auto' : 'metadata'} className="absolute inset-0 h-full w-full object-contain" style={{ display: isActiveVideo ? 'block' : 'none' }} />
                 })}
                 {activeTimelineClip?.kind === 'image' ? <img src={activeTimelineClip.url} alt={activeTimelineClip.name} className="absolute inset-0 h-full w-full object-contain" /> : !activeTimelineClip ? <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">{clips.length ? 'Timeline gap' : 'Your video canvas'}</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">{clips.length ? 'No media clip is placed at this point in the timeline.' : 'Import a video or photo to start editing your project.'}</p>{!clips.length && <button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button>}</div> : null}
-                {audio && <audio ref={audioRef} src={audio.url} preload="metadata" />}
+                {elements.filter(element => playhead >= element.timelineStart && playhead < element.timelineStart + element.trimEnd-element.trimStart).map(element => <div key={element.id} data-element-layer-id={element.id} onPointerDown={event=>beginElementDrag(event,element,'move')} onPointerMove={moveElementPointer} onPointerUp={endElementPointer} onPointerCancel={endElementPointer} onClick={event=>{event.stopPropagation();setSelectedElementId(element.id);setSelectedTextId(null);setSelectedId(null)}} className={'absolute z-10 cursor-move touch-none '+(selectedElementId===element.id?'outline outline-1 outline-dashed outline-sky-300':'hover:outline hover:outline-1 hover:outline-white/40')} style={{left:element.x+'%',top:element.y+'%',width:element.width+'%',height:element.height+'%'}}>{element.kind==='image'?<img src={element.url} alt={element.name} draggable={false} className="pointer-events-none h-full w-full object-contain"/>:<video src={element.url} data-element-video-id={element.id} playsInline muted className="pointer-events-none h-full w-full object-contain"/>}{selectedElementId===element.id&&<button type="button" aria-label="Resize element" onPointerDown={event=>{event.stopPropagation();beginElementDrag(event,element,'resize')}} onPointerMove={moveElementPointer} onPointerUp={endElementPointer} onPointerCancel={endElementPointer} className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-sky-400 shadow-md cursor-nwse-resize touch-none"/>}</div>)}
+                 {audio && <audio ref={audioRef} src={audio.url} preload="metadata" />}
                 {textLayers.filter(layer => (playhead >= layer.timelineStart && playhead < layer.timelineStart + layer.timelineDuration) || (isAnimationPreviewing && selectedTextId === layer.id)).map(layer => { const layerTimelineTime = isAnimationPreviewing && selectedTextId === layer.id ? animationPreviewStartSeconds + animationPreviewTime / 1000 : playhead; return <div key={layer.id} data-text-layer-id={layer.id} onPointerDown={event => { if (event.target === event.currentTarget) beginTextDrag(event,layer,'move') }} onPointerMove={moveTextPointer} onPointerUp={endTextPointer} onPointerCancel={endTextPointer} onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id) }} className={'absolute z-20 min-h-[28px] box-border rounded-sm px-1 py-0.5 outline-none ' + (selectedTextId === layer.id ? 'border border-dashed border-fuchsia-400 shadow-[0_0_0_1px_rgba(217,70,239,.15)]' : 'border border-transparent hover:border-white/40')} style={{ left: layer.x + '%', top: layer.y + '%', width: layer.width + '%', overflow: 'visible', height: layer.height ? layer.height * (canvasRef.current?.clientHeight || exportHeight) / exportHeight + 'px' : undefined, color: layer.color, fontSize: (layer.fontSize * canvasScale) + 'px', fontFamily: layer.fontFamily && layer.fontFamily !== 'Default' ? '"' + layer.fontFamily + '", sans-serif' : 'Arial, Helvetica, sans-serif', fontWeight: layer.bold ? 700 : 400, fontStyle: layer.italic ? 'italic' : 'normal', textDecoration: 'none', textAlign: layer.align, lineHeight: 1.15, cursor: editingTextId === layer.id ? 'text' : 'move', overflowWrap: 'anywhere', transform: (() => { const sample = getLayerAnimationSample(layer, layerTimelineTime); return sample ? (sample.perspective > 0 ? 'perspective(' + sample.perspective + 'px) ' : '') + 'rotateX(' + sample.rotateX + 'deg) rotateY(' + sample.rotateY + 'deg) translate(' + (sample.translateX * canvasScale) + 'px, ' + (sample.translateY * canvasScale) + 'px) scale(' + sample.scaleX + ', ' + sample.scaleY + ') rotate(' + (layer.rotation + sample.rotate) + 'deg) skew(' + sample.skewX + 'deg, ' + sample.skewY + 'deg)' : 'rotate(' + layer.rotation + 'deg)' })(), filter: (() => { const sample = getLayerAnimationSample(layer, layerTimelineTime); return sample?.blur ? 'blur(' + (sample.blur * canvasScale) + 'px)' : undefined })(), transformOrigin: 'center center', transformStyle: 'preserve-3d', backfaceVisibility: 'hidden', opacity: (() => { const sample = getLayerAnimationSample(layer, layerTimelineTime); return sample ? sample.opacity : 1 })() }}>
                   <div dir="auto" contentEditable={editingTextId === layer.id} suppressContentEditableWarning onClick={event => { event.stopPropagation(); setSelectedTextId(layer.id); if (editingTextId !== layer.id) { const node = event.currentTarget; setEditingTextId(layer.id); window.requestAnimationFrame(() => { node.focus(); const selection = window.getSelection(); const range = document.createRange(); range.selectNodeContents(node); range.collapse(false); selection?.removeAllRanges(); selection?.addRange(range) }) } }} onInput={event => { textDrafts.current.set(layer.id, event.currentTarget.innerText.split(/\n/).map(line => layer.listStyle === 'bullet' ? line.replace(/^•\s?/, '') : layer.listStyle === 'number' ? line.replace(/^\d+\\.\s?/, '') : line).join('\n')) }} onBlur={event => { const value = textDrafts.current.get(layer.id); if (value !== undefined) { updateTextLayer(layer.id,{text:value}); textDrafts.current.delete(layer.id) } setEditingTextId(current => current === layer.id ? null : current) }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.blur() } }} className="inline-block min-h-[24px] max-w-full whitespace-pre-wrap break-words outline-none" style={{ display:'inline-block', position:'relative', width:'fit-content', maxWidth:'100%', caretColor: '#f0abfc', opacity: (layer.opacity ?? 100) / 100, color: layer.effect === 'Metallic' || layer.effect === 'Hologram' ? '#cbd5e1' : layer.effectColor || layer.color, textShadow: 'none' }}><span style={{ display:'inline-block', boxSizing:'border-box', maxWidth:'100%', minWidth: editingTextId === layer.id ? '1px' : undefined, minHeight: editingTextId === layer.id ? '1em' : undefined, whiteSpace:'pre-wrap', verticalAlign:'top', backgroundSize:'100% 100%', backgroundPosition:'center', color: layer.color, overflow:'visible', ...getTextEffectStyle(layer.effect, layer.effectIntensity ?? 60, layer.effectColor || '#a855f7', layer.effectSecondaryColor || '#22d3ee', layer.effectBlur ?? 8, layer.effectDistance ?? 4, layer.effectAngle ?? 45) }}>{editingTextId === layer.id ? getFormattedText(layer) : getAnimatedTextContent(layer, layerTimelineTime)}</span>{(layer.underline || layer.strikethrough) && <span aria-hidden="true" className="pointer-events-none absolute left-0 top-0 z-10 inline-block" style={{ whiteSpace:'pre-wrap', overflowWrap:'anywhere', lineHeight:1.15, fontFamily:'inherit', fontSize:'inherit', fontWeight:'inherit', fontStyle:'inherit', letterSpacing:'inherit', textAlign:'inherit', color:'transparent', WebkitTextFillColor:'transparent', textShadow:'none', userSelect:'none', WebkitUserSelect:'none', textDecorationLine: layer.underline && layer.strikethrough ? 'underline line-through' : layer.underline ? 'underline' : 'line-through', textDecorationColor: layer.effect === 'Metallic' || layer.effect === 'Hologram' ? '#cbd5e1' : layer.effectColor || layer.color, textDecorationThickness:'from-font', textDecorationSkipInk:'none', textUnderlineOffset:'0.12em' }}>{getFormattedText(layer)}</span>}</div>
                   {selectedTextId === layer.id && <>
@@ -1735,16 +1777,19 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 </div>
                 {[
                   { key: 'text', label: 'Text', icon: <Type className="h-3 w-3" />, tone: 'fuchsia' },
+                  { key: 'element', label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' },
                   { key: 'media', label: 'Media', icon: <Clapperboard className="h-3 w-3" />, tone: 'violet' },
                   { key: 'audio', label: 'Audio', icon: <Music2 className="h-3 w-3" />, tone: 'emerald' },
                 ].map(track => <div key={track.key} className="flex min-h-[34px] border-b border-white/[0.045]">
-                  <div className={'flex w-[72px] shrink-0 items-center gap-1.5 border-r px-2 text-[9px] font-semibold ' + (track.tone === 'fuchsia' ? 'border-fuchsia-400/10 bg-[#21152b] text-fuchsia-100' : track.tone === 'violet' ? 'border-violet-400/10 bg-[#1b1830] text-violet-100' : 'border-emerald-400/10 bg-[#10271f] text-emerald-100')}>{track.icon}{track.label}</div>
-                  <div className="relative min-h-[34px] shrink-0 cursor-crosshair" style={{ width: timelineWidth, height: track.key === 'text' ? Math.max(34, textLayers.length * 30 + 4) : track.key === 'media' ? mediaTrackHeight : 34 }} onPointerDown={seekTimeline}>
+                  <div className={'flex w-[72px] shrink-0 items-center gap-1.5 border-r px-2 text-[9px] font-semibold ' + (track.tone === 'fuchsia' ? 'border-fuchsia-400/10 bg-[#21152b] text-fuchsia-100' : track.tone === 'sky' ? 'border-sky-400/10 bg-[#142331] text-sky-100' : track.tone === 'violet' ? 'border-violet-400/10 bg-[#1b1830] text-violet-100' : 'border-emerald-400/10 bg-[#10271f] text-emerald-100')}>{track.icon}{track.label}</div>
+                  <div className="relative min-h-[34px] shrink-0 cursor-crosshair" style={{ width: timelineWidth, height: track.key === 'text' ? Math.max(34, textLayers.length * 30 + 4) : track.key === 'element' ? Math.max(34, elements.length * 30 + 4) : track.key === 'media' ? mediaTrackHeight : 34 }} onPointerDown={seekTimeline}>
                     {track.key === 'text' && textLayers.map(layer => <div key={layer.id} onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => { setSelectedTextId(layer.id); setActivePanel('text') }} title={layer.text + (layer.animation?.animationId ? ' · ' + (STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation.animationId)?.name || 'Animation') : '')} data-animation-id={layer.animation?.animationId || undefined} className={'absolute flex h-[22px] min-w-[12px] items-center overflow-visible rounded bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[8px] font-semibold text-white shadow-sm cursor-grab touch-none ' + (selectedTextId === layer.id ? 'ring-1 ring-fuchsia-200' : '')} style={{ top: 6 + textLayers.findIndex(item => item.id === layer.id) * 30, left: layer.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(12, layer.timelineDuration * TIMELINE_PX_PER_SECOND) }}>
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/30" />
                       <span className="min-w-0 flex-1 truncate px-2 text-left">{layer.text || 'Untitled text'}</span>{layer.animation?.animationId && <span aria-hidden="true" className="mr-1 h-1.5 w-1.5 shrink-0 rounded-full bg-white/80 shadow-[0_0_5px_rgba(255,255,255,.65)]" title={STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation.animationId)?.name || 'Text animation'} />}
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/30" />
                     </div>)}
+                    {track.key === 'element' && <div data-element-dropzone="true" className="absolute inset-0 z-0 rounded bg-sky-400/[0.035]" />}
+                    {track.key === 'element' && elements.map((element,index) => <div key={element.id} onPointerDown={event => beginTimelineDrag(event,'element',element.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedElementId(element.id)} title={'Element · '+element.name} className={'absolute flex h-[22px] min-w-[14px] items-center overflow-visible rounded bg-sky-500/35 text-[8px] font-semibold text-sky-100 cursor-grab touch-none '+(selectedElementId===element.id?'ring-1 ring-sky-200':'')} style={{top:6+index*30,left:element.timelineStart*TIMELINE_PX_PER_SECOND,width:Math.max(14,(element.trimEnd-element.trimStart)*TIMELINE_PX_PER_SECOND)}}><span onPointerDown={event=>beginTimelineDrag(event,'element',element.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/35"/><span className="min-w-0 flex-1 truncate px-2">{index+1}. {element.kind==='image'?'Photo':'Video'} · {element.name}</span><span onPointerDown={event=>beginTimelineDrag(event,'element',element.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/35"/></div>)}
                     {track.key === 'media' && [...clips].sort((a,b) => a.timelineStart - b.timelineStart).map((clip, index) => <div key={clip.id} onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedId(clip.id)} title={(clip.kind === 'image' ? 'Photo · ' : 'Video · ') + clip.name} className={'absolute flex min-w-[14px] items-center overflow-visible rounded text-[8px] font-semibold cursor-grab touch-none ' + ((clips.length > 1 && (clip.lane || 0) > 0) ? 'h-[22px] ' : 'h-[44px] ') + (clip.kind === 'image' ? 'bg-sky-500/35 text-sky-100' : 'bg-violet-500/40 text-violet-100') + (selected?.id === clip.id ? ' ring-1 ring-white/70' : '')} style={{ top: 8 + (maxMediaLane - (clips.length <= 1 ? 0 : (clip.lane || 0))) * 30, left: clip.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(14, (clip.trimEnd - clip.trimStart) * TIMELINE_PX_PER_SECOND) }}>
                       <span onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/35" />
                       <span className="min-w-0 flex-1 truncate px-2">{index + 1}. {clip.kind === 'image' ? 'Photo' : 'Video'} · {clip.name}</span>
@@ -1755,7 +1800,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                       <span className="min-w-0 flex-1 truncate px-2">{audio.name}</span>
                       <span onPointerDown={event => beginTimelineDrag(event,'audio',audio.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/35" />
                     </div>}
-                    {((track.key === 'text' && !textLayers.length) || (track.key === 'media' && !clips.length) || (track.key === 'audio' && !audio)) && <span className="absolute left-2 top-[11px] text-[8px] text-slate-600">+ Add {track.key === 'text' ? 'text' : track.key === 'media' ? 'media' : 'audio'}</span>}
+                    {((track.key === 'text' && !textLayers.length) || (track.key === 'element' && !elements.length) || (track.key === 'media' && !clips.length) || (track.key === 'audio' && !audio)) && <span className="absolute left-2 top-[11px] text-[8px] text-slate-600">+ Add {track.key === 'text' ? 'text' : track.key === 'element' ? 'element' : track.key === 'media' ? 'media' : 'audio'}</span>}
                   </div>
                 </div>)}
                 <div className="pointer-events-none absolute bottom-0 top-6 z-30 border-l-2 border-rose-400 shadow-[0_0_8px_rgba(251,113,133,.65)]" style={{ left: 72 + playhead * TIMELINE_PX_PER_SECOND }}><div className="-ml-[5px] -mt-1 h-2.5 w-2.5 rounded-full bg-rose-400 shadow" /></div>
