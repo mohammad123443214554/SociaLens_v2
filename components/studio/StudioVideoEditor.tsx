@@ -50,6 +50,7 @@ type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: st
 type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; fileSize: number; storagePath?: string }
 type ElementDrag = { id: string; pointerId: number; mode: 'move' | 'resize'; startX: number; startY: number; x: number; y: number; width: number; height: number }
 type TimelineTrack = { key: string; label: string; icon: ReactNode; tone: 'fuchsia' | 'sky' | 'violet' | 'emerald'; element?: ElementLayer; elementIndex?: number }
+type TimelineDragPreview = { x: number; y: number; width: number; label: string; kind: 'image' | 'video' }
 type TextDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'rotate'; startX: number; startY: number; startAngle: number; originX: number; originY: number; originWidth: number; originFontSize: number; originRotation: number }
 type TimelineDrag = { id: string; kind: 'clip' | 'text' | 'audio' | 'element'; mode: 'move' | 'left' | 'right'; pointerId: number; startX: number; startY: number; startLane: number; startAt: number; trimStart: number; trimEnd: number; duration: number }
 const MIN_TIMELINE_SECONDS = 60
@@ -367,6 +368,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const canvasRef = useRef<HTMLDivElement>(null)
   const textDrag = useRef<TextDrag | null>(null)
   const timelineDrag = useRef<TimelineDrag | null>(null)
+  const [timelineDragPreview, setTimelineDragPreview] = useState<TimelineDragPreview | null>(null)
   const textDrafts = useRef<Map<string, string>>(new Map())
   const objectUrls = useRef<Set<string>>(new Set())
   const [clips, setClips] = useState<Clip[]>([])
@@ -852,7 +854,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const layer = kind === 'text' ? textLayers.find(item => item.id === id) : null
     const track = kind === 'audio' && audio?.id === id ? audio : null
     const element = kind === 'element' ? elements.find(item => item.id === id) : null
-    if (clip) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: Math.max(0, Math.min(7, clip.lane || 0)), startAt: clip.timelineStart, trimStart: clip.trimStart, trimEnd: clip.trimEnd, duration: clip.duration }
+    if (clip) {
+      timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: 0, startAt: clip.timelineStart, trimStart: clip.trimStart, trimEnd: clip.trimEnd, duration: clip.duration }
+      if (mode === 'move') setTimelineDragPreview({ x: event.clientX, y: event.clientY, width: Math.max(48, Math.min(360, (clip.trimEnd - clip.trimStart) * TIMELINE_PX_PER_SECOND)), label: clip.name, kind: clip.kind })
+    }
     else if (layer) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: 0, startAt: layer.timelineStart, trimStart: 0, trimEnd: layer.timelineDuration, duration: Math.max(MIN_TIMELINE_SECONDS, layer.timelineStart + layer.timelineDuration) }
     else if (track) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: 0, startAt: track.timelineStart, trimStart: track.trimStart, trimEnd: track.trimEnd, duration: track.duration }
     else if (element) timelineDrag.current = { id, kind, mode, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startLane: 0, startAt: element.timelineStart, trimStart: element.trimStart, trimEnd: element.trimEnd, duration: element.duration }
@@ -861,6 +866,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const drag = timelineDrag.current
     if (!drag || drag.pointerId !== event.pointerId) return
     const delta = (event.clientX - drag.startX) / TIMELINE_PX_PER_SECOND
+    if (drag.kind === 'clip' && drag.mode === 'move') setTimelineDragPreview(current => current ? { ...current, x: event.clientX, y: event.clientY } : current)
     if (drag.kind === 'text') {
       const layer = textLayers.find(item => item.id === drag.id)
       if (!layer) return
@@ -913,6 +919,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         }
       }
       timelineDrag.current = null
+      setTimelineDragPreview(null)
     }
   }
   const removeTextLayer = (id: string) => {
@@ -1532,6 +1539,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
 
   return (
     <main className="fixed inset-0 z-[70] flex min-h-0 flex-col overflow-hidden bg-[#080a13] pt-[env(safe-area-inset-top)] text-white">
+      {timelineDragPreview && <div aria-hidden="true" className={'pointer-events-none fixed z-[120] flex h-[36px] items-center overflow-hidden rounded-md border px-2 text-[10px] font-semibold shadow-2xl opacity-95 ' + (timelineDragPreview.kind === 'image' ? 'border-sky-200 bg-sky-600/90 text-white' : 'border-violet-200 bg-violet-600/90 text-white')} style={{ left: timelineDragPreview.x + 12, top: timelineDragPreview.y + 12, width: timelineDragPreview.width, maxWidth: 'min(360px, 70vw)', boxShadow: '0 8px 28px rgba(0,0,0,.55)' }}><span className="mr-1 shrink-0">⠿</span><span className="truncate">{timelineDragPreview.kind === 'image' ? 'Photo' : 'Video'} · {timelineDragPreview.label}</span></div>}
       <header className="z-30 flex h-[62px] min-h-[62px] shrink-0 items-center justify-between border-b border-white/[0.09] bg-[#0c0f1d] px-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.assign('/studio') }} aria-label="Back to Studio" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/[0.06] hover:text-white"><ArrowLeft className="h-4 w-4" /></button>
@@ -1768,8 +1776,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 </div>
                 {([
                   { key: 'text', label: 'Text', icon: <Type className="h-3 w-3" />, tone: 'fuchsia' },
-                  { key: 'element', label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' },
-                  ...[...elements].reverse().map((element, index) => ({ key: 'element-' + element.id, label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky', element, elementIndex: elements.length - index })),
+                  ...(elements.length ? [...elements].reverse().map((element, index) => ({ key: 'element-' + element.id, label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' as const, element, elementIndex: elements.length - index })) : [{ key: 'element', label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' as const }]),
                   { key: 'media', label: 'Media', icon: <Clapperboard className="h-3 w-3" />, tone: 'violet' },
                   { key: 'audio', label: 'Audio', icon: <Music2 className="h-3 w-3" />, tone: 'emerald' },
                 ] as TimelineTrack[]).map(track => <div key={track.key} data-element-track-row={track.key === 'element' || track.key.startsWith('element-') ? 'true' : undefined} className="flex min-h-[34px] border-b border-white/[0.045]">
