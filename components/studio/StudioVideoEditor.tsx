@@ -939,7 +939,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         if (overElementRow && timelineRect && clip && event.clientX >= timelineRect.left && event.clientX <= timelineRect.right) {
           const dropTime = Math.max(0, (event.clientX - timelineRect.left) / TIMELINE_PX_PER_SECOND)
           const element: ElementLayer = { id: makeId(), kind: clip.kind, name: clip.name, url: clip.url, duration: clip.duration, trimStart: clip.trimStart, trimEnd: clip.trimEnd, timelineStart: dropTime, x: 25, y: 25, width: 50, height: 50, fileSize: clip.fileSize, storagePath: clip.storagePath }
-          setElements(items => [...items, element]); setClips(items => items.filter(item => item.id !== clip.id)); setSelectedId(null); setSelectedElementId(element.id); setNotice('')
+          setElements(items => [...items, element]); setClips(items => arrangeStudioClips(items.filter(item => item.id !== clip.id))); setSelectedId(null); setSelectedElementId(element.id); setNotice('')
         } else if (clip) {
           const nextStart = Math.max(0, drag.startAt + (event.clientX - drag.startX) / TIMELINE_PX_PER_SECOND)
           updateClipOnTimeline(drag.id, { timelineStart: nextStart, lane: 0 })
@@ -996,7 +996,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     URL.revokeObjectURL(target.url)
     objectUrls.current.delete(target.url)
     const next = clips.filter(item => item.id !== id)
-    setClips(next)
+    setClips(arrangeStudioClips(next))
     if (selectedId === id) setSelectedId(next[0]?.id || null)
   }
   const moveClip = (id: string, direction: number) => setClips(items => {
@@ -1005,7 +1005,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (index < 0 || target < 0 || target >= items.length) return items
     const next = [...items]
     ;[next[index], next[target]] = [next[target], next[index]]
-    return next
+    return arrangeStudioClips(next)
   })
   const togglePlayback = () => {
     if (playing) {
