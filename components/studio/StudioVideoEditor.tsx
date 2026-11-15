@@ -870,6 +870,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const clip = clips.find(item => item.id === drag.id)
       if (!clip) return
       if (drag.mode === 'move') {
+        const elementRow = document.querySelector<HTMLElement>('[data-element-track-row="true"]')?.getBoundingClientRect()
+        if (elementRow && event.clientY >= elementRow.top && event.clientY <= elementRow.bottom) return
         // Lane 0 is the lower/main scene row. Dragging upward creates higher lanes.
         const desiredLane = clips.length <= 1 ? 0 : Math.max(0, Math.min(7, drag.startLane - Math.round((event.clientY - drag.startY) / 30)))
         const duration = Math.max(0.1, drag.trimEnd - drag.trimStart)
@@ -926,11 +928,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const drag = timelineDrag.current
     if (drag?.pointerId === event.pointerId) {
       if (drag.kind === 'clip' && drag.mode === 'move') {
-        const rect = document.querySelector<HTMLElement>('[data-element-dropzone="true"]')?.getBoundingClientRect()
+        const rect = document.querySelector<HTMLElement>('[data-element-track-row="true"]')?.getBoundingClientRect()
         const clip = clips.find(item => item.id === drag.id)
         if (rect && clip && event.clientY >= rect.top && event.clientY <= rect.bottom) {
           const element: ElementLayer = { id: clip.id, kind: clip.kind, name: clip.name, url: clip.url, duration: clip.duration, trimStart: clip.trimStart, trimEnd: clip.trimEnd, timelineStart: clip.timelineStart, x: 25, y: 25, width: 50, height: 50, fileSize: clip.fileSize, storagePath: clip.storagePath }
-          setElements(items => [...items, element]); setClips(items => items.filter(item => item.id !== clip.id)); setSelectedId(null); setSelectedElementId(element.id); setNotice('Media moved to a new Element layer.')
+          setElements(items => items.some(item => item.id === element.id) ? items : [...items, element]); setClips(items => items.filter(item => item.id !== clip.id)); setSelectedId(null); setSelectedElementId(element.id); setNotice('Media moved to a new Element layer.')
         }
       }
       timelineDrag.current = null
@@ -1792,7 +1794,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   { key: 'element', label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' },
                   { key: 'media', label: 'Media', icon: <Clapperboard className="h-3 w-3" />, tone: 'violet' },
                   { key: 'audio', label: 'Audio', icon: <Music2 className="h-3 w-3" />, tone: 'emerald' },
-                ].map(track => <div key={track.key} className="flex min-h-[34px] border-b border-white/[0.045]">
+                ].map(track => <div key={track.key} data-element-track-row={track.key === 'element' ? 'true' : undefined} className="flex min-h-[34px] border-b border-white/[0.045]">
                   <div className={'flex w-[72px] shrink-0 items-center gap-1.5 border-r px-2 text-[9px] font-semibold ' + (track.tone === 'fuchsia' ? 'border-fuchsia-400/10 bg-[#21152b] text-fuchsia-100' : track.tone === 'sky' ? 'border-sky-400/10 bg-[#142331] text-sky-100' : track.tone === 'violet' ? 'border-violet-400/10 bg-[#1b1830] text-violet-100' : 'border-emerald-400/10 bg-[#10271f] text-emerald-100')}>{track.icon}{track.label}</div>
                   <div className="relative min-h-[34px] shrink-0 cursor-crosshair" style={{ width: timelineWidth, height: track.key === 'text' ? Math.max(34, textLayers.length * 30 + 4) : track.key === 'element' ? Math.max(34, elements.length * 30 + 4) : track.key === 'media' ? mediaTrackHeight : 34 }} onPointerDown={seekTimeline}>
                     {track.key === 'text' && textLayers.map(layer => <div key={layer.id} onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => { setSelectedTextId(layer.id); setActivePanel('text') }} title={layer.text + (layer.animation?.animationId ? ' · ' + (STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation.animationId)?.name || 'Animation') : '')} data-animation-id={layer.animation?.animationId || undefined} className={'absolute flex h-[22px] min-w-[12px] items-center overflow-visible rounded bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[8px] font-semibold text-white shadow-sm cursor-grab touch-none ' + (selectedTextId === layer.id ? 'ring-1 ring-fuchsia-200' : '')} style={{ top: 6 + textLayers.findIndex(item => item.id === layer.id) * 30, left: layer.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(12, layer.timelineDuration * TIMELINE_PX_PER_SECOND) }}>
