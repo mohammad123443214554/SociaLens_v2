@@ -926,7 +926,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           setElements(items => items.filter(item => item.id !== element.id))
           setSelectedElementId(null)
           setSelectedId(clip.id)
-          setNotice('Element moved back to the Media track.')
+          setNotice('')
         }
       }
       if (drag.kind === 'clip' && drag.mode === 'move') {
@@ -937,7 +937,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         if (overElementRow && timelineRect && clip && event.clientX >= timelineRect.left && event.clientX <= timelineRect.right) {
           const dropTime = Math.max(0, (event.clientX - timelineRect.left) / TIMELINE_PX_PER_SECOND)
           const element: ElementLayer = { id: makeId(), kind: clip.kind, name: clip.name, url: clip.url, duration: clip.duration, trimStart: clip.trimStart, trimEnd: clip.trimEnd, timelineStart: dropTime, x: 25, y: 25, width: 50, height: 50, fileSize: clip.fileSize, storagePath: clip.storagePath }
-          setElements(items => [...items, element]); setClips(items => items.filter(item => item.id !== clip.id)); setSelectedId(null); setSelectedElementId(element.id); setNotice('Media moved to a new Element layer.')
+          setElements(items => [...items, element]); setClips(items => items.filter(item => item.id !== clip.id)); setSelectedId(null); setSelectedElementId(element.id); setNotice('')
         }
       }
       timelineDrag.current = null
@@ -1561,7 +1561,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
 
   return (
     <main className="fixed inset-0 z-[70] flex min-h-0 flex-col overflow-hidden bg-[#080a13] pt-[env(safe-area-inset-top)] text-white">
-      {timelineDragPreview && <div aria-hidden="true" className={'pointer-events-none fixed z-[120] flex h-[36px] items-center overflow-hidden rounded-md border px-2 text-[10px] font-semibold shadow-2xl opacity-95 ' + (timelineDragPreview.kind === 'image' ? 'border-sky-200 bg-sky-600/90 text-white' : 'border-violet-200 bg-violet-600/90 text-white')} style={{ left: timelineDragPreview.x + 1, top: timelineDragPreview.y + 8, width: timelineDragPreview.width, maxWidth: 'min(360px, 70vw)', boxShadow: '0 8px 28px rgba(0,0,0,.55)' }}><span className="mr-1 shrink-0">⠿</span><span className="truncate">{timelineDragPreview.kind === 'image' ? 'Photo' : 'Video'} · {timelineDragPreview.label}</span></div>}
+      {timelineDragPreview && <div aria-hidden="true" className={'pointer-events-none fixed z-[120] flex h-[36px] items-center overflow-hidden rounded-md border px-2 text-[10px] font-semibold shadow-2xl opacity-95 ' + (timelineDragPreview.kind === 'image' ? 'border-sky-200 bg-sky-600/90 text-white' : 'border-violet-200 bg-violet-600/90 text-white')} style={{ left: timelineDragPreview.x - Math.min(timelineDragPreview.width, 360) / 2, top: timelineDragPreview.y + 2, width: timelineDragPreview.width, maxWidth: 'min(360px, 70vw)', boxShadow: '0 8px 28px rgba(0,0,0,.55)' }}><span className="mr-1 shrink-0">⠿</span><span className="truncate">{timelineDragPreview.kind === 'image' ? 'Photo' : 'Video'} · {timelineDragPreview.label}</span></div>}
       <header className="z-30 flex h-[62px] min-h-[62px] shrink-0 items-center justify-between border-b border-white/[0.09] bg-[#0c0f1d] px-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.assign('/studio') }} aria-label="Back to Studio" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/[0.06] hover:text-white"><ArrowLeft className="h-4 w-4" /></button>
@@ -1855,7 +1855,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       <input ref={audioInput} type="file" accept="audio/*" className="hidden" onChange={event => { void addAudio(event.target.files?.[0]); event.currentTarget.value = '' }} />
 
       {exporting && <div className="fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-1/2 z-[100] w-[min(92vw,520px)] -translate-x-1/2 rounded-xl border border-violet-300/20 bg-[#171b2d] p-3 shadow-2xl"><div className="mb-2 flex justify-between text-[10px] text-slate-300"><span>Rendering your video</span><span>{exportProgress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-pink-500 transition-[width]" style={{ width: exportProgress + '%' }} /></div><p className="mt-2 text-[9px] text-slate-500">Keep this tab open until the export finishes.</p></div>}
-      {(error || notice) && <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-[100] w-[min(92vw,520px)] -translate-x-1/2 rounded-xl border border-white/10 bg-[#171b2d] px-4 py-3 text-xs shadow-2xl" role={error ? 'alert' : 'status'}><div className="flex items-start gap-2"><span className={error ? 'text-red-300' : 'text-emerald-300'}>{error || notice}</span><button type="button" onClick={() => { setError(''); setNotice('') }} className="ml-auto text-slate-400" aria-label="Dismiss message"><X className="h-4 w-4" /></button></div></div>}
+      {error && <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-[100] w-[min(92vw,520px)] -translate-x-1/2 rounded-xl border border-red-400/20 bg-[#171b2d] px-4 py-3 text-xs shadow-2xl" role="alert"><div className="flex items-start gap-2"><span className="text-red-300">{error}</span><button type="button" onClick={() => setError('')} className="ml-auto text-slate-400" aria-label="Dismiss error"><X className="h-4 w-4" /></button></div></div>}
     </main>
   )
 }
