@@ -38,3 +38,13 @@ export function studioFrameTimeFromElapsedMs(elapsedMs: number, frameRate = STUD
 export function canAdvanceStudioAudio(activeVideo: boolean, videoReady: boolean): boolean {
   return !activeVideo || videoReady
 }
+
+/**
+ * Playback time must never move backwards when the decoder clock and RAF clock
+ * are sampled on adjacent frame boundaries.
+ */
+export function keepStudioTimeMonotonic(candidateSeconds: number, previousSeconds: number): number {
+  const candidate = Number.isFinite(candidateSeconds) ? Math.max(0, candidateSeconds) : 0
+  const previous = Number.isFinite(previousSeconds) ? Math.max(0, previousSeconds) : 0
+  return Math.max(candidate, previous)
+}
