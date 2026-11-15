@@ -1215,6 +1215,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     let audioDestination: MediaStreamAudioDestinationNode | null = null
     let exportStream: MediaStream | null = null
     const exportVideos = new Map<string, HTMLVideoElement>()
+    const exportElementVideos = new Map<string, HTMLVideoElement>()
+    const exportElementImages = new Map<string, HTMLImageElement>()
     let animationFrame = 0
     try {
       await Promise.all([...new Set(textLayers.map(layer => layer.fontFamily || 'Default'))].filter(family => family !== 'Default').map(loadGoogleFont))
@@ -1266,6 +1268,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         recorder!.onerror = () => reject(new Error('The browser stopped recording unexpectedly.'))
       })
       const orderedExportTextLayers = [...textLayers].sort((a, b) => a.timelineStart - b.timelineStart)
+      await Promise.all(elements.map(async element => {
+        if (element.kind === 'image') { const image = new Image(); image.src = element.url; await new Promise<void>((resolve,reject)=>{image.onload=()=>resolve();image.onerror=()=>reject(new Error('Could not load Element photo: '+element.name))}); exportElementImages.set(element.id,image) }
+        else { const video=document.createElement('video'); video.crossOrigin='anonymous'; video.src=element.url; video.muted=true; video.playsInline=true; video.preload='auto'; await new Promise<void>((resolve,reject)=>{video.onloadedmetadata=()=>resolve();video.onerror=()=>reject(new Error('Could not load Element video: '+element.name))}); exportElementVideos.set(element.id,video) }
+      }))
+      const drawElementOverlays = (timelineTime: number) => { for (const element of elements) { const elapsed=timelineTime-element.timelineStart; const active=elapsed>=0&&elapsed<element.trimEnd-element.trimStart; const x=canvas.width*element.x/100,y=canvas.height*element.y/100,w=canvas.width*element.width/100,h=canvas.height*element.height/100; if(element.kind==='image'){const image=exportElementImages.get(element.id);if(active&&image)ctx.drawImage(image,x,y,w,h)}else{const video=exportElementVideos.get(element.id);if(!video)continue;if(!active){if(!video.paused)video.pause();continue}const target=Math.min(element.trimEnd,element.trimStart+elapsed);if(Math.abs(video.currentTime-target)>0.3)video.currentTime=target;if(video.paused&&video.readyState>=HTMLMediaElement.HAVE_FUTURE_DATA)void video.play().catch(()=>undefined);if(video.readyState>=HTMLMediaElement.HAVE_CURRENT_DATA&&video.videoWidth>0)ctx.drawImage(video,x,y,w,h)}}}
       const drawTitle = (timelineTime: number) => {
         ctx.save()
         const scale = canvas.width / 420
@@ -1396,6 +1403,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         const width = video.videoWidth * scale
         const height = video.videoHeight * scale
         ctx.drawImage(video, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
+        drawElementOverlays(timelineTime)
         drawTitle(timelineTime)
       }
       recorder.start(1000)
@@ -1423,6 +1431,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               const timelineTime = quantizeStudioTime(gapStart + elapsed)
               ctx.fillStyle = '#000000'
               ctx.fillRect(0, 0, canvas.width, canvas.height)
+              drawElementOverlays(timelineTime)
               drawTitle(timelineTime)
               syncMusic(timelineTime)
               setExportProgress(Math.min(99, Math.round((timelineTime / Math.max(1, projectEnd)) * 100)))
@@ -1448,6 +1457,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               const height = image.height * scale
               ctx.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
               const timelineTime = quantizeStudioTime(clip.timelineStart + Math.min(durationMs / 1000, (now - start) / 1000))
+              drawElementOverlays(timelineTime)
               drawTitle(timelineTime)
               syncMusic(timelineTime)
               setExportProgress(Math.min(99, Math.round((timelineTime / Math.max(1, projectEnd)) * 100)))
@@ -1502,6 +1512,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             const timelineTime = elapsed >= tailDuration ? projectEnd : quantizeStudioTime(tailStart + elapsed)
             ctx.fillStyle = '#000000'
             ctx.fillRect(0, 0, canvas.width, canvas.height)
+            drawElementOverlays(timelineTime)
             drawTitle(timelineTime)
             syncMusic(timelineTime)
             setExportProgress(Math.min(99, Math.round((timelineTime / Math.max(1, projectEnd)) * 100)))
@@ -1532,6 +1543,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (animationFrame) cancelAnimationFrame(animationFrame)
       if (musicElement) { musicElement.pause(); musicElement.removeAttribute('src'); musicElement.load() }
       exportVideos.forEach(video => { video.pause(); video.removeAttribute('src'); video.load() })
+      exportElementVideos.forEach(video => { video.pause(); video.removeAttribute('src'); video.load() })
       if (audioContext) await audioContext.close().catch(() => undefined)
       exportStream?.getTracks().forEach(track => track.stop())
       exportStream = null
