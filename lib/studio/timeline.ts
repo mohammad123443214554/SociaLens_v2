@@ -20,16 +20,21 @@ export const STUDIO_CLIP_GAP_SNAP_SECONDS = 0
  * previous clip's end. Existing gaps and overlaps are both removed.
  */
 export function arrangeStudioClips<T extends StudioTimelineClip & { id: string }>(clips: readonly T[]): T[] {
-  const ordered = clips.map((clip, index) => ({ ...clip, lane: 0, __order: index })).sort((a, b) => {
-    const difference = a.timelineStart - b.timelineStart
-    return difference || a.__order - b.__order
-  })
+  const ordered = clips
+    .map((clip, index) => ({ clip, index }))
+    .sort((a, b) => {
+      const difference = a.clip.timelineStart - b.clip.timelineStart
+      return difference || a.index - b.index
+    })
+
   let occupiedEnd = 0
-  return ordered.map(({ __order: _order, ...clip }) => {
-    const duration = Math.max(0.1, clip.trimEnd - clip.trimStart)
-    const timelineStart = occupiedEnd
+  return ordered.map(({ clip }) => {
+    const arranged: T = { ...clip }
+    const duration = Math.max(0.1, arranged.trimEnd - arranged.trimStart)
+    arranged.timelineStart = occupiedEnd
+    arranged.lane = 0
     occupiedEnd += duration
-    return { ...clip, timelineStart, lane: 0 }
+    return arranged
   })
 }
 
