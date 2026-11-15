@@ -886,8 +886,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         const elementRows = [...document.querySelectorAll<HTMLElement>('[data-element-track-row="true"]')]
         const overElementDrop = elementRows.some(row => { const rect = row.getBoundingClientRect(); return event.clientY >= rect.top && event.clientY <= rect.bottom })
         if (overElementDrop) return
-        const nextStart = Math.max(0, drag.startAt + delta)
-        updateClipOnTimeline(drag.id, { timelineStart: nextStart, lane: 0 })
+        // Keep the source strip stationary while dragging; only the floating preview follows the pointer.
+        // The actual timeline move is committed once on pointer-up.
+        void delta
       }
       else if (drag.mode === 'left') {
         const nextStart = Math.max(0, Math.min(drag.trimEnd - 0.1, drag.trimStart + delta))
@@ -897,9 +898,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const element = elements.find(item => item.id === drag.id)
       if (!element) return
       if (drag.mode === 'move') {
-        const mediaRows = [...document.querySelectorAll<HTMLElement>('[data-media-track-row="true"]')]
-        const overMediaDrop = mediaRows.some(row => { const rect = row.getBoundingClientRect(); return event.clientY >= rect.top && event.clientY <= rect.bottom })
-        if (!overMediaDrop) setElements(items => items.map(item => item.id === drag.id ? { ...item, timelineStart: Math.max(0, drag.startAt + delta) } : item))
+        // Do not move the original Element strip during pointer movement.
+        // Its position is committed on pointer-up after resolving the drop target.
       }
       else if (drag.mode === 'left') setElements(items => items.map(item => item.id === drag.id ? { ...item, trimStart: Math.min(drag.trimEnd - 0.1, Math.max(0, drag.trimStart + delta)), timelineStart: Math.max(0, drag.startAt + delta) } : item))
       else setElements(items => items.map(item => item.id === drag.id ? { ...item, trimEnd: Math.max(item.trimStart + 0.1, Math.min(item.duration, drag.trimEnd + delta)) } : item))
@@ -927,6 +927,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           setSelectedElementId(null)
           setSelectedId(clip.id)
           setNotice('')
+        } else if (element) {
+          setElements(items => items.map(item => item.id === element.id ? { ...item, timelineStart: Math.max(0, drag.startAt + (event.clientX - drag.startX) / TIMELINE_PX_PER_SECOND) } : item))
         }
       }
       if (drag.kind === 'clip' && drag.mode === 'move') {
@@ -938,6 +940,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           const dropTime = Math.max(0, (event.clientX - timelineRect.left) / TIMELINE_PX_PER_SECOND)
           const element: ElementLayer = { id: makeId(), kind: clip.kind, name: clip.name, url: clip.url, duration: clip.duration, trimStart: clip.trimStart, trimEnd: clip.trimEnd, timelineStart: dropTime, x: 25, y: 25, width: 50, height: 50, fileSize: clip.fileSize, storagePath: clip.storagePath }
           setElements(items => [...items, element]); setClips(items => items.filter(item => item.id !== clip.id)); setSelectedId(null); setSelectedElementId(element.id); setNotice('')
+        } else if (clip) {
+          const nextStart = Math.max(0, drag.startAt + (event.clientX - drag.startX) / TIMELINE_PX_PER_SECOND)
+          updateClipOnTimeline(drag.id, { timelineStart: nextStart, lane: 0 })
         }
       }
       timelineDrag.current = null
