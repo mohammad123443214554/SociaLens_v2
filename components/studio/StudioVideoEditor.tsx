@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import { arrangeStudioClips, moveStudioClipWithoutOverlap, normalizeStudioClipGaps } from '@/lib/studio/timeline'
 import { StudioAnimationPanel } from './StudioAnimationPanel'
+import { StudioTimelineThumbnail, StudioTimelineWaveform } from './StudioTimelineThumbnail'
 import { normalizeTextAnimationSettings, sampleTextAnimation, type TextAnimationDefinition, type TextAnimationSettings } from '@/lib/studio/animation-engine'
 import { BASIC_ENTRANCE_ANIMATIONS } from '@/lib/studio/basic-entrance-animations'
 import { EXIT_ANIMATIONS } from '@/lib/studio/exit-animations'
