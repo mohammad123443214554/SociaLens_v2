@@ -18,7 +18,7 @@ const assertNoOverlaps = (clips: ReturnType<typeof clip>[]) => {
   }
 }
 
-test('arranges existing overlapping clips into one non-overlapping Media lane', () => {
+test('arranges clips contiguously and removes existing gaps and overlaps', () => {
   const arranged = arrangeStudioClips([
     clip('main-video', 0, 32),
     clip('photo', 20, 5),
@@ -50,20 +50,34 @@ test('dropping a clip inside another clip reorders it without stacking', () => {
     clip('photo', 20, 5),
   ], 'video', 20)
   assert.deepEqual(arranged.map(item => [item.id, item.timelineStart]), [
-    ['video', 20],
-    ['photo', 52],
+    ['video', 0],
+    ['photo', 32],
   ])
   assertNoOverlaps(arranged)
 })
 
-test('keeps intentional empty space when moving a clip into a free area', () => {
+test('removes arbitrary gaps between multiple imported clips', () => {
+  const arranged = arrangeStudioClips([
+    clip('first', 0, 4),
+    clip('second', 12, 7),
+    clip('third', 40, 3),
+  ])
+  assert.deepEqual(arranged.map(item => [item.id, item.timelineStart]), [
+    ['first', 0],
+    ['second', 4],
+    ['third', 11],
+  ])
+  assertNoOverlaps(arranged)
+})
+
+test('closes all gaps when a clip is moved into a free area', () => {
   const arranged = moveStudioClipWithoutOverlap([
     clip('first', 0, 5),
     clip('second', 15, 5),
   ], 'second', 30)
   assert.deepEqual(arranged.map(item => [item.id, item.timelineStart]), [
     ['first', 0],
-    ['second', 30],
+    ['second', 5],
   ])
   assertNoOverlaps(arranged)
 })
