@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic } from '../lib/studio/frame-clock.ts'
+import { canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '../lib/studio/frame-clock.ts'
 import { normalizeStudioClipGaps } from '../lib/studio/timeline.ts'
 
 test('audio continues over image clips and timeline gaps', () => {
@@ -59,4 +59,30 @@ test('clip handoff keeps the exact non-frame-aligned timeline boundary', () => {
   const photoStart = 32.933333
   assert.equal(Math.min(videoEnd, 37.933333), photoStart)
   assert.equal(keepStudioTimeMonotonic(photoStart, 32.9), photoStart)
+})
+
+ 
+test('playback clock anchors the requested start position exactly once', () => {
+  assert.equal(studioPlaybackTimeFromElapsedMs(16, 0), 16)
+  assert.equal(studioPlaybackTimeFromElapsedMs(16, 500), 16.5)
+  assert.equal(studioPlaybackTimeFromElapsedMs(20, 0), 20)
+  assert.equal(studioPlaybackTimeFromElapsedMs(0, 500), 0.5)
+})
+
+test('playback clock clamps invalid and negative elapsed values safely', () => {
+  assert.equal(studioPlaybackTimeFromElapsedMs(16, -100), 16)
+  assert.equal(studioPlaybackTimeFromElapsedMs(Number.NaN, 500), 0.5)
+  assert.equal(studioPlaybackTimeFromElapsedMs(16, Number.NaN), 16)
+})
+
+test('pressing Play on the final visible frame restarts the project at zero', () => {
+  const projectEnd = 37.933333
+  const finalFrame = lastStudioFrameBeforeEnd(projectEnd)
+  assert.equal(studioPlaybackStartTime(finalFrame, projectEnd), 0)
+  assert.equal(studioPlaybackStartTime(projectEnd, projectEnd), 0)
+})
+
+test('pressing Play before the final visible frame resumes from the playhead', () => {
+  assert.equal(studioPlaybackStartTime(16, 37.933333), 16)
+  assert.equal(studioPlaybackStartTime(37.9, 37.933333), 37.9)
 })
