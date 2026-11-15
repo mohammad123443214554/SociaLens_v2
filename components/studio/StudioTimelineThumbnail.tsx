@@ -161,6 +161,13 @@ export function StudioTimelineWaveform({ src, className = '' }: { src: string; c
   useEffect(() => {
     let cancelled = false
     let context: AudioContext | null = null
+    const closeContext = () => {
+      const activeContext = context
+      context = null
+      if (activeContext && activeContext.state !== 'closed') {
+        void activeContext.close().catch(() => undefined)
+      }
+    }
     const decode = async () => {
       try {
         const response = await fetch(src)
@@ -184,12 +191,12 @@ export function StudioTimelineWaveform({ src, className = '' }: { src: string; c
       } catch {
         if (!cancelled) setBars([])
       } finally {
-        if (context && context.state !== 'closed') void context.close()
+        closeContext()
       }
     }
     setBars([])
     void decode()
-    return () => { cancelled = true; if (context) void context.close() }
+    return () => { cancelled = true; closeContext() }
   }, [src])
 
   return <div aria-hidden="true" className={'flex h-full items-center justify-around gap-px overflow-hidden px-2 ' + className}>
