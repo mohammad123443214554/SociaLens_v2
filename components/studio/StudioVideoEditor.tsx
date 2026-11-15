@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
+import { normalizeStudioClipGaps } from '@/lib/studio/timeline'
 import { StudioAnimationPanel } from './StudioAnimationPanel'
 import { normalizeTextAnimationSettings, sampleTextAnimation, type TextAnimationDefinition, type TextAnimationSettings } from '@/lib/studio/animation-engine'
 import { BASIC_ENTRANCE_ANIMATIONS } from '@/lib/studio/basic-entrance-animations'
@@ -19,7 +20,7 @@ import { MOTION_DYNAMIC_ANIMATIONS } from '@/lib/studio/motion-dynamic-animation
 import { CINEMATIC_LIGHT_ANIMATIONS } from '@/lib/studio/cinematic-light-animations'
 import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-animations'
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
-import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio } from '@/lib/studio/frame-clock'
+import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
 const STUDIO_TEXT_ANIMATION_BY_ID = new Map(STUDIO_TEXT_ANIMATIONS.map(definition => [definition.id, definition]))
@@ -529,7 +530,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             storagePath: String(item.storagePath),
           })))
           if (!active) return
-          setClips(restored)
+          const gapNormalizedClips = normalizeStudioClipGaps(restored)
+          const closedAccidentalGaps = gapNormalizedClips.some((clip, index) => Math.abs(clip.timelineStart - restored[index].timelineStart) > 0.0001)
+          setClips(gapNormalizedClips)
+          if (closedAccidentalGaps) setNotice('Closed small accidental gaps between timeline clips.')
           if (typeof data.audioPath === 'string' && data.audioPath) {
             const audioUrl = await createStudioAssetUrl(data.audioPath)
             if (!active) return
@@ -785,14 +789,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setNotice('Music track added. Adjust its volume in the Audio panel.')
   }
 
-  const updateClip = (id: string, patch: Partial<Clip>) => setClips(items => items.map(item => item.id === id ? { ...item, ...patch } : item))
+  const updateClip = (id: string, patch: Partial<Clip>) => setClips(items => normalizeStudioClipGaps(items.map(item => item.id === id ? { ...item, ...patch } : item)))
   const updateClipOnTimeline = (id: string, patch: Partial<Clip>) => setClips(items => {
     const updated = items.map(item => item.id === id ? { ...item, ...patch } : item)
     // Keep media lanes packed from the main row upward. This prevents a clip
     // from landing in a visually empty row when the pointer jumps over a lane.
     const occupiedLanes = [...new Set(updated.map(item => Math.max(0, item.lane || 0)))].sort((a, b) => a - b)
     const compactLane = new Map(occupiedLanes.map((lane, index) => [lane, index]))
-    return updated.map(item => ({ ...item, lane: compactLane.get(Math.max(0, item.lane || 0)) ?? 0 }))
+    return normalizeStudioClipGaps(updated.map(item => ({ ...item, lane: compactLane.get(Math.max(0, item.lane || 0)) ?? 0 })))
   })
   const addTextLayer = (kind: TextLayer['kind']) => {
     const presets = {
@@ -1006,6 +1010,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         video.pause()
       }
 
+      // Stop on the final visible frame instead of advancing to the exclusive project end.
+      // This keeps the preview on the last clip rather than displaying a false Timeline gap.
+      const reachedProjectEnd = time >= projectEnd
+      if (reachedProjectEnd) {
+        time = lastStudioFrameBeforeEnd(projectEnd)
+        active = [...clips].filter(item => time >= item.timelineStart && time < item.timelineStart + item.trimEnd - item.trimStart).sort((a, b) => a.timelineStart - b.timelineStart).at(-1)
+      }
+
       if (time !== lastPlaybackTime.current) {
         lastPlaybackTime.current = time
         setPlayhead(time)
@@ -1031,7 +1043,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           audioNeedsSync.current = true
         }
       }
-      if (time >= projectEnd) {
+      if (reachedProjectEnd) {
         playbackFrame.current = null
         previewRef.current?.pause()
         audioRef.current?.pause()

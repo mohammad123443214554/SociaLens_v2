@@ -22,6 +22,13 @@ export function quantizeStudioTime(seconds: number, frameRate = STUDIO_FRAME_RAT
   return studioFrameTime(studioFrameIndexAtTime(seconds, frameRate), frameRate)
 }
 
+/** Return the final renderable frame strictly before the project's exclusive end time. */
+export function lastStudioFrameBeforeEnd(projectEndSeconds: number, frameRate = STUDIO_FRAME_RATE): number {
+  const safeRate = Number.isFinite(frameRate) && frameRate > 0 ? frameRate : STUDIO_FRAME_RATE
+  const safeEnd = Number.isFinite(projectEndSeconds) ? Math.max(0, projectEndSeconds) : 0
+  return quantizeStudioTime(Math.max(0, safeEnd - 1 / safeRate), safeRate)
+}
+
 export function studioFrameTimeFromElapsedMs(elapsedMs: number, frameRate = STUDIO_FRAME_RATE): number {
   const safeElapsed = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0
   return studioFrameTime(Math.floor((safeElapsed * frameRate) / 1000 + 1e-7), frameRate)
