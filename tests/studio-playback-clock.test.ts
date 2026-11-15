@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { canAdvanceStudioAudio, lastStudioFrameBeforeEnd } from '../lib/studio/frame-clock.ts'
+import { canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic } from '../lib/studio/frame-clock.ts'
 import { normalizeStudioClipGaps } from '../lib/studio/timeline.ts'
 
 test('audio continues over image clips and timeline gaps', () => {
@@ -46,4 +46,17 @@ test('normalizes each media lane independently', () => {
 test('stops playback on the last visible frame, not the exclusive end', () => {
   assert.equal(lastStudioFrameBeforeEnd(38.198005), 38 + 4 / 30)
   assert.equal(lastStudioFrameBeforeEnd(0), 0)
+})
+
+test('playback clock never moves backwards after a decoder-driven clip handoff', () => {
+  const exactVideoEnd = 32.933333
+  assert.equal(keepStudioTimeMonotonic(32.9, exactVideoEnd), exactVideoEnd)
+  assert.equal(keepStudioTimeMonotonic(32.966666, exactVideoEnd), 32.966666)
+})
+
+test('clip handoff keeps the exact non-frame-aligned timeline boundary', () => {
+  const videoEnd = 32.933333
+  const photoStart = 32.933333
+  assert.equal(Math.min(videoEnd, 37.933333), photoStart)
+  assert.equal(keepStudioTimeMonotonic(photoStart, 32.9), photoStart)
 })
