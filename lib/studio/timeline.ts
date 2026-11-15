@@ -1,9 +1,9 @@
 /**
  * Timeline helpers shared by Studio editing and playback.
  *
- * Small gaps are usually pointer-placement residue rather than intentional edits.
- * At 16px/second, 350ms is about 5.6px: enough to catch a visually tiny gap while
- * leaving deliberate pauses intact.
+ * The Media lane is a continuous sequence: clips are always adjacent, with no
+ * empty spaces and no overlaps. Reordering changes sequence order, then lays the
+ * complete lane out from time zero using each clip's trimmed duration.
  */
 export type StudioTimelineClip = {
   timelineStart: number
@@ -12,31 +12,30 @@ export type StudioTimelineClip = {
   lane?: number
 }
 
-export const STUDIO_CLIP_GAP_SNAP_SECONDS = 0.35
+export const STUDIO_CLIP_GAP_SNAP_SECONDS = 0
 
 /**
- * Arrange clips on the single Media lane without allowing visual overlap.
- * Existing gaps are preserved; clips that collide are pushed to the right.
+ * Arrange every clip contiguously on the single Media lane.
+ * The first clip starts at zero; each following clip starts exactly at the
+ * previous clip's end. Existing gaps and overlaps are both removed.
  */
 export function arrangeStudioClips<T extends StudioTimelineClip & { id: string }>(clips: readonly T[]): T[] {
-  const ordered = clips.map(clip => ({ ...clip, lane: 0 })).sort((a, b) => {
+  const ordered = clips.map((clip, index) => ({ ...clip, lane: 0, __order: index })).sort((a, b) => {
     const difference = a.timelineStart - b.timelineStart
-    return difference || 0
+    return difference || a.__order - b.__order
   })
   let occupiedEnd = 0
-  return ordered.map(clip => {
+  return ordered.map(({ __order: _order, ...clip }) => {
     const duration = Math.max(0.1, clip.trimEnd - clip.trimStart)
-    const preferredStart = Number.isFinite(clip.timelineStart) ? Math.max(0, clip.timelineStart) : 0
-    const timelineStart = Math.max(preferredStart, occupiedEnd)
-    occupiedEnd = timelineStart + duration
+    const timelineStart = occupiedEnd
+    occupiedEnd += duration
     return { ...clip, timelineStart, lane: 0 }
   })
 }
 
 /**
- * Move a clip to a requested time and reflow the single Media lane.
- * Dropping inside another clip's occupied area reorders the clips instead
- * of stacking them on top of each other.
+ * Reorder a clip by its requested drop position, then close the entire Media
+ * lane so no gap can be introduced by dragging or keyboard controls.
  */
 export function moveStudioClipWithoutOverlap<T extends StudioTimelineClip & { id: string }>(
   clips: readonly T[],
@@ -56,9 +55,8 @@ export function moveStudioClipWithoutOverlap<T extends StudioTimelineClip & { id
   let occupiedEnd = 0
   return ordered.map(clip => {
     const duration = Math.max(0.1, clip.trimEnd - clip.trimStart)
-    const preferredStart = clip.id === movingId ? safeStart : (Number.isFinite(clip.timelineStart) ? Math.max(0, clip.timelineStart) : 0)
-    const timelineStart = Math.max(preferredStart, occupiedEnd)
-    occupiedEnd = timelineStart + duration
+    const timelineStart = occupiedEnd
+    occupiedEnd += duration
     return { ...clip, timelineStart, lane: 0 }
   })
 }
