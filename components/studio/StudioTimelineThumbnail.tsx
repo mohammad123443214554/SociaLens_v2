@@ -184,7 +184,7 @@ export function StudioTimelineWaveform({ src, className = '' }: { src: string; c
       } catch {
         if (!cancelled) setBars([])
       } finally {
-        if (context) void context.close()
+        if (context && context.state !== 'closed') void context.close()
       }
     }
     setBars([])
