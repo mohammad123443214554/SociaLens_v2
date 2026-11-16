@@ -142,18 +142,13 @@ export function StudioTimelineThumbnail({
       aria-hidden="true"
       className={'h-full w-full overflow-hidden ' + className}
       style={{
-        backgroundImage: `url("${src.replace(/["\\\\]/g, '\\\\  if (kind === 'image') {
-    return <div className={'h-full w-full overflow-hidden ' + className}>
-      <img src={src} alt="" draggable={false} className="h-full w-full object-cover" />
-    </div>
-  }')}")`,
+        backgroundImage: 'url(' + JSON.stringify(src) + ')',
         backgroundRepeat: 'repeat-x',
         backgroundPosition: 'left center',
         backgroundSize: 'auto 100%',
       }}
     />
   }
-
   if (frames.length) {
     return <div className={'flex h-full w-full overflow-hidden ' + className}>
       {frames.map((frame, index) => <img key={index} src={frame} alt="" draggable={false} className="h-full min-w-0 flex-1 object-cover" />)}
