@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import { arrangeStudioClips, moveStudioClipWithoutOverlap, normalizeStudioClipGaps } from '@/lib/studio/timeline'
 import { StudioAnimationPanel } from './StudioAnimationPanel'
+import { StudioTimelineThumbnail } from './StudioTimelineThumbnail'
 import { normalizeTextAnimationSettings, sampleTextAnimation, type TextAnimationDefinition, type TextAnimationSettings } from '@/lib/studio/animation-engine'
 import { BASIC_ENTRANCE_ANIMATIONS } from '@/lib/studio/basic-entrance-animations'
 import { EXIT_ANIMATIONS } from '@/lib/studio/exit-animations'
@@ -1100,10 +1101,24 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         }
       }
       if (reachedProjectEnd) {
-        playbackFrame.current = null
-        previewRef.current?.pause()
-        audioRef.current?.pause()
-        setPlaying(false)
+        // Loop the complete Studio composition without dropping the playing state.
+        // Invalidate the previous clip sync so the first video is decoded again at its trim-in.
+        previewVideoElements.current.forEach(candidate => { if (!candidate.paused) candidate.pause() })
+        const firstClip = [...clips].sort((a, b) => a.timelineStart - b.timelineStart)[0]
+        const firstVideo = firstClip?.kind === 'video' ? previewVideoElements.current.get(firstClip.id) : null
+        if (firstVideo) {
+          try { firstVideo.currentTime = firstClip.trimStart } catch { /* the preview effect will retry after metadata */ }
+        }
+        previewSyncToken.current += 1
+        previewIsSeeking.current = false
+        previewClipId.current = null
+        if (previewRef.current && !previewRef.current.paused) previewRef.current.pause()
+        if (audioRef.current && !audioRef.current.paused) audioRef.current.pause()
+        audioNeedsSync.current = true
+        lastPlaybackTime.current = 0
+        playbackStartedAt.current = now
+        setPlayhead(0)
+        playbackFrame.current = requestAnimationFrame(tick)
         return
       }
       playbackFrame.current = requestAnimationFrame(tick)
@@ -1816,9 +1831,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                     </div>)}
                     {track.key.startsWith('element') && <div data-element-dropzone="true" className="absolute inset-0 z-0 rounded" />}
                     {track.element && <div onPointerDown={event => beginTimelineDrag(event,'element',track.element!.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedElementId(track.element!.id)} title={'Element · '+track.element.name} className={'absolute top-[6px] flex h-[22px] min-w-[14px] items-center overflow-visible rounded bg-sky-500/35 text-[8px] font-semibold text-sky-100 cursor-grab touch-none '+(selectedElementId===track.element.id?'ring-1 ring-sky-200':'')} style={{left:track.element.timelineStart*TIMELINE_PX_PER_SECOND,width:Math.max(14,(track.element.trimEnd-track.element.trimStart)*TIMELINE_PX_PER_SECOND)}}><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/35"/><span className="min-w-0 flex-1 truncate px-2">{track.elementIndex}. {track.element.kind==='image'?'Photo':'Video'} · {track.element.name}</span><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/35"/></div>}
-                    {track.key === 'media' && [...clips].sort((a,b) => a.timelineStart - b.timelineStart).map((clip, index) => <div key={clip.id} onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedId(clip.id)} title={(clip.kind === 'image' ? 'Photo · ' : 'Video · ') + clip.name} className={'absolute flex min-w-[14px] items-center overflow-visible rounded text-[8px] font-semibold cursor-grab touch-none ' + 'h-[44px] ' + (clip.kind === 'image' ? 'bg-sky-500/35 text-sky-100' : 'bg-violet-500/40 text-violet-100') + (selected?.id === clip.id ? ' ring-1 ring-white/70' : '')} style={{ top: 8, left: clip.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(14, (clip.trimEnd - clip.trimStart) * TIMELINE_PX_PER_SECOND) }}>
+                    {track.key === 'media' && [...clips].sort((a,b) => a.timelineStart - b.timelineStart).map((clip, index) => <div key={clip.id} onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedId(clip.id)} title={(clip.kind === 'image' ? 'Photo · ' : 'Video · ') + clip.name} className={'absolute flex min-w-[14px] items-center overflow-hidden rounded text-[8px] font-semibold cursor-grab touch-none h-[44px] ' + (clip.kind === 'image' ? 'bg-sky-500/35 text-sky-100' : 'bg-violet-500/40 text-violet-100') + (selected?.id === clip.id ? ' ring-1 ring-white/70' : '')} style={{ top: 3, left: clip.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(14, (clip.trimEnd - clip.trimStart) * TIMELINE_PX_PER_SECOND) }}>
+                      <span className="pointer-events-none absolute inset-0"><StudioTimelineThumbnail src={clip.url} kind={clip.kind} trimStart={clip.trimStart} trimEnd={clip.trimEnd} count={10} /></span>
+                      <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#160d32]/65 via-[#160d32]/35 to-[#160d32]/55" />
+                      <span className="pointer-events-none relative z-[1] min-w-0 flex-1 truncate px-2 drop-shadow">{index + 1}. {clip.kind === 'image' ? 'Photo' : 'Video'} · {clip.name}</span>
                       <span onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/35" />
-                      <span className="min-w-0 flex-1 truncate px-2">{index + 1}. {clip.kind === 'image' ? 'Photo' : 'Video'} · {clip.name}</span>
                       <span onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/35" />
                     </div>)}
                     {track.key === 'audio' && audio && <div onPointerDown={event => beginTimelineDrag(event,'audio',audio.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} title={audio.name} className="absolute top-[6px] flex h-[22px] min-w-[14px] items-center overflow-visible rounded bg-emerald-500/30 text-[8px] font-semibold text-emerald-100 cursor-grab touch-none" style={{ left: audio.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(14, (audio.trimEnd - audio.trimStart) * TIMELINE_PX_PER_SECOND) }}>
