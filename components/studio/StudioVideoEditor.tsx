@@ -1072,9 +1072,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const cropDeltaX = dx / Math.max(5, drag.width)
       const cropDeltaY = dy / Math.max(5, drag.height)
       if (drag.mode === 'crop-left') return { ...item, cropLeft: Math.min(0.95 - drag.cropRight, Math.max(0, drag.cropLeft + cropDeltaX)) }
-      if (drag.mode === 'crop-right') return { ...item, cropRight: Math.min(0.95 - drag.cropLeft, Math.max(0, drag.cropRight + cropDeltaX)) }
+      if (drag.mode === 'crop-right') return { ...item, cropRight: Math.min(0.95 - drag.cropLeft, Math.max(0, drag.cropRight - cropDeltaX)) }
       if (drag.mode === 'crop-top') return { ...item, cropTop: Math.min(0.95 - drag.cropBottom, Math.max(0, drag.cropTop + cropDeltaY)) }
-      return { ...item, cropBottom: Math.min(0.95 - drag.cropTop, Math.max(0, drag.cropBottom + cropDeltaY)) }
+      return { ...item, cropBottom: Math.min(0.95 - drag.cropTop, Math.max(0, drag.cropBottom - cropDeltaY)) }
     }))
   }
   const endElementPointer = (event: ReactPointerEvent<HTMLElement>) => {
