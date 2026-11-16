@@ -893,8 +893,18 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       }
       else if (drag.mode === 'left') {
         const nextStart = Math.max(0, Math.min(drag.trimEnd - 0.1, drag.trimStart + delta))
-        updateClip(drag.id, { trimStart: nextStart, timelineStart: Math.max(0, drag.startAt + nextStart - drag.trimStart) })
-      } else updateClip(drag.id, { trimEnd: Math.max(drag.trimStart + 0.1, Math.min(drag.duration, drag.trimEnd + delta)) })
+        // Keep neighbouring media strips stationary while trimming; compact the lane on release.
+        setClips(items => items.map(item => item.id === drag.id
+          ? { ...item, trimStart: nextStart, timelineStart: Math.max(0, drag.startAt + nextStart - drag.trimStart), lane: 0 }
+          : item))
+      } else {
+        const nextEnd = Math.max(drag.trimStart + 0.1, drag.trimEnd + delta)
+        setClips(items => items.map(item => {
+          if (item.id !== drag.id) return item
+          const boundedEnd = item.kind === 'image' ? nextEnd : Math.min(drag.duration, nextEnd)
+          return { ...item, trimEnd: boundedEnd, duration: item.kind === 'image' ? Math.max(item.duration, boundedEnd) : item.duration, lane: 0 }
+        }))
+      }
     } else if (drag.kind === 'element') {
       const element = elements.find(item => item.id === drag.id)
       if (!element) return
@@ -902,8 +912,17 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         // Do not move the original Element strip during pointer movement.
         // Its position is committed on pointer-up after resolving the drop target.
       }
-      else if (drag.mode === 'left') setElements(items => items.map(item => item.id === drag.id ? { ...item, trimStart: Math.min(drag.trimEnd - 0.1, Math.max(0, drag.trimStart + delta)), timelineStart: Math.max(0, drag.startAt + delta) } : item))
-      else setElements(items => items.map(item => item.id === drag.id ? { ...item, trimEnd: Math.max(item.trimStart + 0.1, Math.min(item.duration, drag.trimEnd + delta)) } : item))
+      else if (drag.mode === 'left') setElements(items => items.map(item => {
+        if (item.id !== drag.id) return item
+        const nextStart = Math.min(drag.trimEnd - 0.1, Math.max(0, drag.trimStart + delta))
+        return { ...item, trimStart: nextStart, timelineStart: Math.max(0, drag.startAt + nextStart - drag.trimStart) }
+      }))
+      else setElements(items => items.map(item => {
+        if (item.id !== drag.id) return item
+        const requestedEnd = Math.max(item.trimStart + 0.1, drag.trimEnd + delta)
+        const nextEnd = item.kind === 'image' ? requestedEnd : Math.min(item.duration, requestedEnd)
+        return { ...item, trimEnd: nextEnd, duration: item.kind === 'image' ? Math.max(item.duration, nextEnd) : item.duration }
+      }))
     } else if (audio?.id === drag.id) {
       if (drag.mode === 'move') setAudio({ ...audio, timelineStart: Math.max(0, drag.startAt + delta) })
       else if (drag.mode === 'left') {
@@ -931,6 +950,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         } else if (element) {
           setElements(items => items.map(item => item.id === element.id ? { ...item, timelineStart: Math.max(0, drag.startAt + (event.clientX - drag.startX) / TIMELINE_PX_PER_SECOND) } : item))
         }
+      }
+      if (drag.kind === 'clip' && drag.mode !== 'move') {
+        // Close the temporary trim gap and keep the Media lane gap-free after release.
+        setClips(items => arrangeStudioClips(items))
       }
       if (drag.kind === 'clip' && drag.mode === 'move') {
         const elementRows = [...document.querySelectorAll<HTMLElement>('[data-element-track-row="true"]')]
@@ -1821,7 +1844,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   ...(elements.length ? [...elements].reverse().map((element, index) => ({ key: 'element-' + element.id, label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' as const, element, elementIndex: elements.length - index })) : [{ key: 'element', label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' as const }]),
                   { key: 'media', label: 'Media', icon: <Clapperboard className="h-3 w-3" />, tone: 'violet' },
                   { key: 'audio', label: 'Audio', icon: <Music2 className="h-3 w-3" />, tone: 'emerald' },
-                ] as TimelineTrack[]).map(track => <div key={track.key} data-element-track-row={track.key === 'element' || track.key.startsWith('element-') ? 'true' : undefined} data-media-track-row={track.key === 'media' ? 'true' : undefined} className="flex min-h-[34px] border-b border-fuchsia-400/30 bg-[#101426]">
+                ] as TimelineTrack[]).map((track, trackIndex, tracks) => <div key={track.key} data-element-track-row={track.key === 'element' || track.key.startsWith('element-') ? 'true' : undefined} data-media-track-row={track.key === 'media' ? 'true' : undefined} className={'flex min-h-[34px] bg-[#101426] ' + (track.key.startsWith('element') && tracks[trackIndex + 1]?.key.startsWith('element') ? 'border-b-0' : 'border-b border-fuchsia-400/30')}>
                   <div className="flex w-[72px] shrink-0 items-center gap-1.5 border-r border-fuchsia-400/25 bg-[#101426] px-2 text-[9px] font-semibold text-slate-200">{track.icon}{track.label}</div>
                   <div data-timeline-content="true" className="relative min-h-[34px] shrink-0 cursor-crosshair" style={{ width: timelineWidth, height: track.key === 'text' ? Math.max(34, textLayers.length * 30 + 4) : track.key === 'element' ? 34 : track.key.startsWith('element-') ? 34 : track.key === 'media' ? mediaTrackHeight : 34 }} onPointerDown={seekTimeline}>
                     {track.key === 'text' && textLayers.map(layer => <div key={layer.id} onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => { setSelectedTextId(layer.id); setActivePanel('text') }} title={layer.text + (layer.animation?.animationId ? ' · ' + (STUDIO_TEXT_ANIMATION_BY_ID.get(layer.animation.animationId)?.name || 'Animation') : '')} data-animation-id={layer.animation?.animationId || undefined} className={'absolute flex h-[22px] min-w-[12px] items-center overflow-visible rounded bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[8px] font-semibold text-white shadow-sm cursor-grab touch-none ' + (selectedTextId === layer.id ? 'ring-1 ring-fuchsia-200' : '')} style={{ top: 6 + textLayers.findIndex(item => item.id === layer.id) * 30, left: layer.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(12, layer.timelineDuration * TIMELINE_PX_PER_SECOND) }}>
@@ -1830,7 +1853,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/30" />
                     </div>)}
                     {track.key.startsWith('element') && <div data-element-dropzone="true" className="absolute inset-0 z-0 rounded" />}
-                    {track.element && <div onPointerDown={event => beginTimelineDrag(event,'element',track.element!.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedElementId(track.element!.id)} title={'Element · '+track.element.name} className={'absolute top-[6px] flex h-[22px] min-w-[14px] items-center overflow-visible rounded bg-sky-500/35 text-[8px] font-semibold text-sky-100 cursor-grab touch-none '+(selectedElementId===track.element.id?'ring-1 ring-sky-200':'')} style={{left:track.element.timelineStart*TIMELINE_PX_PER_SECOND,width:Math.max(14,(track.element.trimEnd-track.element.trimStart)*TIMELINE_PX_PER_SECOND)}}><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/35"/><span className="min-w-0 flex-1 truncate px-2">{track.elementIndex}. {track.element.kind==='image'?'Photo':'Video'} · {track.element.name}</span><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/35"/></div>}
+                    {track.element && <div onPointerDown={event => beginTimelineDrag(event,'element',track.element!.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedElementId(track.element!.id)} title={'Element · '+track.element.name} className={'absolute top-[6px] flex h-[22px] min-w-[14px]] items-center overflow-hidden rounded bg-sky-500/35 text-[8px] font-semibold text-sky-100 cursor-grab touch-none '+(selectedElementId===track.element.id?'ring-1 ring-sky-200':'')} style={{left:track.element.timelineStart*TIMELINE_PX_PER_SECOND,width:Math.max(14,(track.element.trimEnd-track.element.trimStart)*TIMELINE_PX_PER_SECOND)}}><span className="pointer-events-none absolute inset-0"><StudioTimelineThumbnail src={track.element.url} kind={track.element.kind} trimStart={track.element.trimStart} trimEnd={track.element.trimEnd} count={8}/></span><span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-sky-950/65 via-sky-950/35 to-sky-950/65"/><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/45"/><span className="relative z-[1] min-w-0 flex-1 truncate px-2 drop-shadow">{track.elementIndex}. {track.element.kind==='image'?'Photo':'Video'} · {track.element.name}</span><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/45"/></div>}
                     {track.key === 'media' && [...clips].sort((a,b) => a.timelineStart - b.timelineStart).map((clip, index) => <div key={clip.id} onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedId(clip.id)} title={(clip.kind === 'image' ? 'Photo · ' : 'Video · ') + clip.name} className={'absolute flex min-w-[14px] items-center overflow-hidden rounded text-[8px] font-semibold cursor-grab touch-none h-[44px] ' + (clip.kind === 'image' ? 'bg-sky-500/35 text-sky-100' : 'bg-violet-500/40 text-violet-100') + (selected?.id === clip.id ? ' ring-1 ring-white/70' : '')} style={{ top: 3, left: clip.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(14, (clip.trimEnd - clip.trimStart) * TIMELINE_PX_PER_SECOND) }}>
                       <span className="pointer-events-none absolute inset-0"><StudioTimelineThumbnail src={clip.url} kind={clip.kind} trimStart={clip.trimStart} trimEnd={clip.trimEnd} count={10} /></span>
                       <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#160d32]/65 via-[#160d32]/35 to-[#160d32]/55" />
