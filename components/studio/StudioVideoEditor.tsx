@@ -1026,48 +1026,52 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (!drag || drag.pointerId !== event.pointerId || !rect) return
     const dx = (event.clientX - drag.startX) / rect.width * 100
     const dy = (event.clientY - drag.startY) / rect.height * 100
+    let snappedMove: { x: number; y: number } | null = null
+    if (drag.mode === 'move') {
+      const rawX = Math.min(100 - drag.width, Math.max(0, drag.x + dx))
+      const rawY = Math.min(100 - drag.height, Math.max(0, drag.y + dy))
+      const peers = elements.filter(other => other.id !== drag.id)
+      const xTargets = [
+        { value: 0, guide: 0 }, { value: 50 - drag.width / 2, guide: 50 }, { value: 100 - drag.width, guide: 100 },
+        ...peers.flatMap(other => [
+          { value: other.x, guide: other.x },
+          { value: other.x + other.width / 2 - drag.width / 2, guide: other.x + other.width / 2 },
+          { value: other.x + other.width - drag.width, guide: other.x + other.width },
+        ]),
+      ]
+      const yTargets = [
+        { value: 0, guide: 0 }, { value: 50 - drag.height / 2, guide: 50 }, { value: 100 - drag.height, guide: 100 },
+        ...peers.flatMap(other => [
+          { value: other.y, guide: other.y },
+          { value: other.y + other.height / 2 - drag.height / 2, guide: other.y + other.height / 2 },
+          { value: other.y + other.height - drag.height, guide: other.y + other.height },
+        ]),
+      ]
+      const nearestX = xTargets.reduce((best, target) => Math.abs(target.value - rawX) < Math.abs(best.value - rawX) ? target : best)
+      const nearestY = yTargets.reduce((best, target) => Math.abs(target.value - rawY) < Math.abs(best.value - rawY) ? target : best)
+      const snapX = Math.abs(nearestX.value - rawX) <= 0.9
+      const snapY = Math.abs(nearestY.value - rawY) <= 0.9
+      setElementGuides({ vertical: snapX ? nearestX.guide : null, horizontal: snapY ? nearestY.guide : null })
+      snappedMove = { x: snapX ? nearestX.value : rawX, y: snapY ? nearestY.value : rawY }
+    } else {
+      setElementGuides({ vertical: null, horizontal: null })
+    }
     setElements(items => items.map(item => {
       if (item.id !== drag.id) return item
-      if (drag.mode === 'move') {
-        const rawX = Math.min(100 - drag.width, Math.max(0, drag.x + dx))
-        const rawY = Math.min(100 - drag.height, Math.max(0, drag.y + dy))
-        const peers = elements.filter(other => other.id !== drag.id)
-        const xTargets = [
-          { value: 0, guide: 0 }, { value: 50 - drag.width / 2, guide: 50 }, { value: 100 - drag.width, guide: 100 },
-          ...peers.flatMap(other => [
-            { value: other.x, guide: other.x },
-            { value: other.x + other.width / 2 - drag.width / 2, guide: other.x + other.width / 2 },
-            { value: other.x + other.width - drag.width, guide: other.x + other.width },
-          ]),
-        ]
-        const yTargets = [
-          { value: 0, guide: 0 }, { value: 50 - drag.height / 2, guide: 50 }, { value: 100 - drag.height, guide: 100 },
-          ...peers.flatMap(other => [
-            { value: other.y, guide: other.y },
-            { value: other.y + other.height / 2 - drag.height / 2, guide: other.y + other.height / 2 },
-            { value: other.y + other.height - drag.height, guide: other.y + other.height },
-          ]),
-        ]
-        const nearestX = xTargets.reduce((best, target) => Math.abs(target.value - rawX) < Math.abs(best.value - rawX) ? target : best)
-        const nearestY = yTargets.reduce((best, target) => Math.abs(target.value - rawY) < Math.abs(best.value - rawY) ? target : best)
-        const snapX = Math.abs(nearestX.value - rawX) <= 0.9
-        const snapY = Math.abs(nearestY.value - rawY) <= 0.9
-        setElementGuides({ vertical: snapX ? nearestX.guide : null, horizontal: snapY ? nearestY.guide : null })
-        return { ...item, x: snapX ? nearestX.value : rawX, y: snapY ? nearestY.value : rawY }
-      }
-      setElementGuides({ vertical: null, horizontal: null })
+      if (drag.mode === 'move') return { ...item, x: snappedMove?.x ?? drag.x, y: snappedMove?.y ?? drag.y }
       if (drag.mode === 'resize') return { ...item, width: Math.min(100 - drag.x, Math.max(5, drag.width + dx)), height: Math.min(100 - drag.y, Math.max(5, drag.height + dy)) }
       if (drag.mode === 'resize-nw') {
-        const width = Math.max(5, drag.width - dx), height = Math.max(5, drag.height - dy)
-        return { ...item, x: Math.max(0, drag.x + drag.width - width), y: Math.max(0, drag.y + drag.height - height), width, height }
+        const x = Math.min(drag.x + drag.width - 5, Math.max(0, drag.x + dx))
+        const y = Math.min(drag.y + drag.height - 5, Math.max(0, drag.y + dy))
+        return { ...item, x, y, width: drag.x + drag.width - x, height: drag.y + drag.height - y }
       }
       if (drag.mode === 'resize-ne') {
-        const height = Math.max(5, drag.height - dy)
-        return { ...item, y: Math.max(0, drag.y + drag.height - height), width: Math.min(100 - drag.x, Math.max(5, drag.width + dx)), height }
+        const y = Math.min(drag.y + drag.height - 5, Math.max(0, drag.y + dy))
+        return { ...item, y, width: Math.min(100 - drag.x, Math.max(5, drag.width + dx)), height: drag.y + drag.height - y }
       }
       if (drag.mode === 'resize-sw') {
-        const width = Math.max(5, drag.width - dx)
-        return { ...item, x: Math.max(0, drag.x + drag.width - width), width, height: Math.min(100 - drag.y, Math.max(5, drag.height + dy)) }
+        const x = Math.min(drag.x + drag.width - 5, Math.max(0, drag.x + dx))
+        return { ...item, x, width: drag.x + drag.width - x, height: Math.min(100 - drag.y, Math.max(5, drag.height + dy)) }
       }
       const cropDeltaX = dx / Math.max(5, drag.width)
       const cropDeltaY = dy / Math.max(5, drag.height)
