@@ -1,5 +1,12 @@
 export type StudioColorReplacement = { source: string; target: string }
 
+export const STUDIO_REPLACEMENT_SWATCHES = [
+  '#FF2D55', '#FF4F8B', '#E91E63', '#C026D3', '#9333EA',
+  '#6D28D9', '#4F46E5', '#2563EB', '#0284C7', '#06B6D4',
+  '#0D9488', '#16A34A', '#65A30D', '#EAB308', '#F59E0B',
+  '#F97316', '#EF4444', '#FFFFFF', '#9CA3AF', '#111827',
+] as const
+
 const clampByte = (value: number) => Math.max(0, Math.min(255, Math.round(value)))
 const hexToRgb = (hex: string) => {
   const match = /^#?([0-9a-f]{6})$/i.exec(hex)
@@ -9,10 +16,10 @@ const hexToRgb = (hex: string) => {
 }
 const rgbToHex = (r: number, g: number, b: number) => '#' + [r, g, b].map(value => clampByte(value).toString(16).padStart(2, '0')).join('')
 
-export function extractStudioImagePalette(image: HTMLImageElement, limit = 8): string[] {
+export function extractStudioImagePalette(image: HTMLImageElement, limit = 20): string[] {
   if (!image.complete || !image.naturalWidth || !image.naturalHeight) return []
   const sample = document.createElement('canvas')
-  const scale = Math.min(1, 72 / Math.max(image.naturalWidth, image.naturalHeight))
+  const scale = Math.min(1, 128 / Math.max(image.naturalWidth, image.naturalHeight))
   sample.width = Math.max(1, Math.round(image.naturalWidth * scale))
   sample.height = Math.max(1, Math.round(image.naturalHeight * scale))
   const context = sample.getContext('2d', { willReadFrequently: true })
@@ -25,7 +32,7 @@ export function extractStudioImagePalette(image: HTMLImageElement, limit = 8): s
       const alpha = pixels[index + 3]
       if (alpha < 96) continue
       const r = pixels[index], g = pixels[index + 1], b = pixels[index + 2]
-      const key = [r >> 4, g >> 4, b >> 4].join(':')
+      const key = [r >> 3, g >> 3, b >> 3].join(':')
       const bin = bins.get(key) || { r: 0, g: 0, b: 0, count: 0 }
       bin.r += r; bin.g += g; bin.b += b; bin.count += 1
       bins.set(key, bin)
@@ -37,7 +44,7 @@ export function extractStudioImagePalette(image: HTMLImageElement, limit = 8): s
       const rgb = hexToRgb(color)!
       const distinct = palette.every(existing => {
         const other = hexToRgb(existing)!
-        return Math.hypot(rgb.r - other.r, rgb.g - other.g, rgb.b - other.b) >= 34
+        return Math.hypot(rgb.r - other.r, rgb.g - other.g, rgb.b - other.b) >= 26
       })
       if (distinct) palette.push(color)
       if (palette.length >= limit) break
@@ -46,6 +53,47 @@ export function extractStudioImagePalette(image: HTMLImageElement, limit = 8): s
   } catch {
     return []
   }
+}
+
+export function recolorStudioPixelData(data: Uint8ClampedArray, replacements: StudioColorReplacement[]): Uint8ClampedArray {
+  const output = new Uint8ClampedArray(data)
+  const parsed = replacements
+    .map(item => ({ source: hexToRgb(item.source), target: hexToRgb(item.target) }))
+    .filter(item => item.source && item.target) as Array<{
+      source: { r: number; g: number; b: number }
+      target: { r: number; g: number; b: number }
+    }>
+  if (!parsed.length) return output
+
+  // Match against the original source colours, then replace RGB directly.
+  // This deliberately does not preserve the source luminance: a white target
+  // must become white instead of being darkened back toward the old colour.
+  const fullMatchTolerance = 58
+  const edgeTolerance = 82
+  for (let index = 0; index < output.length; index += 4) {
+    if (output[index + 3] < 8) continue
+    let best: typeof parsed[number] | null = null
+    let bestDistance = Infinity
+    for (const replacement of parsed) {
+      const distance = Math.hypot(
+        output[index] - replacement.source.r,
+        output[index + 1] - replacement.source.g,
+        output[index + 2] - replacement.source.b,
+      )
+      if (distance < bestDistance) {
+        bestDistance = distance
+        best = replacement
+      }
+    }
+    if (!best || bestDistance > edgeTolerance) continue
+    const strength = bestDistance <= fullMatchTolerance
+      ? 1
+      : (edgeTolerance - bestDistance) / (edgeTolerance - fullMatchTolerance)
+    output[index] = clampByte(output[index] * (1 - strength) + best.target.r * strength)
+    output[index + 1] = clampByte(output[index + 1] * (1 - strength) + best.target.g * strength)
+    output[index + 2] = clampByte(output[index + 2] * (1 - strength) + best.target.b * strength)
+  }
+  return output
 }
 
 export function createStudioRecoloredCanvas(source: CanvasImageSource, replacements: StudioColorReplacement[]): HTMLCanvasElement {
@@ -61,29 +109,7 @@ export function createStudioRecoloredCanvas(source: CanvasImageSource, replaceme
   context.drawImage(source, 0, 0, width, height)
   if (!replacements.length) return canvas
   const imageData = context.getImageData(0, 0, width, height)
-  const pixels = imageData.data
-  const parsed = replacements.map(item => ({ source: hexToRgb(item.source), target: hexToRgb(item.target) })).filter(item => item.source && item.target) as Array<{ source: {r:number;g:number;b:number}; target: {r:number;g:number;b:number} }>
-  for (let index = 0; index < pixels.length; index += 4) {
-    if (pixels[index + 3] < 8) continue
-    let best: typeof parsed[number] | null = null
-    let bestDistance = Infinity
-    for (const replacement of parsed) {
-      const distance = Math.hypot(pixels[index] - replacement.source.r, pixels[index + 1] - replacement.source.g, pixels[index + 2] - replacement.source.b)
-      if (distance < bestDistance) { bestDistance = distance; best = replacement }
-    }
-    const tolerance = 45
-    if (!best || bestDistance > tolerance) continue
-    const strength = Math.max(0, Math.min(1, (tolerance - bestDistance) / 18))
-    const sourceLuma = best.source.r * 0.2126 + best.source.g * 0.7152 + best.source.b * 0.0722
-    const pixelLuma = pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722
-    const targetLuma = best.target.r * 0.2126 + best.target.g * 0.7152 + best.target.b * 0.0722
-    const shade = sourceLuma > 1 ? Math.max(0.22, Math.min(1.85, pixelLuma / sourceLuma)) : 1
-    const targetScale = targetLuma > 1 ? Math.max(0.22, Math.min(1.85, (pixelLuma / Math.max(1, sourceLuma)) * (sourceLuma / targetLuma))) : shade
-    const scale = Math.max(0.22, Math.min(1.85, targetScale))
-    pixels[index] = clampByte(pixels[index] * (1 - strength) + best.target.r * scale * strength)
-    pixels[index + 1] = clampByte(pixels[index + 1] * (1 - strength) + best.target.g * scale * strength)
-    pixels[index + 2] = clampByte(pixels[index + 2] * (1 - strength) + best.target.b * scale * strength)
-  }
+  imageData.data.set(recolorStudioPixelData(imageData.data, replacements))
   context.putImageData(imageData, 0, 0)
   return canvas
 }
