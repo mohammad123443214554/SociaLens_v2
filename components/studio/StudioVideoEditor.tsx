@@ -21,7 +21,7 @@ import { MOTION_DYNAMIC_ANIMATIONS } from '@/lib/studio/motion-dynamic-animation
 import { CINEMATIC_LIGHT_ANIMATIONS } from '@/lib/studio/cinematic-light-animations'
 import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-animations'
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
-import { extractStudioImagePalette, createStudioRecoloredCanvas, type StudioColorReplacement } from '@/lib/studio/color-replacement'
+import { extractStudioImagePalette, createStudioRecoloredCanvas, STUDIO_REPLACEMENT_SWATCHES, type StudioColorReplacement } from '@/lib/studio/color-replacement'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
@@ -1820,7 +1820,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <p className="mb-3 truncate text-[9px] text-slate-400">{selectedElement.name}</p>
                 {selectedElement.kind === 'image' ? <>
                   <div className="grid grid-cols-5 gap-2">
-                    {elementPalette.map(color => <button key={color} type="button" aria-label={'Select source colour ' + color} title={'Replace ' + color} onClick={() => { setSelectedSourceColor(color); setCustomElementColor(color) }} className={'h-9 rounded-lg border-2 transition hover:scale-105 ' + (selectedSourceColor === color ? 'border-white ring-2 ring-fuchsia-400/60' : 'border-white/15')} style={{ backgroundColor: color }} />)}
+                    {elementPalette.map(color => { const replacement = (selectedElement.colorReplacements || []).find(item => item.source.toLowerCase() === color.toLowerCase()); const swatchColor = replacement?.target || color; return <button key={color} type="button" aria-label={'Select source colour ' + color} title={replacement ? color + ' replaced with ' + replacement.target : 'Replace ' + color} onClick={() => { setSelectedSourceColor(color); setCustomElementColor(replacement?.target || color) }} className={'relative h-9 rounded-lg border-2 transition hover:scale-105 ' + (selectedSourceColor === color ? 'border-white ring-2 ring-fuchsia-400/60' : 'border-white/15')} style={{ backgroundColor: swatchColor }}><span className="absolute bottom-0.5 right-1 text-[7px] font-bold text-white drop-shadow">{replacement ? '✓' : ''}</span></button> })}
                   </div>
                   {!elementPalette.length && <p className="mt-2 text-[9px] text-amber-300">Could not read this image palette. Make sure the photo asset is accessible.</p>}
                   <p className="mt-3 text-[9px] leading-4 text-slate-400">{selectedSourceColor ? 'Selected source: ' + selectedSourceColor + '. Choose its replacement below.' : 'Select an original image colour to replace only that colour.'}</p>
@@ -1835,7 +1835,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   </label>
                 </div>
                 <button type="button" disabled={!selectedSourceColor || !/^#[0-9a-fA-F]{6}$/.test(customElementColor)} onClick={() => { if (selectedSourceColor) updateElementColorReplacement(selectedElement.id, selectedSourceColor, customElementColor) }} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 py-2.5 text-[10px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Apply colour replacement</button>
-                {(selectedElement.colorReplacements || []).length > 0 && <div className="mt-3 space-y-2">{selectedElement.colorReplacements!.map(replacement => <div key={replacement.source} className="flex items-center justify-between rounded-lg border border-white/10 px-2 py-1.5 text-[9px]"><span className="flex items-center gap-2"><i className="h-4 w-4 rounded border border-white/20" style={{backgroundColor:replacement.source}} /> → <i className="h-4 w-4 rounded border border-white/20" style={{backgroundColor:replacement.target}} /> <span className="text-slate-400">{replacement.source.toUpperCase()} → {replacement.target.toUpperCase()}</span></span><button type="button" aria-label="Remove colour replacement" onClick={() => setElements(items => items.map(item => item.id === selectedElement.id ? {...item,colorReplacements:(item.colorReplacements||[]).filter(value=>value.source!==replacement.source)} : item))} className="px-2 text-rose-300">×</button></div>)}</div>}
+                <div className="mt-3">
+                  <h4 className="mb-2 text-[9px] font-semibold text-slate-300">Quick colours</h4>
+                  <div className="grid grid-cols-5 gap-2">
+                    {STUDIO_REPLACEMENT_SWATCHES.map(color => <button key={color} type="button" aria-label={'Replace selected colour with ' + color} title={color} disabled={!selectedSourceColor} onClick={() => { if (selectedSourceColor) { setCustomElementColor(color); updateElementColorReplacement(selectedElement.id, selectedSourceColor, color) } }} className="h-8 rounded-lg border border-white/20 shadow-sm transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40" style={{ backgroundColor: color }} />)}
+                  </div>
+                </div>
                 <button type="button" onClick={() => { setElements(items => items.map(item => item.id === selectedElement.id ? {...item,color:undefined,colorStrength:0.72,colorReplacements:[]} : item)); setSelectedSourceColor(null) }} className="mt-3 w-full rounded-lg border border-white/10 py-2 text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.06]">Reset all colour changes</button>
               </section>}
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
