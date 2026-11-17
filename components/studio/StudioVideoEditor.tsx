@@ -21,6 +21,7 @@ import { MOTION_DYNAMIC_ANIMATIONS } from '@/lib/studio/motion-dynamic-animation
 import { CINEMATIC_LIGHT_ANIMATIONS } from '@/lib/studio/cinematic-light-animations'
 import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-animations'
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
+import { extractStudioImagePalette, createStudioRecoloredCanvas, type StudioColorReplacement } from '@/lib/studio/color-replacement'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
@@ -48,7 +49,7 @@ type Clip = {
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
 type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; height?: number; fontSize: number; color: string; opacity?: number; animation?: Partial<TextAnimationSettings>; effect?: TextEffect; effectIntensity?: number; effectBlur?: number; effectDistance?: number; effectAngle?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
-type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; cropLeft?: number; cropRight?: number; cropTop?: number; cropBottom?: number; color?: string; colorStrength?: number; fileSize: number; storagePath?: string }
+type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; cropLeft?: number; cropRight?: number; cropTop?: number; cropBottom?: number; color?: string; colorStrength?: number; colorReplacements?: StudioColorReplacement[]; fileSize: number; storagePath?: string }
 type ElementDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'crop-left' | 'crop-right' | 'crop-top' | 'crop-bottom'; startX: number; startY: number; x: number; y: number; width: number; height: number; cropLeft: number; cropRight: number; cropTop: number; cropBottom: number }
 type TimelineTrack = { key: string; label: string; icon: ReactNode; tone: 'fuchsia' | 'sky' | 'violet' | 'emerald'; element?: ElementLayer; elementIndex?: number }
 type TimelineDragPreview = { x: number; y: number; width: number; label: string; kind: 'image' | 'video' }
@@ -325,6 +326,28 @@ function loadGoogleFont(family: string): Promise<void> {
   return promise
 }
 
+function StudioRecoloredImage({ src, replacements, alt, className, style }: { src: string; replacements: StudioColorReplacement[]; alt: string; className: string; style: React.CSSProperties }) {
+  const [renderedSrc, setRenderedSrc] = useState(src)
+  useEffect(() => {
+    let active = true
+    if (!replacements.length) { setRenderedSrc(src); return }
+    const image = new Image()
+    image.crossOrigin = 'anonymous'
+    image.onload = () => {
+      try {
+        const canvas = createStudioRecoloredCanvas(image, replacements)
+        if (active) setRenderedSrc(canvas.toDataURL('image/png'))
+      } catch {
+        if (active) setRenderedSrc(src)
+      }
+    }
+    image.onerror = () => { if (active) setRenderedSrc(src) }
+    image.src = src
+    return () => { active = false }
+  }, [src, replacements])
+  return <img src={renderedSrc} alt={alt} draggable={false} className={className} style={style} />
+}
+
 function readMediaDuration(file: File, url: string, kind: ClipKind): Promise<number> {
   return new Promise(resolve => {
     const media = document.createElement(kind === 'video' ? 'video' : 'img')
@@ -434,6 +457,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [saveStatus, setSaveStatus] = useState('Loading project…')
   const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects' | 'animation' | 'position' | 'element-color'>('media')
   const [customElementColor, setCustomElementColor] = useState('#ec4899')
+  const [elementPalette, setElementPalette] = useState<string[]>([])
+  const [selectedSourceColor, setSelectedSourceColor] = useState<string | null>(null)
   const [animationSearch, setAnimationSearch] = useState('')
   const [isAnimationPreviewing, setIsAnimationPreviewing] = useState(false)
   const [animationPreviewTime, setAnimationPreviewTime] = useState(0)
@@ -443,7 +468,18 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const saveSequence = useRef(0)
   const selected = clips.find(item => item.id === selectedId) || clips[0] || null
   const selectedElement = elements.find(item => item.id === selectedElementId) || null
-  useEffect(() => { if (selectedElement?.color) setCustomElementColor(selectedElement.color) }, [selectedElement?.id, selectedElement?.color])
+  useEffect(() => {
+    let active = true
+    setElementPalette([])
+    setSelectedSourceColor(null)
+    if (!selectedElement || selectedElement.kind !== 'image') return
+    const image = new Image()
+    image.crossOrigin = 'anonymous'
+    image.onload = () => { if (active) setElementPalette(extractStudioImagePalette(image, 8)) }
+    image.onerror = () => { if (active) setElementPalette([]) }
+    image.src = selectedElement.url
+    return () => { active = false }
+  }, [selectedElement?.id, selectedElement?.url])
   const maxMediaLane = 0
   const mediaTrackHeight = 68
   const selectedText = textLayers.find(item => item.id === selectedTextId) || null
@@ -548,7 +584,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           setClips(arrangedClips)
           if (closedAccidentalGaps) setNotice('Closed small accidental gaps between timeline clips.')
           if (Array.isArray(data.elements)) {
-            const restoredElements: ElementLayer[] = await Promise.all((data.elements as Array<Record<string, unknown>>).filter(item => typeof item.storagePath === 'string' && (item.kind === 'image' || item.kind === 'video')).map(async item => ({ id: String(item.id || makeId()), kind: item.kind as ClipKind, name: String(item.name || 'Overlay'), url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration) || 5, trimStart: Math.max(0, Number(item.trimStart) || 0), trimEnd: Math.max(0.1, Number(item.trimEnd) || Number(item.duration) || 5), timelineStart: Math.max(0, Number(item.timelineStart) || 0), x: Math.min(95, Math.max(0, Number(item.x) || 25)), y: Math.min(95, Math.max(0, Number(item.y) || 25)), width: Math.min(100, Math.max(5, Number(item.width) || 50)), height: Math.min(100, Math.max(5, Number(item.height) || 50)), cropLeft: Math.min(0.8, Math.max(0, Number(item.cropLeft) || 0)), cropRight: Math.min(0.8, Math.max(0, Number(item.cropRight) || 0)), cropTop: Math.min(0.8, Math.max(0, Number(item.cropTop) || 0)), cropBottom: Math.min(0.8, Math.max(0, Number(item.cropBottom) || 0)), color: typeof item.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(item.color) ? item.color : undefined, colorStrength: typeof item.colorStrength === 'number' ? Math.min(1, Math.max(0, item.colorStrength)) : 0.72, fileSize: Number(item.fileSize) || 0, storagePath: String(item.storagePath) })))
+            const restoredElements: ElementLayer[] = await Promise.all((data.elements as Array<Record<string, unknown>>).filter(item => typeof item.storagePath === 'string' && (item.kind === 'image' || item.kind === 'video')).map(async item => ({ id: String(item.id || makeId()), kind: item.kind as ClipKind, name: String(item.name || 'Overlay'), url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration) || 5, trimStart: Math.max(0, Number(item.trimStart) || 0), trimEnd: Math.max(0.1, Number(item.trimEnd) || Number(item.duration) || 5), timelineStart: Math.max(0, Number(item.timelineStart) || 0), x: Math.min(95, Math.max(0, Number(item.x) || 25)), y: Math.min(95, Math.max(0, Number(item.y) || 25)), width: Math.min(100, Math.max(5, Number(item.width) || 50)), height: Math.min(100, Math.max(5, Number(item.height) || 50)), cropLeft: Math.min(0.8, Math.max(0, Number(item.cropLeft) || 0)), cropRight: Math.min(0.8, Math.max(0, Number(item.cropRight) || 0)), cropTop: Math.min(0.8, Math.max(0, Number(item.cropTop) || 0)), cropBottom: Math.min(0.8, Math.max(0, Number(item.cropBottom) || 0)), color: typeof item.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(item.color) ? item.color : undefined, colorReplacements: Array.isArray(item.colorReplacements) ? (item.colorReplacements as StudioColorReplacement[]).filter(value => value && /^#[0-9a-fA-F]{6}$/.test(value.source) && /^#[0-9a-fA-F]{6}$/.test(value.target)) : [], colorStrength: typeof item.colorStrength === 'number' ? Math.min(1, Math.max(0, item.colorStrength)) : 0.72, fileSize: Number(item.fileSize) || 0, storagePath: String(item.storagePath) })))
             if (!active) return
             setElements(restoredElements)
             if (typeof data.selectedElementId === 'string') setSelectedElementId(data.selectedElementId)
@@ -626,7 +662,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           id: projectId, project_type: 'video', name: projectName, template_id: templateId || null,
           data: {
             clips: clips.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane: 0, fileSize, storagePath })),
-            elements: elements.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, fileSize, storagePath })), selectedElementId, 
+            elements: elements.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, colorReplacements, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, fileSize, storagePath })), selectedElementId, 
             audioPath: audio?.storagePath || null, audioId: audio?.id || null, audioName: audio?.name || null,
             audioDuration: audio?.duration || 0, audioTrimStart: audio?.trimStart || 0, audioTrimEnd: audio?.trimEnd || 0, audioTimelineStart: audio?.timelineStart || 0, audioFileSize: audio?.fileSize || 0, selectedId, muted, volume,
             audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, textLayers, selectedTextId, exportWidth, exportHeight,
@@ -1089,7 +1125,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       setElementGuides({ vertical: null, horizontal: null })
     }
   }
-  const updateElementColor = (id: string, color: string) => setElements(items => items.map(item => item.id === id ? { ...item, color: color || undefined, colorStrength: item.colorStrength ?? 0.72 } : item))
+  const updateElementColorReplacement = (id: string, source: string, target: string) => setElements(items => items.map(item => {
+    if (item.id !== id) return item
+    const current = item.colorReplacements || []
+    const next = current.filter(replacement => replacement.source.toLowerCase() !== source.toLowerCase())
+    next.push({ source, target })
+    return { ...item, color: undefined, colorStrength: 0.72, colorReplacements: next }
+  }))
   const removeElement = (id: string) => { setElements(items => items.filter(item => item.id !== id)); if (selectedElementId === id) setSelectedElementId(null) }
   const removeClip = (id: string) => {
     const target = clips.find(item => item.id === id)
@@ -1345,7 +1387,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const exportVideos = new Map<string, HTMLVideoElement>()
     const exportElementVideos = new Map<string, HTMLVideoElement>()
     const exportElementImages = new Map<string, HTMLImageElement>()
-    const exportElementTintCanvases = new Map<string, HTMLCanvasElement>()
+    const exportElementRecoloredCanvases = new Map<string, HTMLCanvasElement>()
     let animationFrame = 0
     try {
       await Promise.all([...new Set(textLayers.map(layer => layer.fontFamily || 'Default'))].filter(family => family !== 'Default').map(loadGoogleFont))
@@ -1403,17 +1445,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       }))
       for (const element of elements) {
         const image = element.kind === 'image' ? exportElementImages.get(element.id) : undefined
-        if (!image || !element.color) continue
-        const tintCanvas = document.createElement('canvas')
-        tintCanvas.width = image.naturalWidth
-        tintCanvas.height = image.naturalHeight
-        const tintContext = tintCanvas.getContext('2d')
-        if (!tintContext) continue
-        tintContext.drawImage(image, 0, 0)
-        tintContext.globalCompositeOperation = 'source-in'
-        tintContext.fillStyle = element.color
-        tintContext.fillRect(0, 0, tintCanvas.width, tintCanvas.height)
-        exportElementTintCanvases.set(element.id, tintCanvas)
+        if (!image || !element.colorReplacements?.length) continue
+        try {
+          exportElementRecoloredCanvases.set(element.id, createStudioRecoloredCanvas(image, element.colorReplacements))
+        } catch (cause) {
+          throw new Error('Could not apply selected image colours to ' + element.name + ': ' + (cause instanceof Error ? cause.message : 'image pixel access failed'))
+        }
       }
       const drawElementOverlays = (timelineTime: number) => {
         for (const element of elements) {
@@ -1445,15 +1482,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             const destY = y + height * top
             const destWidth = width * (1 - left - right)
             const destHeight = height * (1 - top - bottom)
-            ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, destX, destY, destWidth, destHeight)
-            const tintCanvas = exportElementTintCanvases.get(element.id)
-            if (tintCanvas && element.color) {
-              ctx.save()
-              ctx.globalCompositeOperation = 'color'
-              ctx.globalAlpha = Math.min(1, Math.max(0, element.colorStrength ?? 0.72))
-              ctx.drawImage(tintCanvas, sourceX, sourceY, sourceWidth, sourceHeight, destX, destY, destWidth, destHeight)
-              ctx.restore()
-            }
+            const recolored = exportElementRecoloredCanvases.get(element.id)
+            ctx.drawImage(recolored || image, sourceX, sourceY, sourceWidth, sourceHeight, destX, destY, destWidth, destHeight)
           } else {
             const video = exportElementVideos.get(element.id)
             if (!video) continue
@@ -1779,32 +1809,34 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
 
         <aside className={(activePanel === 'position' || activePanel === 'element-color' ? 'fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] top-[calc(58px+env(safe-area-inset-top))] z-[90] flex w-auto overflow-hidden rounded-2xl border border-white/10 shadow-2xl lg:relative lg:inset-auto lg:z-20 lg:w-[260px] lg:rounded-none lg:border-0 lg:shadow-none' : 'hidden w-[260px] lg:flex') + ' shrink-0 flex-col border-r border-white/[0.08] bg-[#0d1020]'}>
           <div className="border-b border-white/[0.07] px-4 py-4">
-            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : activePanel === 'audio' ? 'Audio library' : activePanel === 'effects' ? 'Text effects' : activePanel === 'position' ? 'Text position' : activePanel === 'element-color' ? 'Element colour' : 'Text animations'}</h2>{activePanel !== 'animation' && <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : activePanel === 'effects' ? '40 effects' : activePanel === 'position' ? 'PX controls' : activePanel === 'element-color' ? 'Image & video' : ''}</span>}{(activePanel === 'position' || activePanel === 'element-color') && <button type="button" onClick={() => setActivePanel('media')} aria-label="Close element panel" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 lg:hidden"><X className="h-4 w-4" /></button>}</div>
+            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : activePanel === 'audio' ? 'Audio library' : activePanel === 'effects' ? 'Text effects' : activePanel === 'position' ? 'Text position' : activePanel === 'element-color' ? 'Element colour' : 'Text animations'}</h2>{activePanel !== 'animation' && activePanel !== 'element-color' && <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : activePanel === 'effects' ? '40 effects' : activePanel === 'position' ? 'PX controls' : ''}</span>}{(activePanel === 'position' || activePanel === 'element-color') && <button type="button" onClick={() => setActivePanel('media')} aria-label="Close element panel" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 lg:hidden"><X className="h-4 w-4" /></button>}</div>
             <p className="mt-1 text-[9px] text-slate-500">{activePanel === 'media' ? 'Import and manage your video and photo clips.' : activePanel === 'text' ? 'Edit the text currently shown on your canvas.' : activePanel === 'audio' ? 'Add a music track and control its volume.' : activePanel === 'animation' ? 'Explore motion families for the selected text layer.' : activePanel === 'position' ? 'Set exact placement and align text to the canvas.' : activePanel === 'element-color' ? 'Choose a colour for the selected canvas element.' : 'Style the appearance of your selected text.'}</p>
           </div>
 
           {activePanel === 'element-color' && <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
             {selectedElement ? <>
               <section>
-                <div className="mb-2 flex items-center justify-between"><h3 className="text-[11px] font-bold text-slate-100">Colours</h3><span className="text-[9px] text-slate-500">Selected element</span></div>
+                <div className="mb-2 flex items-center justify-between"><h3 className="text-[11px] font-bold text-slate-100">Image colours</h3><span className="text-[9px] text-slate-500">{elementPalette.length} detected</span></div>
                 <p className="mb-3 truncate text-[9px] text-slate-400">{selectedElement.name}</p>
-                <div className="grid grid-cols-5 gap-2">
-                  {['#ec4899','#f43f5e','#f97316','#facc15','#22c55e','#06b6d4','#3b82f6','#6366f1','#8b5cf6','#a855f7','#ffffff','#d1d5db','#6b7280','#374151','#111827'].map(color => <button key={color} type="button" aria-label={'Apply colour ' + color} title={color} onClick={() => { setCustomElementColor(color); updateElementColor(selectedElement.id, color) }} className={'h-9 rounded-lg border-2 transition hover:scale-105 ' + ((selectedElement.color || '').toLowerCase() === color ? 'border-white ring-2 ring-fuchsia-400/50' : 'border-white/15')} style={{ backgroundColor: color }} />)}
-                </div>
+                {selectedElement.kind === 'image' ? <>
+                  <div className="grid grid-cols-5 gap-2">
+                    {elementPalette.map(color => <button key={color} type="button" aria-label={'Select source colour ' + color} title={'Replace ' + color} onClick={() => { setSelectedSourceColor(color); setCustomElementColor(color) }} className={'h-9 rounded-lg border-2 transition hover:scale-105 ' + (selectedSourceColor === color ? 'border-white ring-2 ring-fuchsia-400/60' : 'border-white/15')} style={{ backgroundColor: color }} />)}
+                  </div>
+                  {!elementPalette.length && <p className="mt-2 text-[9px] text-amber-300">Could not read this image palette. Make sure the photo asset is accessible.</p>}
+                  <p className="mt-3 text-[9px] leading-4 text-slate-400">{selectedSourceColor ? 'Selected source: ' + selectedSourceColor + '. Choose its replacement below.' : 'Select an original image colour to replace only that colour.'}</p>
+                </> : <p className="text-[9px] leading-4 text-amber-300">Individual colour replacement is currently supported for photo elements. Video colour sampling is not included in this step.</p>}
               </section>
-              <section className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-3">
-                <h3 className="mb-3 text-[10px] font-bold text-slate-200">Custom colour</h3>
+              {selectedElement.kind === 'image' && <section className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-3">
+                <h3 className="mb-3 text-[10px] font-bold text-slate-200">Replace with</h3>
                 <div className="flex items-center gap-3">
-                  <input aria-label="Choose custom element colour" type="color" value={selectedElement.color || customElementColor} onChange={event => { setCustomElementColor(event.target.value); updateElementColor(selectedElement.id, event.target.value) }} className="h-11 w-14 cursor-pointer rounded-lg border border-white/10 bg-transparent p-1" />
+                  <input aria-label="Choose replacement colour" type="color" value={customElementColor} onChange={event => setCustomElementColor(event.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-white/10 bg-transparent p-1" />
                   <label className="min-w-0 flex-1 text-[9px] text-slate-400">HEX
-                    <input aria-label="Custom colour HEX value" type="text" value={customElementColor} maxLength={7} onChange={event => { const value = event.target.value; setCustomElementColor(value); if (/^#[0-9a-fA-F]{6}$/.test(value)) updateElementColor(selectedElement.id, value) }} onBlur={() => { if (!/^#[0-9a-fA-F]{6}$/.test(customElementColor)) setCustomElementColor(selectedElement.color || '#ec4899') }} className="mt-1 h-9 w-full rounded-md border border-white/10 bg-[#080c18] px-2 text-[11px] font-semibold uppercase text-white outline-none focus:border-fuchsia-400/50" />
+                    <input aria-label="Replacement colour HEX value" type="text" value={customElementColor} maxLength={7} onChange={event => setCustomElementColor(event.target.value)} className="mt-1 h-9 w-full rounded-md border border-white/10 bg-[#080c18] px-2 text-[11px] font-semibold uppercase text-white outline-none focus:border-fuchsia-400/50" />
                   </label>
                 </div>
-              </section>
-              {selectedElement.color && <section className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-3">
-                <div className="mb-2 flex items-center justify-between"><label htmlFor="element-colour-strength" className="text-[10px] font-semibold text-slate-200">Colour intensity</label><span className="text-[10px] tabular-nums text-fuchsia-200">{Math.round((selectedElement.colorStrength ?? 0.72) * 100)}%</span></div>
-                <input id="element-colour-strength" aria-label="Colour intensity" type="range" min="0" max="100" value={Math.round((selectedElement.colorStrength ?? 0.72) * 100)} onChange={event => setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, colorStrength: Number(event.target.value) / 100 } : item))} className="w-full accent-fuchsia-500" />
-                <button type="button" onClick={() => setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, color: undefined, colorStrength: 0.72 } : item))} className="mt-3 w-full rounded-lg border border-white/10 py-2 text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.06]">Reset to original colour</button>
+                <button type="button" disabled={!selectedSourceColor || !/^#[0-9a-fA-F]{6}$/.test(customElementColor)} onClick={() => { if (selectedSourceColor) updateElementColorReplacement(selectedElement.id, selectedSourceColor, customElementColor) }} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 py-2.5 text-[10px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Apply colour replacement</button>
+                {(selectedElement.colorReplacements || []).length > 0 && <div className="mt-3 space-y-2">{selectedElement.colorReplacements!.map(replacement => <div key={replacement.source} className="flex items-center justify-between rounded-lg border border-white/10 px-2 py-1.5 text-[9px]"><span className="flex items-center gap-2"><i className="h-4 w-4 rounded border border-white/20" style={{backgroundColor:replacement.source}} /> → <i className="h-4 w-4 rounded border border-white/20" style={{backgroundColor:replacement.target}} /> <span className="text-slate-400">{replacement.source.toUpperCase()} → {replacement.target.toUpperCase()}</span></span><button type="button" aria-label="Remove colour replacement" onClick={() => setElements(items => items.map(item => item.id === selectedElement.id ? {...item,colorReplacements:(item.colorReplacements||[]).filter(value=>value.source!==replacement.source)} : item))} className="px-2 text-rose-300">×</button></div>)}</div>}
+                <button type="button" onClick={() => { setElements(items => items.map(item => item.id === selectedElement.id ? {...item,color:undefined,colorStrength:0.72,colorReplacements:[]} : item)); setSelectedSourceColor(null) }} className="mt-3 w-full rounded-lg border border-white/10 py-2 text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.06]">Reset all colour changes</button>
               </section>}
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
           </div>}
@@ -1996,7 +2028,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   const resizeHandle = 'absolute z-30 h-3 w-3 rounded-full border-2 border-white bg-sky-400 shadow-md touch-none'
                   const cropHandle = 'absolute z-20 rounded-full border border-white bg-fuchsia-500 shadow-lg touch-none'
                   return <div key={element.id} data-element-layer-id={element.id} onPointerDown={event => beginElementDrag(event, element, 'move')} onPointerMove={moveElementPointer} onPointerUp={endElementPointer} onPointerCancel={endElementPointer} onClick={event => { event.stopPropagation(); setSelectedElementId(element.id); setSelectedTextId(null); setSelectedId(null) }} className={'absolute z-10 cursor-move touch-none ' + (selected ? 'border border-sky-300 shadow-[0_0_0_1px_rgba(56,189,248,.35)]' : 'hover:outline hover:outline-1 hover:outline-white/40')} style={{ left: (element.x + element.width * cropLeft) + '%', top: (element.y + element.height * cropTop) + '%', width: (element.width * cropWidth) + '%', height: (element.height * cropHeight) + '%' }}>
-                    {element.kind === 'image' ? <div className="pointer-events-none absolute inset-0 overflow-hidden"><img src={element.url} alt={element.name} draggable={false} className="absolute max-w-none" style={{ left: (-cropLeft / cropWidth * 100) + '%', top: (-cropTop / cropHeight * 100) + '%', width: (100 / cropWidth) + '%', height: (100 / cropHeight) + '%', objectFit: 'contain' }} />{element.color && <div aria-hidden="true" className="pointer-events-none absolute mix-blend-color" style={{ left: (-cropLeft / cropWidth * 100) + '%', top: (-cropTop / cropHeight * 100) + '%', width: (100 / cropWidth) + '%', height: (100 / cropHeight) + '%', backgroundColor: element.color, opacity: element.colorStrength ?? 0.72, maskImage: 'url("' + element.url + '")', WebkitMaskImage: 'url("' + element.url + '")', maskSize: 'contain', WebkitMaskSize: 'contain', maskPosition: 'center', WebkitMaskPosition: 'center', maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat' }} />}</div> : <><video src={element.url} data-element-video-id={element.id} playsInline muted className="pointer-events-none h-full w-full object-contain" />{element.color && <div aria-hidden="true" className="pointer-events-none absolute inset-0 mix-blend-color" style={{ backgroundColor: element.color, opacity: element.colorStrength ?? 0.72 }} />}</>}
+                    {element.kind === 'image' ? <div className="pointer-events-none absolute inset-0 overflow-hidden"><StudioRecoloredImage src={element.url} replacements={element.colorReplacements || []} alt={element.name} className="absolute max-w-none" style={{ left: (-cropLeft / cropWidth * 100) + '%', top: (-cropTop / cropHeight * 100) + '%', width: (100 / cropWidth) + '%', height: (100 / cropHeight) + '%', objectFit: 'contain' }} /></div> : <><video src={element.url} data-element-video-id={element.id} playsInline muted className="pointer-events-none h-full w-full object-contain" />{element.color && <div aria-hidden="true" className="pointer-events-none absolute inset-0 mix-blend-color" style={{ backgroundColor: element.color, opacity: element.colorStrength ?? 0.72 }} />}</>}
                     {selected && <>
                       <button type="button" aria-label="Resize element top left" title="Resize" onPointerDown={event => beginElementDrag(event, element, 'resize-nw')} onPointerMove={moveElementPointer} onPointerUp={endElementPointer} onPointerCancel={endElementPointer} className={resizeHandle + ' -left-1.5 -top-1.5 cursor-nwse-resize'} />
                       <button type="button" aria-label="Resize element top right" title="Resize" onPointerDown={event => beginElementDrag(event, element, 'resize-ne')} onPointerMove={moveElementPointer} onPointerUp={endElementPointer} onPointerCancel={endElementPointer} className={resizeHandle + ' -right-1.5 -top-1.5 cursor-nesw-resize'} />
