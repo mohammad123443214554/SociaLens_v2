@@ -71,7 +71,7 @@ export function createStudioRecoloredCanvas(source: CanvasImageSource, replaceme
       const distance = Math.hypot(pixels[index] - replacement.source.r, pixels[index + 1] - replacement.source.g, pixels[index + 2] - replacement.source.b)
       if (distance < bestDistance) { bestDistance = distance; best = replacement }
     }
-    const tolerance = 54
+    const tolerance = 45
     if (!best || bestDistance > tolerance) continue
     const strength = Math.max(0, Math.min(1, (tolerance - bestDistance) / 18))
     const sourceLuma = best.source.r * 0.2126 + best.source.g * 0.7152 + best.source.b * 0.0722
