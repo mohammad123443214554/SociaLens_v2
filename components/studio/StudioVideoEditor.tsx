@@ -475,7 +475,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (!selectedElement || selectedElement.kind !== 'image') return
     const image = new Image()
     image.crossOrigin = 'anonymous'
-    image.onload = () => { if (active) setElementPalette(extractStudioImagePalette(image, 8)) }
+    image.onload = () => { if (active) setElementPalette(extractStudioImagePalette(image, 20)) }
     image.onerror = () => { if (active) setElementPalette([]) }
     image.src = selectedElement.url
     return () => { active = false }
