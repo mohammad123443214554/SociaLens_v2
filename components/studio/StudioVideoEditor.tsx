@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type CSSProperties } from 'react'
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import { arrangeStudioClips, moveStudioClipWithoutOverlap, normalizeStudioClipGaps } from '@/lib/studio/timeline'
 import { StudioAnimationPanel } from './StudioAnimationPanel'
@@ -326,7 +326,7 @@ function loadGoogleFont(family: string): Promise<void> {
   return promise
 }
 
-function StudioRecoloredImage({ src, replacements, alt, className, style }: { src: string; replacements: StudioColorReplacement[]; alt: string; className: string; style: React.CSSProperties }) {
+function StudioRecoloredImage({ src, replacements, alt, className, style }: { src: string; replacements: StudioColorReplacement[]; alt: string; className: string; style: CSSProperties }) {
   const [renderedSrc, setRenderedSrc] = useState(src)
   useEffect(() => {
     let active = true
@@ -662,7 +662,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           id: projectId, project_type: 'video', name: projectName, template_id: templateId || null,
           data: {
             clips: clips.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane: 0, fileSize, storagePath })),
-            elements: elements.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, colorReplacements, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, fileSize, storagePath })), selectedElementId, 
+            elements: elements.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, colorReplacements, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, colorReplacements, fileSize, storagePath })), selectedElementId, 
             audioPath: audio?.storagePath || null, audioId: audio?.id || null, audioName: audio?.name || null,
             audioDuration: audio?.duration || 0, audioTrimStart: audio?.trimStart || 0, audioTrimEnd: audio?.trimEnd || 0, audioTimelineStart: audio?.timelineStart || 0, audioFileSize: audio?.fileSize || 0, selectedId, muted, volume,
             audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, textLayers, selectedTextId, exportWidth, exportHeight,
