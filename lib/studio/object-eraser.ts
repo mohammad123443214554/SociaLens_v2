@@ -44,7 +44,7 @@ export function getRoboflowRequestError(status:number):RoboflowRequestError{
 export async function requestRoboflow(path:string,body:BodyInit,contentType:string){
  const apiKey=process.env.ROBOFLOW_API_KEY?.trim()
  if(!apiKey)throw new RoboflowRequestError('Roboflow is not configured yet.','not_configured',503)
- if(path!=='/grounding_dino/infer')throw new RoboflowRequestError('Invalid Roboflow endpoint configuration.','provider_error',500)
+ if(path!=='/grounding_dino/infer'&&path!=='/sam2/segment_image')throw new RoboflowRequestError('Invalid Roboflow endpoint configuration.','provider_error',500)
  const url=new URL(path,'https://serverless.roboflow.com');url.searchParams.set('api_key',apiKey)
  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),ROBOFLOW_REQUEST_TIMEOUT_MS)
  try{
@@ -75,4 +75,36 @@ export function normalizeRoboflowDetections(payload:unknown,imageWidth:number,im
   results.push({id:String(results.length+1),label,confidence,x:left,y:top,width:right-left,height:bottom-top})
  }
  return results.sort((a,b)=>b.confidence-a.confidence).slice(0,100)
+}
+
+
+export type ObjectEraserSegmentation = { id:string; confidence:number; polygons:number[][][] }
+export function normalizeRoboflowSegmentations(payload:unknown,detections:ObjectEraserDetection[]):ObjectEraserSegmentation[]{
+ if(!isRecord(payload)||!Array.isArray(payload.predictions))throw new RoboflowRequestError('SAM 2 returned an invalid segmentation response.','provider_error',502)
+ const predictions=payload.predictions
+ if(predictions.length!==detections.length)throw new RoboflowRequestError('SAM 2 did not return a mask for every detected object. Please run detection again.','provider_error',502)
+ return predictions.map((entry,index)=>{
+  if(!isRecord(entry))throw new RoboflowRequestError('SAM 2 returned an invalid object mask.','provider_error',502)
+  const raw=entry.masks
+  const rawPolygons=isRecord(raw)?(raw.polygons??raw.mask??raw.coordinates):raw
+  if(!Array.isArray(rawPolygons))throw new RoboflowRequestError('SAM 2 did not return polygon masks.','provider_error',502)
+  const candidate=rawPolygons as unknown[]
+  const polygonGroups:number[][][]=[]
+  const looksLikePointList=candidate.length>0&&Array.isArray(candidate[0])&&typeof (candidate[0] as unknown[])[0]==='number'
+  const groups=looksLikePointList?[candidate]:candidate
+  for(const group of groups){
+   if(!Array.isArray(group))continue
+   const points:number[][]=[]
+   for(const point of group){
+    if(Array.isArray(point)&&point.length>=2){
+     const x=Number(point[0]),y=Number(point[1])
+     if(Number.isFinite(x)&&Number.isFinite(y))points.push([x,y])
+    }else if(typeof point==='number'&&Number.isFinite(point))continue
+   }
+   if(points.length>=3)polygonGroups.push(points.slice(0,30000))
+  }
+  if(!polygonGroups.length)throw new RoboflowRequestError('SAM 2 returned an empty object mask. Please try detection again.','provider_error',502)
+  const confidence=Number(entry.confidence??1)
+  return {id:detections[index].id,confidence:Number.isFinite(confidence)?Math.max(0,Math.min(1,confidence)):1,polygons:polygonGroups}
+ })
 }
