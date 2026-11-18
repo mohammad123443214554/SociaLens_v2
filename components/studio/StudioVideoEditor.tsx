@@ -623,14 +623,15 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
 
   const restoreOriginalObjectEraserImage = async () => {
     if (!selectedElement || selectedElement.kind !== 'image' || !selectedElement.originalStoragePath || objectEraserApplyBusy) return
+    const originalStoragePath = selectedElement.originalStoragePath
     setObjectEraserApplyBusy(true); setObjectEraserError('')
     try {
-      const url = await createStudioAssetUrl(selectedElement.originalStoragePath)
+      const url = await createStudioAssetUrl(originalStoragePath)
       setElements(items => items.map(item => item.id === selectedElement.id ? {
         ...item,
         url,
-        storagePath: selectedElement.originalStoragePath,
-        name: selectedElement.originalName || item.name.replace(/-object-erased\\.png$/i, '') || item.name,
+        storagePath: originalStoragePath,
+        name: selectedElement.originalName || item.name,
         fileSize: selectedElement.originalFileSize ?? item.fileSize,
         originalStoragePath: undefined,
         originalName: undefined,
