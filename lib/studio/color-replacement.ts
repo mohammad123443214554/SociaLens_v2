@@ -57,41 +57,54 @@ export function extractStudioImagePalette(image: HTMLImageElement, limit = 20): 
 
 export function recolorStudioPixelData(data: Uint8ClampedArray, replacements: StudioColorReplacement[]): Uint8ClampedArray {
   const output = new Uint8ClampedArray(data)
+  const rgbToHsv = (rgb: { r: number; g: number; b: number }) => {
+    const r = rgb.r / 255, g = rgb.g / 255, b = rgb.b / 255
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), delta = max - min
+    let hue = 0
+    if (delta > 0) {
+      if (max === r) hue = 60 * (((g - b) / delta) % 6)
+      else if (max === g) hue = 60 * ((b - r) / delta + 2)
+      else hue = 60 * ((r - g) / delta + 4)
+    }
+    return { h: (hue + 360) % 360, s: max === 0 ? 0 : delta / max, v: max }
+  }
   const parsed = replacements
-    .map(item => ({ source: hexToRgb(item.source), target: hexToRgb(item.target) }))
-    .filter(item => item.source && item.target) as Array<{
-      source: { r: number; g: number; b: number }
-      target: { r: number; g: number; b: number }
-    }>
+    .map(item => {
+      const source = hexToRgb(item.source), target = hexToRgb(item.target)
+      return source && target ? { source, target, hsv: rgbToHsv(source) } : null
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
   if (!parsed.length) return output
 
-  // Match against the original source colours, then replace RGB directly.
-  // This deliberately does not preserve the source luminance: a white target
-  // must become white instead of being darkened back toward the old colour.
-  const fullMatchTolerance = 58
-  const edgeTolerance = 82
+  // A palette swatch represents a gradient family, not one exact RGB value.
+  // Hue matching captures the darker/lighter shades and anti-aliased pixels
+  // that the previous narrow RGB radius left unchanged.
   for (let index = 0; index < output.length; index += 4) {
     if (output[index + 3] < 8) continue
+    const pixel = { r: output[index], g: output[index + 1], b: output[index + 2] }
+    const hsv = rgbToHsv(pixel)
     let best: typeof parsed[number] | null = null
-    let bestDistance = Infinity
-    for (const replacement of parsed) {
-      const distance = Math.hypot(
-        output[index] - replacement.source.r,
-        output[index + 1] - replacement.source.g,
-        output[index + 2] - replacement.source.b,
-      )
-      if (distance < bestDistance) {
-        bestDistance = distance
-        best = replacement
+    let bestScore = Infinity
+    for (const candidate of parsed) {
+      let score = Infinity
+      if (candidate.hsv.s >= 0.12) {
+        if (hsv.s < 0.055) continue
+        const rawHueDiff = Math.abs(hsv.h - candidate.hsv.h)
+        const hueDiff = Math.min(rawHueDiff, 360 - rawHueDiff)
+        if (hueDiff > 52) continue
+        score = hueDiff / 52 + Math.abs(hsv.s - candidate.hsv.s) * 0.28 + Math.abs(hsv.v - candidate.hsv.v) * 0.12
+      } else {
+        const distance = Math.hypot(pixel.r - candidate.source.r, pixel.g - candidate.source.g, pixel.b - candidate.source.b)
+        if (distance > 105) continue
+        score = distance / 105 + 1
       }
+      if (score < bestScore) { bestScore = score; best = candidate }
     }
-    if (!best || bestDistance > edgeTolerance) continue
-    const strength = bestDistance <= fullMatchTolerance
-      ? 1
-      : (edgeTolerance - bestDistance) / (edgeTolerance - fullMatchTolerance)
-    output[index] = clampByte(output[index] * (1 - strength) + best.target.r * strength)
-    output[index + 1] = clampByte(output[index + 1] * (1 - strength) + best.target.g * strength)
-    output[index + 2] = clampByte(output[index + 2] * (1 - strength) + best.target.b * strength)
+    if (!best) continue
+    // Use the exact requested target while retaining source alpha.
+    output[index] = best.target.r
+    output[index + 1] = best.target.g
+    output[index + 2] = best.target.b
   }
   return output
 }
