@@ -38,10 +38,10 @@ export async function POST(request:NextRequest){
   const response=await requestRoboflow('/sam2/segment_image',JSON.stringify({
    id:crypto.randomUUID(),
    image:{type:'base64',value:prepared.base64},
-   sam2_version_id:'hiera_large',
+   model_id:'sam2/hiera_large',
    format:'json',
    multimask_output:false,
-   prompts:{prompts:detections.map(item=>({box:{x:item.x+item.width/2,y:item.y+item.height/2,width:item.width,height:item.height}}))}
+   prompts:{prompts:detections.map(item=>({box:{x:item.x,y:item.y,width:item.width,height:item.height}}))}
   }),'application/json')
   let result:unknown
   try{result=await response.json()}catch{return jsonError('SAM 2 returned unreadable mask data. Please try again.',502,'invalid_provider_response',true)}
