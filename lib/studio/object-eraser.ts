@@ -1,4 +1,4 @@
-export const OBJECT_ERASER_MAX_IMAGE_BYTES = 10 * 1024 * 1024
+export const OBJECT_ERASER_MAX_IMAGE_BYTES = 4 * 1024 * 1024
 export const ROBOFLOW_REQUEST_TIMEOUT_MS = 45_000
 export const OBJECT_ERASER_DEFAULT_PROMPTS = [
   'person','face','animal','bird','cat','dog','car','bicycle','motorcycle','bus','truck',
@@ -23,7 +23,7 @@ const SIGNATURES: Array<{mimeType:ObjectEraserImageType;matches:(b:Uint8Array)=>
 export function detectObjectEraserImageType(bytes:Uint8Array):ObjectEraserImageType|null{return SIGNATURES.find(s=>s.matches(bytes))?.mimeType??null}
 export async function prepareObjectEraserImage(file:File):Promise<PreparedObjectEraserImage>{
  if(!file||file.size<=0)throw new Error('Please choose a non-empty image.')
- if(file.size>OBJECT_ERASER_MAX_IMAGE_BYTES)throw new Error('Image is too large. Please use an image up to 10 MB.')
+ if(file.size>OBJECT_ERASER_MAX_IMAGE_BYTES)throw new Error('Image is too large. Please use an image up to 4 MB.')
  const bytes=new Uint8Array(await file.arrayBuffer());const mimeType=detectObjectEraserImageType(bytes)
  if(!mimeType)throw new Error('Unsupported or invalid image. Use a JPEG, PNG, or WebP image.')
  if(file.type&&file.type!==mimeType)throw new Error('The image file type does not match its contents.')
