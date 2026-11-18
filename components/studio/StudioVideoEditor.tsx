@@ -465,6 +465,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [objectEraserError, setObjectEraserError] = useState('')
   const [objectEraserDetections, setObjectEraserDetections] = useState<Array<{id:string;label:string;confidence:number;x:number;y:number;width:number;height:number}>>([])
   const [objectEraserImageSize, setObjectEraserImageSize] = useState<{width:number;height:number}|null>(null)
+  const objectEraserPreviewUrlRef = useRef<string|null>(null)
   const [objectEraserObjects, setObjectEraserObjects] = useState<Array<{id:string;label:string;confidence:number;thumbnail:string;polygons:number[][][]}>>([])
   const [objectEraserSelectedId, setObjectEraserSelectedId] = useState<string|null>(null)
   const [animationSearch, setAnimationSearch] = useState('')
@@ -475,6 +476,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveSequence = useRef(0)
 
+  useEffect(() => () => { if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current) }, [])
+  useEffect(() => { if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current); objectEraserPreviewUrlRef.current = null; setObjectEraserObjects([]); setObjectEraserDetections([]); setObjectEraserSelectedId(null); setObjectEraserImageSize(null); setObjectEraserError('') }, [selectedElementId, selectedElement?.url])
+
   const detectObjectsInSelectedImage = async () => {
     if (!selectedElement || selectedElement.kind !== 'image' || objectEraserBusy || objectEraserSegmentBusy) return
     setObjectEraserBusy(true); setObjectEraserSegmentBusy(false); setObjectEraserError(''); setObjectEraserDetections([]); setObjectEraserObjects([]); setObjectEraserSelectedId(null); setObjectEraserImageSize(null)
@@ -483,7 +487,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (!source.ok) throw new Error('Could not load the selected image. Please try again.')
       const blob = await source.blob()
       const file = new File([blob], selectedElement.name || 'studio-image', { type: blob.type || 'image/jpeg' })
+      if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
       const previewUrl = URL.createObjectURL(blob)
+      objectEraserPreviewUrlRef.current = previewUrl
       const form = new FormData(); form.append('image', file)
       if (objectEraserPrompt.trim()) form.append('prompts', objectEraserPrompt.trim())
       const response = await fetch('/api/studio/object-eraser/prepare', { method: 'POST', body: form, credentials: 'same-origin' })
@@ -1947,7 +1953,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <div className="mb-2 flex items-center gap-2"><ScanSearch className="h-4 w-4 text-fuchsia-300" /><h3 className="text-[11px] font-bold text-slate-100">AI object detection</h3></div>
                 <p className="text-[9px] leading-4 text-slate-400">Find objects in this photo with Grounding DINO. Leave the prompt empty to scan common objects, or enter specific names separated by commas.</p>
                 <textarea value={objectEraserPrompt} onChange={event=>setObjectEraserPrompt(event.target.value)} placeholder="Example: cup, pen, bottle, logo" rows={2} className="mt-3 w-full resize-y rounded-lg border border-white/10 bg-black/20 p-2 text-[10px] text-white outline-none placeholder:text-slate-600 focus:border-fuchsia-400/50" />
-                <button type="button" onClick={detectObjectsInSelectedImage} disabled={objectEraserBusy} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:cursor-wait disabled:opacity-60">{objectEraserBusy ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"/>Analyzing image…</> : <><ScanSearch className="h-3.5 w-3.5"/>Detect objects</>}</button>
+                <button type="button" onClick={detectObjectsInSelectedImage} disabled={objectEraserBusy || objectEraserSegmentBusy} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:cursor-wait disabled:opacity-60">{objectEraserBusy || objectEraserSegmentBusy ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"/>{objectEraserBusy ? 'Finding objects…' : 'Isolating objects…'}</> : <><ScanSearch className="h-3.5 w-3.5"/>Detect objects</>}</button>
                 {objectEraserError && <p role="status" className="mt-2 rounded-lg border border-amber-300/15 bg-amber-300/[0.06] p-2 text-[9px] leading-4 text-amber-100">{objectEraserError}</p>}
                 {objectEraserImageSize && <div className="mt-3 flex items-center justify-between text-[9px] text-slate-400"><span>{objectEraserObjects.length ? objectEraserObjects.length + ' isolated object cutouts' : objectEraserDetections.length + ' objects detected'}</span><span>{objectEraserImageSize.width} × {objectEraserImageSize.height}</span></div>}
                 {(objectEraserBusy || objectEraserSegmentBusy) && <div className="mt-3 flex items-center gap-2 rounded-lg border border-violet-400/15 bg-violet-400/[0.06] p-3 text-[9px] text-violet-100"><span className="h-3 w-3 animate-spin rounded-full border-2 border-violet-200/30 border-t-violet-200"/>{objectEraserBusy ? 'Finding objects in your image…' : 'Separating each object from its background…'}</div>}
