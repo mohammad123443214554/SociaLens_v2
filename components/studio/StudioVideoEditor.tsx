@@ -459,6 +459,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [customElementColor, setCustomElementColor] = useState('#ec4899')
   const [elementPalette, setElementPalette] = useState<string[]>([])
   const [selectedSourceColor, setSelectedSourceColor] = useState<string | null>(null)
+  const [objectEraserPrompt, setObjectEraserPrompt] = useState('')
+  const [objectEraserBusy, setObjectEraserBusy] = useState(false)
+  const [objectEraserError, setObjectEraserError] = useState('')
+  const [objectEraserDetections, setObjectEraserDetections] = useState<Array<{id:string;label:string;confidence:number;x:number;y:number;width:number;height:number}>>([])
+  const [objectEraserImageSize, setObjectEraserImageSize] = useState<{width:number;height:number}|null>(null)
   const [animationSearch, setAnimationSearch] = useState('')
   const [isAnimationPreviewing, setIsAnimationPreviewing] = useState(false)
   const [animationPreviewTime, setAnimationPreviewTime] = useState(0)
@@ -466,6 +471,27 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [hydrated, setHydrated] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveSequence = useRef(0)
+
+  const detectObjectsInSelectedImage = async () => {
+    if (!selectedElement || selectedElement.kind !== 'image' || objectEraserBusy) return
+    setObjectEraserBusy(true); setObjectEraserError(''); setObjectEraserDetections([]); setObjectEraserImageSize(null)
+    try {
+      const source = await fetch(selectedElement.url)
+      if (!source.ok) throw new Error('Could not load the selected image. Please try again.')
+      const blob = await source.blob()
+      const file = new File([blob], selectedElement.name || 'studio-image', { type: blob.type || 'image/jpeg' })
+      const form = new FormData(); form.append('image', file)
+      if (objectEraserPrompt.trim()) form.append('prompts', objectEraserPrompt.trim())
+      const response = await fetch('/api/studio/object-eraser/prepare', { method: 'POST', body: form, credentials: 'same-origin' })
+      const result = await response.json()
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Object detection failed. Please try again.')
+      setObjectEraserDetections(Array.isArray(result.detections) ? result.detections : [])
+      setObjectEraserImageSize({width:result.image.width,height:result.image.height})
+      if (!result.detections?.length) setObjectEraserError('No objects were detected for these prompts. Try different object names or a clearer image.')
+    } catch (err) {
+      setObjectEraserError(err instanceof Error ? err.message : 'Object detection failed. Please try again.')
+    } finally { setObjectEraserBusy(false) }
+  }
   const selected = clips.find(item => item.id === selectedId) || clips[0] || null
   const selectedElement = elements.find(item => item.id === selectedElementId) || null
   useEffect(() => {
@@ -1871,9 +1897,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <div className="flex max-h-[220px] min-h-[140px] items-center justify-center bg-[#080b16] p-3"><img src={selectedElement.url} alt={selectedElement.name} className="max-h-[194px] max-w-full rounded-md object-contain" /></div>
               </div>
               <div className="rounded-xl border border-fuchsia-400/15 bg-fuchsia-500/[0.045] p-3">
-                <div className="mb-2 flex items-center gap-2"><ScanSearch className="h-4 w-4 text-fuchsia-300" /><h3 className="text-[11px] font-bold text-slate-100">Object detection</h3></div>
-                <p className="text-[9px] leading-4 text-slate-400">The object detection service will be connected in Part 3. No objects are being guessed or shown before the AI analysis is available.</p>
-                <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/[0.07] bg-black/10 px-3 py-2"><span className="h-1.5 w-1.5 rounded-full bg-amber-300" /><span className="text-[9px] font-medium text-slate-300">AI detection setup pending</span></div>
+                <div className="mb-2 flex items-center gap-2"><ScanSearch className="h-4 w-4 text-fuchsia-300" /><h3 className="text-[11px] font-bold text-slate-100">AI object detection</h3></div>
+                <p className="text-[9px] leading-4 text-slate-400">Find objects in this photo with Grounding DINO. Leave the prompt empty to scan common objects, or enter specific names separated by commas.</p>
+                <textarea value={objectEraserPrompt} onChange={event=>setObjectEraserPrompt(event.target.value)} placeholder="Example: cup, pen, bottle, logo" rows={2} className="mt-3 w-full resize-y rounded-lg border border-white/10 bg-black/20 p-2 text-[10px] text-white outline-none placeholder:text-slate-600 focus:border-fuchsia-400/50" />
+                <button type="button" onClick={detectObjectsInSelectedImage} disabled={objectEraserBusy} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:cursor-wait disabled:opacity-60">{objectEraserBusy ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"/>Analyzing image…</> : <><ScanSearch className="h-3.5 w-3.5"/>Detect objects</>}</button>
+                {objectEraserError && <p role="status" className="mt-2 rounded-lg border border-amber-300/15 bg-amber-300/[0.06] p-2 text-[9px] leading-4 text-amber-100">{objectEraserError}</p>}
+                {objectEraserImageSize && <div className="mt-3 flex items-center justify-between text-[9px] text-slate-400"><span>{objectEraserDetections.length} object{objectEraserDetections.length===1?'':'s'} detected</span><span>{objectEraserImageSize.width} × {objectEraserImageSize.height}</span></div>}
+                {objectEraserDetections.length>0 && <div className="mt-2 space-y-1.5">{objectEraserDetections.map(item=><div key={item.id} className="flex items-center justify-between rounded-lg border border-white/[0.07] bg-black/15 px-2.5 py-2"><span className="truncate text-[9px] font-semibold capitalize text-slate-100">{item.label}</span><span className="ml-2 shrink-0 text-[9px] tabular-nums text-fuchsia-200">{Math.round(item.confidence*100)}%</span></div>)}</div>}
+                <p className="mt-2 text-[8px] leading-4 text-slate-500">Detection identifies objects only. Selecting object cutouts and erasing them are handled in the next parts.</p>
               </div>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select a photo element to use Object Eraser.</div>}
           </div>}
