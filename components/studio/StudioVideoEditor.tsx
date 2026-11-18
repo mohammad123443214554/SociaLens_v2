@@ -467,8 +467,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [objectEraserImageSize, setObjectEraserImageSize] = useState<{width:number;height:number}|null>(null)
   const [objectEraserObjects, setObjectEraserObjects] = useState<Array<{id:string;label:string;confidence:number;thumbnail:string;polygons:number[][][]}>>([])
   const [objectEraserSelectedId, setObjectEraserSelectedId] = useState<string|null>(null)
-  const objectEraserFileRef = useRef<File|null>(null)
-  const [objectEraserImageUrl, setObjectEraserImageUrl] = useState('')
   const [animationSearch, setAnimationSearch] = useState('')
   const [isAnimationPreviewing, setIsAnimationPreviewing] = useState(false)
   const [animationPreviewTime, setAnimationPreviewTime] = useState(0)
@@ -485,9 +483,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (!source.ok) throw new Error('Could not load the selected image. Please try again.')
       const blob = await source.blob()
       const file = new File([blob], selectedElement.name || 'studio-image', { type: blob.type || 'image/jpeg' })
-      objectEraserFileRef.current = file
       const previewUrl = URL.createObjectURL(blob)
-      setObjectEraserImageUrl(previewUrl)
       const form = new FormData(); form.append('image', file)
       if (objectEraserPrompt.trim()) form.append('prompts', objectEraserPrompt.trim())
       const response = await fetch('/api/studio/object-eraser/prepare', { method: 'POST', body: form, credentials: 'same-origin' })
