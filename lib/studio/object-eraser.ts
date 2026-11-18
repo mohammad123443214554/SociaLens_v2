@@ -85,13 +85,13 @@ export function normalizeRoboflowSegmentations(payload:unknown,detections:Object
  if(predictions.length!==detections.length)throw new RoboflowRequestError('SAM 2 did not return a mask for every detected object. Please run detection again.','provider_error',502)
  return predictions.map((entry,index)=>{
   if(!isRecord(entry))throw new RoboflowRequestError('SAM 2 returned an invalid object mask.','provider_error',502)
-  const raw=entry.masks
-  const rawPolygons=isRecord(raw)?(raw.polygons??raw.mask??raw.coordinates):raw
+  const raw=entry.masks??entry.mask??entry.polygons
+  const rawPolygons=isRecord(raw)?(raw.polygons??raw.mask??raw.coordinates??raw.data):raw
   if(!Array.isArray(rawPolygons))throw new RoboflowRequestError('SAM 2 did not return polygon masks.','provider_error',502)
   const candidate=rawPolygons as unknown[]
   const polygonGroups:number[][][]=[]
   const looksLikePointList=candidate.length>0&&Array.isArray(candidate[0])&&typeof (candidate[0] as unknown[])[0]==='number'
-  const groups=looksLikePointList?[candidate]:candidate
+  const groups=looksLikePointList?[candidate]:candidate.length>0&&isRecord(candidate[0])?[candidate.map(item=>isRecord(item)?[item.x,item.y]:item)]:candidate
   for(const group of groups){
    if(!Array.isArray(group))continue
    const points:number[][]=[]
