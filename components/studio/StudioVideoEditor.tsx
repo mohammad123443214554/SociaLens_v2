@@ -477,7 +477,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const saveSequence = useRef(0)
 
   useEffect(() => () => { if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current) }, [])
-  useEffect(() => { if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current); objectEraserPreviewUrlRef.current = null; setObjectEraserObjects([]); setObjectEraserDetections([]); setObjectEraserSelectedId(null); setObjectEraserImageSize(null); setObjectEraserError('') }, [selectedElementId, selectedElement?.url])
+  useEffect(() => { if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current); objectEraserPreviewUrlRef.current = null; setObjectEraserObjects([]); setObjectEraserDetections([]); setObjectEraserSelectedId(null); setObjectEraserImageSize(null); setObjectEraserError('') }, [selectedElementId])
 
   const detectObjectsInSelectedImage = async () => {
     if (!selectedElement || selectedElement.kind !== 'image' || objectEraserBusy || objectEraserSegmentBusy) return
