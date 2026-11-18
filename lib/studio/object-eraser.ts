@@ -49,7 +49,27 @@ export async function requestRoboflow(path:string,body:BodyInit,contentType:stri
  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),ROBOFLOW_REQUEST_TIMEOUT_MS)
  try{
   const response=await fetch(url,{method:'POST',headers:{'Content-Type':contentType},body,signal:controller.signal,cache:'no-store'})
-  if(!response.ok)throw getRoboflowRequestError(response.status)
+  if(!response.ok){
+   const mapped=getRoboflowRequestError(response.status)
+   let providerDetail=''
+   try{
+    const raw=await response.text()
+    if(raw){
+     try{
+      const parsed=JSON.parse(raw) as unknown
+      if(typeof parsed==='object'&&parsed!==null){
+       const record=parsed as Record<string,unknown>
+       if(typeof record.message==='string')providerDetail=record.message
+       else if(typeof record.detail==='string')providerDetail=record.detail
+       else if(Array.isArray(record.detail))providerDetail=record.detail.map(item=>typeof item==='object'&&item!==null&&'msg' in item?String((item as {msg:unknown}).msg):'').filter(Boolean).join('; ')
+       else providerDetail=raw
+      }else providerDetail=raw
+     }catch{providerDetail=raw}
+    }
+   }catch{}
+   const safeDetail=providerDetail.replace(/https?:\\/\\/[^\\s]+/g,'[provider URL]').replace(/api_key=[^&\\s]+/gi,'api_key=[redacted]').slice(0,500)
+   throw new RoboflowRequestError(safeDetail?mapped.message+' Provider detail: '+safeDetail:mapped.message,mapped.code,mapped.status,mapped.retryable)
+  }
   return response
  }catch(error){
   if(error instanceof RoboflowRequestError)throw error
