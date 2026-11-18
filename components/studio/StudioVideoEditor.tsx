@@ -49,7 +49,7 @@ type Clip = {
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
 type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; height?: number; fontSize: number; color: string; opacity?: number; animation?: Partial<TextAnimationSettings>; effect?: TextEffect; effectIntensity?: number; effectBlur?: number; effectDistance?: number; effectAngle?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
-type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; cropLeft?: number; cropRight?: number; cropTop?: number; cropBottom?: number; color?: string; colorStrength?: number; colorReplacements?: StudioColorReplacement[]; fileSize: number; storagePath?: string }
+type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; cropLeft?: number; cropRight?: number; cropTop?: number; cropBottom?: number; color?: string; colorStrength?: number; colorReplacements?: StudioColorReplacement[]; fileSize: number; storagePath?: string; originalStoragePath?: string; originalName?: string; originalFileSize?: number }
 type ElementDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'crop-left' | 'crop-right' | 'crop-top' | 'crop-bottom'; startX: number; startY: number; x: number; y: number; width: number; height: number; cropLeft: number; cropRight: number; cropTop: number; cropBottom: number }
 type TimelineTrack = { key: string; label: string; icon: ReactNode; tone: 'fuchsia' | 'sky' | 'violet' | 'emerald'; element?: ElementLayer; elementIndex?: number }
 type TimelineDragPreview = { x: number; y: number; width: number; label: string; kind: 'image' | 'video' }
@@ -612,12 +612,37 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const file = new File([blob], baseName + '-object-erased.png', { type: blob.type || 'image/png' })
       const storagePath = await uploadStudioAsset(projectId, file)
       const url = await createStudioAssetUrl(storagePath)
-      setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, url, storagePath, name: file.name, fileSize: file.size, color: undefined, colorReplacements: [] } : item))
+      setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, url, storagePath, name: file.name, fileSize: file.size, originalStoragePath: item.originalStoragePath || item.storagePath, originalName: item.originalName || item.name, originalFileSize: item.originalFileSize ?? item.fileSize } : item))
       setObjectEraserResultUrl(null)
       setObjectEraserError('')
       setNotice('AI object removal applied to the Studio image. The original upload remains saved.')
     } catch (error) {
       setObjectEraserError(error instanceof Error ? error.message : 'Could not apply the edited image to Studio.')
+    } finally { setObjectEraserApplyBusy(false) }
+  }
+
+  const restoreOriginalObjectEraserImage = async () => {
+    if (!selectedElement || selectedElement.kind !== 'image' || !selectedElement.originalStoragePath || objectEraserApplyBusy) return
+    setObjectEraserApplyBusy(true); setObjectEraserError('')
+    try {
+      const url = await createStudioAssetUrl(selectedElement.originalStoragePath)
+      setElements(items => items.map(item => item.id === selectedElement.id ? {
+        ...item,
+        url,
+        storagePath: selectedElement.originalStoragePath,
+        name: selectedElement.originalName || item.name.replace(/-object-erased\\.png$/i, '') || item.name,
+        fileSize: selectedElement.originalFileSize ?? item.fileSize,
+        originalStoragePath: undefined,
+        originalName: undefined,
+        originalFileSize: undefined,
+      } : item))
+      setObjectEraserResultUrl(null)
+      setObjectEraserObjects([])
+      setObjectEraserDetections([])
+      setObjectEraserSelectedId(null)
+      setNotice('Original image restored. Studio layout, timing and transforms were preserved.')
+    } catch (error) {
+      setObjectEraserError(error instanceof Error ? error.message : 'Could not restore the original image.')
     } finally { setObjectEraserApplyBusy(false) }
   }
 
@@ -739,7 +764,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           setClips(arrangedClips)
           if (closedAccidentalGaps) setNotice('Closed small accidental gaps between timeline clips.')
           if (Array.isArray(data.elements)) {
-            const restoredElements: ElementLayer[] = await Promise.all((data.elements as Array<Record<string, unknown>>).filter(item => typeof item.storagePath === 'string' && (item.kind === 'image' || item.kind === 'video')).map(async item => ({ id: String(item.id || makeId()), kind: item.kind as ClipKind, name: String(item.name || 'Overlay'), url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration) || 5, trimStart: Math.max(0, Number(item.trimStart) || 0), trimEnd: Math.max(0.1, Number(item.trimEnd) || Number(item.duration) || 5), timelineStart: Math.max(0, Number(item.timelineStart) || 0), x: Math.min(95, Math.max(0, Number(item.x) || 25)), y: Math.min(95, Math.max(0, Number(item.y) || 25)), width: Math.min(100, Math.max(5, Number(item.width) || 50)), height: Math.min(100, Math.max(5, Number(item.height) || 50)), cropLeft: Math.min(0.8, Math.max(0, Number(item.cropLeft) || 0)), cropRight: Math.min(0.8, Math.max(0, Number(item.cropRight) || 0)), cropTop: Math.min(0.8, Math.max(0, Number(item.cropTop) || 0)), cropBottom: Math.min(0.8, Math.max(0, Number(item.cropBottom) || 0)), color: typeof item.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(item.color) ? item.color : undefined, colorReplacements: Array.isArray(item.colorReplacements) ? (item.colorReplacements as StudioColorReplacement[]).filter(value => value && /^#[0-9a-fA-F]{6}$/.test(value.source) && /^#[0-9a-fA-F]{6}$/.test(value.target)) : [], colorStrength: typeof item.colorStrength === 'number' ? Math.min(1, Math.max(0, item.colorStrength)) : 0.72, fileSize: Number(item.fileSize) || 0, storagePath: String(item.storagePath) })))
+            const restoredElements: ElementLayer[] = await Promise.all((data.elements as Array<Record<string, unknown>>).filter(item => typeof item.storagePath === 'string' && (item.kind === 'image' || item.kind === 'video')).map(async item => ({ id: String(item.id || makeId()), kind: item.kind as ClipKind, name: String(item.name || 'Overlay'), url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration) || 5, trimStart: Math.max(0, Number(item.trimStart) || 0), trimEnd: Math.max(0.1, Number(item.trimEnd) || Number(item.duration) || 5), timelineStart: Math.max(0, Number(item.timelineStart) || 0), x: Math.min(95, Math.max(0, Number(item.x) || 25)), y: Math.min(95, Math.max(0, Number(item.y) || 25)), width: Math.min(100, Math.max(5, Number(item.width) || 50)), height: Math.min(100, Math.max(5, Number(item.height) || 50)), cropLeft: Math.min(0.8, Math.max(0, Number(item.cropLeft) || 0)), cropRight: Math.min(0.8, Math.max(0, Number(item.cropRight) || 0)), cropTop: Math.min(0.8, Math.max(0, Number(item.cropTop) || 0)), cropBottom: Math.min(0.8, Math.max(0, Number(item.cropBottom) || 0)), color: typeof item.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(item.color) ? item.color : undefined, colorReplacements: Array.isArray(item.colorReplacements) ? (item.colorReplacements as StudioColorReplacement[]).filter(value => value && /^#[0-9a-fA-F]{6}$/.test(value.source) && /^#[0-9a-fA-F]{6}$/.test(value.target)) : [], colorStrength: typeof item.colorStrength === 'number' ? Math.min(1, Math.max(0, item.colorStrength)) : 0.72, fileSize: Number(item.fileSize) || 0, storagePath: String(item.storagePath), originalStoragePath: typeof item.originalStoragePath === 'string' ? item.originalStoragePath : undefined, originalName: typeof item.originalName === 'string' ? item.originalName : undefined, originalFileSize: Number.isFinite(Number(item.originalFileSize)) ? Number(item.originalFileSize) : undefined })))
             if (!active) return
             setElements(restoredElements)
             if (typeof data.selectedElementId === 'string') setSelectedElementId(data.selectedElementId)
@@ -817,7 +842,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           id: projectId, project_type: 'video', name: projectName, template_id: templateId || null,
           data: {
             clips: clips.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane: 0, fileSize, storagePath })),
-            elements: elements.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, colorReplacements, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, colorReplacements, fileSize, storagePath })), selectedElementId, 
+            elements: elements.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, colorReplacements, fileSize, storagePath, originalStoragePath, originalName, originalFileSize }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, colorReplacements, fileSize, storagePath, originalStoragePath, originalName, originalFileSize })), selectedElementId, 
             audioPath: audio?.storagePath || null, audioId: audio?.id || null, audioName: audio?.name || null,
             audioDuration: audio?.duration || 0, audioTrimStart: audio?.trimStart || 0, audioTrimEnd: audio?.trimEnd || 0, audioTimelineStart: audio?.timelineStart || 0, audioFileSize: audio?.fileSize || 0, selectedId, muted, volume,
             audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, textLayers, selectedTextId, exportWidth, exportHeight,
@@ -2024,6 +2049,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               <div className="overflow-hidden rounded-xl border border-white/10 bg-black/20">
                 <div className="flex items-center justify-between border-b border-white/[0.07] px-3 py-2"><span className="text-[10px] font-semibold text-slate-200">Selected image</span><span className="max-w-[120px] truncate text-[8px] text-slate-500">{selectedElement.name}</span></div>
                 <div className="flex max-h-[220px] min-h-[140px] items-center justify-center bg-[#080b16] p-3"><img src={objectEraserResultUrl || selectedElement.url} alt={objectEraserResultUrl ? "AI object removal preview" : selectedElement.name} className="max-h-[194px] max-w-full rounded-md object-contain" /></div>
+                {selectedElement.originalStoragePath && <div className="border-t border-white/[0.07] p-2"><button type="button" onClick={restoreOriginalObjectEraserImage} disabled={objectEraserApplyBusy || objectEraserInpaintBusy} className="w-full rounded-lg border border-amber-300/20 px-3 py-2 text-[9px] font-semibold text-amber-100 transition hover:bg-amber-300/[0.06] disabled:opacity-50">{objectEraserApplyBusy ? 'Restoring…' : 'Restore original image'}</button><p className="mt-1 text-center text-[8px] text-slate-500">Returns to the first uploaded image without changing its Studio placement or timing.</p></div>}
               </div>
               <div className="rounded-xl border border-fuchsia-400/15 bg-fuchsia-500/[0.045] p-3">
                 <div className="mb-2 flex items-center gap-2"><ScanSearch className="h-4 w-4 text-fuchsia-300" /><h3 className="text-[11px] font-bold text-slate-100">AI object detection</h3></div>
