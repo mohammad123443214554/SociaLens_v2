@@ -461,9 +461,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [selectedSourceColor, setSelectedSourceColor] = useState<string | null>(null)
   const [objectEraserPrompt, setObjectEraserPrompt] = useState('')
   const [objectEraserBusy, setObjectEraserBusy] = useState(false)
+  const [objectEraserSegmentBusy, setObjectEraserSegmentBusy] = useState(false)
   const [objectEraserError, setObjectEraserError] = useState('')
   const [objectEraserDetections, setObjectEraserDetections] = useState<Array<{id:string;label:string;confidence:number;x:number;y:number;width:number;height:number}>>([])
   const [objectEraserImageSize, setObjectEraserImageSize] = useState<{width:number;height:number}|null>(null)
+  const [objectEraserObjects, setObjectEraserObjects] = useState<Array<{id:string;label:string;confidence:number;thumbnail:string;polygons:number[][][]}>>([])
+  const [objectEraserSelectedId, setObjectEraserSelectedId] = useState<string|null>(null)
+  const objectEraserFileRef = useRef<File|null>(null)
+  const [objectEraserImageUrl, setObjectEraserImageUrl] = useState('')
   const [animationSearch, setAnimationSearch] = useState('')
   const [isAnimationPreviewing, setIsAnimationPreviewing] = useState(false)
   const [animationPreviewTime, setAnimationPreviewTime] = useState(0)
@@ -473,24 +478,70 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const saveSequence = useRef(0)
 
   const detectObjectsInSelectedImage = async () => {
-    if (!selectedElement || selectedElement.kind !== 'image' || objectEraserBusy) return
-    setObjectEraserBusy(true); setObjectEraserError(''); setObjectEraserDetections([]); setObjectEraserImageSize(null)
+    if (!selectedElement || selectedElement.kind !== 'image' || objectEraserBusy || objectEraserSegmentBusy) return
+    setObjectEraserBusy(true); setObjectEraserSegmentBusy(false); setObjectEraserError(''); setObjectEraserDetections([]); setObjectEraserObjects([]); setObjectEraserSelectedId(null); setObjectEraserImageSize(null)
     try {
       const source = await fetch(selectedElement.url)
       if (!source.ok) throw new Error('Could not load the selected image. Please try again.')
       const blob = await source.blob()
       const file = new File([blob], selectedElement.name || 'studio-image', { type: blob.type || 'image/jpeg' })
+      objectEraserFileRef.current = file
+      const previewUrl = URL.createObjectURL(blob)
+      setObjectEraserImageUrl(previewUrl)
       const form = new FormData(); form.append('image', file)
       if (objectEraserPrompt.trim()) form.append('prompts', objectEraserPrompt.trim())
       const response = await fetch('/api/studio/object-eraser/prepare', { method: 'POST', body: form, credentials: 'same-origin' })
       const result = await response.json()
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Object detection failed. Please try again.')
-      setObjectEraserDetections(Array.isArray(result.detections) ? result.detections : [])
+      const detections = Array.isArray(result.detections) ? result.detections : []
+      setObjectEraserDetections(detections)
       setObjectEraserImageSize({width:result.image.width,height:result.image.height})
-      if (!result.detections?.length) setObjectEraserError('No objects were detected for these prompts. Try different object names or a clearer image.')
+      if (!detections.length) {
+        setObjectEraserError('No objects were detected for these prompts. Try different object names or a clearer image.')
+        return
+      }
+      setObjectEraserBusy(false)
+      setObjectEraserSegmentBusy(true)
+      const segmentationForm = new FormData()
+      segmentationForm.append('image', file)
+      segmentationForm.append('detections', JSON.stringify(detections))
+      const segmentationResponse = await fetch('/api/studio/object-eraser/segment', { method: 'POST', body: segmentationForm, credentials: 'same-origin' })
+      const segmentationResult = await segmentationResponse.json()
+      if (!segmentationResponse.ok || !segmentationResult?.ok) throw new Error(segmentationResult?.error || 'Could not isolate detected objects. Please try again.')
+      const image = new Image()
+      image.src = previewUrl
+      await new Promise<void>((resolve,reject) => { image.onload=()=>resolve(); image.onerror=()=>reject(new Error('Could not prepare the original image for object cutouts.')) })
+      const cutouts = (segmentationResult.segmentations as Array<{id:string;confidence:number;polygons:number[][][]}>).map(mask => {
+        const detection = detections.find((item:any)=>item.id===mask.id)
+        if (!detection) return null
+        const padX=Math.max(4,detection.width*0.08),padY=Math.max(4,detection.height*0.08)
+        const left=Math.max(0,Math.floor(detection.x-padX)),top=Math.max(0,Math.floor(detection.y-padY))
+        const right=Math.min(image.naturalWidth,Math.ceil(detection.x+detection.width+padX)),bottom=Math.min(image.naturalHeight,Math.ceil(detection.y+detection.height+padY))
+        const width=Math.max(1,right-left),height=Math.max(1,bottom-top)
+        const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height
+        const context=canvas.getContext('2d')
+        if(!context) return null
+        context.drawImage(image,left,top,width,height,0,0,width,height)
+        const maskCanvas=document.createElement('canvas');maskCanvas.width=width;maskCanvas.height=height
+        const maskContext=maskCanvas.getContext('2d')
+        if(!maskContext) return null
+        maskContext.fillStyle='#fff';maskContext.beginPath()
+        for(const polygon of mask.polygons){
+          if(polygon.length<3) continue
+          maskContext.moveTo(polygon[0][0]-left,polygon[0][1]-top)
+          for(let index=1;index<polygon.length;index++) maskContext.lineTo(polygon[index][0]-left,polygon[index][1]-top)
+          maskContext.closePath()
+        }
+        maskContext.fill('evenodd')
+        context.globalCompositeOperation='destination-in';context.drawImage(maskCanvas,0,0)
+        return {id:mask.id,label:detection.label,confidence:Math.min(detection.confidence,mask.confidence),thumbnail:canvas.toDataURL('image/png'),polygons:mask.polygons}
+      }).filter((item):item is {id:string;label:string;confidence:number;thumbnail:string;polygons:number[][][]}=>!!item)
+      if (!cutouts.length) throw new Error('The AI returned no usable object cutouts. Please run detection again.')
+      setObjectEraserObjects(cutouts)
+      setObjectEraserSelectedId(cutouts[0].id)
     } catch (err) {
-      setObjectEraserError(err instanceof Error ? err.message : 'Object detection failed. Please try again.')
-    } finally { setObjectEraserBusy(false) }
+      setObjectEraserError(err instanceof Error ? err.message : 'Object detection or segmentation failed. Please try again.')
+    } finally { setObjectEraserBusy(false); setObjectEraserSegmentBusy(false) }
   }
   const selected = clips.find(item => item.id === selectedId) || clips[0] || null
   const selectedElement = elements.find(item => item.id === selectedElementId) || null
@@ -1902,9 +1953,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <textarea value={objectEraserPrompt} onChange={event=>setObjectEraserPrompt(event.target.value)} placeholder="Example: cup, pen, bottle, logo" rows={2} className="mt-3 w-full resize-y rounded-lg border border-white/10 bg-black/20 p-2 text-[10px] text-white outline-none placeholder:text-slate-600 focus:border-fuchsia-400/50" />
                 <button type="button" onClick={detectObjectsInSelectedImage} disabled={objectEraserBusy} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:cursor-wait disabled:opacity-60">{objectEraserBusy ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"/>Analyzing image…</> : <><ScanSearch className="h-3.5 w-3.5"/>Detect objects</>}</button>
                 {objectEraserError && <p role="status" className="mt-2 rounded-lg border border-amber-300/15 bg-amber-300/[0.06] p-2 text-[9px] leading-4 text-amber-100">{objectEraserError}</p>}
-                {objectEraserImageSize && <div className="mt-3 flex items-center justify-between text-[9px] text-slate-400"><span>{objectEraserDetections.length} object{objectEraserDetections.length===1?'':'s'} detected</span><span>{objectEraserImageSize.width} × {objectEraserImageSize.height}</span></div>}
-                {objectEraserDetections.length>0 && <div className="mt-2 space-y-1.5">{objectEraserDetections.map(item=><div key={item.id} className="flex items-center justify-between rounded-lg border border-white/[0.07] bg-black/15 px-2.5 py-2"><span className="truncate text-[9px] font-semibold capitalize text-slate-100">{item.label}</span><span className="ml-2 shrink-0 text-[9px] tabular-nums text-fuchsia-200">{Math.round(item.confidence*100)}%</span></div>)}</div>}
-                <p className="mt-2 text-[8px] leading-4 text-slate-500">Detection identifies objects only. Selecting object cutouts and erasing them are handled in the next parts.</p>
+                {objectEraserImageSize && <div className="mt-3 flex items-center justify-between text-[9px] text-slate-400"><span>{objectEraserObjects.length ? objectEraserObjects.length + ' isolated object cutouts' : objectEraserDetections.length + ' objects detected'}</span><span>{objectEraserImageSize.width} × {objectEraserImageSize.height}</span></div>}
+                {(objectEraserBusy || objectEraserSegmentBusy) && <div className="mt-3 flex items-center gap-2 rounded-lg border border-violet-400/15 bg-violet-400/[0.06] p-3 text-[9px] text-violet-100"><span className="h-3 w-3 animate-spin rounded-full border-2 border-violet-200/30 border-t-violet-200"/>{objectEraserBusy ? 'Finding objects in your image…' : 'Separating each object from its background…'}</div>}
+                {objectEraserObjects.length>0 && <div className="mt-3">
+                  <div className="mb-2 flex items-center justify-between"><span className="text-[10px] font-bold text-slate-100">Objects found</span><span className="text-[8px] text-slate-500">Click an object to select it</span></div>
+                  <div className="grid grid-cols-3 gap-2">{objectEraserObjects.map(item=><button key={item.id} type="button" onClick={()=>setObjectEraserSelectedId(item.id)} aria-pressed={objectEraserSelectedId===item.id} className={'group min-w-0 rounded-xl border p-1.5 text-left transition '+(objectEraserSelectedId===item.id?'border-fuchsia-400 bg-fuchsia-500/10 ring-1 ring-fuchsia-400/30':'border-white/10 bg-black/20 hover:border-white/25')}><span className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-[linear-gradient(45deg,#171a29_25%,transparent_25%,transparent_75%,#171a29_75%),linear-gradient(45deg,#171a29_25%,#0d1020_25%,#0d1020_75%,#171a29_75%)] bg-[length:12px_12px] bg-[position:0_0,6px_6px]"><img src={item.thumbnail} alt={item.label+' cutout'} className="max-h-full max-w-full object-contain"/></span><span className="mt-1.5 block truncate text-[9px] font-semibold capitalize text-slate-100">{item.label}</span><span className="mt-0.5 block text-[8px] text-slate-500">{Math.round(item.confidence*100)}% match</span></button>)}</div>
+                  {objectEraserObjects.find(item=>item.id===objectEraserSelectedId) && <div className="mt-3 flex items-center gap-3 rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/[0.06] p-3"><div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/20 p-1"><img src={objectEraserObjects.find(item=>item.id===objectEraserSelectedId)!.thumbnail} alt="Selected object cutout" className="max-h-full max-w-full object-contain"/></div><div className="min-w-0"><span className="block text-[8px] font-bold uppercase tracking-wider text-fuchsia-200">Selected object</span><span className="mt-1 block truncate text-[11px] font-bold capitalize text-white">{objectEraserObjects.find(item=>item.id===objectEraserSelectedId)!.label}</span><span className="mt-1 block text-[8px] text-slate-400">Isolated from the original image with a transparent background</span></div><Check className="ml-auto h-4 w-4 shrink-0 text-fuchsia-300"/></div>}
+                </div>}
+                <p className="mt-2 text-[8px] leading-4 text-slate-500">Each thumbnail is a pixel-level cutout from your original photo. Choose the exact object here; object removal is the next step.</p>
               </div>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select a photo element to use Object Eraser.</div>}
           </div>}
