@@ -554,7 +554,74 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (!selectedElement.storagePath) { setObjectEraserError('This image is not saved in the Studio project yet. Re-import it and try again.'); return }
     const megapixels = objectEraserImageSize.width * objectEraserImageSize.height / 1_000_000
     const estimatedUsd = megapixels * 0.03
-    if (!window.confirm('AI Object Removal uses fal.ai Qwen Inpainting. Estimated model cost: about   const selectedElement = elements.find(item => item.id === selectedElementId) || null
+    if (!window.confirm('AI Object Removal uses fal.ai Qwen Inpainting. Estimated model cost: about $' + estimatedUsd.toFixed(3) + ' for this image (pricing may change). Continue?')) return
+    setObjectEraserInpaintBusy(true); setObjectEraserError(''); setObjectEraserResultUrl(null)
+    try {
+      const maskCanvas = document.createElement('canvas')
+      maskCanvas.width = objectEraserImageSize.width
+      maskCanvas.height = objectEraserImageSize.height
+      const maskContext = maskCanvas.getContext('2d')
+      if (!maskContext) throw new Error('Could not prepare the object mask.')
+      maskContext.fillStyle = '#000'
+      maskContext.fillRect(0, 0, maskCanvas.width, maskCanvas.height)
+      maskContext.fillStyle = '#fff'
+      maskContext.strokeStyle = '#fff'
+      maskContext.lineWidth = Math.max(6, Math.min(36, Math.round(Math.min(maskCanvas.width, maskCanvas.height) * 0.012)))
+      maskContext.lineJoin = 'round'
+      maskContext.lineCap = 'round'
+      for (const polygon of target.polygons) {
+        if (polygon.length < 3) continue
+        maskContext.beginPath()
+        maskContext.moveTo(polygon[0][0], polygon[0][1])
+        for (let index = 1; index < polygon.length; index++) maskContext.lineTo(polygon[index][0], polygon[index][1])
+        maskContext.closePath()
+        maskContext.fill()
+        maskContext.stroke()
+      }
+      const maskDataUrl = maskCanvas.toDataURL('image/png')
+      const submitResponse = await fetch('/api/studio/object-eraser/inpaint', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, storagePath: selectedElement.storagePath, label: target.label, maskDataUrl })
+      })
+      const submitted = await submitResponse.json()
+      if (!submitResponse.ok || !submitted?.ok || !submitted.requestId) throw new Error(submitted?.error || 'Could not start AI object removal.')
+      let completed: any = null
+      for (let attempt = 0; attempt < 80; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 2500))
+        const statusResponse = await fetch('/api/studio/object-eraser/inpaint?requestId=' + encodeURIComponent(submitted.requestId), { credentials: 'same-origin', cache: 'no-store' })
+        const status = await statusResponse.json()
+        if (!statusResponse.ok || !status?.ok) throw new Error(status?.error || 'AI object removal failed.')
+        if (status.status === 'COMPLETED' && status.imageUrl) { completed = status; break }
+      }
+      if (!completed?.imageUrl) throw new Error('AI is taking longer than expected. Your original image is unchanged; please try again later.')
+      setObjectEraserResultUrl(completed.imageUrl)
+    } catch (error) {
+      setObjectEraserError(error instanceof Error ? error.message : 'AI object removal failed. Your original image is unchanged.')
+    } finally { setObjectEraserInpaintBusy(false) }
+  }
+
+  const applyObjectEraserResult = async () => {
+    if (!objectEraserResultUrl || !selectedElement || selectedElement.kind !== 'image' || objectEraserApplyBusy) return
+    setObjectEraserApplyBusy(true); setObjectEraserError('')
+    try {
+      const response = await fetch(objectEraserResultUrl)
+      if (!response.ok) throw new Error('Could not download the AI-edited image.')
+      const blob = await response.blob()
+      if (!blob.type.startsWith('image/')) throw new Error('AI service returned an invalid image file.')
+      const baseName = selectedElement.name.replace(/\.[^.]+$/, '') || 'studio-image'
+      const file = new File([blob], baseName + '-object-erased.png', { type: blob.type || 'image/png' })
+      const storagePath = await uploadStudioAsset(projectId, file)
+      const url = await createStudioAssetUrl(storagePath)
+      setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, url, storagePath, name: file.name, fileSize: file.size, color: undefined, colorReplacements: [] } : item))
+      setObjectEraserResultUrl(null)
+      setObjectEraserError('')
+      setNotice('AI object removal applied to the Studio image. The original upload remains saved.')
+    } catch (error) {
+      setObjectEraserError(error instanceof Error ? error.message : 'Could not apply the edited image to Studio.')
+    } finally { setObjectEraserApplyBusy(false) }
+  }
+
+  const selectedElement = elements.find(item => item.id === selectedElementId) || null
   useEffect(() => {
     let active = true
     setElementPalette([])
