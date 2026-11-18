@@ -67,7 +67,7 @@ export async function requestRoboflow(path:string,body:BodyInit,contentType:stri
      }catch{providerDetail=raw}
     }
    }catch{}
-   const safeDetail=providerDetail.replace(/https?:\\/\\/[^\\s]+/g,'[provider URL]').replace(/api_key=[^&\\s]+/gi,'api_key=[redacted]').slice(0,500)
+    const safeDetail=providerDetail.replace(/https?:\/\/\S+/g,'[provider URL]').replace(/api_key=[^&\s]+/gi,'api_key=[redacted]').slice(0,500)
    throw new RoboflowRequestError(safeDetail?mapped.message+' Provider detail: '+safeDetail:mapped.message,mapped.code,mapped.status,mapped.retryable)
   }
   return response
