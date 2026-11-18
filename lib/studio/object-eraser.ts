@@ -87,23 +87,17 @@ export function normalizeRoboflowSegmentations(payload:unknown,detections:Object
   if(!isRecord(entry))throw new RoboflowRequestError('SAM 2 returned an invalid object mask.','provider_error',502)
   const raw=entry.masks??entry.mask??entry.polygons
   const rawPolygons=isRecord(raw)?(raw.polygons??raw.mask??raw.coordinates??raw.data):raw
-  if(!Array.isArray(rawPolygons))throw new RoboflowRequestError('SAM 2 did not return polygon masks.','provider_error',502)
-  const candidate=rawPolygons as unknown[]
+  if(!Array.isArray(rawPolygons))throw new RoboflowRequestError('SAM 2 response contained no polygon data. Please retry segmentation.','provider_error',502)
   const polygonGroups:number[][][]=[]
-  const looksLikePointList=candidate.length>0&&Array.isArray(candidate[0])&&typeof (candidate[0] as unknown[])[0]==='number'
-  const groups=looksLikePointList?[candidate]:candidate.length>0&&isRecord(candidate[0])?[candidate.map(item=>isRecord(item)?[item.x,item.y]:item)]:candidate
-  for(const group of groups){
-   if(!Array.isArray(group))continue
-   const points:number[][]=[]
-   for(const point of group){
-    if(Array.isArray(point)&&point.length>=2){
-     const x=Number(point[0]),y=Number(point[1])
-     if(Number.isFinite(x)&&Number.isFinite(y))points.push([x,y])
-    }else if(typeof point==='number'&&Number.isFinite(point))continue
+  const visit=(node:unknown,depth=0):void=>{
+   if(!Array.isArray(node)||depth>8)return
+   if(node.length>=3&&node.every(point=>Array.isArray(point)&&point.length>=2&&Number.isFinite(Number(point[0]))&&Number.isFinite(Number(point[1])))){
+    polygonGroups.push(node.map(point=>[Number(point[0]),Number(point[1])]).slice(0,30000));return
    }
-   if(points.length>=3)polygonGroups.push(points.slice(0,30000))
+   for(const child of node)visit(child,depth+1)
   }
-  if(!polygonGroups.length)throw new RoboflowRequestError('SAM 2 returned an empty object mask. Please try detection again.','provider_error',502)
+  visit(rawPolygons)
+  if(!polygonGroups.length)throw new RoboflowRequestError('SAM 2 returned an empty or unsupported polygon mask. Please retry segmentation.','provider_error',502)
   const confidence=Number(entry.confidence??1)
   return {id:detections[index].id,confidence:Number.isFinite(confidence)?Math.max(0,Math.min(1,confidence)):1,polygons:polygonGroups}
  })
