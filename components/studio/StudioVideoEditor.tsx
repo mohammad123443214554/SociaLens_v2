@@ -622,6 +622,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   }
 
   const selectedElement = elements.find(item => item.id === selectedElementId) || null
+  const selected = clips.find(item => item.id === selectedId) || null
   useEffect(() => {
     let active = true
     setElementPalette([])
