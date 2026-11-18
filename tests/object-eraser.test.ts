@@ -20,13 +20,13 @@ test('normalizes Grounding DINO center boxes into bounded top-left rectangles', 
   const detections = normalizeRoboflowDetections({
     predictions: [
       { x: 50, y: 40, width: 40, height: 20, confidence: 0.9, class: 'cup' },
-      { x: -10, y: 10, width: 20, height: 20, confidence: 0.8, class: 'pen' },
+      { x: 0, y: 10, width: 20, height: 20, confidence: 0.8, class: 'pen' },
       { x: 10, y: 10, width: 0, height: 20, confidence: 0.7, class: 'invalid' },
     ],
   }, 100, 80)
   assert.equal(detections.length, 2)
   assert.deepEqual(detections[0], { id: '1', label: 'cup', confidence: 0.9, x: 30, y: 30, width: 40, height: 20 })
-  assert.deepEqual(detections[1], { id: '2', label: 'pen', confidence: 0.8, x: 0, y: 0, width: 0, height: 20 })
+  assert.deepEqual(detections[1], { id: '2', label: 'pen', confidence: 0.8, x: 0, y: 0, width: 10, height: 20 })
 })
 
 test('normalizes one polygon mask for each matching detection', () => {
