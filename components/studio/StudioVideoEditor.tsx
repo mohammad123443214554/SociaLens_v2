@@ -1440,7 +1440,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       })
       const orderedExportTextLayers = [...textLayers].sort((a, b) => a.timelineStart - b.timelineStart)
       await Promise.all(elements.map(async element => {
-        if (element.kind === 'image') { const image = new Image(); image.src = element.url; await new Promise<void>((resolve,reject)=>{image.onload=()=>resolve();image.onerror=()=>reject(new Error('Could not load Element photo: '+element.name))}); exportElementImages.set(element.id,image) }
+        if (element.kind === 'image') { const image = new Image(); image.crossOrigin = 'anonymous'; image.src = element.url; await new Promise<void>((resolve,reject)=>{image.onload=()=>resolve();image.onerror=()=>reject(new Error('Could not load Element photo: '+element.name))}); exportElementImages.set(element.id,image) }
         else { const video=document.createElement('video'); video.crossOrigin='anonymous'; video.src=element.url; video.muted=true; video.playsInline=true; video.preload='auto'; await new Promise<void>((resolve,reject)=>{video.onloadedmetadata=()=>resolve();video.onerror=()=>reject(new Error('Could not load Element video: '+element.name))}); exportElementVideos.set(element.id,video) }
       }))
       for (const element of elements) {
