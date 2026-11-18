@@ -22,7 +22,7 @@ export async function POST(request:NextRequest){
  if(!user)return jsonError('Please sign in to use Object Eraser.',401,'unauthorized')
  if(!getRoboflowConfiguration().configured)return jsonError('AI detection is not configured yet. Add ROBOFLOW_API_KEY to Vercel Environment Variables.',503,'not_configured')
  const length=Number(request.headers.get('content-length')||0)
- if(length>OBJECT_ERASER_MAX_IMAGE_BYTES+256*1024)return jsonError('Image is too large. Please use an image up to 10 MB.',413,'image_too_large')
+ if(length>OBJECT_ERASER_MAX_IMAGE_BYTES+256*1024)return jsonError('Image is too large. Please use an image up to 4 MB.',413,'image_too_large')
  let form:FormData
  try{form=await request.formData()}catch{return jsonError('Could not read the image upload. Please try again.',400,'invalid_upload')}
  const image=form.get('image')
