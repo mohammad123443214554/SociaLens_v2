@@ -38,7 +38,7 @@ export async function POST(request:NextRequest){
   const response=await requestRoboflow('/sam2/segment_image',JSON.stringify({
    id:crypto.randomUUID(),
    image:{type:'base64',value:prepared.base64},
-   model_id:'sam2/hiera_large',
+   sam2_version_id:'hiera_large',
    format:'json',
    multimask_output:false,
    prompts:{prompts:detections.map(item=>({box:{x:item.x,y:item.y,width:item.width,height:item.height}}))}
