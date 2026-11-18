@@ -36,7 +36,7 @@ export async function POST(request:NextRequest){
  if(!projectId||projectId.length>100||!storagePath.startsWith(user.id+'/'+projectId+'/'))return fail('The selected Studio image does not belong to this project.',403,'invalid_asset')
  if(!/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/.test(maskDataUrl)||maskDataUrl.length>2_500_000)return fail('The object mask is invalid or too large. Please detect the object again.',400,'invalid_mask')
  const supabase=await createClient()
- const {data:signed,error:signedError}=await supabase.storage.from('studio-projects').createSignedUrl(storagePath,60*10)
+ const {data:signed,error:signedError}=await supabase.storage.from('studio-projects').createSignedUrl(storagePath,60*60)
  if(signedError||!signed?.signedUrl)return fail('Could not securely prepare the selected image for AI editing.',400,'asset_unavailable')
  const prompt='Remove the '+label+' selected by the white mask. Reconstruct only the masked region so it blends seamlessly with the surrounding original photograph. Continue nearby textures, patterns, edges, lighting, shadows, perspective and depth naturally. Preserve every unmasked pixel and all other objects exactly. Do not add new objects, text, logos or decorations.'
  let response:Response
@@ -61,7 +61,7 @@ export async function GET(request:NextRequest){
  if(!key)return fail('AI object removal is not configured. Add FAL_KEY to Vercel Environment Variables.',503,'not_configured')
  const requestId=request.nextUrl.searchParams.get('requestId')||''
  if(!/^[0-9a-f-]{36}$/i.test(requestId))return fail('Invalid AI removal request identifier.',400,'invalid_request')
- const base='https://queue.fal.run/fal-ai/qwen-image-edit/inpaint/requests/'+requestId
+ const base='https://queue.fal.run/fal-ai/qwen-image-edit/requests/'+requestId
  let statusResponse:Response
  try{statusResponse=await fetch(base+'/status',{headers:{Authorization:'Key '+key},cache:'no-store'})}
  catch{return fail('Could not check AI editing progress. Please retry.',503,'provider_unavailable')}
