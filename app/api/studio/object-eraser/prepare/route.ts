@@ -35,6 +35,7 @@ export async function POST(request:NextRequest){
  try{
   const prepared=await prepareObjectEraserImage(image)
   const upstream=await requestRoboflow('/grounding_dino/infer',JSON.stringify({
+   id: crypto.randomUUID(),
    image:{type:'base64',value:prepared.base64},
    text:uniquePrompts,
    box_threshold:0.28,
@@ -43,8 +44,9 @@ export async function POST(request:NextRequest){
   let result:unknown
   try{result=await upstream.json()}catch{return jsonError('Roboflow returned unreadable detection data. Please try again.',502,'invalid_provider_response',true)}
   const payload=result as Record<string,unknown>
-  const imageInfo=payload&&typeof payload==='object'&&payload.image&&typeof payload.image==='object'?payload.image as Record<string,unknown>:{}
-  const width=Number(imageInfo.width),height=Number(imageInfo.height)
+  const rawImageInfo=payload&&typeof payload==='object'?payload.image:undefined
+  const imageInfo=Array.isArray(rawImageInfo)?(rawImageInfo[0] as Record<string,unknown>|undefined):(rawImageInfo as Record<string,unknown>|undefined)
+  const width=Number(imageInfo?.width),height=Number(imageInfo?.height)
   if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)return jsonError('Roboflow did not return valid image dimensions.',502,'invalid_provider_response',true)
   const detections=normalizeRoboflowDetections(result,width,height)
   return NextResponse.json({ok:true,provider:'roboflow',image:{mimeType:prepared.mimeType,size:prepared.size,sha256:prepared.sha256,width,height},detections,count:detections.length,promptCount:uniquePrompts.length,model:'Grounding DINO'},{headers:NO_STORE_HEADERS})
