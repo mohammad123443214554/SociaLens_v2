@@ -48,3 +48,27 @@ test('does not mutate the original pixel buffer', () => {
   recolorStudioPixelData(input, [{ source: '#F014B4', target: '#16A34A' }])
   assert.deepEqual([...input], [240, 20, 180, 255])
 })
+
+test('replaces darker gradient shades even when RGB distance exceeds the old edge threshold', () => {
+  const input = new Uint8ClampedArray([
+    42, 6, 79, 255,
+    0, 0, 0, 255,
+  ])
+  const output = recolorStudioPixelData(input, [{ source: '#7805F8', target: '#FFFFFF' }])
+  assert.deepEqual([...output], [
+    255, 255, 255, 255,
+    0, 0, 0, 255,
+  ])
+})
+
+test('keeps unrelated hues unchanged when replacing a selected colour family', () => {
+  const input = new Uint8ClampedArray([
+    35, 8, 90, 255,
+    20, 180, 70, 255,
+  ])
+  const output = recolorStudioPixelData(input, [{ source: '#7805F8', target: '#FFFFFF' }])
+  assert.deepEqual([...output], [
+    255, 255, 255, 255,
+    20, 180, 70, 255,
+  ])
+})
