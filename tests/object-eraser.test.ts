@@ -41,6 +41,24 @@ test('normalizes one polygon mask for each matching detection', () => {
   assert.deepEqual(result[0].polygons[0], [[11, 12], [28, 12], [28, 29], [11, 29]])
 })
 
+test('normalizes wrapped SAM2 polygon points returned as coordinate objects', () => {
+  const detections = [
+    { id: '1', label: 'cup', confidence: 0.95, x: 10, y: 10, width: 20, height: 20 },
+    { id: '2', label: 'pen', confidence: 0.9, x: 40, y: 10, width: 20, height: 20 },
+  ]
+  const result = normalizeRoboflowSegmentations({
+    predictions: [{
+      masks: [
+        { polygons: [[{ x: 11, y: 12 }, { x: 28, y: 12 }, { x: 28, y: 29 }]] },
+        { mask: [[[41, 12], [58, 12], [58, 29]]] },
+      ],
+    }],
+  }, detections)
+  assert.equal(result.length, 2)
+  assert.deepEqual(result[0].polygons[0], [[11, 12], [28, 12], [28, 29]])
+  assert.deepEqual(result[1].polygons[0], [[41, 12], [58, 12], [58, 29]])
+})
+
 test('rejects missing or mismatched SAM2 masks instead of fabricating cutouts', () => {
   const detections = [{ id: '1', label: 'cup', confidence: 0.95, x: 10, y: 10, width: 20, height: 20 }]
   assert.throws(
