@@ -110,6 +110,27 @@ export function brushStrokeIntersectsDetectionBox(
   return brushStrokeIntersectsPolygons(stroke, [polygon], brushRadius)
 }
 
+export function getObjectEraserBrushRegionKey(
+  stroke: readonly number[][],
+  brushRadius: number,
+  imageWidth: number,
+  imageHeight: number,
+) {
+  const points = stroke.map(asPoint).filter((point): point is ObjectEraserPoint => point !== null)
+  if (!points.length || imageWidth <= 0 || imageHeight <= 0) return ''
+  const radius = Number.isFinite(brushRadius) ? Math.max(0, brushRadius) : 0
+  const xs = points.map(point => point[0])
+  const ys = points.map(point => point[1])
+  const quantize = (value: number, dimension: number) =>
+    Math.round(Math.max(0, Math.min(dimension, value)) / dimension * 50) * 2
+  return [
+    quantize(Math.min(...xs) - radius, imageWidth),
+    quantize(Math.min(...ys) - radius, imageHeight),
+    quantize(Math.max(...xs) + radius, imageWidth),
+    quantize(Math.max(...ys) + radius, imageHeight),
+  ].join(':')
+}
+
 /** Stable cache key based on source image and normalized object position/size. */
 export function getObjectEraserTargetCacheKey(
   sourceKey: string,
@@ -117,6 +138,8 @@ export function getObjectEraserTargetCacheKey(
   polygons: readonly number[][][],
   imageWidth: number,
   imageHeight: number,
+  stroke?: readonly number[][],
+  brushRadius = 0,
 ) {
   const points = polygons.flat().map(asPoint).filter((point): point is ObjectEraserPoint => point !== null)
   if (!sourceKey || !points.length || imageWidth <= 0 || imageHeight <= 0) return ''
@@ -136,5 +159,6 @@ export function getObjectEraserTargetCacheKey(
     quantize(right, imageWidth),
     quantize(bottom, imageHeight),
   ].join(':')
-  return sourceKey + '::' + label.trim().toLocaleLowerCase() + '::' + bounds
+  const selectionKey = stroke?.length ? getObjectEraserBrushRegionKey(stroke, brushRadius, imageWidth, imageHeight) : ''
+  return sourceKey + '::' + label.trim().toLocaleLowerCase() + '::' + bounds + '::' + selectionKey
 }
