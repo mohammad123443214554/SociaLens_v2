@@ -791,14 +791,24 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         setObjectEraserError('No object was found in the highlighted area. Please brush directly over an object, not the background.')
         return
       }
-      const rankedTargets = detectedObjects.map((item: any) => ({
-        ...item,
-        brushMatchScore: scoreBrushStrokeAgainstPolygons(selection, item.polygons, objectEraserBrushSize),
-      })).sort((a: any, b: any) => b.brushMatchScore - a.brushMatchScore || b.confidence - a.confidence)
-      const target = rankedTargets[0]
-      if (!target || target.brushMatchScore <= 0) {
+      const matchedTargets = detectedObjects
+        .map((item: any) => ({
+          ...item,
+          brushMatchScore: scoreBrushStrokeAgainstPolygons(selection, item.polygons, objectEraserBrushSize),
+        }))
+        .filter((item: any) => item.brushMatchScore > 0 && Array.isArray(item.polygons) && item.polygons.length > 0)
+        .sort((a: any, b: any) => b.brushMatchScore - a.brushMatchScore || b.confidence - a.confidence)
+      if (!matchedTargets.length) {
         setObjectEraserError('The highlighted area could not be matched to a clear object. Please brush over the object itself and try again.')
         return
+      }
+      // Union every SAM2 silhouette touched by the painted area. Do not pick
+      // only the top-ranked mask: a single brush selection can cover multiple
+      // distinct objects and multiple parts of a compound object.
+      const target = {
+        label: matchedTargets.length === 1 ? String(matchedTargets[0].label || 'object') : matchedTargets.length + ' selected objects',
+        confidence: Math.min(...matchedTargets.map((item: any) => Number(item.confidence) || 0)),
+        polygons: matchedTargets.flatMap((item: any) => item.polygons),
       }
       const cacheKey = getObjectEraserTargetCacheKey(sourceKey, target.label, target.polygons, objectEraserImageSize.width, objectEraserImageSize.height, selection, objectEraserBrushSize)
       const exactCached = cacheKey ? objectEraserResultCacheRef.current.get(cacheKey) : undefined
@@ -818,8 +828,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (!maskContext) throw new Error('Could not prepare the object mask.')
 
       // Stability expects a black background and white pixels to replace.
-      // Fill the complete SAM2 silhouette, not just the painted brush path:
-      // one short highlight should remove the entire selected object.
+      // Fill the union of every SAM2 silhouette touched by the brush, not
+      // only one ranked instance and not merely the narrow brush path.
       maskContext.fillStyle = '#000'
       maskContext.fillRect(0, 0, maskCanvas.width, maskCanvas.height)
       maskContext.fillStyle = '#fff'
