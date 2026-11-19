@@ -29,7 +29,7 @@ import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, s
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
 const STUDIO_TEXT_ANIMATION_BY_ID = new Map(STUDIO_TEXT_ANIMATIONS.map(definition => [definition.id, definition]))
 import {
-  ArrowLeft, AudioLines, Check, Clapperboard, Undo2, Redo2,
+  ArrowLeft, AudioLines, Check, Clapperboard, Undo2, Redo2, Download,
   Bold, CaseUpper, ChevronDown, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
   Eraser, ImageMinus, ScanSearch, Palette, Pause, Play, Plus, Search, Sparkles, Strikethrough, Trash2, Type, Underline, Video, Move,
   Volume2, VolumeX, X
@@ -565,10 +565,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const objectEraserUndoRef = useRef<ElementLayer|null>(null)
   const objectEraserRedoRef = useRef<ElementLayer|null>(null)
   const objectEraserResultCacheRef = useRef<Map<string,ObjectEraserCachedRemoval>>(new Map())
-  const [backgroundEraserForegroundMasks, setBackgroundEraserForegroundMasks] = useState<Array<{id:string;polygons:number[][][];confidence:number}>>([])
-  const [backgroundEraserDetectBusy, setBackgroundEraserDetectBusy] = useState(false)
   const [backgroundEraserRemoveBusy, setBackgroundEraserRemoveBusy] = useState(false)
   const [backgroundEraserError, setBackgroundEraserError] = useState('')
+  const [backgroundEraserDownloadUrl, setBackgroundEraserDownloadUrl] = useState<string | null>(null)
   const [animationSearch, setAnimationSearch] = useState('')
   const [isAnimationPreviewing, setIsAnimationPreviewing] = useState(false)
   const [animationPreviewTime, setAnimationPreviewTime] = useState(0)
@@ -578,6 +577,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const saveSequence = useRef(0)
 
   useEffect(() => () => { if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current) }, [])
+  useEffect(() => {
+    if (!backgroundEraserDownloadUrl) return
+    return () => URL.revokeObjectURL(backgroundEraserDownloadUrl)
+  }, [backgroundEraserDownloadUrl])
   useEffect(() => {
     if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
     objectEraserPreviewUrlRef.current = null
@@ -591,10 +594,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setObjectEraserManualDrawing(false)
     setObjectEraserCursor(null)
     setObjectEraserError('')
-    setBackgroundEraserForegroundMasks([])
-    setBackgroundEraserDetectBusy(false)
     setBackgroundEraserRemoveBusy(false)
     setBackgroundEraserError('')
+    setBackgroundEraserDownloadUrl(null)
   }, [selectedElementId])
 
   const loadObjectEraserImage = useCallback(async (element: ElementLayer) => {
@@ -705,133 +707,32 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     return getObjectEraserTargetsUnderBrush(stroke, segmentedTargets, objectEraserBrushSize)
   }
 
-  const detectBackgroundForeground = async () => {
-    if (!selectedElement || selectedElement.kind !== 'image' || !objectEraserImageSize || !objectEraserSourceFileRef.current || backgroundEraserDetectBusy || backgroundEraserRemoveBusy) return
-    setBackgroundEraserDetectBusy(true)
-    setBackgroundEraserError('')
-    setBackgroundEraserForegroundMasks([])
-    try {
-      // Grounding DINO finds likely foreground subjects across common photo categories.
-      // SAM 2 then refines each detected silhouette before the inverse is previewed as background.
-      const foregroundPrompts = [
-        'person','people','human','face','dog','cat','bird','horse','cow','sheep',
-        'elephant','bear','zebra','giraffe','animal','car','bicycle','motorcycle','bus','truck',
-        'boat','airplane','train','vehicle','chair','sofa','couch','table','bed','bench',
-        'plant','tree','flower','potted plant','flower pot','bottle','cup','bag','backpack','suitcase',
-        'umbrella','hat','shoe','clothing','book','laptop','phone','food','toy','sports equipment'
-      ]
-      const sourceFile = objectEraserSourceFileRef.current
-      const detectionForm = new FormData()
-      detectionForm.append('image', sourceFile)
-      detectionForm.append('prompts', foregroundPrompts.join(','))
-      const detectionResponse = await fetch('/api/studio/object-eraser/prepare', { method: 'POST', body: detectionForm, credentials: 'same-origin' })
-      const detectionResult = await detectionResponse.json()
-      if (!detectionResponse.ok || !detectionResult?.ok) throw new Error(detectionResult?.error || 'Could not detect the foreground subjects. Please try again.')
-      const detections = (Array.isArray(detectionResult.detections) ? detectionResult.detections : [])
-        .filter((item: any) => item && Number.isFinite(Number(item.x)) && Number.isFinite(Number(item.y)) && Number(item.width) > 0 && Number(item.height) > 0)
-        .sort((a: any, b: any) => Number(b.confidence || 0) - Number(a.confidence || 0))
-        .slice(0, 100)
-      if (!detections.length) throw new Error('No clear foreground subject was detected. Try a photo with a more visible subject.')
-      const segmentationForm = new FormData()
-      segmentationForm.append('image', sourceFile)
-      segmentationForm.append('detections', JSON.stringify(detections))
-      segmentationForm.append('imageWidth', String(objectEraserImageSize.width))
-      segmentationForm.append('imageHeight', String(objectEraserImageSize.height))
-      const points: number[][] = []
-      for (let row = 1; row <= 4; row++) {
-        for (let column = 1; column <= 4; column++) {
-          points.push([objectEraserImageSize.width * column / 5, objectEraserImageSize.height * row / 5])
-        }
-      }
-      segmentationForm.append('brushPoints', JSON.stringify(points))
-      const segmentationResponse = await fetch('/api/studio/object-eraser/segment', { method: 'POST', body: segmentationForm, credentials: 'same-origin' })
-      const segmentationResult = await segmentationResponse.json()
-      if (!segmentationResponse.ok || !segmentationResult?.ok) throw new Error(segmentationResult?.error || 'Could not refine the foreground edges. Please try again.')
-      const masks = (Array.isArray(segmentationResult.segmentations) ? segmentationResult.segmentations : [])
-        .map((item: any) => ({
-          id: String(item.id || ''),
-          confidence: Number(item.confidence) || 0,
-          polygons: Array.isArray(item.polygons) ? item.polygons.filter((polygon: any) =>
-            Array.isArray(polygon) && polygon.length >= 3 && polygon.every((point: any) =>
-              Array.isArray(point) && point.length === 2 && point.every((value: any) => Number.isFinite(Number(value)))
-            )
-          ) : [],
-        }))
-        .filter((item: any) => item.polygons.length > 0)
-      if (!masks.length) throw new Error('The foreground silhouette could not be isolated clearly. Your original image has not been changed.')
-      setBackgroundEraserForegroundMasks(masks)
-    } catch (error) {
-      setBackgroundEraserError(error instanceof Error ? error.message : 'Background detection failed. Your original image is unchanged.')
-    } finally {
-      setBackgroundEraserDetectBusy(false)
-    }
-  }
-
-  const removeDetectedBackground = async () => {
-    if (!selectedElement || selectedElement.kind !== 'image' || !objectEraserImageSize || !backgroundEraserForegroundMasks.length || backgroundEraserRemoveBusy) return
-    const sourceUrl = objectEraserPreviewUrlRef.current
-    if (!sourceUrl) {
-      setBackgroundEraserError('The original photo preview is not ready. Reopen Background Eraser and try again.')
-      return
-    }
+  const removeBackgroundWithStability = async () => {
+    if (!selectedElement || selectedElement.kind !== 'image' || !objectEraserImageSize || !objectEraserSourceFileRef.current || backgroundEraserRemoveBusy || objectEraserBusy) return
+    const sourceFile = objectEraserSourceFileRef.current
     setBackgroundEraserRemoveBusy(true)
     setBackgroundEraserError('')
     try {
-      const width = objectEraserImageSize.width
-      const height = objectEraserImageSize.height
-      const sourceImage = await loadObjectEraserImageElement(sourceUrl)
-      if (sourceImage.naturalWidth !== width || sourceImage.naturalHeight !== height) throw new Error('The photo dimensions changed. Reopen Background Eraser and detect again.')
-      const outputCanvas = document.createElement('canvas')
-      outputCanvas.width = width
-      outputCanvas.height = height
-      const outputContext = outputCanvas.getContext('2d')
-      if (!outputContext) throw new Error('Could not prepare the transparent image.')
-      outputContext.drawImage(sourceImage, 0, 0, width, height)
-
-      const hardMask = document.createElement('canvas')
-      hardMask.width = width
-      hardMask.height = height
-      const maskContext = hardMask.getContext('2d')
-      if (!maskContext) throw new Error('Could not prepare the foreground mask.')
-      maskContext.fillStyle = '#000'
-      maskContext.fillRect(0, 0, width, height)
-      maskContext.fillStyle = '#fff'
-      maskContext.strokeStyle = '#fff'
-      maskContext.lineJoin = 'round'
-      maskContext.lineCap = 'round'
-      maskContext.lineWidth = Math.max(1, Math.min(3, Math.round(Math.max(width, height) * 0.001)))
-      let polygonCount = 0
-      for (const target of backgroundEraserForegroundMasks) {
-        for (const polygon of target.polygons) {
-          if (!Array.isArray(polygon) || polygon.length < 3) continue
-          maskContext.beginPath()
-          maskContext.moveTo(polygon[0][0], polygon[0][1])
-          for (let index = 1; index < polygon.length; index++) maskContext.lineTo(polygon[index][0], polygon[index][1])
-          maskContext.closePath()
-          maskContext.fill()
-          maskContext.stroke()
-          polygonCount++
-        }
-      }
-      if (!polygonCount) throw new Error('No valid foreground edges were available. Detect the background again.')
-
-      // Feather only the silhouette boundary slightly to avoid a jagged cutout.
-      const featheredMask = document.createElement('canvas')
-      featheredMask.width = width
-      featheredMask.height = height
-      const featherContext = featheredMask.getContext('2d')
-      if (!featherContext) throw new Error('Could not smooth the foreground edges.')
-      featherContext.filter = 'blur(0.8px)'
-      featherContext.drawImage(hardMask, 0, 0)
-      outputContext.globalCompositeOperation = 'destination-in'
-      outputContext.drawImage(featheredMask, 0, 0)
-      outputContext.globalCompositeOperation = 'source-over'
-
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        outputCanvas.toBlob(value => value ? resolve(value) : reject(new Error('Could not create the transparent PNG.')), 'image/png')
+      // Send the complete, unmodified source file. Stability's dedicated
+      // remove-background endpoint does not accept prompts or object masks.
+      const form = new FormData()
+      form.append('image', sourceFile, sourceFile.name || selectedElement.name || 'original-photo')
+      const response = await fetch('/api/studio/background-eraser/remove', {
+        method: 'POST',
+        body: form,
+        credentials: 'same-origin',
+        cache: 'no-store',
       })
-      if (blob.size < 100) throw new Error('The transparent image was empty. Your original photo is unchanged.')
-      const baseName = selectedElement.name.replace(/\.[^.]+$/, '') || 'studio-image'
+      if (!response.ok) {
+        let payload: any = null
+        try { payload = await response.json() } catch { /* use fallback below */ }
+        throw new Error(typeof payload?.error === 'string' ? payload.error : 'Stability AI could not remove the background. Your original photo is unchanged.')
+      }
+      const blob = await response.blob()
+      if (blob.type !== 'image/png' || blob.size < 100) {
+        throw new Error('Stability AI returned an invalid transparent PNG. Your original photo is unchanged.')
+      }
+      const baseName = selectedElement.name.replace(/\\.[^.]+$/, '') || 'studio-image'
       const file = new File([blob], baseName + '-background-removed.png', { type: 'image/png' })
       const storagePath = await uploadStudioAsset(projectId, file)
       const url = await createStudioAssetUrl(storagePath)
@@ -847,15 +748,15 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       objectEraserUndoRef.current = { ...selectedElement }
       objectEraserRedoRef.current = null
       setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, ...result } : item))
-      setBackgroundEraserForegroundMasks([])
+      setBackgroundEraserDownloadUrl(URL.createObjectURL(blob))
       setBackgroundEraserError('')
-      setNotice('Background removed. The transparent PNG is saved to your selected Studio image layer. Undo restores the original photo.')
+      setNotice('Background removed. The transparent PNG is saved to your Studio image layer and ready to download.')
       if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
       objectEraserPreviewUrlRef.current = null
       objectEraserSourceFileRef.current = null
       setObjectEraserImageSize(null)
     } catch (error) {
-      setBackgroundEraserError(error instanceof Error ? error.message : 'Background removal failed. Your original image is unchanged.')
+      setBackgroundEraserError(error instanceof Error ? error.message : 'Background removal failed. Your original photo is unchanged.')
     } finally {
       setBackgroundEraserRemoveBusy(false)
     }
@@ -2512,49 +2413,51 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-fuchsia-300/20 bg-fuchsia-400/10 text-fuchsia-200"><ScanSearch className="h-5 w-5" /></span>
                 <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold text-white">Object Eraser</span><span className="mt-1 block text-[9px] leading-4 text-slate-400">Detect and remove selected objects while preserving the rest of your image.</span><span className="mt-2 inline-flex items-center gap-1 text-[9px] font-semibold text-fuchsia-200">Open object eraser <span aria-hidden="true">→</span></span></span>
               </button>
-              <button type="button" onClick={() => { setBackgroundEraserForegroundMasks([]); setBackgroundEraserError(''); setObjectEraserError(''); setActivePanel('background-eraser') }} className="group flex w-full items-start gap-3 rounded-xl border border-white/[0.10] bg-gradient-to-br from-pink-500/[0.10] to-violet-500/[0.07] p-3 text-left transition hover:border-pink-300/45 hover:from-pink-500/[0.15] hover:to-violet-500/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400">
+              <button type="button" onClick={() => { setBackgroundEraserDownloadUrl(null); setBackgroundEraserError(''); setObjectEraserError(''); setActivePanel('background-eraser') }} className="group flex w-full items-start gap-3 rounded-xl border border-white/[0.10] bg-gradient-to-br from-pink-500/[0.10] to-violet-500/[0.07] p-3 text-left transition hover:border-pink-300/45 hover:from-pink-500/[0.15] hover:to-violet-500/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-pink-300/20 bg-pink-400/10 text-pink-200"><ImageMinus className="h-5 w-5" /></span>
                 <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold text-white">Background Eraser</span><span className="mt-1 block text-[9px] leading-4 text-slate-400">Detect the foreground subject and remove the background.</span><span className="mt-2 inline-flex items-center gap-1 text-[9px] font-semibold text-pink-200">Open background eraser <span aria-hidden="true">→</span></span></span>
               </button>
             </> : <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 p-5 text-center"><Eraser className="mb-3 h-7 w-7 text-slate-500" /><p className="text-[11px] font-semibold text-slate-200">Select a photo element</p><p className="mt-1 text-[9px] leading-4 text-slate-500">Eraser tools are available for image elements. Select a photo overlay on the canvas or timeline to continue.</p></div>}
-          </div>}
-
-          {activePanel === 'background-eraser' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+                   {activePanel === 'background-eraser' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <button type="button" onClick={() => setActivePanel('eraser')} className="inline-flex w-fit items-center gap-1.5 rounded-lg px-2 py-1.5 text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> Back to Eraser</button>
             {selectedElement?.kind === 'image' ? <>
               <section className="rounded-xl border border-white/10 bg-black/20 p-3">
                 <div className="mb-3 flex items-center justify-between">
-                  <div><h4 className="text-[10px] font-bold text-slate-100">Background Eraser</h4><p className="mt-1 text-[8px] text-slate-500">Detect the subject first. The pink area previews what will become transparent.</p></div>
+                  <div><h4 className="text-[10px] font-bold text-slate-100">Background Eraser</h4><p className="mt-1 text-[8px] text-slate-500">Remove only the background and keep the original foreground subject.</p></div>
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={undoObjectEraserStep} disabled={!objectEraserUndoRef.current || backgroundEraserDetectBusy || backgroundEraserRemoveBusy} title="Undo background removal" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5"/></button>
-                    <button type="button" onClick={redoObjectEraserStep} disabled={!objectEraserRedoRef.current || backgroundEraserDetectBusy || backgroundEraserRemoveBusy} title="Redo background removal" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5"/></button>
+                    <button type="button" onClick={undoObjectEraserStep} disabled={!objectEraserUndoRef.current || backgroundEraserRemoveBusy} title="Undo background removal" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5"/></button>
+                    <button type="button" onClick={redoObjectEraserStep} disabled={!objectEraserRedoRef.current || backgroundEraserRemoveBusy} title="Redo background removal" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5"/></button>
                   </div>
                 </div>
                 {objectEraserImageSize ? <div className="relative mx-auto w-full overflow-hidden rounded-lg bg-[#080b16]" style={{aspectRatio: objectEraserImageSize.width + '/' + objectEraserImageSize.height}}>
-                  <img src={objectEraserPreviewUrlRef.current || selectedElement.url} alt="Photo background preview" draggable={false} className="absolute inset-0 h-full w-full select-none object-fill"/>
-                  <svg viewBox={`0 0 ${objectEraserImageSize.width} ${objectEraserImageSize.height}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full pointer-events-none">
-                    {backgroundEraserForegroundMasks.length > 0 && <>
-                      <defs>
-                        <mask id="background-eraser-foreground-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={objectEraserImageSize.width} height={objectEraserImageSize.height}>
-                          <rect x="0" y="0" width={objectEraserImageSize.width} height={objectEraserImageSize.height} fill="white"/>
-                          {backgroundEraserForegroundMasks.flatMap(target => target.polygons).map((polygon,index) => <polygon key={index} points={polygon.map(point => point.join(',')).join(' ')} fill="black" stroke="black" strokeWidth={Math.max(1, objectEraserImageSize.width / 1400)} strokeLinejoin="round"/>)}
-                        </mask>
-                      </defs>
-                      <rect x="0" y="0" width={objectEraserImageSize.width} height={objectEraserImageSize.height} fill="#ec4899" opacity=".48" mask="url(#background-eraser-foreground-mask)"/>
-                    </>}
-                    {backgroundEraserDetectBusy && <g>
-                      <rect x="0" y="0" width={objectEraserImageSize.width} height="3" fill="#f9a8d4" opacity=".95">
-                        <animate attributeName="y" values={`0;${objectEraserImageSize.height};0`} dur="1.7s" repeatCount="indefinite"/>
-                      </rect>
-                    </g>}
-                  </svg>
-                </div> : <div className="flex aspect-[4/3] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] text-center text-[9px] text-slate-500">{objectEraserBusy ? 'Preparing photo…' : 'Preparing photo preview…'}</div>}
-                <div className="mt-3 flex items-center justify-between gap-2"><span className="text-[8px] text-slate-500">{backgroundEraserForegroundMasks.length ? backgroundEraserForegroundMasks.length + ' foreground regions detected' : objectEraserImageSize ? objectEraserImageSize.width + ' × ' + objectEraserImageSize.height : 'Photo loading'}</span>{backgroundEraserForegroundMasks.length > 0 && <button type="button" onClick={() => { setBackgroundEraserForegroundMasks([]); setBackgroundEraserError('') }} disabled={backgroundEraserDetectBusy || backgroundEraserRemoveBusy} className="rounded-md border border-white/10 px-2 py-1 text-[8px] font-semibold text-slate-300 disabled:opacity-40">Detect again</button>}</div>
+                  <img src={objectEraserPreviewUrlRef.current || selectedElement.url} alt="Original photo for background removal" draggable={false} className="absolute inset-0 h-full w-full select-none object-fill"/>
+                  {backgroundEraserRemoveBusy && <svg viewBox={`0 0 ${objectEraserImageSize.width} ${objectEraserImageSize.height}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full pointer-events-none">
+                    <defs>
+                      <linearGradient id="background-eraser-scan-gradient" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stopColor="#ec4899" stopOpacity="0"/>
+                        <stop offset="45%" stopColor="#f0abfc" stopOpacity=".9"/>
+                        <stop offset="55%" stopColor="#fce7f3" stopOpacity="1"/>
+                        <stop offset="100%" stopColor="#ec4899" stopOpacity="0"/>
+                      </linearGradient>
+                      <filter id="background-eraser-scan-glow" x="-30%" y="-500%" width="160%" height="1100%">
+                        <feGaussianBlur stdDeviation="5"/>
+                      </filter>
+                    </defs>
+                    <rect x="0" y="0" width={objectEraserImageSize.width} height="18" fill="url(#background-eraser-scan-gradient)" opacity=".55" filter="url(#background-eraser-scan-glow)">
+                      <animate attributeName="y" values={`-18;${objectEraserImageSize.height};-18`} dur="1.8s" repeatCount="indefinite"/>
+                    </rect>
+                    <rect x="0" y="0" width={objectEraserImageSize.width} height="2.5" fill="#f0abfc" opacity=".95">
+                      <animate attributeName="y" values={`-2.5;${objectEraserImageSize.height};-2.5`} dur="1.8s" repeatCount="indefinite"/>
+                    </rect>
+                  </svg>}
+                </div> : <div className="flex aspect-[4/3] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] text-center text-[9px] text-slate-500">{objectEraserBusy ? 'Preparing original photo…' : 'Preparing photo preview…'}</div>}
+                <div className="mt-3 flex items-center justify-between gap-2"><span className="text-[8px] text-slate-500">{objectEraserImageSize ? objectEraserImageSize.width + ' × ' + objectEraserImageSize.height : objectEraserBusy ? 'Loading original image…' : 'Photo loading'}</span></div>
                 {backgroundEraserError && <p role="status" className="mt-2 rounded-lg border border-amber-300/15 bg-amber-300/[0.06] p-2 text-[9px] leading-4 text-amber-100">{backgroundEraserError}</p>}
-                <button type="button" onClick={() => backgroundEraserForegroundMasks.length ? void removeDetectedBackground() : void detectBackgroundForeground()} disabled={!objectEraserImageSize || objectEraserBusy || backgroundEraserDetectBusy || backgroundEraserRemoveBusy} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:opacity-60">{backgroundEraserDetectBusy ? 'Detecting background…' : backgroundEraserRemoveBusy ? 'Removing background…' : backgroundEraserForegroundMasks.length ? 'Remove background' : 'Detect background'}</button>
+                <button type="button" onClick={() => void removeBackgroundWithStability()} disabled={!objectEraserImageSize || objectEraserBusy || backgroundEraserRemoveBusy} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:opacity-60">{backgroundEraserRemoveBusy ? 'Removing background…' : 'Remove background'}</button>
+                {backgroundEraserDownloadUrl && <a href={backgroundEraserDownloadUrl} download={selectedElement.name || 'background-removed.png'} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-fuchsia-300/25 bg-fuchsia-400/[0.08] px-3 py-2.5 text-[10px] font-bold text-fuchsia-100 transition hover:bg-fuchsia-400/[0.14]"><Download className="h-3.5 w-3.5"/>Download transparent PNG</a>}
               </section>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select a photo element to use Background Eraser.</div>}
-          </div>}
+          </div>}   </div>}
 
           {activePanel === 'object-eraser' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <button type="button" onClick={() => setActivePanel('eraser')} className="inline-flex w-fit items-center gap-1.5 rounded-lg px-2 py-1.5 text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> Back to Eraser</button>
