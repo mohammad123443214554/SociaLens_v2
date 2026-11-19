@@ -184,6 +184,22 @@ export function scoreBrushStrokeAgainstPolygons(
   return matched / samples.length
 }
 
+/**
+ * Return every segmented object touched by the user's brush. A brush region
+ * may intentionally cover several objects (for example flowers and a pot);
+ * never collapse this list to only the highest-scoring instance.
+ */
+export function getObjectEraserTargetsUnderBrush<T extends { polygons: number[][][] }>(
+  stroke: readonly number[][],
+  targets: readonly T[],
+  brushRadius = 0,
+): T[] {
+  return targets.filter(target =>
+    Array.isArray(target.polygons)
+    && brushStrokeIntersectsPolygons(stroke, target.polygons, brushRadius)
+  )
+}
+
 /** Scores how strongly the brush stroke targets a detection rectangle. */
 export function scoreBrushStrokeAgainstDetectionBox(
  stroke:readonly number[][],
