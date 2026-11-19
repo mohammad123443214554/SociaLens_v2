@@ -132,7 +132,7 @@ test('configures Stability AI and the Comfy-compatible migration host safely', (
   assert.equal(STABILITY_ERASE_CREDITS, 5)
 })
 
-test('uses Stability AI dedicated background removal without object masks or prompts', () => {
+test('configures Stability AI dedicated background removal and maps provider failures', () => {
   assert.equal(STABILITY_REMOVE_BACKGROUND_PATH, '/v2beta/stable-image/edit/remove-background')
   assert.equal(mapStabilityBackgroundError(401).code, 'unauthorized')
   assert.equal(mapStabilityBackgroundError(402).code, 'insufficient_credits')
