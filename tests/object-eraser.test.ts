@@ -1,5 +1,5 @@
 import test from 'node:test'
-import { getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons } from '../lib/studio/object-eraser-selection.ts'
+import { getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons } from '../lib/studio/object-eraser-selection.ts'
 import assert from 'node:assert/strict'
 import {
   detectObjectEraserImageType,
@@ -134,4 +134,18 @@ test('object eraser cache key is stable for small segmentation boundary changes'
   const differentObject = getObjectEraserTargetCacheKey('project/image.png', 'cup', [[[50, 20], [90, 20], [90, 60], [50, 60]]], 100, 100)
   assert.equal(first, second)
   assert.notEqual(first, differentObject)
+})
+
+
+test('object eraser cache separates different brush regions on the same object', () => {
+  const object = [[[20, 20], [80, 20], [80, 80], [20, 80]]]
+  const firstStroke = [[35, 35], [45, 45]]
+  const sameAreaStroke = [[35.2, 35.1], [45.1, 45.2]]
+  const differentAreaStroke = [[65, 65], [75, 75]]
+  const first = getObjectEraserTargetCacheKey('project/image.png', 'cup', object, 100, 100, firstStroke, 8)
+  const same = getObjectEraserTargetCacheKey('project/image.png', 'cup', object, 100, 100, sameAreaStroke, 8)
+  const different = getObjectEraserTargetCacheKey('project/image.png', 'cup', object, 100, 100, differentAreaStroke, 8)
+  assert.equal(first, same)
+  assert.notEqual(first, different)
+  assert.notEqual(getObjectEraserBrushRegionKey(firstStroke, 8, 100, 100), getObjectEraserBrushRegionKey(differentAreaStroke, 8, 100, 100))
 })
