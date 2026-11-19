@@ -22,7 +22,7 @@ import { CINEMATIC_LIGHT_ANIMATIONS } from '@/lib/studio/cinematic-light-animati
 import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-animations'
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
 import { extractStudioImagePalette, createStudioRecoloredCanvas, STUDIO_REPLACEMENT_SWATCHES, type StudioColorReplacement } from '@/lib/studio/color-replacement'
-import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, scoreBrushStrokeAgainstPolygons } from '@/lib/studio/object-eraser-selection'
+import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, scoreBrushStrokeAgainstPolygons, scoreBrushStrokeAgainstDetectionBox } from '@/lib/studio/object-eraser-selection'
 import { scaleObjectEraserPolygons } from '@/lib/studio/object-eraser-selection'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
@@ -651,11 +651,18 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       item && brushStrokeIntersectsDetectionBox(stroke, item, objectEraserBrushSize)
     )
     if (!candidates.length) return []
+    // A single removal action targets one object. Sending several nearby
+    // boxes in one SAM2 request can make the returned mask map to the wrong
+    // candidate, so choose the box most directly covered by the user's brush.
+    const focusedCandidate = candidates
+      .map((item: any) => ({ ...item, brushMatchScore: scoreBrushStrokeAgainstDetectionBox(stroke, item, objectEraserBrushSize) }))
+      .sort((a: any, b: any) => b.brushMatchScore - a.brushMatchScore || b.confidence - a.confidence)[0]
+    if (!focusedCandidate || focusedCandidate.brushMatchScore <= 0) return []
     setObjectEraserBusy(false)
     setObjectEraserSegmentBusy(true)
     const segmentationForm = new FormData()
     segmentationForm.append('image', file)
-    segmentationForm.append('detections', JSON.stringify(candidates))
+    segmentationForm.append('detections', JSON.stringify([focusedCandidate]))
     segmentationForm.append('imageWidth', String(objectEraserImageSize!.width))
     segmentationForm.append('imageHeight', String(objectEraserImageSize!.height))
     segmentationForm.append('brushPoints', JSON.stringify(stroke))
