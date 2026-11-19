@@ -2368,7 +2368,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                       cy={objectEraserManualPoints[0][1]}
                       r={objectEraserBrushSize}
                       fill="rgba(217,70,239,.22)"
-                      stroke="rgba(255,255,255,.7)"
+                      stroke="#d946ef"
                       strokeWidth={Math.max(1, objectEraserImageSize.width / 1200)}
                       pointerEvents="none"
                     />}
