@@ -13,7 +13,17 @@ export type PreparedObjectEraserImage = { mimeType: ObjectEraserImageType; size:
 export type ObjectEraserDetection = { id: string; label: string; confidence: number; x: number; y: number; width: number; height: number }
 export type RoboflowFailureCode = 'not_configured' | 'unauthorized' | 'quota_exceeded' | 'image_too_large' | 'model_not_found' | 'provider_unavailable' | 'request_timeout' | 'provider_error'
 export class RoboflowRequestError extends Error {
-  constructor(message: string, public readonly code: RoboflowFailureCode, public readonly status: number, public readonly retryable = false) { super(message); this.name = 'RoboflowRequestError' }
+  public readonly code: RoboflowFailureCode
+  public readonly status: number
+  public readonly retryable: boolean
+
+  constructor(message: string, code: RoboflowFailureCode, status: number, retryable = false) {
+    super(message)
+    this.name = 'RoboflowRequestError'
+    this.code = code
+    this.status = status
+    this.retryable = retryable
+  }
 }
 const SIGNATURES: Array<{mimeType:ObjectEraserImageType;matches:(b:Uint8Array)=>boolean}> = [
  {mimeType:'image/jpeg',matches:b=>b.length>=3&&b[0]===255&&b[1]===216&&b[2]===255},
