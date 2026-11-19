@@ -502,18 +502,18 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setObjectEraserError('')
   }, [selectedElementId])
 
-  const loadObjectEraserImage = useCallback(async () => {
-    if (!selectedElement || selectedElement.kind !== 'image' || objectEraserBusy) return
+  const loadObjectEraserImage = useCallback(async (element: ElementLayer) => {
+    if (element.kind !== 'image' || objectEraserBusy) return
     const sequence = ++objectEraserLoadSequenceRef.current
     setObjectEraserBusy(true)
     setObjectEraserError('')
     let previewUrl: string | null = null
     try {
-      const source = await fetch(selectedElement.url, { cache: 'no-store' })
+      const source = await fetch(element.url, { cache: 'no-store' })
       if (!source.ok) throw new Error('Could not load the selected image. Please try again.')
       const blob = await source.blob()
       if (!blob.type.startsWith('image/')) throw new Error('The selected Studio asset is not a supported image.')
-      const file = new File([blob], selectedElement.name || 'studio-image', { type: blob.type })
+      const file = new File([blob], element.name || 'studio-image', { type: blob.type })
       previewUrl = URL.createObjectURL(blob)
       const image = new Image()
       image.src = previewUrl
@@ -540,7 +540,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (previewUrl) URL.revokeObjectURL(previewUrl)
       if (sequence === objectEraserLoadSequenceRef.current) setObjectEraserBusy(false)
     }
-  }, [selectedElement, objectEraserBusy, objectEraserLoadSequenceRef])
+  }, [objectEraserBusy, objectEraserLoadSequenceRef])
 
 
   // Detection and segmentation are deliberately deferred until the user presses
@@ -548,7 +548,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   // triggers a provider request or highlights automatically detected objects.
   useEffect(() => {
     if (activePanel === 'object-eraser' && selectedElement?.kind === 'image' && !objectEraserBusy && !objectEraserImageSize && !objectEraserError) {
-      void loadObjectEraserImage()
+      void loadObjectEraserImage(selectedElement)
     }
   }, [activePanel, selectedElementId, objectEraserImageSize, objectEraserBusy, objectEraserError, loadObjectEraserImage])
 
