@@ -1,5 +1,5 @@
-export const STABILITY_INPAINT_PATH = '/v2beta/stable-image/edit/inpaint'
-export const STABILITY_INPAINT_CREDITS = 5
+export const STABILITY_ERASE_PATH = '/v2beta/stable-image/edit/erase'
+export const STABILITY_ERASE_CREDITS = 5
 
 const ALLOWED_API_HOSTS = new Set(['api.stability.ai', 'stability.comfy.org'])
 
