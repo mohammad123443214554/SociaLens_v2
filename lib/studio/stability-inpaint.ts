@@ -8,7 +8,7 @@ export function getStabilityImageApiBaseUrl(value = process.env.STABILITY_API_BA
   let parsed: URL
   try { parsed = new URL(raw) } catch { throw new Error('STABILITY_API_BASE_URL must be a valid HTTPS URL.') }
   if (parsed.protocol !== 'https:' || !ALLOWED_API_HOSTS.has(parsed.hostname) || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) {
-    throw new Error('STABILITY_API_BASE_URL must be https://api.stability.ai or https://stability.comfy.org.')
+    throw new Error('STABILITY_API_BASE_URL must be https://api.stability.ai or https://stability.comfy.org and must use an HTTPS URL.')
   }
   return parsed.origin
 }
