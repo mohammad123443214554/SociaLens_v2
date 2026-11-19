@@ -698,6 +698,162 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     return getObjectEraserTargetsUnderBrush(stroke, segmentedTargets, objectEraserBrushSize)
   }
 
+  const detectBackgroundForeground = async () => {
+    if (!selectedElement || selectedElement.kind !== 'image' || !objectEraserImageSize || !objectEraserSourceFileRef.current || backgroundEraserDetectBusy || backgroundEraserRemoveBusy) return
+    setBackgroundEraserDetectBusy(true)
+    setBackgroundEraserError('')
+    setBackgroundEraserForegroundMasks([])
+    try {
+      // Grounding DINO finds likely foreground subjects across common photo categories.
+      // SAM 2 then refines each detected silhouette before the inverse is previewed as background.
+      const foregroundPrompts = [
+        'person','people','human','face','dog','cat','bird','horse','cow','sheep',
+        'elephant','bear','zebra','giraffe','animal','car','bicycle','motorcycle','bus','truck',
+        'boat','airplane','train','vehicle','chair','sofa','couch','table','bed','bench',
+        'plant','tree','flower','potted plant','flower pot','bottle','cup','bag','backpack','suitcase',
+        'umbrella','hat','shoe','clothing','book','laptop','phone','food','toy','sports equipment'
+      ]
+      const sourceFile = objectEraserSourceFileRef.current
+      const detectionForm = new FormData()
+      detectionForm.append('image', sourceFile)
+      detectionForm.append('prompts', foregroundPrompts.join(','))
+      const detectionResponse = await fetch('/api/studio/object-eraser/prepare', { method: 'POST', body: detectionForm, credentials: 'same-origin' })
+      const detectionResult = await detectionResponse.json()
+      if (!detectionResponse.ok || !detectionResult?.ok) throw new Error(detectionResult?.error || 'Could not detect the foreground subjects. Please try again.')
+      const detections = (Array.isArray(detectionResult.detections) ? detectionResult.detections : [])
+        .filter((item: any) => item && Number.isFinite(Number(item.x)) && Number.isFinite(Number(item.y)) && Number(item.width) > 0 && Number(item.height) > 0)
+        .sort((a: any, b: any) => Number(b.confidence || 0) - Number(a.confidence || 0))
+        .slice(0, 100)
+      if (!detections.length) throw new Error('No clear foreground subject was detected. Try a photo with a more visible subject.')
+      const segmentationForm = new FormData()
+      segmentationForm.append('image', sourceFile)
+      segmentationForm.append('detections', JSON.stringify(detections))
+      segmentationForm.append('imageWidth', String(objectEraserImageSize.width))
+      segmentationForm.append('imageHeight', String(objectEraserImageSize.height))
+      const points: number[][] = []
+      for (let row = 1; row <= 4; row++) {
+        for (let column = 1; column <= 4; column++) {
+          points.push([objectEraserImageSize.width * column / 5, objectEraserImageSize.height * row / 5])
+        }
+      }
+      segmentationForm.append('brushPoints', JSON.stringify(points))
+      const segmentationResponse = await fetch('/api/studio/object-eraser/segment', { method: 'POST', body: segmentationForm, credentials: 'same-origin' })
+      const segmentationResult = await segmentationResponse.json()
+      if (!segmentationResponse.ok || !segmentationResult?.ok) throw new Error(segmentationResult?.error || 'Could not refine the foreground edges. Please try again.')
+      const masks = (Array.isArray(segmentationResult.segmentations) ? segmentationResult.segmentations : [])
+        .map((item: any) => ({
+          id: String(item.id || ''),
+          confidence: Number(item.confidence) || 0,
+          polygons: Array.isArray(item.polygons) ? item.polygons.filter((polygon: any) =>
+            Array.isArray(polygon) && polygon.length >= 3 && polygon.every((point: any) =>
+              Array.isArray(point) && point.length === 2 && point.every((value: any) => Number.isFinite(Number(value)))
+            )
+          ) : [],
+        }))
+        .filter((item: any) => item.polygons.length > 0)
+      if (!masks.length) throw new Error('The foreground silhouette could not be isolated clearly. Your original image has not been changed.')
+      setBackgroundEraserForegroundMasks(masks)
+    } catch (error) {
+      setBackgroundEraserError(error instanceof Error ? error.message : 'Background detection failed. Your original image is unchanged.')
+    } finally {
+      setBackgroundEraserDetectBusy(false)
+    }
+  }
+
+  const removeDetectedBackground = async () => {
+    if (!selectedElement || selectedElement.kind !== 'image' || !objectEraserImageSize || !backgroundEraserForegroundMasks.length || backgroundEraserRemoveBusy) return
+    const sourceUrl = objectEraserPreviewUrlRef.current
+    if (!sourceUrl) {
+      setBackgroundEraserError('The original photo preview is not ready. Reopen Background Eraser and try again.')
+      return
+    }
+    setBackgroundEraserRemoveBusy(true)
+    setBackgroundEraserError('')
+    try {
+      const width = objectEraserImageSize.width
+      const height = objectEraserImageSize.height
+      const sourceImage = await loadObjectEraserImageElement(sourceUrl)
+      if (sourceImage.naturalWidth !== width || sourceImage.naturalHeight !== height) throw new Error('The photo dimensions changed. Reopen Background Eraser and detect again.')
+      const outputCanvas = document.createElement('canvas')
+      outputCanvas.width = width
+      outputCanvas.height = height
+      const outputContext = outputCanvas.getContext('2d')
+      if (!outputContext) throw new Error('Could not prepare the transparent image.')
+      outputContext.drawImage(sourceImage, 0, 0, width, height)
+
+      const hardMask = document.createElement('canvas')
+      hardMask.width = width
+      hardMask.height = height
+      const maskContext = hardMask.getContext('2d')
+      if (!maskContext) throw new Error('Could not prepare the foreground mask.')
+      maskContext.fillStyle = '#000'
+      maskContext.fillRect(0, 0, width, height)
+      maskContext.fillStyle = '#fff'
+      maskContext.strokeStyle = '#fff'
+      maskContext.lineJoin = 'round'
+      maskContext.lineCap = 'round'
+      maskContext.lineWidth = Math.max(1, Math.min(3, Math.round(Math.max(width, height) * 0.001)))
+      let polygonCount = 0
+      for (const target of backgroundEraserForegroundMasks) {
+        for (const polygon of target.polygons) {
+          if (!Array.isArray(polygon) || polygon.length < 3) continue
+          maskContext.beginPath()
+          maskContext.moveTo(polygon[0][0], polygon[0][1])
+          for (let index = 1; index < polygon.length; index++) maskContext.lineTo(polygon[index][0], polygon[index][1])
+          maskContext.closePath()
+          maskContext.fill()
+          maskContext.stroke()
+          polygonCount++
+        }
+      }
+      if (!polygonCount) throw new Error('No valid foreground edges were available. Detect the background again.')
+
+      // Feather only the silhouette boundary slightly to avoid a jagged cutout.
+      const featheredMask = document.createElement('canvas')
+      featheredMask.width = width
+      featheredMask.height = height
+      const featherContext = featheredMask.getContext('2d')
+      if (!featherContext) throw new Error('Could not smooth the foreground edges.')
+      featherContext.filter = 'blur(0.8px)'
+      featherContext.drawImage(hardMask, 0, 0)
+      outputContext.globalCompositeOperation = 'destination-in'
+      outputContext.drawImage(featheredMask, 0, 0)
+      outputContext.globalCompositeOperation = 'source-over'
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        outputCanvas.toBlob(value => value ? resolve(value) : reject(new Error('Could not create the transparent PNG.')), 'image/png')
+      })
+      if (blob.size < 100) throw new Error('The transparent image was empty. Your original photo is unchanged.')
+      const baseName = selectedElement.name.replace(/\.[^.]+$/, '') || 'studio-image'
+      const file = new File([blob], baseName + '-background-removed.png', { type: 'image/png' })
+      const storagePath = await uploadStudioAsset(projectId, file)
+      const url = await createStudioAssetUrl(storagePath)
+      const result = {
+        url,
+        storagePath,
+        name: file.name,
+        fileSize: file.size,
+        originalStoragePath: selectedElement.originalStoragePath || selectedElement.storagePath,
+        originalName: selectedElement.originalName || selectedElement.name,
+        originalFileSize: selectedElement.originalFileSize ?? selectedElement.fileSize,
+      }
+      objectEraserUndoRef.current = { ...selectedElement }
+      objectEraserRedoRef.current = null
+      setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, ...result } : item))
+      setBackgroundEraserForegroundMasks([])
+      setBackgroundEraserError('')
+      setNotice('Background removed. The transparent PNG is saved to your selected Studio image layer. Undo restores the original photo.')
+      if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
+      objectEraserPreviewUrlRef.current = null
+      objectEraserSourceFileRef.current = null
+      setObjectEraserImageSize(null)
+    } catch (error) {
+      setBackgroundEraserError(error instanceof Error ? error.message : 'Background removal failed. Your original image is unchanged.')
+    } finally {
+      setBackgroundEraserRemoveBusy(false)
+    }
+  }
+
   const clearObjectEraserResult = () => {
     setObjectEraserResultUrl(current => {
       if (current?.startsWith('blob:')) URL.revokeObjectURL(current)
