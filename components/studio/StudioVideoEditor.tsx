@@ -606,6 +606,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if(cached){
       objectEraserUndoRef.current={...selectedElement};objectEraserRedoRef.current=null
       setElements(items=>items.map(item=>item.id===selectedElement.id?{...item,...cached}:item))
+      if(objectEraserPreviewUrlRef.current)URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
+      objectEraserPreviewUrlRef.current=null
+      setObjectEraserImageSize(null);setObjectEraserObjects([])
       setObjectEraserManualPoints([]);setObjectEraserManualActive(false);setObjectEraserSelectedId(null);setObjectEraserError('')
       setNotice('Reused the previous removal result. No additional AI credits were used.')
       return
@@ -664,6 +667,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       } : item))
       objectEraserResultCacheRef.current.set(cacheKey,{url,storagePath,name:file.name,fileSize:file.size,originalStoragePath:selectedElement.originalStoragePath||selectedElement.storagePath,originalName:selectedElement.originalName||selectedElement.name,originalFileSize:selectedElement.originalFileSize??selectedElement.fileSize})
       clearObjectEraserResult()
+      if(objectEraserPreviewUrlRef.current)URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
+      objectEraserPreviewUrlRef.current=null
+      setObjectEraserImageSize(null)
       setObjectEraserObjects(items => items.filter(item => item.id !== detectedTarget.id))
       setObjectEraserSelectedId(null)
       setObjectEraserManualPoints([])
