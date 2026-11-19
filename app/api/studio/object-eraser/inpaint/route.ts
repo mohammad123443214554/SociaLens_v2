@@ -38,7 +38,6 @@ export async function POST(request: NextRequest) {
 
   const storagePath = typeof body.storagePath === 'string' ? body.storagePath : ''
   const projectId = typeof body.projectId === 'string' ? body.projectId : ''
-  const label = typeof body.label === 'string' ? body.label.trim().slice(0, 60) : 'object'
   const maskDataUrl = typeof body.maskDataUrl === 'string' ? body.maskDataUrl : ''
 
   if (!projectId || projectId.length > 100 || !storagePath.startsWith(user.id + '/' + projectId + '/')) {
