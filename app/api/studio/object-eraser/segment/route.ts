@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { normalizeRoboflowSegmentations, scaleObjectEraserPolygons, OBJECT_ERASER_MAX_IMAGE_BYTES, prepareObjectEraserImage, requestRoboflow, RoboflowRequestError, type ObjectEraserDetection } from '@/lib/studio/object-eraser'
+import { scaleObjectEraserPolygons } from '@/lib/studio/object-eraser-selection'
+import { normalizeRoboflowSegmentations, OBJECT_ERASER_MAX_IMAGE_BYTES, prepareObjectEraserImage, requestRoboflow, RoboflowRequestError, type ObjectEraserDetection } from '@/lib/studio/object-eraser'
 
 export const runtime='nodejs'
 export const maxDuration=60
