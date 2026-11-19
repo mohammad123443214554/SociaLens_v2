@@ -9,7 +9,7 @@ import {
   RoboflowRequestError,
   prepareObjectEraserImage,
 } from '../lib/studio/object-eraser.ts'
-import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_INPAINT_CREDITS, STABILITY_INPAINT_PATH } from '../lib/studio/stability-inpaint.ts'
+import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_ERASE_CREDITS, STABILITY_ERASE_PATH } from '../lib/studio/stability-inpaint.ts'
 
 test('detects supported image signatures instead of trusting the filename', () => {
   assert.equal(detectObjectEraserImageType(new Uint8Array([255, 216, 255, 0])), 'image/jpeg')
@@ -98,8 +98,8 @@ test('configures Stability AI and the Comfy-compatible migration host safely', (
   assert.equal(getStabilityImageApiBaseUrl('https://stability.comfy.org'), 'https://stability.comfy.org')
   assert.throws(() => getStabilityImageApiBaseUrl('http://api.stability.ai'), /HTTPS URL/)
   assert.throws(() => getStabilityImageApiBaseUrl('https://attacker.example'), /must be https/)
-  assert.equal(STABILITY_INPAINT_PATH, '/v2beta/stable-image/edit/inpaint')
-  assert.equal(STABILITY_INPAINT_CREDITS, 5)
+  assert.equal(STABILITY_ERASE_PATH, '/v2beta/stable-image/edit/erase')
+  assert.equal(STABILITY_ERASE_CREDITS, 5)
 })
 
 test('maps Stability AI authentication, credit, safety, and retry failures', () => {
