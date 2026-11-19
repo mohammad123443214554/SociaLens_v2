@@ -762,6 +762,38 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     }
   }
 
+  const restoreBackgroundToOriginal = async () => {
+    if (!selectedElement || selectedElement.kind !== 'image' || !selectedElement.originalStoragePath || backgroundEraserRemoveBusy || objectEraserBusy) return
+    setBackgroundEraserRemoveBusy(true)
+    setBackgroundEraserError('')
+    try {
+      // Restore the exact source asset saved before background removal. This
+      // avoids another AI request and preserves the original photo unchanged.
+      const originalStoragePath = selectedElement.originalStoragePath
+      const originalUrl = await createStudioAssetUrl(originalStoragePath)
+      objectEraserUndoRef.current = { ...selectedElement }
+      objectEraserRedoRef.current = null
+      setElements(items => items.map(item => item.id === selectedElement.id ? {
+        ...item,
+        url: originalUrl,
+        storagePath: originalStoragePath,
+        name: selectedElement.originalName || selectedElement.name.replace(/-background-removed\\.png$/i, ''),
+        fileSize: selectedElement.originalFileSize ?? selectedElement.fileSize,
+        originalStoragePath: undefined,
+        originalName: undefined,
+        originalFileSize: undefined,
+      } : item))
+      setBackgroundEraserDownloadUrl(null)
+      setObjectEraserSourceFileRef.current = null
+      setObjectEraserImageSize(null)
+      setNotice('Original background restored. Your full photo is back in the Studio layer.')
+    } catch (error) {
+      setBackgroundEraserError(error instanceof Error ? error.message : 'Could not restore the original background. Your edited photo is unchanged.')
+    } finally {
+      setBackgroundEraserRemoveBusy(false)
+    }
+  }
+
   const clearObjectEraserResult = () => {
     setObjectEraserResultUrl(current => {
       if (current?.startsWith('blob:')) URL.revokeObjectURL(current)
@@ -2453,7 +2485,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 </div> : <div className="flex aspect-[4/3] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] text-center text-[9px] text-slate-500">{objectEraserBusy ? 'Preparing original photo…' : 'Preparing photo preview…'}</div>}
                 <div className="mt-3 flex items-center justify-between gap-2"><span className="text-[8px] text-slate-500">{objectEraserImageSize ? objectEraserImageSize.width + ' × ' + objectEraserImageSize.height : objectEraserBusy ? 'Loading original image…' : 'Photo loading'}</span></div>
                 {backgroundEraserError && <p role="status" className="mt-2 rounded-lg border border-amber-300/15 bg-amber-300/[0.06] p-2 text-[9px] leading-4 text-amber-100">{backgroundEraserError}</p>}
-                <button type="button" onClick={() => void removeBackgroundWithStability()} disabled={!objectEraserImageSize || objectEraserBusy || backgroundEraserRemoveBusy} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:opacity-60">{backgroundEraserRemoveBusy ? 'Removing background…' : 'Remove background'}</button>
+                {selectedElement?.kind === 'image' && selectedElement.originalStoragePath ? (
+                  <button type="button" onClick={() => void restoreBackgroundToOriginal()} disabled={objectEraserBusy || backgroundEraserRemoveBusy} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:opacity-60">{backgroundEraserRemoveBusy ? 'Restoring background…' : 'Restore background'}</button>
+                ) : (
+                  <button type="button" onClick={() => void removeBackgroundWithStability()} disabled={!objectEraserImageSize || objectEraserBusy || backgroundEraserRemoveBusy} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:opacity-60">{backgroundEraserRemoveBusy ? 'Removing background…' : 'Remove background'}</button>
+                )}
                 {backgroundEraserDownloadUrl && <a href={backgroundEraserDownloadUrl} download={selectedElement.name || 'background-removed.png'} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-fuchsia-300/25 bg-fuchsia-400/[0.08] px-3 py-2.5 text-[10px] font-bold text-fuchsia-100 transition hover:bg-fuchsia-400/[0.14]"><Download className="h-3.5 w-3.5"/>Download transparent PNG</a>}
               </section>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select a photo element to use Background Eraser.</div>}
