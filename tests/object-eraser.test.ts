@@ -1,5 +1,5 @@
 import test from 'node:test'
-import { getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons } from '../lib/studio/object-eraser-selection.ts'
+import { getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, scoreBrushStrokeAgainstPolygons } from '../lib/studio/object-eraser-selection.ts'
 import assert from 'node:assert/strict'
 import {
   detectObjectEraserImageType,
@@ -126,6 +126,15 @@ test('object eraser rejects a brush stroke over empty background', () => {
 test('object eraser accounts for the circular brush radius near an object edge', () => {
   const object = [[[40, 40], [60, 40], [60, 60], [40, 60]]]
   assert.equal(brushStrokeIntersectsPolygons([[0, 37], [100, 37]], object, 4), true)
+})
+
+test('object eraser chooses the segmented object most directly covered by the brush', () => {
+  const paintedObject = [[[20, 20], [42, 20], [42, 48], [20, 48]]]
+  const nearbyObject = [[[58, 20], [82, 20], [82, 48], [58, 48]]]
+  const brush = [[24, 32], [38, 32]]
+  assert.ok(scoreBrushStrokeAgainstPolygons(brush, paintedObject, 3) > 0.9)
+  assert.equal(scoreBrushStrokeAgainstPolygons(brush, nearbyObject, 3), 0)
+  assert.ok(scoreBrushStrokeAgainstPolygons([[21, 21]], paintedObject, 2) > 0)
 })
 
 test('object eraser cache key is stable for small segmentation boundary changes', () => {
