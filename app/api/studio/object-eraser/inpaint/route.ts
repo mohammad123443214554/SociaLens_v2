@@ -21,7 +21,7 @@ function safeProviderMessage(payload: unknown, fallback: string) {
   const record = payload as Record<string, unknown>
   const errors = Array.isArray(record.errors) ? record.errors.filter(item => typeof item === 'string').join('; ') : ''
   const detail = errors || (typeof record.message === 'string' ? record.message : typeof record.detail === 'string' ? record.detail : '')
-  return (detail || fallback).replace(/https?:\\/\\/\\S+/g, '[provider URL]').replace(/(?:api[_-]?key|authorization)[=: ]+[^&\\s,]+/gi, '[redacted]').slice(0, 400)
+  return (detail || fallback).replace(/https?:\/\/\S+/g, '[provider URL]').replace(/(?:api[_-]?key|authorization)[=: ]+[^&\\s,]+/gi, '[redacted]').slice(0, 400)
 }
 
 function readPngDimensions(bytes: Uint8Array) {
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   if (!Number.isSafeInteger(imageWidth) || !Number.isSafeInteger(imageHeight) || imageWidth < 64 || imageHeight < 64 || imageWidth * imageHeight > 9_437_184) {
     return fail('The selected photo dimensions are not supported for object removal.', 400, 'invalid_dimensions')
   }
-  if (!/^data:image\\/png;base64,[A-Za-z0-9+/]+=*$/.test(maskDataUrl) || maskDataUrl.length > 2_500_000) {
+  if (!/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/.test(maskDataUrl) || maskDataUrl.length > 2_500_000) {
     return fail('The object mask is invalid or too large. Please detect the object again.', 400, 'invalid_mask')
   }
 
