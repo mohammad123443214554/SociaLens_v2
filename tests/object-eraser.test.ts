@@ -1,5 +1,5 @@
 import test from 'node:test'
-import { getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, scoreBrushStrokeAgainstPolygons, scaleObjectEraserPolygons } from '../lib/studio/object-eraser-selection.ts'
+import { getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, scoreBrushStrokeAgainstPolygons, scaleObjectEraserPolygons, scoreBrushStrokeAgainstDetectionBox } from '../lib/studio/object-eraser-selection.ts'
 import assert from 'node:assert/strict'
 import {
   detectObjectEraserImageType,
@@ -149,6 +149,15 @@ test('object eraser rejects a brush stroke over empty background', () => {
 test('object eraser accounts for the circular brush radius near an object edge', () => {
   const object = [[[40, 40], [60, 40], [60, 60], [40, 60]]]
   assert.equal(brushStrokeIntersectsPolygons([[0, 37], [100, 37]], object, 4), true)
+})
+
+
+test('object eraser prioritizes the detection box directly covered by the brush', () => {
+  const stroke = [[25, 40], [35, 40]]
+  const selected = { x: 20, y: 20, width: 30, height: 40 }
+  const nearby = { x: 60, y: 20, width: 30, height: 40 }
+  assert.ok(scoreBrushStrokeAgainstDetectionBox(stroke, selected, 3) > 0.9)
+  assert.equal(scoreBrushStrokeAgainstDetectionBox(stroke, nearby, 3), 0)
 })
 
 test('object eraser chooses the segmented object most directly covered by the brush', () => {
