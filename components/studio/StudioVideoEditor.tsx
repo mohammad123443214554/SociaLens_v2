@@ -596,8 +596,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     objectEraserRedoRef.current={...selectedElement}
     setElements(items=>items.map(item=>item.id===snapshot.id?{...snapshot}:item))
     objectEraserUndoRef.current=null
-    setObjectEraserObjects([])
-    setObjectEraserSelectedId(null)
+    objectEraserSourceFileRef.current = null
     setObjectEraserManualPoints([])
     setObjectEraserImageSize(null)
     setObjectEraserError('')
@@ -609,8 +608,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     objectEraserUndoRef.current={...selectedElement}
     setElements(items=>items.map(item=>item.id===snapshot.id?{...snapshot}:item))
     objectEraserRedoRef.current=null
-    setObjectEraserObjects([])
-    setObjectEraserSelectedId(null)
+    objectEraserSourceFileRef.current = null
     setObjectEraserManualPoints([])
     setObjectEraserImageSize(null)
     setObjectEraserError('')
@@ -789,32 +787,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       setNotice('AI object removal applied to the Studio image. The original upload remains saved.')
     } catch (error) {
       setObjectEraserError(error instanceof Error ? error.message : 'Could not apply the edited image to Studio.')
-    } finally { setObjectEraserApplyBusy(false) }
-  }
-
-  const restoreOriginalObjectEraserImage = async () => {
-    if (!selectedElement || selectedElement.kind !== 'image' || !selectedElement.originalStoragePath || objectEraserApplyBusy) return
-    const originalStoragePath = selectedElement.originalStoragePath
-    setObjectEraserApplyBusy(true); setObjectEraserError('')
-    try {
-      const url = await createStudioAssetUrl(originalStoragePath)
-      setElements(items => items.map(item => item.id === selectedElement.id ? {
-        ...item,
-        url,
-        storagePath: originalStoragePath,
-        name: selectedElement.originalName || item.name,
-        fileSize: selectedElement.originalFileSize ?? item.fileSize,
-        originalStoragePath: undefined,
-        originalName: undefined,
-        originalFileSize: undefined,
-      } : item))
-      clearObjectEraserResult()
-      setObjectEraserObjects([])
-      setObjectEraserDetections([])
-      setObjectEraserSelectedId(null)
-      setNotice('Original image restored. Studio layout, timing and transforms were preserved.')
-    } catch (error) {
-      setObjectEraserError(error instanceof Error ? error.message : 'Could not restore the original image.')
     } finally { setObjectEraserApplyBusy(false) }
   }
 
