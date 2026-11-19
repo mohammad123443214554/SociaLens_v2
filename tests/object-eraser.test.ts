@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons } from '../lib/studio/object-eraser-selection.ts'
 import assert from 'node:assert/strict'
 import {
   detectObjectEraserImageType,
@@ -108,4 +109,29 @@ test('maps Stability AI authentication, credit, safety, and retry failures', () 
   assert.equal(mapStabilityApiError(429).retryable, true)
   assert.equal(mapStabilityApiError(503).retryable, true)
   assert.equal(mapStabilityApiError(400).retryable, false)
+})
+
+
+test('object eraser detects a brush segment crossing an object when endpoints are outside', () => {
+  const object = [[[40, 40], [60, 40], [60, 60], [40, 60]]]
+  assert.equal(brushStrokeIntersectsPolygons([[0, 50], [100, 50]], object, 0), true)
+})
+
+test('object eraser rejects a brush stroke over empty background', () => {
+  const object = [[[40, 40], [60, 40], [60, 60], [40, 60]]]
+  assert.equal(brushStrokeIntersectsPolygons([[0, 0], [20, 20]], object, 3), false)
+  assert.equal(brushStrokeIntersectsDetectionBox([[0, 0], [20, 20]], { x: 40, y: 40, width: 20, height: 20 }, 3), false)
+})
+
+test('object eraser accounts for the circular brush radius near an object edge', () => {
+  const object = [[[40, 40], [60, 40], [60, 60], [40, 60]]]
+  assert.equal(brushStrokeIntersectsPolygons([[0, 37], [100, 37]], object, 4), true)
+})
+
+test('object eraser cache key is stable for small segmentation boundary changes', () => {
+  const first = getObjectEraserTargetCacheKey('project/image.png', 'Cup', [[[20, 20], [80, 20], [80, 80], [20, 80]]], 100, 100)
+  const second = getObjectEraserTargetCacheKey('project/image.png', 'cup', [[[20.2, 20.1], [80.2, 20.1], [80.2, 80.2], [20.2, 80.2]]], 100, 100)
+  const differentObject = getObjectEraserTargetCacheKey('project/image.png', 'cup', [[[50, 20], [90, 20], [90, 60], [50, 60]]], 100, 100)
+  assert.equal(first, second)
+  assert.notEqual(first, differentObject)
 })
