@@ -521,28 +521,44 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       await new Promise<void>((resolve,reject) => { image.onload=()=>resolve(); image.onerror=()=>reject(new Error('Could not prepare the original image for object cutouts.')) })
       const cutouts = (segmentationResult.segmentations as Array<{id:string;confidence:number;polygons:number[][][]}>).map(mask => {
         const detection = detections.find((item:any)=>item.id===mask.id)
-        if (!detection) return null
-        const padX=Math.max(4,detection.width*0.08),padY=Math.max(4,detection.height*0.08)
-        const left=Math.max(0,Math.floor(detection.x-padX)),top=Math.max(0,Math.floor(detection.y-padY))
-        const right=Math.min(image.naturalWidth,Math.ceil(detection.x+detection.width+padX)),bottom=Math.min(image.naturalHeight,Math.ceil(detection.y+detection.height+padY))
+        if (!detection || !Array.isArray(mask.polygons)) return null
+        // Normalize providers that return polygon coordinates in 0..1 units.
+        const rawPoints=mask.polygons.flat().filter(point=>Array.isArray(point)&&point.length===2&&point.every(Number.isFinite))
+        if(rawPoints.length<3)return null
+        const maxX=Math.max(...rawPoints.map(point=>point[0])),maxY=Math.max(...rawPoints.map(point=>point[1]))
+        const polygons=maxX<=1.5&&maxY<=1.5
+          ? mask.polygons.map(polygon=>polygon.map(([x,y])=>[x*image.naturalWidth,y*image.naturalHeight]))
+          : mask.polygons
+        const points=polygons.flat().filter(point=>Array.isArray(point)&&point.length===2&&point.every(Number.isFinite))
+        if(points.length<3)return null
+        const minX=Math.min(...points.map(point=>point[0])),minY=Math.min(...points.map(point=>point[1]))
+        const maxPolygonX=Math.max(...points.map(point=>point[0])),maxPolygonY=Math.max(...points.map(point=>point[1]))
+        const padX=Math.max(8,(maxPolygonX-minX)*0.08),padY=Math.max(8,(maxPolygonY-minY)*0.08)
+        const left=Math.max(0,Math.floor(minX-padX)),top=Math.max(0,Math.floor(minY-padY))
+        const right=Math.min(image.naturalWidth,Math.ceil(maxPolygonX+padX)),bottom=Math.min(image.naturalHeight,Math.ceil(maxPolygonY+padY))
         const width=Math.max(1,right-left),height=Math.max(1,bottom-top)
+        if(width<3||height<3)return null
         const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height
         const context=canvas.getContext('2d')
-        if(!context) return null
+        if(!context)return null
         context.drawImage(image,left,top,width,height,0,0,width,height)
         const maskCanvas=document.createElement('canvas');maskCanvas.width=width;maskCanvas.height=height
         const maskContext=maskCanvas.getContext('2d')
-        if(!maskContext) return null
+        if(!maskContext)return null
         maskContext.fillStyle='#fff';maskContext.beginPath()
-        for(const polygon of mask.polygons){
-          if(polygon.length<3) continue
+        for(const polygon of polygons){
+          if(polygon.length<3)continue
           maskContext.moveTo(polygon[0][0]-left,polygon[0][1]-top)
-          for(let index=1;index<polygon.length;index++) maskContext.lineTo(polygon[index][0]-left,polygon[index][1]-top)
+          for(let index=1;index<polygon.length;index++)maskContext.lineTo(polygon[index][0]-left,polygon[index][1]-top)
           maskContext.closePath()
         }
         maskContext.fill('evenodd')
         context.globalCompositeOperation='destination-in';context.drawImage(maskCanvas,0,0)
-        return {id:mask.id,label:detection.label,confidence:Math.min(detection.confidence,mask.confidence),thumbnail:canvas.toDataURL('image/png'),polygons:mask.polygons}
+        const pixelData=context.getImageData(0,0,width,height).data
+        let visiblePixels=0
+        for(let index=3;index<pixelData.length;index+=4)if(pixelData[index]>0)visiblePixels++
+        if(visiblePixels<Math.max(12,width*height*0.0005))return null
+        return {id:mask.id,label:detection.label,confidence:Math.min(detection.confidence,mask.confidence),thumbnail:canvas.toDataURL('image/png'),polygons}
       }).filter((item):item is {id:string;label:string;confidence:number;thumbnail:string;polygons:number[][][]}=>!!item)
       if (!cutouts.length) throw new Error('The AI returned no usable object cutouts. Please run detection again.')
       setObjectEraserObjects(cutouts)
