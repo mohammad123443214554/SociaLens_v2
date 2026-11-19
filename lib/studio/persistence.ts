@@ -16,6 +16,10 @@ export type StudioProjectRow = {
 
 const BUCKET = 'studio-projects'
 
+// Serialize writes per project so a slower older autosave cannot overwrite
+// a newer editor snapshot when multiple save triggers fire close together.
+const projectSaveQueues = new Map<string, Promise<void>>()
+
 export async function getStudioUserId() {
   const supabase = createClient()
   const { data, error } = await supabase.auth.getUser()
@@ -52,16 +56,25 @@ export async function saveStudioProject(input: {
   template_id: string | null
   data: Record<string, unknown>
 }) {
-  const supabase = createClient()
-  const userId = await getStudioUserId()
-  const now = new Date().toISOString()
-  const { error } = await supabase.from('studio_projects').upsert({
-    ...input,
-    user_id: userId,
-    updated_at: now,
-    last_opened_at: now,
-  }, { onConflict: 'id' })
-  if (error) throw error
+  const previous = projectSaveQueues.get(input.id) || Promise.resolve()
+  const current = previous.catch(() => undefined).then(async () => {
+    const supabase = createClient()
+    const userId = await getStudioUserId()
+    const now = new Date().toISOString()
+    const { error } = await supabase.from('studio_projects').upsert({
+      ...input,
+      user_id: userId,
+      updated_at: now,
+      last_opened_at: now,
+    }, { onConflict: 'id' })
+    if (error) throw error
+  })
+  projectSaveQueues.set(input.id, current)
+  try {
+    await current
+  } finally {
+    if (projectSaveQueues.get(input.id) === current) projectSaveQueues.delete(input.id)
+  }
 }
 
 export async function loadStudioProject(id: string, type: StudioProjectType) {
