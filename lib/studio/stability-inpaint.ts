@@ -25,3 +25,5 @@ export function mapStabilityApiError(status: number): { code: StabilityFailureCo
   if (status >= 500) return { code: 'provider_unavailable', message: 'Stability AI is temporarily unavailable. Your original image is unchanged; please try again later.', retryable: true, httpStatus: 503 }
   return { code: 'provider_error', message: 'Stability AI could not complete this image edit.', retryable: false, httpStatus: status >= 400 && status < 600 ? status : 502 }
 }
+
+// Redeploy trigger: pick up the Stability AI environment configuration.
