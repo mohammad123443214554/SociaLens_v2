@@ -614,7 +614,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const storagePath = await uploadStudioAsset(projectId, file)
       const url = await createStudioAssetUrl(storagePath)
       setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, url, storagePath, name: file.name, fileSize: file.size, originalStoragePath: item.originalStoragePath || item.storagePath, originalName: item.originalName || item.name, originalFileSize: item.originalFileSize ?? item.fileSize } : item))
-      setObjectEraserResultUrl(null)
+      clearObjectEraserResult()
       setObjectEraserError('')
       setNotice('AI object removal applied to the Studio image. The original upload remains saved.')
     } catch (error) {
@@ -638,7 +638,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         originalName: undefined,
         originalFileSize: undefined,
       } : item))
-      setObjectEraserResultUrl(null)
+      clearObjectEraserResult()
       setObjectEraserObjects([])
       setObjectEraserDetections([])
       setObjectEraserSelectedId(null)
