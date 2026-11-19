@@ -1,6 +1,32 @@
 export type ObjectEraserPoint = readonly [number, number]
 export type ObjectEraserPolygon = readonly ObjectEraserPoint[]
 
+/**
+ * Convert SAM2 polygon coordinates into the original image's pixel space.
+ * Roboflow may return polygon coordinates in the inference image's pixel
+ * dimensions, while the editor canvas uses the source image dimensions.
+ */
+export function scaleObjectEraserPolygons(
+ polygons:number[][][],
+ sourceWidth:number,
+ sourceHeight:number,
+ coordinateWidth=sourceWidth,
+ coordinateHeight=sourceHeight,
+):number[][][]{
+ if(![sourceWidth,sourceHeight,coordinateWidth,coordinateHeight].every(Number.isFinite)
+  || sourceWidth<=0||sourceHeight<=0||coordinateWidth<=0||coordinateHeight<=0) return []
+ const points=polygons.flat()
+ const normalized=points.length>0&&points.every(point=>Array.isArray(point)&&point.length===2
+  &&Number.isFinite(point[0])&&Number.isFinite(point[1])
+  &&point[0]>=-0.01&&point[0]<=1.01&&point[1]>=-0.01&&point[1]<=1.01)
+ const scaleX=normalized?sourceWidth:sourceWidth/coordinateWidth
+ const scaleY=normalized?sourceHeight:sourceHeight/coordinateHeight
+ return polygons.map(polygon=>polygon.map(([x,y])=>[
+  Math.max(0,Math.min(sourceWidth,x*scaleX)),
+  Math.max(0,Math.min(sourceHeight,y*scaleY)),
+ ]))
+}
+
 function asPoint(value: readonly number[]): ObjectEraserPoint | null {
   return value.length === 2 && Number.isFinite(value[0]) && Number.isFinite(value[1])
     ? [value[0], value[1]]
