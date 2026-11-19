@@ -544,7 +544,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
   const [saveStatus, setSaveStatus] = useState('Loading project…')
-  const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects' | 'animation' | 'position' | 'element-color' | 'eraser' | 'object-eraser'>('media')
+  const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects' | 'animation' | 'position' | 'element-color' | 'eraser' | 'object-eraser' | 'background-eraser'>('media')
   const [customElementColor, setCustomElementColor] = useState('#ec4899')
   const [elementPalette, setElementPalette] = useState<string[]>([])
   const [selectedSourceColor, setSelectedSourceColor] = useState<string | null>(null)
@@ -565,6 +565,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const objectEraserUndoRef = useRef<ElementLayer|null>(null)
   const objectEraserRedoRef = useRef<ElementLayer|null>(null)
   const objectEraserResultCacheRef = useRef<Map<string,ObjectEraserCachedRemoval>>(new Map())
+  const [backgroundEraserForegroundMasks, setBackgroundEraserForegroundMasks] = useState<Array<{id:string;polygons:number[][][];confidence:number}>>([])
+  const [backgroundEraserDetectBusy, setBackgroundEraserDetectBusy] = useState(false)
+  const [backgroundEraserRemoveBusy, setBackgroundEraserRemoveBusy] = useState(false)
+  const [backgroundEraserError, setBackgroundEraserError] = useState('')
   const [animationSearch, setAnimationSearch] = useState('')
   const [isAnimationPreviewing, setIsAnimationPreviewing] = useState(false)
   const [animationPreviewTime, setAnimationPreviewTime] = useState(0)
@@ -587,6 +591,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setObjectEraserManualDrawing(false)
     setObjectEraserCursor(null)
     setObjectEraserError('')
+    setBackgroundEraserForegroundMasks([])
+    setBackgroundEraserDetectBusy(false)
+    setBackgroundEraserRemoveBusy(false)
+    setBackgroundEraserError('')
   }, [selectedElementId])
 
   const loadObjectEraserImage = useCallback(async (element: ElementLayer) => {
@@ -634,7 +642,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   // Remove object. Opening the panel only loads the image locally and never
   // triggers a provider request or highlights automatically detected objects.
   useEffect(() => {
-    if (activePanel === 'object-eraser' && selectedElement?.kind === 'image' && !objectEraserBusy && !objectEraserImageSize && !objectEraserError) {
+    if ((activePanel === 'object-eraser' || activePanel === 'background-eraser') && selectedElement?.kind === 'image' && !objectEraserBusy && !objectEraserImageSize && !objectEraserError) {
       void loadObjectEraserImage(selectedElement)
     }
   }, [activePanel, selectedElementId, objectEraserImageSize, objectEraserBusy, objectEraserError, loadObjectEraserImage])
@@ -2526,7 +2534,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                       <defs>
                         <mask id="background-eraser-foreground-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={objectEraserImageSize.width} height={objectEraserImageSize.height}>
                           <rect x="0" y="0" width={objectEraserImageSize.width} height={objectEraserImageSize.height} fill="white"/>
-                          {backgroundEraserForegroundMasks.flatMap(target => target.polygons).map((polygon,index) => <polygon key={target.id + '-' + index} points={polygon.map(point => point.join(',')).join(' ')} fill="black" stroke="black" strokeWidth={Math.max(1, objectEraserImageSize.width / 1400)} strokeLinejoin="round"/>)}
+                          {backgroundEraserForegroundMasks.flatMap(target => target.polygons).map((polygon,index) => <polygon key={index} points={polygon.map(point => point.join(',')).join(' ')} fill="black" stroke="black" strokeWidth={Math.max(1, objectEraserImageSize.width / 1400)} strokeLinejoin="round"/>)}
                         </mask>
                       </defs>
                       <rect x="0" y="0" width={objectEraserImageSize.width} height={objectEraserImageSize.height} fill="#ec4899" opacity=".48" mask="url(#background-eraser-foreground-mask)"/>
