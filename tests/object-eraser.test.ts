@@ -10,7 +10,8 @@ import {
   RoboflowRequestError,
   prepareObjectEraserImage,
 } from '../lib/studio/object-eraser.ts'
-import { getStabilityImageApiBaseUrl, mapStabilityApiError, mapStabilityBackgroundError, STABILITY_ERASE_CREDITS, STABILITY_ERASE_PATH, STABILITY_REMOVE_BACKGROUND_PATH } from '../lib/studio/stability-inpaint.ts'
+import { getStabilityImageApiBaseUrl, mapStabilityApiError, mapStabilityBackgroundError, STABILITY_ERASE_CREDITS, STABILITY_ERASE_PATH, STABILITY_INPAINT_PATH, STABILITY_REMOVE_BACKGROUND_PATH } from '../lib/studio/stability-inpaint.ts'
+import { DEFAULT_GEMINI_OBJECT_ERASER_MODEL, parseGeminiObjectRemovalPrompt } from '../lib/studio/object-eraser-prompt.ts'
 
 
 test('scales normalized SAM2 masks into the original image pixel space', () => {
@@ -130,6 +131,33 @@ test('configures Stability AI and the Comfy-compatible migration host safely', (
   assert.throws(() => getStabilityImageApiBaseUrl('https://attacker.example'), /must be https/)
   assert.equal(STABILITY_ERASE_PATH, '/v2beta/stable-image/edit/erase')
   assert.equal(STABILITY_ERASE_CREDITS, 5)
+})
+
+test('configures Stability AI prompt-guided inpainting endpoint', () => {
+  assert.equal(STABILITY_INPAINT_PATH, '/v2beta/stable-image/edit/inpaint')
+})
+
+test('uses a current fast Gemini model for object-removal scene analysis', () => {
+  assert.equal(DEFAULT_GEMINI_OBJECT_ERASER_MODEL, 'gemini-3.8-flash')
+})
+
+test('parses Gemini structured object-removal prompt output', () => {
+  const parsed = parseGeminiObjectRemovalPrompt({
+    output_text: JSON.stringify({
+      object_description: 'A small red cup',
+      scene_description: 'A wooden desk with warm side lighting',
+      prompt: 'Photorealistic continuation of the warm wooden desk grain and soft side lighting, matching the camera perspective and natural depth of field.',
+    }),
+  })
+  assert.equal(parsed.objectDescription, 'A small red cup')
+  assert.match(parsed.prompt, /Photorealistic continuation/)
+})
+
+test('rejects incomplete Gemini object-removal prompts', () => {
+  assert.throws(
+    () => parseGeminiObjectRemovalPrompt({ output_text: JSON.stringify({ prompt: 'remove it' }) }),
+    /sufficiently detailed removal prompt/,
+  )
 })
 
 test('configures Stability AI dedicated background removal and maps provider failures', () => {
