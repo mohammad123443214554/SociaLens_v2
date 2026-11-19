@@ -8,8 +8,32 @@ import {
   getRoboflowRequestError,
   RoboflowRequestError,
   prepareObjectEraserImage,
+  scaleObjectEraserPolygons,
 } from '../lib/studio/object-eraser.ts'
 import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_ERASE_CREDITS, STABILITY_ERASE_PATH } from '../lib/studio/stability-inpaint.ts'
+
+
+test('scales normalized SAM2 masks into the original image pixel space', () => {
+  const result = scaleObjectEraserPolygons(
+    [[[0.1, 0.2], [0.9, 0.2], [0.9, 0.8], [0.1, 0.8]]],
+    4000,
+    3000,
+    1000,
+    750,
+  )
+  assert.deepEqual(result[0], [[400, 600], [3600, 600], [3600, 2400], [400, 2400]])
+})
+
+test('rescales SAM2 pixel masks when inference dimensions differ from the editor image', () => {
+  const result = scaleObjectEraserPolygons(
+    [[[100, 80], [900, 80], [900, 670], [100, 670]]],
+    4000,
+    3000,
+    1000,
+    750,
+  )
+  assert.deepEqual(result[0], [[400, 320], [3600, 320], [3600, 2680], [400, 2680]])
+})
 
 test('detects supported image signatures instead of trusting the filename', () => {
   assert.equal(detectObjectEraserImageType(new Uint8Array([255, 216, 255, 0])), 'image/jpeg')
