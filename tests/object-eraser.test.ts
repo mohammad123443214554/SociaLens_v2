@@ -1,5 +1,5 @@
 import test from 'node:test'
-import { getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, scoreBrushStrokeAgainstPolygons } from '../lib/studio/object-eraser-selection.ts'
+import { getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, scoreBrushStrokeAgainstPolygons, scaleObjectEraserPolygons } from '../lib/studio/object-eraser-selection.ts'
 import assert from 'node:assert/strict'
 import {
   detectObjectEraserImageType,
@@ -8,7 +8,6 @@ import {
   getRoboflowRequestError,
   RoboflowRequestError,
   prepareObjectEraserImage,
-  scaleObjectEraserPolygons,
 } from '../lib/studio/object-eraser.ts'
 import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_ERASE_CREDITS, STABILITY_ERASE_PATH } from '../lib/studio/stability-inpaint.ts'
 
