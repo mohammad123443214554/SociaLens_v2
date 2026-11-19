@@ -59,6 +59,7 @@ export function StudioPhotoEditor({ projectName, templateId, projectId }: { proj
   useEffect(() => {
     let active = true
     const restore = async () => {
+      let restoreSucceeded = false
       try {
         const row = await loadStudioProject(projectId, 'photo')
         if (!active) return
@@ -79,9 +80,14 @@ export function StudioPhotoEditor({ projectName, templateId, projectId }: { proj
           }
           setSaveStatus('Draft restored')
         } else setSaveStatus('New draft')
+        restoreSucceeded = true
       } catch (cause) {
         if (active) setSaveStatus(cause instanceof Error ? cause.message : 'Could not load draft')
-      } finally { if (active) setHydrated(true) }
+      } finally {
+        // Never autosave blank defaults after a failed restore: that could
+        // overwrite the user's last good cloud draft.
+        if (active && restoreSucceeded) setHydrated(true)
+      }
     }
     void restore()
     return () => { active = false }
@@ -92,7 +98,7 @@ export function StudioPhotoEditor({ projectName, templateId, projectId }: { proj
     if (saveTimer.current) clearTimeout(saveTimer.current)
     setSaveStatus('Unsaved changes')
     const sequence = ++saveSequence.current
-    saveTimer.current = setTimeout(async () => {
+    const persist = async () => {
       try {
         await saveStudioProject({
           id: projectId,
@@ -105,8 +111,22 @@ export function StudioPhotoEditor({ projectName, templateId, projectId }: { proj
       } catch (cause) {
         if (sequence === saveSequence.current) setSaveStatus(cause instanceof Error ? cause.message : 'Save failed')
       }
-    }, 900)
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+    }
+    const flush = () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      void persist()
+    }
+    saveTimer.current = setTimeout(() => { void persist() }, 250)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [hydrated, projectId, projectName, templateId, format, customWidth, customHeight, background, fit, rotation, zoom, imageName, imagePath, layers])
 
   const importImage = async (file?: File) => {
