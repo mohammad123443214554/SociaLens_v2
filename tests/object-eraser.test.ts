@@ -1,5 +1,5 @@
 import test from 'node:test'
-import { getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, scoreBrushStrokeAgainstPolygons, scaleObjectEraserPolygons, scoreBrushStrokeAgainstDetectionBox } from '../lib/studio/object-eraser-selection.ts'
+import { getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, scoreBrushStrokeAgainstPolygons, scaleObjectEraserPolygons, scoreBrushStrokeAgainstDetectionBox, getObjectEraserTargetsUnderBrush } from '../lib/studio/object-eraser-selection.ts'
 import assert from 'node:assert/strict'
 import {
   detectObjectEraserImageType,
@@ -151,6 +151,20 @@ test('object eraser accounts for the circular brush radius near an object edge',
   assert.equal(brushStrokeIntersectsPolygons([[0, 37], [100, 37]], object, 4), true)
 })
 
+
+
+test('object eraser keeps every object covered by one highlighted brush area', () => {
+  const flower = { id: 'flower', polygons: [[[30, 20], [55, 20], [55, 45], [30, 45]]] }
+  const pot = { id: 'pot', polygons: [[[25, 42], [65, 42], [65, 85], [25, 85]]] }
+  const nearby = { id: 'nearby', polygons: [[[110, 20], [140, 20], [140, 60], [110, 60]]] }
+  const selected = getObjectEraserTargetsUnderBrush(
+    [[35, 30], [50, 55]],
+    [flower, pot, nearby],
+    4,
+  )
+  assert.deepEqual(selected.map(item => item.id), ['flower', 'pot'])
+  assert.equal(selected.flatMap(item => item.polygons).length, 2)
+})
 
 test('object eraser prioritizes the detection box directly covered by the brush', () => {
   const stroke = [[25, 40], [35, 40]]
