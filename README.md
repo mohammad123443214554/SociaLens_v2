@@ -10,7 +10,7 @@ A full-stack social media app built with **Next.js 16**, **TypeScript**, **Tailw
 - ✅ User profiles with avatar & cover photo
 - ✅ Follow system (public & private accounts)
 - ✅ Follow requests & approval
-- ✅ Posts (text + image + video)
+- ✅ Posts (text + Image + video)
 - ✅ Like / Comment / Share
 - ✅ Reels — TikTok-style vertical video feed
 - ✅ Real-time 1-on-1 chat (Supabase Realtime)
