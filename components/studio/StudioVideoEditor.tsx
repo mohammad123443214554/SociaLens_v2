@@ -543,11 +543,18 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       }).filter((item):item is {id:string;label:string;confidence:number;thumbnail:string;polygons:number[][][]}=>!!item)
       if (!cutouts.length) throw new Error('The AI returned no usable object cutouts. Please run detection again.')
       setObjectEraserObjects(cutouts)
+      if (segmentationResult.warning) setObjectEraserError(segmentationResult.warning)
       setObjectEraserSelectedId(cutouts[0].id)
     } catch (err) {
       setObjectEraserError(err instanceof Error ? err.message : 'Object detection or segmentation failed. Please try again.')
     } finally { setObjectEraserBusy(false); setObjectEraserSegmentBusy(false) }
   }
+  useEffect(() => {
+    if (activePanel === 'object-eraser' && selectedElement?.kind === 'image' && !objectEraserBusy && !objectEraserSegmentBusy && !objectEraserImageSize && !objectEraserError) {
+      void detectObjectsInSelectedImage()
+    }
+  }, [activePanel, selectedElementId, objectEraserImageSize, objectEraserError])
+
   const clearObjectEraserResult = () => {
     setObjectEraserResultUrl(current => {
       if (current?.startsWith('blob:')) URL.revokeObjectURL(current)
@@ -2059,6 +2066,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <textarea value={objectEraserPrompt} onChange={event=>setObjectEraserPrompt(event.target.value)} placeholder="Example: cup, pen, bottle, logo" rows={2} className="mt-3 w-full resize-y rounded-lg border border-white/10 bg-black/20 p-2 text-[10px] text-white outline-none placeholder:text-slate-600 focus:border-fuchsia-400/50" />
                 <button type="button" onClick={detectObjectsInSelectedImage} disabled={objectEraserBusy || objectEraserSegmentBusy} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:cursor-wait disabled:opacity-60">{objectEraserBusy || objectEraserSegmentBusy ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"/>{objectEraserBusy ? 'Finding objects…' : 'Isolating objects…'}</> : <><ScanSearch className="h-3.5 w-3.5"/>Detect objects</>}</button>
                 {objectEraserError && <p role="status" className="mt-2 rounded-lg border border-amber-300/15 bg-amber-300/[0.06] p-2 text-[9px] leading-4 text-amber-100">{objectEraserError}</p>}
+                 {!objectEraserBusy && !objectEraserSegmentBusy && objectEraserImageSize && objectEraserDetections.length===0 && <div className="mt-3 rounded-xl border border-dashed border-white/15 bg-white/[0.025] p-4 text-center"><ScanSearch className="mx-auto mb-2 h-5 w-5 text-slate-400"/><p className="text-[10px] font-semibold text-slate-200">No objects found</p><p className="mt-1 text-[9px] leading-4 text-slate-500">You can still select an area manually below and remove it with AI.</p></div>}
                 {objectEraserImageSize && <div className="mt-3 flex items-center justify-between text-[9px] text-slate-400"><span>{objectEraserObjects.length ? objectEraserObjects.length + ' isolated object cutouts' : objectEraserDetections.length + ' objects detected'}</span><span>{objectEraserImageSize.width} × {objectEraserImageSize.height}</span></div>}
                 {(objectEraserBusy || objectEraserSegmentBusy) && <div className="mt-3 flex items-center gap-2 rounded-lg border border-violet-400/15 bg-violet-400/[0.06] p-3 text-[9px] text-violet-100"><span className="h-3 w-3 animate-spin rounded-full border-2 border-violet-200/30 border-t-violet-200"/>{objectEraserBusy ? 'Finding objects in your image…' : 'Separating each object from its background…'}</div>}
                 {objectEraserObjects.length>0 && <div className="mt-3">
