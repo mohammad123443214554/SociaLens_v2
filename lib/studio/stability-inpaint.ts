@@ -1,4 +1,5 @@
 export const STABILITY_ERASE_PATH = '/v2beta/stable-image/edit/erase'
+export const STABILITY_INPAINT_PATH = '/v2beta/stable-image/edit/inpaint'
 export const STABILITY_REMOVE_BACKGROUND_PATH = '/v2beta/stable-image/edit/remove-background'
 export const STABILITY_ERASE_CREDITS = 5
 
