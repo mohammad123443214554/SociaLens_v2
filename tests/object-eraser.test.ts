@@ -10,7 +10,7 @@ import {
   RoboflowRequestError,
   prepareObjectEraserImage,
 } from '../lib/studio/object-eraser.ts'
-import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_ERASE_CREDITS, STABILITY_ERASE_PATH } from '../lib/studio/stability-inpaint.ts'
+import { getStabilityImageApiBaseUrl, mapStabilityApiError, mapStabilityBackgroundError, STABILITY_ERASE_CREDITS, STABILITY_ERASE_PATH, STABILITY_REMOVE_BACKGROUND_PATH } from '../lib/studio/stability-inpaint.ts'
 
 
 test('scales normalized SAM2 masks into the original image pixel space', () => {
@@ -130,6 +130,16 @@ test('configures Stability AI and the Comfy-compatible migration host safely', (
   assert.throws(() => getStabilityImageApiBaseUrl('https://attacker.example'), /must be https/)
   assert.equal(STABILITY_ERASE_PATH, '/v2beta/stable-image/edit/erase')
   assert.equal(STABILITY_ERASE_CREDITS, 5)
+})
+
+test('uses Stability AI dedicated background removal without object masks or prompts', () => {
+  assert.equal(STABILITY_REMOVE_BACKGROUND_PATH, '/v2beta/stable-image/edit/remove-background')
+  assert.equal(mapStabilityBackgroundError(401).code, 'unauthorized')
+  assert.equal(mapStabilityBackgroundError(402).code, 'insufficient_credits')
+  assert.equal(mapStabilityBackgroundError(413).code, 'image_too_large')
+  assert.equal(mapStabilityBackgroundError(429).retryable, true)
+  assert.equal(mapStabilityBackgroundError(503).retryable, true)
+  assert.equal(mapStabilityBackgroundError(400).retryable, false)
 })
 
 test('maps Stability AI authentication, credit, safety, and retry failures', () => {
