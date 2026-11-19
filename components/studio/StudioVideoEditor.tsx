@@ -23,7 +23,7 @@ import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-anima
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
 import { extractStudioImagePalette, createStudioRecoloredCanvas, STUDIO_REPLACEMENT_SWATCHES, type StudioColorReplacement } from '@/lib/studio/color-replacement'
 import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, scoreBrushStrokeAgainstPolygons } from '@/lib/studio/object-eraser-selection'
-import { scaleObjectEraserPolygons } from '@/lib/studio/object-eraser'
+import { scaleObjectEraserPolygons } from '@/lib/studio/object-eraser-selection'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
