@@ -505,7 +505,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       setObjectEraserDetections(detections)
       setObjectEraserImageSize({width:result.image.width,height:result.image.height})
       if (!detections.length) {
-        setObjectEraserError('No objects were detected for these prompts. Try different object names or a clearer image.')
+        setObjectEraserError('')
         return
       }
       setObjectEraserBusy(false)
