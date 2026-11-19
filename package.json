@@ -13,7 +13,7 @@
     "test:photo-collage": "node --experimental-strip-types --test tests/photo-collage.test.ts",
     "test:shape-cut": "node --experimental-strip-types --test tests/shape-cut.test.ts",
     "test:studio-animation": "node --experimental-strip-types --test tests/studio-animation-engine.test.ts",
-    "prebuild": "node scripts/restore-call-reaction-assets.mjs",
+    "prebuild": "node scripts/restore-call-reaction-assets.mjs && npm run test:object-eraser",
     "test:studio-playback": "node --experimental-strip-types --test tests/studio-playback-clock.test.ts",
     "test:studio-timeline": "node --experimental-strip-types --test tests/studio-timeline-layout.test.ts",
     "test:object-eraser": "node --experimental-strip-types --test tests/object-eraser.test.ts"
