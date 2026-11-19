@@ -100,7 +100,7 @@ export function normalizeRoboflowDetections(payload:unknown,imageWidth:number,im
 
 export type ObjectEraserSegmentation = { id:string; confidence:number; polygons:number[][][] }
 function readMaskPoint(value:unknown):[number,number]|null{
- if(Array.isArray(value)&&value.length>=2){
+ if(Array.isArray(value)&&value.length===2){
   const x=Number(value[0]),y=Number(value[1])
   return Number.isFinite(x)&&Number.isFinite(y)?[x,y]:null
  }
