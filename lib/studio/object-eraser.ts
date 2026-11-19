@@ -99,26 +99,77 @@ export function normalizeRoboflowDetections(payload:unknown,imageWidth:number,im
 
 
 export type ObjectEraserSegmentation = { id:string; confidence:number; polygons:number[][][] }
-export function normalizeRoboflowSegmentations(payload:unknown,detections:ObjectEraserDetection[]):ObjectEraserSegmentation[]{
- if(!isRecord(payload)||!Array.isArray(payload.predictions))throw new RoboflowRequestError('SAM 2 returned an invalid segmentation response.','provider_error',502)
- const predictions=payload.predictions
- if(predictions.length!==detections.length)throw new RoboflowRequestError('SAM 2 did not return a mask for every detected object. Please run detection again.','provider_error',502)
- return predictions.map((entry,index)=>{
-  if(!isRecord(entry))throw new RoboflowRequestError('SAM 2 returned an invalid object mask.','provider_error',502)
-  const raw=entry.masks??entry.mask??entry.polygons
-  const rawPolygons=isRecord(raw)?(raw.polygons??raw.mask??raw.coordinates??raw.data):raw
-  if(!Array.isArray(rawPolygons))throw new RoboflowRequestError('SAM 2 response contained no polygon data. Please retry segmentation.','provider_error',502)
-  const polygonGroups:number[][][]=[]
-  const visit=(node:unknown,depth=0):void=>{
-   if(!Array.isArray(node)||depth>8)return
-   if(node.length>=3&&node.every(point=>Array.isArray(point)&&point.length>=2&&Number.isFinite(Number(point[0]))&&Number.isFinite(Number(point[1])))){
-    polygonGroups.push(node.map(point=>[Number(point[0]),Number(point[1])]).slice(0,30000));return
+function readMaskPoint(value:unknown):[number,number]|null{
+ if(Array.isArray(value)&&value.length>=2){
+  const x=Number(value[0]),y=Number(value[1])
+  return Number.isFinite(x)&&Number.isFinite(y)?[x,y]:null
+ }
+ if(isRecord(value)){
+  const x=Number(value.x??value.X??value.column??value.col)
+  const y=Number(value.y??value.Y??value.row)
+  return Number.isFinite(x)&&Number.isFinite(y)?[x,y]:null
+ }
+ return null
+}
+function collectMaskPolygons(value:unknown):number[][][]{
+ const groups:number[][][]=[]
+ const visited=new Set<unknown>()
+ const visit=(node:unknown,depth=0):void=>{
+  if(depth>12||node===null||node===undefined||visited.has(node))return
+  if(typeof node==='object')visited.add(node)
+  if(Array.isArray(node)){
+   if(node.length>=3){
+    const points=node.map(readMaskPoint)
+    if(points.every((point):point is [number,number]=>point!==null)){
+     groups.push(points.slice(0,30000));return
+    }
    }
    for(const child of node)visit(child,depth+1)
+   return
   }
-  visit(rawPolygons)
-  if(!polygonGroups.length)throw new RoboflowRequestError('SAM 2 returned an empty or unsupported polygon mask. Please retry segmentation.','provider_error',502)
-  const confidence=Number(entry.confidence??1)
-  return {id:detections[index].id,confidence:Number.isFinite(confidence)?Math.max(0,Math.min(1,confidence)):1,polygons:polygonGroups}
- })
+  if(isRecord(node)){
+   // Provider response wrappers have appeared as masks, mask, polygons,
+   // coordinates, data, and segmentation depending on serialization format.
+   for(const key of ['polygons','polygon','mask','masks','coordinates','contours','segmentation','data','points','xy']){
+    if(key in node)visit(node[key],depth+1)
+   }
+  }
+ }
+ visit(value)
+ return groups
+}
+export function normalizeRoboflowSegmentations(payload:unknown,detections:ObjectEraserDetection[]):ObjectEraserSegmentation[]{
+ if(!isRecord(payload))throw new RoboflowRequestError('SAM 2 returned an invalid segmentation response.','provider_error',502)
+ const rawPredictions=payload.predictions??payload.segmentations??payload.results
+ if(!Array.isArray(rawPredictions))throw new RoboflowRequestError('SAM 2 response did not contain predictions.','provider_error',502)
+ if(!rawPredictions.length)throw new RoboflowRequestError('SAM 2 returned no masks for the detected objects.','provider_error',502,true)
+ const results:ObjectEraserSegmentation[]=[]
+ const add=(entry:unknown,detection:ObjectEraserDetection,index:number)=>{
+  if(!isRecord(entry))return
+  const candidates=[entry.masks,entry.mask,entry.polygons,entry.segmentation,entry.contours,entry.coordinates,entry]
+  let polygons:number[][][]=[]
+  for(const candidate of candidates){
+   polygons=collectMaskPolygons(candidate)
+   if(polygons.length)break
+  }
+  if(!polygons.length)return
+  const confidence=Number(entry.confidence??entry.score??1)
+  results.push({id:detection.id,confidence:Number.isFinite(confidence)?Math.max(0,Math.min(1,confidence)):1,polygons})
+ }
+ // Roboflow's serverless SAM2 JSON response returns predictions with polygon
+ // masks. Some deployments wrap all prompt masks into one prediction object;
+ // others return one prediction per prompt.
+ if(rawPredictions.length===detections.length){
+  rawPredictions.forEach((entry,index)=>add(entry,detections[index],index))
+ }else if(rawPredictions.length===1&&detections.length>1&&isRecord(rawPredictions[0])){
+  const entry=rawPredictions[0]
+  const masks=entry.masks??entry.mask
+  if(Array.isArray(masks)&&masks.length===detections.length){
+   masks.forEach((mask,index)=>add({masks:mask,confidence:entry.confidence},detections[index],index))
+  }else add(entry,detections[0],0)
+ }else{
+  rawPredictions.slice(0,detections.length).forEach((entry,index)=>add(entry,detections[index],index))
+ }
+ if(!results.length)throw new RoboflowRequestError('SAM 2 returned mask data in an unsupported format. The provider response did not contain readable polygon coordinates.','provider_error',502,true)
+ return results
 }
