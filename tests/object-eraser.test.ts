@@ -3,6 +3,7 @@ import { getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, brushStro
 import assert from 'node:assert/strict'
 import {
   detectObjectEraserImageType,
+  OBJECT_ERASER_DEFAULT_PROMPTS,
   normalizeRoboflowDetections,
   normalizeRoboflowSegmentations,
   getRoboflowRequestError,
@@ -32,6 +33,12 @@ test('rescales SAM2 pixel masks when inference dimensions differ from the editor
     750,
   )
   assert.deepEqual(result[0], [[400, 320], [3600, 320], [3600, 2680], [400, 2680]])
+})
+
+test('includes common plant containers in Object Eraser detection prompts', () => {
+  assert.ok(OBJECT_ERASER_DEFAULT_PROMPTS.includes('pot'))
+  assert.ok(OBJECT_ERASER_DEFAULT_PROMPTS.includes('flower pot'))
+  assert.ok(OBJECT_ERASER_DEFAULT_PROMPTS.includes('planter'))
 })
 
 test('detects supported image signatures instead of trusting the filename', () => {
