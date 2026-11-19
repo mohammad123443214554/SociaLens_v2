@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
     const form = new FormData()
     form.set('image', new Blob([imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength) as ArrayBuffer], { type: mimeType }), 'source-image')
     form.set('mask', new Blob([maskBytes.buffer.slice(maskBytes.byteOffset, maskBytes.byteOffset + maskBytes.byteLength) as ArrayBuffer], { type: 'image/png' }), 'object-mask.png')
-    form.set('prompt', 'Photorealistic seamless continuation of the existing background. Reconstruct only the masked region by extending the immediately surrounding scene, textures, patterns, edges, lighting, shadows, perspective and depth. The masked region must contain background only; do not place or recreate any foreground object in it. Keep every unmasked pixel and all other objects unchanged.')
-    form.set('negative_prompt', 'cup, mug, plate, bowl, tableware, foreground object, extra object, duplicate object, replacement object, new subject, text, watermark, logo, distorted texture, visible patch, hard edge, blur, artifacts')
+    form.set('prompt', 'Photorealistic object removal and background reconstruction. The masked region marks the single existing foreground object that must be removed completely. Replace only that object with a natural continuation of the immediately surrounding background, matching nearby texture, color, lighting, shadows, perspective, focus and depth. Do not invent, add, move, duplicate or redesign anything. Continue existing background details only. The final image must look like the selected object was never there.')
+    form.set('negative_prompt', 'new object, extra object, replacement object, duplicate object, additional subject, person, animal, product, prop, decoration, furniture, plant, text, letters, watermark, logo, invented detail, changed background, changed composition, changed colors, changed lighting, changed perspective, distorted texture, visible patch, hard edge, blur, artifacts')
     form.set('output_format', 'png')
 
     let upstream: Response
