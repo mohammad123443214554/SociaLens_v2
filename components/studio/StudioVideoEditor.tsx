@@ -2417,10 +2417,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                         </filter>
                       </defs>
                       <rect x="0" y="0" width={objectEraserImageSize.width} height="18" fill="url(#object-eraser-scan-gradient)" opacity=".55" filter="url(#object-eraser-scan-glow)">
-                        <animate attributeName="y" values={`-18;\u0024{objectEraserImageSize.height};-18`} dur="1.8s" repeatCount="indefinite" />
+                        <animate attributeName="y" values={`-18;${objectEraserImageSize.height};-18`} dur="1.8s" repeatCount="indefinite" />
                       </rect>
                       <rect x="0" y="0" width={objectEraserImageSize.width} height="2.5" fill="#f0abfc" opacity=".95">
-                        <animate attributeName="y" values={`-2.5;\u0024{objectEraserImageSize.height};-2.5`} dur="1.8s" repeatCount="indefinite" />
+                        <animate attributeName="y" values={`-2.5;${objectEraserImageSize.height};-2.5`} dur="1.8s" repeatCount="indefinite" />
                       </rect>
                     </g>}
                   </svg>
