@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { detectObjectEraserImageType, OBJECT_ERASER_MAX_IMAGE_BYTES } from '@/lib/studio/object-eraser'
-import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_INPAINT_PATH } from '@/lib/studio/stability-inpaint'
+import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_ERASE_PATH } from '@/lib/studio/stability-inpaint'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -71,8 +71,10 @@ export async function POST(request: NextRequest) {
     const form = new FormData()
     form.set('image', new Blob([imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength) as ArrayBuffer], { type: mimeType }), 'source-image')
     form.set('mask', new Blob([maskBytes.buffer.slice(maskBytes.byteOffset, maskBytes.byteOffset + maskBytes.byteLength) as ArrayBuffer], { type: 'image/png' }), 'object-mask.png')
-    form.set('prompt', 'Photorealistic object removal and background reconstruction. The masked region marks the single existing foreground object that must be removed completely. Replace only that object with a natural continuation of the immediately surrounding background, matching nearby texture, color, lighting, shadows, perspective, focus and depth. Do not invent, add, move, duplicate or redesign anything. Continue existing background details only. The final image must look like the selected object was never there.')
-    form.set('negative_prompt', 'new object, extra object, replacement object, duplicate object, additional subject, person, animal, product, prop, decoration, furniture, plant, text, letters, watermark, logo, invented detail, changed background, changed composition, changed colors, changed lighting, changed perspective, distorted texture, visible patch, hard edge, blur, artifacts')
+    // Use Stability's dedicated Erase endpoint, not generative Inpaint.
+    // Erase accepts only the source image + explicit mask and performs object
+    // removal/background continuation without a replacement-object prompt.
+    form.set('grow_mask', '3')
     form.set('output_format', 'png')
 
     let upstream: Response
