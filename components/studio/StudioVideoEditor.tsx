@@ -2418,7 +2418,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold text-white">Background Eraser</span><span className="mt-1 block text-[9px] leading-4 text-slate-400">Detect the foreground subject and remove the background.</span><span className="mt-2 inline-flex items-center gap-1 text-[9px] font-semibold text-pink-200">Open background eraser <span aria-hidden="true">→</span></span></span>
               </button>
             </> : <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 p-5 text-center"><Eraser className="mb-3 h-7 w-7 text-slate-500" /><p className="text-[11px] font-semibold text-slate-200">Select a photo element</p><p className="mt-1 text-[9px] leading-4 text-slate-500">Eraser tools are available for image elements. Select a photo overlay on the canvas or timeline to continue.</p></div>}
-                   {activePanel === 'background-eraser' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+          </div>}
+
+          {activePanel === 'background-eraser' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <button type="button" onClick={() => setActivePanel('eraser')} className="inline-flex w-fit items-center gap-1.5 rounded-lg px-2 py-1.5 text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> Back to Eraser</button>
             {selectedElement?.kind === 'image' ? <>
               <section className="rounded-xl border border-white/10 bg-black/20 p-3">
