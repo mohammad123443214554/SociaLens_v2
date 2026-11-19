@@ -795,7 +795,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         return
       }
 
-      if (!window.confirm('Stability AI Inpaint uses 5 credits for this removal. Continue?')) return
+      if (!window.confirm('Stability AI Erase Object uses 5 credits for this removal. Continue?')) return
       setObjectEraserInpaintBusy(true)
       clearObjectEraserResult()
 
