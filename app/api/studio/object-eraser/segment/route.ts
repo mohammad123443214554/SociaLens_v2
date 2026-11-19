@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { normalizeRoboflowSegmentations, OBJECT_ERASER_MAX_IMAGE_BYTES, prepareObjectEraserImage, requestRoboflow, RoboflowRequestError, type ObjectEraserDetection } from '@/lib/studio/object-eraser'
+import { normalizeRoboflowSegmentations, scaleObjectEraserPolygons, OBJECT_ERASER_MAX_IMAGE_BYTES, prepareObjectEraserImage, requestRoboflow, RoboflowRequestError, type ObjectEraserDetection } from '@/lib/studio/object-eraser'
 
 export const runtime='nodejs'
 export const maxDuration=60
@@ -20,6 +20,11 @@ export async function POST(request:NextRequest){
  try{form=await request.formData()}catch{return jsonError('Could not read the segmentation upload. Please try again.',400,'invalid_upload')}
  const image=form.get('image')
  if(!(image instanceof File))return jsonError('Please attach the original image.',400,'missing_image')
+ const sourceWidth=Number(form.get('imageWidth'))
+ const sourceHeight=Number(form.get('imageHeight'))
+ if(!Number.isInteger(sourceWidth)||!Number.isInteger(sourceHeight)||sourceWidth<64||sourceHeight<64||sourceWidth*sourceHeight>9_437_184){
+  return jsonError('The source image dimensions are invalid. Reopen Object Eraser and try again.',400,'invalid_image_dimensions')
+ }
  let detections:ObjectEraserDetection[]
  try{
   const parsed=JSON.parse(String(form.get('detections')||'[]'))
@@ -48,7 +53,18 @@ export async function POST(request:NextRequest){
    }),'application/json')
    let result:unknown
    try{result=await response.json()}catch{throw new RoboflowRequestError('SAM 2 returned unreadable mask data. Please retry segmentation.','provider_error',502,true)}
-   return normalizeRoboflowSegmentations(result,batch)
+   const normalized=normalizeRoboflowSegmentations(result,batch)
+   const payload=result as Record<string,unknown>
+   const rawImageInfo=payload&&typeof payload==='object'?payload.image:undefined
+   const imageInfo=Array.isArray(rawImageInfo)?(rawImageInfo[0] as Record<string,unknown>|undefined):(rawImageInfo as Record<string,unknown>|undefined)
+   const coordinateWidth=Number(imageInfo?.width)
+   const coordinateHeight=Number(imageInfo?.height)
+   const hasCoordinateSize=Number.isFinite(coordinateWidth)&&Number.isFinite(coordinateHeight)&&coordinateWidth>=1&&coordinateHeight>=1
+   return normalized.map(item=>({
+    ...item,
+    polygons:scaleObjectEraserPolygons(item.polygons,sourceWidth,sourceHeight,
+     hasCoordinateSize?coordinateWidth:sourceWidth,hasCoordinateSize?coordinateHeight:sourceHeight),
+   }))
   }))
   const segmentations=settled.flatMap(item=>item.status==='fulfilled'?item.value:[])
   const failedBatches=settled.filter(item=>item.status==='rejected').length
@@ -58,7 +74,7 @@ export async function POST(request:NextRequest){
    if(reason instanceof RoboflowRequestError)return jsonError(reason.message,reason.status,reason.code,reason.retryable)
    return jsonError('SAM 2 could not isolate these objects. Try detecting fewer objects or use manual selection.',502,'segmentation_failed',true)
   }
-  return NextResponse.json({ok:true,provider:'roboflow',model:'SAM 2',image:{mimeType:prepared.mimeType,size:prepared.size,sha256:prepared.sha256},segmentations,count:segmentations.length,failedBatches,warning:failedBatches?'Some objects could not be isolated. The available cutouts are still shown.':undefined},{headers:NO_STORE_HEADERS})
+  return NextResponse.json({ok:true,provider:'roboflow',model:'SAM 2',image:{mimeType:prepared.mimeType,size:prepared.size,sha256:prepared.sha256,width:sourceWidth,height:sourceHeight},segmentations,count:segmentations.length,failedBatches,warning:failedBatches?'Some objects could not be isolated. The available cutouts are still shown.':undefined},{headers:NO_STORE_HEADERS})
  }catch(error){
   if(error instanceof RoboflowRequestError)return jsonError(error.message,error.status,error.code,error.retryable)
   const message=error instanceof Error?error.message:'Object segmentation failed.'
