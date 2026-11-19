@@ -1,6 +1,12 @@
 export type ObjectEraserPoint = readonly [number, number]
 export type ObjectEraserPolygon = readonly ObjectEraserPoint[]
 
+function asPoint(value: readonly number[]): ObjectEraserPoint | null {
+  return value.length === 2 && Number.isFinite(value[0]) && Number.isFinite(value[1])
+    ? [value[0], value[1]]
+    : null
+}
+
 function cross(a: ObjectEraserPoint, b: ObjectEraserPoint, c: ObjectEraserPoint) {
   return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
 }
@@ -56,23 +62,25 @@ export function isObjectEraserPointInsidePolygon(point: ObjectEraserPoint, polyg
  * when both stroke endpoints are outside the segmentation polygon.
  */
 export function brushStrokeIntersectsPolygons(
-  stroke: readonly ObjectEraserPoint[],
-  polygons: readonly ObjectEraserPolygon[],
+  stroke: readonly number[][],
+  polygons: readonly number[][][],
   brushRadius = 0,
 ) {
-  if (!stroke.length || !polygons.length) return false
+  const validStroke = stroke.map(asPoint).filter((point): point is ObjectEraserPoint => point !== null)
+  const validPolygons = polygons.map(polygon => polygon.map(asPoint).filter((point): point is ObjectEraserPoint => point !== null))
+  if (!validStroke.length || !validPolygons.length) return false
   const radius = Number.isFinite(brushRadius) ? Math.max(0, brushRadius) : 0
-  for (const polygon of polygons) {
+  for (const polygon of validPolygons) {
     if (polygon.length < 3) continue
-    if (stroke.some(point => isObjectEraserPointInsidePolygon(point, polygon))) return true
+    if (validStroke.some(point => isObjectEraserPointInsidePolygon(point, polygon))) return true
     const polygonEdges = polygon.map((point, index) => [point, polygon[(index + 1) % polygon.length]] as const)
-    if (stroke.length === 1) {
-      if (polygonEdges.some(([start, end]) => pointSegmentDistance(stroke[0], start, end) <= radius)) return true
+    if (validStroke.length === 1) {
+      if (polygonEdges.some(([start, end]) => pointSegmentDistance(validStroke[0], start, end) <= radius)) return true
       continue
     }
-    for (let index = 0; index < stroke.length - 1; index++) {
-      const start = stroke[index]
-      const end = stroke[index + 1]
+    for (let index = 0; index < validStroke.length - 1; index++) {
+      const start = validStroke[index]
+      const end = validStroke[index + 1]
       for (const [edgeStart, edgeEnd] of polygonEdges) {
         if (segmentsIntersect(start, end, edgeStart, edgeEnd)) return true
         if (radius > 0 && (
@@ -88,7 +96,7 @@ export function brushStrokeIntersectsPolygons(
 }
 
 export function brushStrokeIntersectsDetectionBox(
-  stroke: readonly ObjectEraserPoint[],
+  stroke: readonly number[][],
   box: { x: number; y: number; width: number; height: number },
   brushRadius = 0,
 ) {
@@ -106,11 +114,11 @@ export function brushStrokeIntersectsDetectionBox(
 export function getObjectEraserTargetCacheKey(
   sourceKey: string,
   label: string,
-  polygons: readonly ObjectEraserPolygon[],
+  polygons: readonly number[][][],
   imageWidth: number,
   imageHeight: number,
 ) {
-  const points = polygons.flat().filter(point => point.length === 2 && point.every(Number.isFinite))
+  const points = polygons.flat().map(asPoint).filter((point): point is ObjectEraserPoint => point !== null)
   if (!sourceKey || !points.length || imageWidth <= 0 || imageHeight <= 0) return ''
   const xs = points.map(point => point[0])
   const ys = points.map(point => point[1])
