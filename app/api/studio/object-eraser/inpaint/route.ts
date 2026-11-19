@@ -111,7 +111,8 @@ export async function POST(request: NextRequest) {
     const outputType = detectObjectEraserImageType(outputBytes)
     if (!outputType) return fail('Stability AI returned an unsupported image format.', 502, 'invalid_provider_response')
 
-    return new NextResponse(outputBytes, {
+    const outputBuffer = outputBytes.buffer.slice(outputBytes.byteOffset, outputBytes.byteOffset + outputBytes.byteLength) as ArrayBuffer
+    return new NextResponse(outputBuffer, {
       status: 200,
       headers: {
         ...NO_STORE,
