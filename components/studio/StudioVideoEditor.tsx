@@ -2227,7 +2227,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 </div>
                 {objectEraserImageSize && <div className="relative mx-auto w-full overflow-hidden rounded-lg bg-[#080b16]" style={{aspectRatio: objectEraserImageSize.width + '/' + objectEraserImageSize.height}}>
                   <img src={objectEraserPreviewUrlRef.current || selectedElement.url} alt="Image for object removal" draggable={false} className="absolute inset-0 h-full w-full select-none object-fill"/>
-                  <svg viewBox={\`0 0 \${objectEraserImageSize.width} \${objectEraserImageSize.height}\`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full touch-none cursor-none"
+                  <svg viewBox={`0 0 ${objectEraserImageSize.width} ${objectEraserImageSize.height}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full touch-none cursor-none"
                     onPointerDown={event => {
                       const rect = event.currentTarget.getBoundingClientRect()
                       const x = Math.max(0, Math.min(objectEraserImageSize.width, (event.clientX - rect.left) / rect.width * objectEraserImageSize.width))
@@ -2259,7 +2259,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                     {objectEraserInpaintBusy && <g>
                       <defs><linearGradient id="eraser-scan" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#e879f9" stopOpacity="0"/><stop offset="50%" stopColor="#f0abfc" stopOpacity=".9"/><stop offset="100%" stopColor="#e879f9" stopOpacity="0"/></linearGradient></defs>
                       <rect x="0" y="0" width={objectEraserImageSize.width} height={objectEraserImageSize.height} fill="rgba(8,11,22,.30)"/>
-                      <rect x="0" y="0" width={objectEraserImageSize.width} height={Math.max(36, objectEraserImageSize.height * .12)} fill="url(#eraser-scan)" opacity=".75"><animate attributeName="y" values={\`-\${objectEraserImageSize.height * .12};\${objectEraserImageSize.height}\`} dur="1.6s" repeatCount="indefinite"/></rect>
+                      <rect x="0" y="0" width={objectEraserImageSize.width} height={Math.max(36, objectEraserImageSize.height * .12)} fill="url(#eraser-scan)" opacity=".75"><animate attributeName="y" values={`-${objectEraserImageSize.height * .12};${objectEraserImageSize.height}`} dur="1.6s" repeatCount="indefinite"/></rect>
                       {objectEraserManualPoints.length > 1 && <polyline points={objectEraserManualPoints.map(point => point.join(',')).join(' ')} fill="none" stroke="#fff" strokeWidth={Math.max(18, Math.min(96, objectEraserBrushSize * 2.2))} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="26 13" opacity=".95"><animate attributeName="stroke-dashoffset" values="0;-78" dur=".8s" repeatCount="indefinite"/></polyline>}
                       <text x="50%" y="50%" textAnchor="middle" fill="#fff" fontSize={Math.max(14, objectEraserImageSize.width / 35)} fontWeight="600">Removing object…</text>
                     </g>}
