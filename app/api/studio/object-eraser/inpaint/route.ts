@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
 
   const stabilityKey = process.env.STABILITY_API_KEY?.trim()
   if (!stabilityKey) return fail('Stability AI is not configured. Add STABILITY_API_KEY to Vercel Environment Variables.', 503, 'not_configured')
-  const geminiKey = process.env.GEMINI_API_KEY?.trim()
-  if (!geminiKey) return fail('Gemini is not configured. Add GEMINI_API_KEY to Vercel Environment Variables.', 503, 'gemini_not_configured')
+  const geminiKey = process.env.SOCIALENS_OBJECT_ERASER_GEMINI_API_KEY?.trim()
+  if (!geminiKey) return fail('Gemini is not configured. Add SOCIALENS_OBJECT_ERASER_GEMINI_API_KEY to Vercel Environment Variables.', 503, 'gemini_not_configured')
 
   const contentLength = Number(request.headers.get('content-length') || 0)
   if (contentLength > 3 * 1024 * 1024) return fail('The object mask is too large. Please run detection again.', 413, 'mask_too_large')
