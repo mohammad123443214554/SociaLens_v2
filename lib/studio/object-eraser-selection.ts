@@ -184,6 +184,22 @@ export function scoreBrushStrokeAgainstPolygons(
   return matched / samples.length
 }
 
+/** Scores how strongly the brush stroke targets a detection rectangle. */
+export function scoreBrushStrokeAgainstDetectionBox(
+ stroke:readonly number[][],
+ box:{x:number;y:number;width:number;height:number},
+ brushRadius=0,
+){
+ if(![box.x,box.y,box.width,box.height].every(Number.isFinite)||box.width<=0||box.height<=0)return 0
+ const polygon:number[][]=[
+  [box.x,box.y],
+  [box.x+box.width,box.y],
+  [box.x+box.width,box.y+box.height],
+  [box.x,box.y+box.height],
+ ]
+ return scoreBrushStrokeAgainstPolygons(stroke,[polygon],brushRadius)
+}
+
 export function getObjectEraserBrushRegionKey(
   stroke: readonly number[][],
   brushRadius: number,
