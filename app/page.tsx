@@ -8,7 +8,7 @@ export default async function HomePage() {
   } = await supabase.auth.getUser()
 
   // The public landing page has been removed.
-  // Existing signed-in users go straight to the app; guests see login/signup.
+  // Existing signed-in users go straight to the app; Guests see login/signup.
   if (user) {
     redirect('/feed')
   }
