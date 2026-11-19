@@ -658,6 +658,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     segmentationForm.append('detections', JSON.stringify(candidates))
     segmentationForm.append('imageWidth', String(objectEraserImageSize!.width))
     segmentationForm.append('imageHeight', String(objectEraserImageSize!.height))
+    segmentationForm.append('brushPoints', JSON.stringify(stroke))
     const segmentationResponse = await fetch('/api/studio/object-eraser/segment', { method: 'POST', body: segmentationForm, credentials: 'same-origin' })
     const segmentationResult = await segmentationResponse.json()
     if (!segmentationResponse.ok || !segmentationResult?.ok) throw new Error(segmentationResult?.error || 'Could not verify the selected object. Please try again.')
