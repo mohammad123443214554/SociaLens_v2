@@ -22,6 +22,7 @@ import { CINEMATIC_LIGHT_ANIMATIONS } from '@/lib/studio/cinematic-light-animati
 import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-animations'
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
 import { extractStudioImagePalette, createStudioRecoloredCanvas, STUDIO_REPLACEMENT_SWATCHES, type StudioColorReplacement } from '@/lib/studio/color-replacement'
+import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserTargetCacheKey } from '@/lib/studio/object-eraser-selection'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
@@ -50,6 +51,7 @@ type Clip = {
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
 type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; height?: number; fontSize: number; color: string; opacity?: number; animation?: Partial<TextAnimationSettings>; effect?: TextEffect; effectIntensity?: number; effectBlur?: number; effectDistance?: number; effectAngle?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
 type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; cropLeft?: number; cropRight?: number; cropTop?: number; cropBottom?: number; color?: string; colorStrength?: number; colorReplacements?: StudioColorReplacement[]; fileSize: number; storagePath?: string; originalStoragePath?: string; originalName?: string; originalFileSize?: number }
+type ObjectEraserCachedRemoval = { sourceKey: string; label: string; polygons: number[][][]; result: { url: string; storagePath: string; name: string; fileSize: number; originalStoragePath?: string; originalName?: string; originalFileSize?: number } }
 type ElementDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'crop-left' | 'crop-right' | 'crop-top' | 'crop-bottom'; startX: number; startY: number; x: number; y: number; width: number; height: number; cropLeft: number; cropRight: number; cropTop: number; cropBottom: number }
 type TimelineTrack = { key: string; label: string; icon: ReactNode; tone: 'fuchsia' | 'sky' | 'violet' | 'emerald'; element?: ElementLayer; elementIndex?: number }
 type TimelineDragPreview = { x: number; y: number; width: number; label: string; kind: 'image' | 'video' }
@@ -459,26 +461,22 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [customElementColor, setCustomElementColor] = useState('#ec4899')
   const [elementPalette, setElementPalette] = useState<string[]>([])
   const [selectedSourceColor, setSelectedSourceColor] = useState<string | null>(null)
-  const [objectEraserPrompt, setObjectEraserPrompt] = useState('')
   const [objectEraserBusy, setObjectEraserBusy] = useState(false)
   const [objectEraserSegmentBusy, setObjectEraserSegmentBusy] = useState(false)
   const [objectEraserError, setObjectEraserError] = useState('')
-  const [objectEraserDetections, setObjectEraserDetections] = useState<Array<{id:string;label:string;confidence:number;x:number;y:number;width:number;height:number}>>([])
   const [objectEraserImageSize, setObjectEraserImageSize] = useState<{width:number;height:number}|null>(null)
   const objectEraserPreviewUrlRef = useRef<string|null>(null)
-  const [objectEraserObjects, setObjectEraserObjects] = useState<Array<{id:string;label:string;confidence:number;polygons:number[][][]}>>([])
-  const [objectEraserSelectedId, setObjectEraserSelectedId] = useState<string|null>(null)
+  const objectEraserSourceFileRef = useRef<File|null>(null)
   const [objectEraserInpaintBusy, setObjectEraserInpaintBusy] = useState(false)
   const [objectEraserResultUrl, setObjectEraserResultUrl] = useState<string|null>(null)
   const [objectEraserApplyBusy, setObjectEraserApplyBusy] = useState(false)
   const [objectEraserManualPoints, setObjectEraserManualPoints] = useState<number[][]>([])
-  const [objectEraserManualActive, setObjectEraserManualActive] = useState(false)
   const [objectEraserManualDrawing, setObjectEraserManualDrawing] = useState(false)
   const [objectEraserBrushSize,setObjectEraserBrushSize] = useState(22)
   const [objectEraserCursor,setObjectEraserCursor] = useState<[number,number]|null>(null)
   const objectEraserUndoRef = useRef<ElementLayer|null>(null)
   const objectEraserRedoRef = useRef<ElementLayer|null>(null)
-  const objectEraserResultCacheRef = useRef<Map<string,{url:string;storagePath:string;name:string;fileSize:number;originalStoragePath?:string;originalName?:string;originalFileSize?:number}>>(new Map())
+  const objectEraserResultCacheRef = useRef<Map<string,ObjectEraserCachedRemoval>>(new Map())
   const [animationSearch, setAnimationSearch] = useState('')
   const [isAnimationPreviewing, setIsAnimationPreviewing] = useState(false)
   const [animationPreviewTime, setAnimationPreviewTime] = useState(0)
@@ -488,68 +486,102 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const saveSequence = useRef(0)
 
   useEffect(() => () => { if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current) }, [])
-  useEffect(() => { if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current); objectEraserPreviewUrlRef.current = null; setObjectEraserObjects([]); setObjectEraserDetections([]); setObjectEraserSelectedId(null); setObjectEraserImageSize(null); setObjectEraserError('') }, [selectedElementId])
+  useEffect(() => {
+    if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
+    objectEraserPreviewUrlRef.current = null
+    objectEraserSourceFileRef.current = null
+    setObjectEraserImageSize(null)
+    setObjectEraserManualPoints([])
+    setObjectEraserManualDrawing(false)
+    setObjectEraserCursor(null)
+    setObjectEraserError('')
+  }, [selectedElementId])
 
-  const detectObjectsInSelectedImage = async () => {
-    if (!selectedElement || selectedElement.kind !== 'image' || objectEraserBusy || objectEraserSegmentBusy) return
-    setObjectEraserBusy(true); setObjectEraserSegmentBusy(false); setObjectEraserError(''); setObjectEraserDetections([]); setObjectEraserObjects([]); setObjectEraserSelectedId(null); setObjectEraserImageSize(null)
+  const loadObjectEraserImage = async () => {
+    if (!selectedElement || selectedElement.kind !== 'image' || objectEraserBusy) return
+    setObjectEraserBusy(true)
+    setObjectEraserError('')
     try {
-      const source = await fetch(selectedElement.url)
+      const source = await fetch(selectedElement.url, { cache: 'no-store' })
       if (!source.ok) throw new Error('Could not load the selected image. Please try again.')
       const blob = await source.blob()
-      const file = new File([blob], selectedElement.name || 'studio-image', { type: blob.type || 'image/jpeg' })
+      if (!blob.type.startsWith('image/')) throw new Error('The selected Studio asset is not a supported image.')
+      const file = new File([blob], selectedElement.name || 'studio-image', { type: blob.type })
       if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
       const previewUrl = URL.createObjectURL(blob)
       objectEraserPreviewUrlRef.current = previewUrl
-      const form = new FormData(); form.append('image', file)
-      if (objectEraserPrompt.trim()) form.append('prompts', objectEraserPrompt.trim())
-      const response = await fetch('/api/studio/object-eraser/prepare', { method: 'POST', body: form, credentials: 'same-origin' })
-      const result = await response.json()
-      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Object detection failed. Please try again.')
-      const detections = Array.isArray(result.detections) ? result.detections : []
-      setObjectEraserDetections(detections)
-      setObjectEraserImageSize({width:result.image.width,height:result.image.height})
-      if (!detections.length) {
-        setObjectEraserError('')
-        return
-      }
-      setObjectEraserBusy(false)
-      setObjectEraserSegmentBusy(true)
-      const segmentationForm = new FormData()
-      segmentationForm.append('image', file)
-      segmentationForm.append('detections', JSON.stringify(detections))
-      const segmentationResponse = await fetch('/api/studio/object-eraser/segment', { method: 'POST', body: segmentationForm, credentials: 'same-origin' })
-      const segmentationResult = await segmentationResponse.json()
-      if (!segmentationResponse.ok || !segmentationResult?.ok) throw new Error(segmentationResult?.error || 'Could not isolate detected objects. Please try again.')
       const image = new Image()
       image.src = previewUrl
-      await new Promise<void>((resolve,reject) => { image.onload=()=>resolve(); image.onerror=()=>reject(new Error('Could not prepare the original image for object cutouts.')) })
-      const objectMasks = (segmentationResult.segmentations as Array<{id:string;confidence:number;polygons:number[][][]}>).map(mask => {
-        const detection = detections.find((item:any)=>item.id===mask.id)
-        if (!detection || !Array.isArray(mask.polygons)) return null
-        const rawPoints=mask.polygons.flat().filter(point=>Array.isArray(point)&&point.length===2&&point.every(Number.isFinite))
-        if(rawPoints.length<3)return null
-        const maxX=Math.max(...rawPoints.map(point=>point[0])),maxY=Math.max(...rawPoints.map(point=>point[1]))
-        const polygons= maxX<=1.5&&maxY<=1.5
-          ? mask.polygons.map(polygon=>polygon.map(([x,y])=>[x*image.naturalWidth,y*image.naturalHeight]))
-          : mask.polygons
-        const validPoints=polygons.flat().filter(point=>Array.isArray(point)&&point.length===2&&point.every(Number.isFinite))
-        if(validPoints.length<3)return null
-        return {id:mask.id,label:detection.label,confidence:Math.min(detection.confidence,mask.confidence),polygons}
-      }).filter((item):item is {id:string;label:string;confidence:number;polygons:number[][][]}=>!!item)
-      if (!objectMasks.length) throw new Error('The AI returned no usable object outlines. Please run detection again.')
-      setObjectEraserObjects(objectMasks)
-      if (segmentationResult.warning) setObjectEraserError(segmentationResult.warning)
-      setObjectEraserSelectedId(null)
-    } catch (err) {
-      setObjectEraserError(err instanceof Error ? err.message : 'Object detection or segmentation failed. Please try again.')
-    } finally { setObjectEraserBusy(false); setObjectEraserSegmentBusy(false) }
-  }
-  useEffect(() => {
-    if (activePanel === 'object-eraser' && selectedElement?.kind === 'image' && !objectEraserBusy && !objectEraserSegmentBusy && !objectEraserImageSize && !objectEraserError) {
-      void detectObjectsInSelectedImage()
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve()
+        image.onerror = () => reject(new Error('Could not prepare the selected image for Object Eraser.'))
+      })
+      if (!image.naturalWidth || !image.naturalHeight) throw new Error('The selected image has invalid dimensions.')
+      objectEraserSourceFileRef.current = file
+      setObjectEraserImageSize({ width: image.naturalWidth, height: image.naturalHeight })
+    } catch (error) {
+      setObjectEraserError(error instanceof Error ? error.message : 'Could not prepare the selected image.')
+    } finally {
+      setObjectEraserBusy(false)
     }
-  }, [activePanel, selectedElementId, objectEraserImageSize, objectEraserError])
+  }
+
+  // Detection and segmentation are deliberately deferred until the user presses
+  // Remove object. Opening the panel only loads the image locally and never
+  // triggers a provider request or highlights automatically detected objects.
+  useEffect(() => {
+    if (activePanel === 'object-eraser' && selectedElement?.kind === 'image' && !objectEraserBusy && !objectEraserImageSize && !objectEraserError) {
+      void loadObjectEraserImage()
+    }
+  }, [activePanel, selectedElementId, objectEraserImageSize, objectEraserBusy, objectEraserError])
+
+  const detectObjectsUnderBrush = async (file: File, stroke: number[][]) => {
+    const form = new FormData()
+    form.append('image', file)
+    const response = await fetch('/api/studio/object-eraser/prepare', { method: 'POST', body: form, credentials: 'same-origin' })
+    const result = await response.json()
+    if (!response.ok || !result?.ok) throw new Error(result?.error || 'Could not verify the selected area. Please try again.')
+    const detections = Array.isArray(result.detections) ? result.detections : []
+    if (!detections.length) return []
+    const candidates = detections.filter((item: any) =>
+      item && brushStrokeIntersectsDetectionBox(stroke, item, objectEraserBrushSize)
+    )
+    if (!candidates.length) return []
+    setObjectEraserBusy(false)
+    setObjectEraserSegmentBusy(true)
+    const segmentationForm = new FormData()
+    segmentationForm.append('image', file)
+    segmentationForm.append('detections', JSON.stringify(candidates))
+    const segmentationResponse = await fetch('/api/studio/object-eraser/segment', { method: 'POST', body: segmentationForm, credentials: 'same-origin' })
+    const segmentationResult = await segmentationResponse.json()
+    if (!segmentationResponse.ok || !segmentationResult?.ok) throw new Error(segmentationResult?.error || 'Could not verify the selected object. Please try again.')
+    const rawSegmentations = Array.isArray(segmentationResult.segmentations) ? segmentationResult.segmentations : []
+    return rawSegmentations.map((mask: any) => {
+      const detection = candidates.find((item: any) => String(item.id) === String(mask.id))
+      if (!detection || !Array.isArray(mask.polygons)) return null
+      const rawPoints = mask.polygons.flat().filter((point: any) =>
+        Array.isArray(point) && point.length === 2 && point.every(Number.isFinite)
+      )
+      if (rawPoints.length < 3) return null
+      const maxX = Math.max(...rawPoints.map((point: number[]) => point[0]))
+      const maxY = Math.max(...rawPoints.map((point: number[]) => point[1]))
+      const polygons = maxX <= 1.5 && maxY <= 1.5
+        ? mask.polygons.map((polygon: number[][]) => polygon.map(([x, y]) => [x * objectEraserImageSize!.width, y * objectEraserImageSize!.height]))
+        : mask.polygons
+      const validPoints = polygons.flat().filter((point: any) =>
+        Array.isArray(point) && point.length === 2 && point.every(Number.isFinite)
+      )
+      if (validPoints.length < 3) return null
+      return {
+        id: String(mask.id),
+        label: String(detection.label || 'object'),
+        confidence: Math.min(Number(detection.confidence) || 0, Number(mask.confidence) || 0),
+        polygons: polygons as number[][][],
+      }
+    }).filter((item: any) =>
+      item && brushStrokeIntersectsPolygons(stroke, item.polygons, objectEraserBrushSize)
+    )
+  }
 
   const clearObjectEraserResult = () => {
     setObjectEraserResultUrl(current => {
@@ -558,16 +590,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     })
   }
 
-  const getObjectEraserCacheKey = (element:ElementLayer,target:{id:string}) => (element.originalStoragePath||element.storagePath||element.id)+'::'+target.id
-  const isPointInsidePolygon = (point:number[],polygon:number[][]) => {
-    let inside=false
-    for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){
-      const [xi,yi]=polygon[i], [xj,yj]=polygon[j]
-      const intersects=((yi>point[1])!==(yj>point[1]))&&(point[0]<(xj-xi)*(point[1]-yi)/(yj-yi+Number.EPSILON)+xi)
-      if(intersects)inside=!inside
-    }
-    return inside
-  }
   const undoObjectEraserStep = () => {
     const snapshot=objectEraserUndoRef.current
     if(!snapshot||!selectedElement)return
@@ -595,89 +617,158 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setNotice('Restored the last Object Eraser edit.')
   }
   const removeSelectedObjectWithAI = async () => {
-    const target = objectEraserManualActive && objectEraserManualPoints.length >= 3 ? { id: 'manual-area', label: 'selected area', confidence: 1, thumbnail: '', polygons: [objectEraserManualPoints] } : objectEraserObjects.find(item => item.id === objectEraserSelectedId)
-    if (!selectedElement || selectedElement.kind !== 'image' || !target || !objectEraserImageSize || objectEraserInpaintBusy) return
-    const detectedTarget=target.id==='manual-area'
-      ? objectEraserObjects.find(item=>target.polygons.some(path=>path.some(point=>item.polygons.some(poly=>isPointInsidePolygon(point,poly)))))
-      : target
-    if(!detectedTarget){setObjectEraserError('No object detected in the selected area. Brush over an object, then try again.');return}
-    const cacheKey=getObjectEraserCacheKey(selectedElement,detectedTarget)
-    const cached=objectEraserResultCacheRef.current.get(cacheKey)
-    if(cached){
-      objectEraserUndoRef.current={...selectedElement};objectEraserRedoRef.current=null
-      setElements(items=>items.map(item=>item.id===selectedElement.id?{...item,...cached}:item))
-      if(objectEraserPreviewUrlRef.current)URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
-      objectEraserPreviewUrlRef.current=null
-      setObjectEraserImageSize(null);setObjectEraserObjects([])
-      setObjectEraserManualPoints([]);setObjectEraserManualActive(false);setObjectEraserSelectedId(null);setObjectEraserError('')
-      setNotice('Reused the previous removal result. No additional AI credits were used.')
+    const selection = objectEraserManualPoints
+    if (!selectedElement || selectedElement.kind !== 'image' || !objectEraserImageSize || !selection.length
+      || objectEraserInpaintBusy || objectEraserBusy || objectEraserSegmentBusy) return
+
+    const sourceKey = selectedElement.originalStoragePath || selectedElement.storagePath || selectedElement.id
+    const cachedEntry = Array.from(objectEraserResultCacheRef.current.values()).find(entry =>
+      entry.sourceKey === sourceKey
+      && brushStrokeIntersectsPolygons(selection, entry.polygons, objectEraserBrushSize)
+    )
+    const applyCachedResult = (entry: ObjectEraserCachedRemoval) => {
+      objectEraserUndoRef.current = { ...selectedElement }
+      objectEraserRedoRef.current = null
+      setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, ...entry.result } : item))
+      if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
+      objectEraserPreviewUrlRef.current = null
+      objectEraserSourceFileRef.current = null
+      setObjectEraserImageSize(null)
+      setObjectEraserManualPoints([])
+      setObjectEraserManualDrawing(false)
+      setObjectEraserCursor(null)
+      setObjectEraserError('')
+      setNotice('Reused the previous removal result. No additional AI editing credits were used.')
+    }
+    if (cachedEntry) {
+      applyCachedResult(cachedEntry)
       return
     }
-    if (!selectedElement.storagePath) { setObjectEraserError('This image is not saved in the Studio project yet. Re-import it and try again.'); return }
-    if (!window.confirm('Stability AI Inpaint uses 5 credits for this removal. Continue?')) return
-    setObjectEraserInpaintBusy(true); setObjectEraserError(''); clearObjectEraserResult()
+
+    if (!selectedElement.storagePath) {
+      setObjectEraserError('This image is not saved in the Studio project yet. Re-import it and try again.')
+      return
+    }
+    const sourceFile = objectEraserSourceFileRef.current
+    if (!sourceFile) {
+      setObjectEraserError('The image is still preparing. Please wait a moment and try again.')
+      return
+    }
+
+    setObjectEraserBusy(true)
+    setObjectEraserError('')
     try {
+      // First verify that the painted brush stroke overlaps a real object. The
+      // Stability inpaint endpoint is not called for empty/background regions.
+      const detectedObjects = await detectObjectsUnderBrush(sourceFile, selection)
+      setObjectEraserBusy(false)
+      setObjectEraserSegmentBusy(false)
+      if (!detectedObjects.length) {
+        setObjectEraserError('No object was found in the highlighted area. Please brush directly over an object, not the background.')
+        return
+      }
+      const target = detectedObjects.sort((a: any, b: any) => b.confidence - a.confidence)[0]
+      const cacheKey = getObjectEraserTargetCacheKey(sourceKey, target.label, target.polygons, objectEraserImageSize.width, objectEraserImageSize.height)
+      const exactCached = cacheKey ? objectEraserResultCacheRef.current.get(cacheKey) : undefined
+      if (exactCached) {
+        applyCachedResult(exactCached)
+        return
+      }
+
+      if (!window.confirm('Stability AI Inpaint uses 5 credits for this removal. Continue?')) return
+      setObjectEraserInpaintBusy(true)
+      clearObjectEraserResult()
+
       const maskCanvas = document.createElement('canvas')
       maskCanvas.width = objectEraserImageSize.width
       maskCanvas.height = objectEraserImageSize.height
       const maskContext = maskCanvas.getContext('2d')
       if (!maskContext) throw new Error('Could not prepare the object mask.')
-      maskContext.fillStyle = '#000'
-      maskContext.fillRect(0, 0, maskCanvas.width, maskCanvas.height)
-      maskContext.fillStyle = '#fff'
+
+      // Clip the user's brush to the confirmed object silhouette so an
+      // accidental brush overshoot cannot erase unrelated background pixels.
+      maskContext.save()
+      maskContext.beginPath()
+      for (const polygon of target.polygons) {
+        if (polygon.length < 3) continue
+        maskContext.moveTo(polygon[0][0], polygon[0][1])
+        for (let index = 1; index < polygon.length; index++) maskContext.lineTo(polygon[index][0], polygon[index][1])
+        maskContext.closePath()
+      }
+      maskContext.clip('evenodd')
       maskContext.strokeStyle = '#fff'
-      maskContext.lineWidth = Math.max(18, Math.min(72, objectEraserBrushSize * 2))
+      maskContext.fillStyle = '#fff'
+      maskContext.lineWidth = Math.max(16, Math.min(96, objectEraserBrushSize * 2))
       maskContext.lineJoin = 'round'
       maskContext.lineCap = 'round'
-      for (const path of target.polygons) {
-        if (!path.length) continue
+      if (selection.length === 1) {
         maskContext.beginPath()
-        maskContext.moveTo(path[0][0],path[0][1])
-        if(path.length===1){maskContext.lineTo(path[0][0]+0.1,path[0][1]+0.1)}else for(let index=1;index<path.length;index++)maskContext.lineTo(path[index][0],path[index][1])
+        maskContext.arc(selection[0][0], selection[0][1], objectEraserBrushSize, 0, Math.PI * 2)
+        maskContext.fill()
+      } else {
+        maskContext.beginPath()
+        maskContext.moveTo(selection[0][0], selection[0][1])
+        for (let index = 1; index < selection.length; index++) maskContext.lineTo(selection[index][0], selection[index][1])
         maskContext.stroke()
       }
+      maskContext.restore()
+
       const maskDataUrl = maskCanvas.toDataURL('image/png')
       const response = await fetch('/api/studio/object-eraser/inpaint', {
-        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, storagePath: selectedElement.storagePath, label: target.label, maskDataUrl })
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, storagePath: selectedElement.storagePath, label: target.label, maskDataUrl }),
       })
       if (!response.ok) {
         let payload: any = null
-        try { payload = await response.json() } catch { /* keep the generic error below */ }
+        try { payload = await response.json() } catch { /* retain the generic error below */ }
         throw new Error(payload?.error || 'Stability AI object removal failed.')
       }
       const blob = await response.blob()
       if (!blob.type.startsWith('image/') || blob.size < 100) throw new Error('Stability AI returned an invalid or empty edited image.')
-      // A successful provider response is not a completed Studio edit until the
-      // generated file is persisted and the actual selected layer points to it.
-      const baseName = selectedElement.name.replace(/\\.[^.]+$/, '') || 'studio-image'
+
+      const baseName = selectedElement.name.replace(/\.[^.]+$/, '') || 'studio-image'
       const file = new File([blob], baseName + '-object-erased.png', { type: blob.type || 'image/png' })
       const storagePath = await uploadStudioAsset(projectId, file)
       const url = await createStudioAssetUrl(storagePath)
-      objectEraserUndoRef.current={...selectedElement};objectEraserRedoRef.current=null
-      setElements(items => items.map(item => item.id === selectedElement.id ? {
-        ...item,
+      const result = {
         url,
         storagePath,
         name: file.name,
         fileSize: file.size,
-        originalStoragePath: item.originalStoragePath || item.storagePath,
-        originalName: item.originalName || item.name,
-        originalFileSize: item.originalFileSize ?? item.fileSize,
-      } : item))
-      objectEraserResultCacheRef.current.set(cacheKey,{url,storagePath,name:file.name,fileSize:file.size,originalStoragePath:selectedElement.originalStoragePath||selectedElement.storagePath,originalName:selectedElement.originalName||selectedElement.name,originalFileSize:selectedElement.originalFileSize??selectedElement.fileSize})
+        originalStoragePath: selectedElement.originalStoragePath || selectedElement.storagePath,
+        originalName: selectedElement.originalName || selectedElement.name,
+        originalFileSize: selectedElement.originalFileSize ?? selectedElement.fileSize,
+      }
+      objectEraserUndoRef.current = { ...selectedElement }
+      objectEraserRedoRef.current = null
+      setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, ...result } : item))
+      if (cacheKey) {
+        objectEraserResultCacheRef.current.set(cacheKey, {
+          sourceKey,
+          label: target.label,
+          polygons: target.polygons,
+          result,
+        })
+      }
       clearObjectEraserResult()
-      if(objectEraserPreviewUrlRef.current)URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
-      objectEraserPreviewUrlRef.current=null
+      if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
+      objectEraserPreviewUrlRef.current = null
+      objectEraserSourceFileRef.current = null
       setObjectEraserImageSize(null)
-      setObjectEraserObjects(items => items.filter(item => item.id !== detectedTarget.id))
-      setObjectEraserSelectedId(null)
       setObjectEraserManualPoints([])
-      setObjectEraserManualActive(false)
-      setNotice('AI removal applied to the canvas and saved as the selected image layer. Export will use this edited image. The original can be restored.')
+      setObjectEraserManualDrawing(false)
+      setObjectEraserCursor(null)
+      setObjectEraserError('')
+      setNotice('AI removal applied to the canvas and saved as the selected image layer. Undo restores the previous image.')
     } catch (error) {
-      setObjectEraserError(error instanceof Error ? error.message : 'Stability AI object removal failed. Your original image is unchanged.')
-    } finally { setObjectEraserInpaintBusy(false) }
+      setObjectEraserError(error instanceof Error ? error.message : 'Object removal failed. Your original image is unchanged.')
+    } finally {
+      setObjectEraserBusy(false)
+      setObjectEraserSegmentBusy(false)
+      setObjectEraserInpaintBusy(false)
+    }
   }
 
   const applyObjectEraserResult = async () => {
@@ -2129,26 +2220,58 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             {selectedElement?.kind === 'image' ? <>
               <section className="rounded-xl border border-white/10 bg-black/20 p-3">
                 <div className="mb-3 flex items-center justify-between">
-                  <div><h4 className="text-[10px] font-bold text-slate-100">Object Eraser</h4><p className="mt-1 text-[8px] text-slate-500">Brush over the object you want to remove.</p></div>
+                  <div><h4 className="text-[10px] font-bold text-slate-100">Object Eraser</h4><p className="mt-1 text-[8px] text-slate-500">Brush directly over the object you want to remove.</p></div>
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={undoObjectEraserStep} disabled={!objectEraserUndoRef.current||objectEraserInpaintBusy} title="Undo one edit" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5"/></button>
-                    <button type="button" onClick={redoObjectEraserStep} disabled={!objectEraserRedoRef.current||objectEraserInpaintBusy} title="Redo one edit" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5"/></button>
+                    <button type="button" onClick={undoObjectEraserStep} disabled={!objectEraserUndoRef.current || objectEraserInpaintBusy || objectEraserBusy || objectEraserSegmentBusy} title="Undo one edit" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5"/></button>
+                    <button type="button" onClick={redoObjectEraserStep} disabled={!objectEraserRedoRef.current || objectEraserInpaintBusy || objectEraserBusy || objectEraserSegmentBusy} title="Redo one edit" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5"/></button>
                   </div>
                 </div>
-                {objectEraserImageSize&&<div className="relative mx-auto w-full overflow-hidden rounded-lg bg-[#080b16]" style={{aspectRatio:objectEraserImageSize.width+'/'+objectEraserImageSize.height}}>
-                  <img src={objectEraserPreviewUrlRef.current||selectedElement.url} alt="Image for object removal" draggable={false} className="absolute inset-0 h-full w-full select-none object-fill"/>
-                  <svg viewBox={`0 0 ${objectEraserImageSize.width} ${objectEraserImageSize.height}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full touch-none cursor-none" onPointerDown={event=>{const rect=event.currentTarget.getBoundingClientRect();const x=(event.clientX-rect.left)/rect.width*objectEraserImageSize.width;const y=(event.clientY-rect.top)/rect.height*objectEraserImageSize.height;event.currentTarget.setPointerCapture(event.pointerId);setObjectEraserManualPoints([[x,y]]);setObjectEraserManualActive(true);setObjectEraserManualDrawing(true);setObjectEraserSelectedId(null);setObjectEraserCursor([x,y])}} onPointerMove={event=>{const rect=event.currentTarget.getBoundingClientRect();const x=(event.clientX-rect.left)/rect.width*objectEraserImageSize.width;const y=(event.clientY-rect.top)/rect.height*objectEraserImageSize.height;setObjectEraserCursor([x,y]);if(!objectEraserManualDrawing)return;setObjectEraserManualPoints(points=>{const last=points[points.length-1];if(last&&Math.hypot(last[0]-x,last[1]-y)<Math.max(2,objectEraserImageSize.width/500))return points;return [...points,[x,y]]})}} onPointerUp={()=>setObjectEraserManualDrawing(false)} onPointerCancel={()=>setObjectEraserManualDrawing(false)} onPointerLeave={()=>{if(!objectEraserManualDrawing)setObjectEraserCursor(null)}}>
-                    {objectEraserManualPoints.length>0&&<polyline points={objectEraserManualPoints.map(point=>point.join(',')).join(' ')} fill="none" stroke="#e879f9" strokeWidth={Math.max(18,Math.min(72,objectEraserBrushSize*2))} strokeLinecap="round" strokeLinejoin="round" opacity=".65"/>}
-                    {objectEraserCursor&&<circle cx={objectEraserCursor[0]} cy={objectEraserCursor[1]} r={objectEraserBrushSize} fill="rgba(232,121,249,.12)" stroke="#f0abfc" strokeWidth={Math.max(2,objectEraserImageSize.width/500)} pointerEvents="none"/>}
-                    {objectEraserInpaintBusy&&<g><defs><linearGradient id="eraser-scan" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#e879f9" stopOpacity="0"/><stop offset="50%" stopColor="#f0abfc" stopOpacity=".9"/><stop offset="100%" stopColor="#e879f9" stopOpacity="0"/></linearGradient></defs><rect x="0" y="0" width={objectEraserImageSize.width} height={objectEraserImageSize.height} fill="rgba(8,11,22,.38)"/><rect x="0" y="0" width={objectEraserImageSize.width} height={Math.max(36,objectEraserImageSize.height*.12)} fill="url(#eraser-scan)" opacity=".75"><animate attributeName="y" values={`-${objectEraserImageSize.height*.12};${objectEraserImageSize.height}`} dur="1.6s" repeatCount="indefinite"/></rect><text x="50%" y="50%" textAnchor="middle" fill="#fff" fontSize={Math.max(14,objectEraserImageSize.width/35)} fontWeight="600">Removing object…</text></g>}
+                {objectEraserImageSize && <div className="relative mx-auto w-full overflow-hidden rounded-lg bg-[#080b16]" style={{aspectRatio: objectEraserImageSize.width + '/' + objectEraserImageSize.height}}>
+                  <img src={objectEraserPreviewUrlRef.current || selectedElement.url} alt="Image for object removal" draggable={false} className="absolute inset-0 h-full w-full select-none object-fill"/>
+                  <svg viewBox={\`0 0 \${objectEraserImageSize.width} \${objectEraserImageSize.height}\`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full touch-none cursor-none"
+                    onPointerDown={event => {
+                      const rect = event.currentTarget.getBoundingClientRect()
+                      const x = Math.max(0, Math.min(objectEraserImageSize.width, (event.clientX - rect.left) / rect.width * objectEraserImageSize.width))
+                      const y = Math.max(0, Math.min(objectEraserImageSize.height, (event.clientY - rect.top) / rect.height * objectEraserImageSize.height))
+                      event.currentTarget.setPointerCapture(event.pointerId)
+                      setObjectEraserManualPoints([[x, y]])
+                      setObjectEraserManualDrawing(true)
+                      setObjectEraserCursor([x, y])
+                      setObjectEraserError('')
+                    }}
+                    onPointerMove={event => {
+                      const rect = event.currentTarget.getBoundingClientRect()
+                      const x = Math.max(0, Math.min(objectEraserImageSize.width, (event.clientX - rect.left) / rect.width * objectEraserImageSize.width))
+                      const y = Math.max(0, Math.min(objectEraserImageSize.height, (event.clientY - rect.top) / rect.height * objectEraserImageSize.height))
+                      setObjectEraserCursor([x, y])
+                      if (!objectEraserManualDrawing) return
+                      setObjectEraserManualPoints(points => {
+                        const last = points[points.length - 1]
+                        if (last && Math.hypot(last[0] - x, last[1] - y) < Math.max(2, objectEraserImageSize.width / 500)) return points
+                        return [...points, [x, y]]
+                      })
+                    }}
+                    onPointerUp={() => setObjectEraserManualDrawing(false)}
+                    onPointerCancel={() => setObjectEraserManualDrawing(false)}
+                    onPointerLeave={() => { if (!objectEraserManualDrawing) setObjectEraserCursor(null) }}>
+                    {objectEraserManualPoints.length > 0 && <polyline points={objectEraserManualPoints.map(point => point.join(',')).join(' ')} fill="none" stroke="#e879f9" strokeWidth={Math.max(16, Math.min(96, objectEraserBrushSize * 2))} strokeLinecap="round" strokeLinejoin="round" opacity=".62"/>}
+                    {objectEraserManualPoints.length === 1 && <circle cx={objectEraserManualPoints[0][0]} cy={objectEraserManualPoints[0][1]} r={objectEraserBrushSize} fill="rgba(232,121,249,.55)"/>}
+                    {objectEraserCursor && <circle cx={objectEraserCursor[0]} cy={objectEraserCursor[1]} r={objectEraserBrushSize} fill="rgba(232,121,249,.12)" stroke="#f0abfc" strokeWidth={Math.max(2, objectEraserImageSize.width / 500)} pointerEvents="none"/>}
+                    {objectEraserInpaintBusy && <g>
+                      <defs><linearGradient id="eraser-scan" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#e879f9" stopOpacity="0"/><stop offset="50%" stopColor="#f0abfc" stopOpacity=".9"/><stop offset="100%" stopColor="#e879f9" stopOpacity="0"/></linearGradient></defs>
+                      <rect x="0" y="0" width={objectEraserImageSize.width} height={objectEraserImageSize.height} fill="rgba(8,11,22,.30)"/>
+                      <rect x="0" y="0" width={objectEraserImageSize.width} height={Math.max(36, objectEraserImageSize.height * .12)} fill="url(#eraser-scan)" opacity=".75"><animate attributeName="y" values={\`-\${objectEraserImageSize.height * .12};\${objectEraserImageSize.height}\`} dur="1.6s" repeatCount="indefinite"/></rect>
+                      {objectEraserManualPoints.length > 1 && <polyline points={objectEraserManualPoints.map(point => point.join(',')).join(' ')} fill="none" stroke="#fff" strokeWidth={Math.max(18, Math.min(96, objectEraserBrushSize * 2.2))} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="26 13" opacity=".95"><animate attributeName="stroke-dashoffset" values="0;-78" dur=".8s" repeatCount="indefinite"/></polyline>}
+                      <text x="50%" y="50%" textAnchor="middle" fill="#fff" fontSize={Math.max(14, objectEraserImageSize.width / 35)} fontWeight="600">Removing object…</text>
+                    </g>}
                   </svg>
                 </div>}
                 <div className="mt-3 flex items-center justify-between gap-2"><label className="text-[8px] text-slate-400">Brush size</label><span className="text-[8px] text-slate-400">{objectEraserBrushSize}px</span></div>
-                <input aria-label="Brush size" type="range" min="8" max="48" value={objectEraserBrushSize} onChange={event=>setObjectEraserBrushSize(Number(event.target.value))} className="mt-1 w-full accent-fuchsia-500"/>
-                <div className="mt-2 flex items-center justify-between gap-2"><span className="text-[8px] text-slate-500">{objectEraserImageSize?objectEraserImageSize.width+' × '+objectEraserImageSize.height:'Preparing image…'}</span><button type="button" onClick={()=>{setObjectEraserManualPoints([]);setObjectEraserManualActive(false);setObjectEraserManualDrawing(false);setObjectEraserError('')}} className="rounded-md border border-white/10 px-2 py-1 text-[8px] font-semibold text-slate-300">Reset selection</button></div>
-                {objectEraserError&&<p role="status" className="mt-2 rounded-lg border border-amber-300/15 bg-amber-300/[0.06] p-2 text-[9px] leading-4 text-amber-100">{objectEraserError}</p>}
-                {objectEraserManualPoints.length>0&&<button type="button" onClick={removeSelectedObjectWithAI} disabled={objectEraserInpaintBusy||objectEraserApplyBusy||objectEraserBusy||objectEraserSegmentBusy} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:opacity-60">{objectEraserInpaintBusy?'Removing object…':'Remove object'}</button>}
-                <p className="mt-2 text-[8px] leading-4 text-slate-500">Only detected objects can be removed. Areas without an object are rejected without using AI editing credits.</p>
+                <input aria-label="Brush size" type="range" min="8" max="48" value={objectEraserBrushSize} onChange={event => setObjectEraserBrushSize(Number(event.target.value))} className="mt-1 w-full accent-fuchsia-500"/>
+                <div className="mt-2 flex items-center justify-between gap-2"><span className="text-[8px] text-slate-500">{objectEraserImageSize ? objectEraserImageSize.width + ' × ' + objectEraserImageSize.height : objectEraserBusy ? 'Preparing image…' : 'Image not ready'}</span><button type="button" onClick={() => { setObjectEraserManualPoints([]); setObjectEraserManualDrawing(false); setObjectEraserCursor(null); setObjectEraserError('') }} disabled={objectEraserInpaintBusy || objectEraserBusy || objectEraserSegmentBusy} className="rounded-md border border-white/10 px-2 py-1 text-[8px] font-semibold text-slate-300 disabled:opacity-40">Reset selection</button></div>
+                {objectEraserError && <p role="status" className="mt-2 rounded-lg border border-amber-300/15 bg-amber-300/[0.06] p-2 text-[9px] leading-4 text-amber-100">{objectEraserError}</p>}
+                {objectEraserManualPoints.length > 0 && <button type="button" onClick={removeSelectedObjectWithAI} disabled={objectEraserInpaintBusy || objectEraserApplyBusy || objectEraserBusy || objectEraserSegmentBusy || !objectEraserImageSize} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:opacity-60">{objectEraserInpaintBusy ? 'Removing object…' : objectEraserBusy ? 'Checking selection…' : objectEraserSegmentBusy ? 'Verifying object…' : 'Remove object'}</button>}
+                <p className="mt-2 text-[8px] leading-4 text-slate-500">Your selection is checked before editing. Empty or background areas are rejected without using AI editing credits.</p>
               </section>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select a photo element to use Object Eraser.</div>}
           </div>}
