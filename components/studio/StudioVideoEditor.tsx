@@ -23,6 +23,7 @@ import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-anima
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
 import { extractStudioImagePalette, createStudioRecoloredCanvas, STUDIO_REPLACEMENT_SWATCHES, type StudioColorReplacement } from '@/lib/studio/color-replacement'
 import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, scoreBrushStrokeAgainstPolygons } from '@/lib/studio/object-eraser-selection'
+import { scaleObjectEraserPolygons } from '@/lib/studio/object-eraser'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
@@ -655,6 +656,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const segmentationForm = new FormData()
     segmentationForm.append('image', file)
     segmentationForm.append('detections', JSON.stringify(candidates))
+    segmentationForm.append('imageWidth', String(objectEraserImageSize!.width))
+    segmentationForm.append('imageHeight', String(objectEraserImageSize!.height))
     const segmentationResponse = await fetch('/api/studio/object-eraser/segment', { method: 'POST', body: segmentationForm, credentials: 'same-origin' })
     const segmentationResult = await segmentationResponse.json()
     if (!segmentationResponse.ok || !segmentationResult?.ok) throw new Error(segmentationResult?.error || 'Could not verify the selected object. Please try again.')
@@ -666,11 +669,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         Array.isArray(point) && point.length === 2 && point.every(Number.isFinite)
       )
       if (rawPoints.length < 3) return null
-      const maxX = Math.max(...rawPoints.map((point: number[]) => point[0]))
-      const maxY = Math.max(...rawPoints.map((point: number[]) => point[1]))
-      const polygons = maxX <= 1.5 && maxY <= 1.5
-        ? mask.polygons.map((polygon: number[][]) => polygon.map(([x, y]) => [x * objectEraserImageSize!.width, y * objectEraserImageSize!.height]))
-        : mask.polygons
+      const polygons = scaleObjectEraserPolygons(
+        mask.polygons,
+        objectEraserImageSize!.width,
+        objectEraserImageSize!.height,
+      )
       const validPoints = polygons.flat().filter((point: any) =>
         Array.isArray(point) && point.length === 2 && point.every(Number.isFinite)
       )
@@ -795,7 +798,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         return
       }
 
-      if (!window.confirm('Stability AI Erase Object uses 5 credits for this removal. Continue?')) return
+      // Continue directly inside the editor; never show a browser-native confirm popup.
       setObjectEraserInpaintBusy(true)
       clearObjectEraserResult()
 
@@ -2401,6 +2404,25 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                       strokeWidth={Math.max(1.5, objectEraserImageSize.width / 700)}
                       pointerEvents="none"
                     />}
+                    {objectEraserInpaintBusy && <g pointerEvents="none">
+                      <defs>
+                        <linearGradient id="object-eraser-scan-gradient" x1="0" x2="0" y1="0" y2="1">
+                          <stop offset="0%" stopColor="#ec4899" stopOpacity="0" />
+                          <stop offset="45%" stopColor="#f0abfc" stopOpacity=".9" />
+                          <stop offset="55%" stopColor="#fce7f3" stopOpacity="1" />
+                          <stop offset="100%" stopColor="#ec4899" stopOpacity="0" />
+                        </linearGradient>
+                        <filter id="object-eraser-scan-glow" x="-30%" y="-500%" width="160%" height="1100%">
+                          <feGaussianBlur stdDeviation="5" />
+                        </filter>
+                      </defs>
+                      <rect x="0" y="0" width={objectEraserImageSize.width} height="18" fill="url(#object-eraser-scan-gradient)" opacity=".55" filter="url(#object-eraser-scan-glow)">
+                        <animate attributeName="y" values={`-18;\u0024{objectEraserImageSize.height};-18`} dur="1.8s" repeatCount="indefinite" />
+                      </rect>
+                      <rect x="0" y="0" width={objectEraserImageSize.width} height="2.5" fill="#f0abfc" opacity=".95">
+                        <animate attributeName="y" values={`-2.5;\u0024{objectEraserImageSize.height};-2.5`} dur="1.8s" repeatCount="indefinite" />
+                      </rect>
+                    </g>}
                   </svg>
                 </div>}
                 <div className="mt-3 flex items-center justify-between gap-2"><label className="text-[8px] text-slate-400">Brush size</label><span className="text-[8px] text-slate-400">{objectEraserBrushSize}px</span></div>
@@ -2408,6 +2430,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <div className="mt-2 flex items-center justify-between gap-2"><span className="text-[8px] text-slate-500">{objectEraserImageSize ? objectEraserImageSize.width + ' × ' + objectEraserImageSize.height : objectEraserBusy ? 'Preparing image…' : 'Image not ready'}</span><button type="button" onClick={() => { setObjectEraserManualPoints([]); setObjectEraserManualDrawing(false); setObjectEraserCursor(null); setObjectEraserError('') }} disabled={objectEraserInpaintBusy || objectEraserBusy || objectEraserSegmentBusy} className="rounded-md border border-white/10 px-2 py-1 text-[8px] font-semibold text-slate-300 disabled:opacity-40">Reset selection</button></div>
                 {objectEraserError && <p role="status" className="mt-2 rounded-lg border border-amber-300/15 bg-amber-300/[0.06] p-2 text-[9px] leading-4 text-amber-100">{objectEraserError}</p>}
                 {objectEraserManualPoints.length > 0 && <button type="button" onClick={removeSelectedObjectWithAI} disabled={objectEraserInpaintBusy || objectEraserApplyBusy || objectEraserBusy || objectEraserSegmentBusy || !objectEraserImageSize} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:opacity-60">{objectEraserInpaintBusy ? 'Removing object…' : objectEraserBusy ? 'Checking selection…' : objectEraserSegmentBusy ? 'Verifying object…' : 'Remove object'}</button>}
+                <p className="mt-1 text-center text-[8px] text-slate-500">AI erase uses 5 credits when a new removal is processed.</p>
                 <p className="mt-2 text-[8px] leading-4 text-slate-500">Your selection is checked before editing. Empty or background areas are rejected without using AI editing credits.</p>
               </section>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select a photo element to use Object Eraser.</div>}
