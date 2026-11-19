@@ -1017,6 +1017,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   useEffect(() => {
     let active = true
     const restore = async () => {
+      let restoreSucceeded = false
       try {
         const row = await loadStudioProject(projectId, 'video')
         if (!active) return
@@ -1094,9 +1095,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           }
           setSaveStatus('New draft')
         }
+        restoreSucceeded = true
       } catch (cause) {
         if (active) setSaveStatus(cause instanceof Error ? cause.message : 'Could not load draft')
-      } finally { if (active) setHydrated(true) }
+      } finally {
+        // Keep autosave locked if cloud restore failed; otherwise empty defaults
+        // could overwrite a previously saved project.
+        if (active && restoreSucceeded) setHydrated(true)
+      }
     }
     void restore()
     return () => { active = false }
@@ -1107,13 +1113,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (saveTimer.current) clearTimeout(saveTimer.current)
     setSaveStatus('Unsaved changes')
     const sequence = ++saveSequence.current
-    saveTimer.current = setTimeout(async () => {
+    const persist = async () => {
       try {
         await saveStudioProject({
           id: projectId, project_type: 'video', name: projectName, template_id: templateId || null,
           data: {
             clips: clips.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane: 0, fileSize, storagePath })),
-            elements: elements.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, colorReplacements, fileSize, storagePath, originalStoragePath, originalName, originalFileSize }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, colorReplacements, fileSize, storagePath, originalStoragePath, originalName, originalFileSize })), selectedElementId, 
+            elements: elements.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, colorReplacements, fileSize, storagePath, originalStoragePath, originalName, originalFileSize }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, color, colorStrength, colorReplacements, fileSize, storagePath, originalStoragePath, originalName, originalFileSize })), selectedElementId,
             audioPath: audio?.storagePath || null, audioId: audio?.id || null, audioName: audio?.name || null,
             audioDuration: audio?.duration || 0, audioTrimStart: audio?.trimStart || 0, audioTrimEnd: audio?.trimEnd || 0, audioTimelineStart: audio?.timelineStart || 0, audioFileSize: audio?.fileSize || 0, selectedId, muted, volume,
             audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, textLayers, selectedTextId, exportWidth, exportHeight,
@@ -1123,8 +1129,22 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       } catch (cause) {
         if (sequence === saveSequence.current) setSaveStatus(cause instanceof Error ? cause.message : 'Save failed')
       }
-    }, 1000)
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+    }
+    const flush = () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      void persist()
+    }
+    saveTimer.current = setTimeout(() => { void persist() }, 250)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [hydrated, projectId, projectName, templateId, clips, elements, selectedElementId, audio, selectedId, muted, volume, audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, textLayers, selectedTextId, exportWidth, exportHeight])
 
 
