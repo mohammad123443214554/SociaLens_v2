@@ -22,7 +22,7 @@ import { CINEMATIC_LIGHT_ANIMATIONS } from '@/lib/studio/cinematic-light-animati
 import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-animations'
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
 import { extractStudioImagePalette, createStudioRecoloredCanvas, STUDIO_REPLACEMENT_SWATCHES, type StudioColorReplacement } from '@/lib/studio/color-replacement'
-import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, scoreBrushStrokeAgainstPolygons, scoreBrushStrokeAgainstDetectionBox } from '@/lib/studio/object-eraser-selection'
+import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, scoreBrushStrokeAgainstPolygons, scoreBrushStrokeAgainstDetectionBox, getObjectEraserTargetsUnderBrush } from '@/lib/studio/object-eraser-selection'
 import { scaleObjectEraserPolygons } from '@/lib/studio/object-eraser-selection'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
@@ -651,18 +651,19 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       item && brushStrokeIntersectsDetectionBox(stroke, item, objectEraserBrushSize)
     )
     if (!candidates.length) return []
-    // A single removal action targets one object. Sending several nearby
-    // boxes in one SAM2 request can make the returned mask map to the wrong
-    // candidate, so choose the box most directly covered by the user's brush.
-    const focusedCandidate = candidates
+    // Keep every detected instance touched by the brush. One highlighted
+    // region can cover multiple overlapping objects or parts (e.g. flowers,
+    // leaves and the pot); SAM2 must receive all matching prompts together.
+    const matchedCandidates = candidates
       .map((item: any) => ({ ...item, brushMatchScore: scoreBrushStrokeAgainstDetectionBox(stroke, item, objectEraserBrushSize) }))
-      .sort((a: any, b: any) => b.brushMatchScore - a.brushMatchScore || b.confidence - a.confidence)[0]
-    if (!focusedCandidate || focusedCandidate.brushMatchScore <= 0) return []
+      .filter((item: any) => item.brushMatchScore > 0)
+      .sort((a: any, b: any) => b.brushMatchScore - a.brushMatchScore || b.confidence - a.confidence)
+    if (!matchedCandidates.length) return []
     setObjectEraserBusy(false)
     setObjectEraserSegmentBusy(true)
     const segmentationForm = new FormData()
     segmentationForm.append('image', file)
-    segmentationForm.append('detections', JSON.stringify([focusedCandidate]))
+    segmentationForm.append('detections', JSON.stringify(matchedCandidates))
     segmentationForm.append('imageWidth', String(objectEraserImageSize!.width))
     segmentationForm.append('imageHeight', String(objectEraserImageSize!.height))
     segmentationForm.append('brushPoints', JSON.stringify(stroke))
@@ -670,8 +671,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const segmentationResult = await segmentationResponse.json()
     if (!segmentationResponse.ok || !segmentationResult?.ok) throw new Error(segmentationResult?.error || 'Could not verify the selected object. Please try again.')
     const rawSegmentations = Array.isArray(segmentationResult.segmentations) ? segmentationResult.segmentations : []
-    return rawSegmentations.map((mask: any) => {
-      const detection = candidates.find((item: any) => String(item.id) === String(mask.id))
+    const segmentedTargets = rawSegmentations.map((mask: any) => {
+      const detection = matchedCandidates.find((item: any) => String(item.id) === String(mask.id))
       if (!detection || !Array.isArray(mask.polygons)) return null
       const rawPoints = mask.polygons.flat().filter((point: any) =>
         Array.isArray(point) && point.length === 2 && point.every(Number.isFinite)
@@ -692,9 +693,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         confidence: Math.min(Number(detection.confidence) || 0, Number(mask.confidence) || 0),
         polygons: polygons as number[][][],
       }
-    }).filter((item: any) =>
-      item && brushStrokeIntersectsPolygons(stroke, item.polygons, objectEraserBrushSize)
-    )
+    }).filter((item: any) => item && item.polygons.length > 0)
+    // Keep all masks intersected by the brush, not just the best-scoring one.
+    return getObjectEraserTargetsUnderBrush(stroke, segmentedTargets, objectEraserBrushSize)
   }
 
   const clearObjectEraserResult = () => {
