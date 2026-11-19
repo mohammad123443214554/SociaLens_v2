@@ -638,9 +638,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   }, [objectEraserBusy, objectEraserLoadSequenceRef])
 
 
-  // Detection and segmentation are deliberately deferred until the user presses
-  // Remove object. Opening the panel only loads the image locally and never
-  // triggers a provider request or highlights automatically detected objects.
+  // Object and background detection are deferred until the user explicitly starts them.
+  // Opening either panel only loads the selected photo locally.
   useEffect(() => {
     if ((activePanel === 'object-eraser' || activePanel === 'background-eraser') && selectedElement?.kind === 'image' && !objectEraserBusy && !objectEraserImageSize && !objectEraserError) {
       void loadObjectEraserImage(selectedElement)
@@ -876,6 +875,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setElements(items=>items.map(item=>item.id===snapshot.id?{...snapshot}:item))
     objectEraserUndoRef.current=null
     objectEraserSourceFileRef.current = null
+    setBackgroundEraserForegroundMasks([])
+    setBackgroundEraserError('')
     setObjectEraserManualPoints([])
     setObjectEraserImageSize(null)
     setObjectEraserError('')
@@ -888,6 +889,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setElements(items=>items.map(item=>item.id===snapshot.id?{...snapshot}:item))
     objectEraserRedoRef.current=null
     objectEraserSourceFileRef.current = null
+    setBackgroundEraserForegroundMasks([])
+    setBackgroundEraserError('')
     setObjectEraserManualPoints([])
     setObjectEraserImageSize(null)
     setObjectEraserError('')
@@ -2509,7 +2512,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-fuchsia-300/20 bg-fuchsia-400/10 text-fuchsia-200"><ScanSearch className="h-5 w-5" /></span>
                 <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold text-white">Object Eraser</span><span className="mt-1 block text-[9px] leading-4 text-slate-400">Detect and remove selected objects while preserving the rest of your image.</span><span className="mt-2 inline-flex items-center gap-1 text-[9px] font-semibold text-fuchsia-200">Open object eraser <span aria-hidden="true">→</span></span></span>
               </button>
-              <button type="button" onClick={() => { setBackgroundEraserForegroundMasks([]); setBackgroundEraserError(''); setActivePanel('background-eraser') }} className="group flex w-full items-start gap-3 rounded-xl border border-white/[0.10] bg-gradient-to-br from-pink-500/[0.10] to-violet-500/[0.07] p-3 text-left transition hover:border-pink-300/45 hover:from-pink-500/[0.15] hover:to-violet-500/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400">
+              <button type="button" onClick={() => { setBackgroundEraserForegroundMasks([]); setBackgroundEraserError(''); setObjectEraserError(''); setActivePanel('background-eraser') }} className="group flex w-full items-start gap-3 rounded-xl border border-white/[0.10] bg-gradient-to-br from-pink-500/[0.10] to-violet-500/[0.07] p-3 text-left transition hover:border-pink-300/45 hover:from-pink-500/[0.15] hover:to-violet-500/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-pink-300/20 bg-pink-400/10 text-pink-200"><ImageMinus className="h-5 w-5" /></span>
                 <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold text-white">Background Eraser</span><span className="mt-1 block text-[9px] leading-4 text-slate-400">Detect the foreground subject and remove the background.</span><span className="mt-2 inline-flex items-center gap-1 text-[9px] font-semibold text-pink-200">Open background eraser <span aria-hidden="true">→</span></span></span>
               </button>
