@@ -3,9 +3,9 @@ export const ROBOFLOW_REQUEST_TIMEOUT_MS = 45_000
 export const OBJECT_ERASER_DEFAULT_PROMPTS = [
   'person','face','animal','bird','cat','dog','car','bicycle','motorcycle','bus','truck',
   'phone','laptop','computer','camera','cup','mug','bottle','glass','plate','bowl','book',
-  'bag','backpack','handbag','chair','table','sofa','plant','flower','tree','lamp',
+  'bag','backpack','handbag','chair','table','sofa','plant','flower','flower pot','pot','planter','tree','lamp',
   'shoe','hat','watch','jewelry','food','fruit','box','toy','remote control','keyboard',
-  'mouse','screen','logo','sign','pen','pencil'
+  'mouse','screen','logo','pen','pencil'
 ] as const
 
 export type ObjectEraserImageType = 'image/jpeg' | 'image/png' | 'image/webp'
