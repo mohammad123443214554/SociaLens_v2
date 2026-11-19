@@ -634,7 +634,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (!selectedElement || selectedElement.kind !== 'image' || !objectEraserImageSize || !selection.length
       || objectEraserInpaintBusy || objectEraserBusy || objectEraserSegmentBusy) return
 
-    const sourceKey = selectedElement.originalStoragePath || selectedElement.storagePath || selectedElement.id
+    // Key against the exact image currently being edited. After Undo this is
+    // the original asset again; on a later, different edited image it cannot
+    // accidentally reuse an earlier object's cached output.
+    const sourceKey = selectedElement.storagePath || selectedElement.id
     const selectionKey = getObjectEraserBrushRegionKey(selection, objectEraserBrushSize, objectEraserImageSize.width, objectEraserImageSize.height)
     const cachedEntry = Array.from(objectEraserResultCacheRef.current.values()).find(entry =>
       entry.sourceKey === sourceKey && entry.selectionKey === selectionKey
