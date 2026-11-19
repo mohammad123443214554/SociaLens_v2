@@ -532,8 +532,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         if(validPoints.length<3)return null
         return {id:mask.id,label:detection.label,confidence:Math.min(detection.confidence,mask.confidence),polygons}
       }).filter((item):item is {id:string;label:string;confidence:number;polygons:number[][][]}=>!!item)
-      if (!cutouts.length) throw new Error('The AI returned no usable object cutouts. Please run detection again.')
-      setObjectEraserObjects(cutouts)
+      if (!objectMasks.length) throw new Error('The AI returned no usable object outlines. Please run detection again.')
+      setObjectEraserObjects(objectMasks)
       if (segmentationResult.warning) setObjectEraserError(segmentationResult.warning)
       setObjectEraserSelectedId(null)
     } catch (err) {
