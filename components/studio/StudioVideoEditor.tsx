@@ -577,6 +577,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setObjectEraserObjects([])
     setObjectEraserSelectedId(null)
     setObjectEraserManualPoints([])
+    setObjectEraserImageSize(null)
     setObjectEraserError('')
     setNotice('Undid the last Object Eraser edit.')
   }
@@ -589,6 +590,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setObjectEraserObjects([])
     setObjectEraserSelectedId(null)
     setObjectEraserManualPoints([])
+    setObjectEraserImageSize(null)
     setObjectEraserError('')
     setNotice('Restored the last Object Eraser edit.')
   }
@@ -2132,7 +2134,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   <svg viewBox={`0 0 ${objectEraserImageSize.width} ${objectEraserImageSize.height}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full touch-none cursor-none" onPointerDown={event=>{const rect=event.currentTarget.getBoundingClientRect();const x=(event.clientX-rect.left)/rect.width*objectEraserImageSize.width;const y=(event.clientY-rect.top)/rect.height*objectEraserImageSize.height;event.currentTarget.setPointerCapture(event.pointerId);setObjectEraserManualPoints([[x,y]]);setObjectEraserManualActive(true);setObjectEraserManualDrawing(true);setObjectEraserSelectedId(null);setObjectEraserCursor([x,y])}} onPointerMove={event=>{const rect=event.currentTarget.getBoundingClientRect();const x=(event.clientX-rect.left)/rect.width*objectEraserImageSize.width;const y=(event.clientY-rect.top)/rect.height*objectEraserImageSize.height;setObjectEraserCursor([x,y]);if(!objectEraserManualDrawing)return;setObjectEraserManualPoints(points=>{const last=points[points.length-1];if(last&&Math.hypot(last[0]-x,last[1]-y)<Math.max(2,objectEraserImageSize.width/500))return points;return [...points,[x,y]]})}} onPointerUp={()=>setObjectEraserManualDrawing(false)} onPointerCancel={()=>setObjectEraserManualDrawing(false)} onPointerLeave={()=>{if(!objectEraserManualDrawing)setObjectEraserCursor(null)}}>
                     {objectEraserManualPoints.length>0&&<polyline points={objectEraserManualPoints.map(point=>point.join(',')).join(' ')} fill="none" stroke="#e879f9" strokeWidth={Math.max(18,Math.min(72,objectEraserBrushSize*2))} strokeLinecap="round" strokeLinejoin="round" opacity=".65"/>}
                     {objectEraserCursor&&<circle cx={objectEraserCursor[0]} cy={objectEraserCursor[1]} r={objectEraserBrushSize} fill="rgba(232,121,249,.12)" stroke="#f0abfc" strokeWidth={Math.max(2,objectEraserImageSize.width/500)} pointerEvents="none"/>}
-                    {objectEraserInpaintBusy&&<g><rect x="0" y="0" width={objectEraserImageSize.width} height={objectEraserImageSize.height} fill="rgba(8,11,22,.38)"/><rect x="0" y="0" width={objectEraserImageSize.width} height={objectEraserImageSize.height} fill="url(#eraser-scan)" opacity=".35"><animate attributeName="y" values={`-${objectEraserImageSize.height};${objectEraserImageSize.height}`} dur="1.8s" repeatCount="indefinite"/></rect><text x="50%" y="50%" textAnchor="middle" fill="#fff" fontSize={Math.max(14,objectEraserImageSize.width/35)} fontWeight="600">Removing object…</text></g>}
+                    {objectEraserInpaintBusy&&<g><defs><linearGradient id="eraser-scan" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#e879f9" stopOpacity="0"/><stop offset="50%" stopColor="#f0abfc" stopOpacity=".9"/><stop offset="100%" stopColor="#e879f9" stopOpacity="0"/></linearGradient></defs><rect x="0" y="0" width={objectEraserImageSize.width} height={objectEraserImageSize.height} fill="rgba(8,11,22,.38)"/><rect x="0" y="0" width={objectEraserImageSize.width} height={Math.max(36,objectEraserImageSize.height*.12)} fill="url(#eraser-scan)" opacity=".75"><animate attributeName="y" values={`-${objectEraserImageSize.height*.12};${objectEraserImageSize.height}`} dur="1.6s" repeatCount="indefinite"/></rect><text x="50%" y="50%" textAnchor="middle" fill="#fff" fontSize={Math.max(14,objectEraserImageSize.width/35)} fontWeight="600">Removing object…</text></g>}
                   </svg>
                 </div>}
                 <div className="mt-3 flex items-center justify-between gap-2"><label className="text-[8px] text-slate-400">Brush size</label><span className="text-[8px] text-slate-400">{objectEraserBrushSize}px</span></div>
