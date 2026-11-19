@@ -35,18 +35,30 @@ export async function POST(request:NextRequest){
  }catch(error){return jsonError(error instanceof Error?error.message:'Object detection data is invalid.',400,'invalid_detections')}
  try{
   const prepared=await prepareObjectEraserImage(image)
-  const response=await requestRoboflow('/sam2/segment_image',JSON.stringify({
-   id:crypto.randomUUID(),
-   image:{type:'base64',value:prepared.base64},
-   sam2_version_id:'hiera_large',
-   format:'json',
-   multimask_output:false,
-   prompts:{prompts:detections.map(item=>({box:{x:item.x,y:item.y,width:item.width,height:item.height}}))}
-  }),'application/json')
-  let result:unknown
-  try{result=await response.json()}catch{return jsonError('SAM 2 returned unreadable mask data. Please try again.',502,'invalid_provider_response',true)}
-  const segmentations=normalizeRoboflowSegmentations(result,detections)
-  return NextResponse.json({ok:true,provider:'roboflow',model:'SAM 2',image:{mimeType:prepared.mimeType,size:prepared.size,sha256:prepared.sha256},segmentations,count:segmentations.length},{headers:NO_STORE_HEADERS})
+  const batches:Array<ObjectEraserDetection[]>=[]
+  for(let index=0;index<detections.length;index+=5)batches.push(detections.slice(index,index+5))
+  const settled=await Promise.allSettled(batches.map(async batch=>{
+   const response=await requestRoboflow('/sam2/segment_image',JSON.stringify({
+    id:crypto.randomUUID(),
+    image:{type:'base64',value:prepared.base64},
+    sam2_version_id:'hiera_large',
+    format:'json',
+    multimask_output:false,
+    prompts:{prompts:batch.map(item=>({box:{x:item.x,y:item.y,width:item.width,height:item.height}}))}
+   }),'application/json')
+   let result:unknown
+   try{result=await response.json()}catch{throw new RoboflowRequestError('SAM 2 returned unreadable mask data. Please retry segmentation.','provider_error',502,true)}
+   return normalizeRoboflowSegmentations(result,batch)
+  }))
+  const segmentations=settled.flatMap(item=>item.status==='fulfilled'?item.value:[])
+  const failedBatches=settled.filter(item=>item.status==='rejected').length
+  if(!segmentations.length){
+   const firstFailure=settled.find(item=>item.status==='rejected')
+   const reason=firstFailure&&firstFailure.status==='rejected'?firstFailure.reason:null
+   if(reason instanceof RoboflowRequestError)return jsonError(reason.message,reason.status,reason.code,reason.retryable)
+   return jsonError('SAM 2 could not isolate these objects. Try detecting fewer objects or use manual selection.',502,'segmentation_failed',true)
+  }
+  return NextResponse.json({ok:true,provider:'roboflow',model:'SAM 2',image:{mimeType:prepared.mimeType,size:prepared.size,sha256:prepared.sha256},segmentations,count:segmentations.length,failedBatches,warning:failedBatches?'Some objects could not be isolated. The available cutouts are still shown.':undefined},{headers:NO_STORE_HEADERS})
  }catch(error){
   if(error instanceof RoboflowRequestError)return jsonError(error.message,error.status,error.code,error.retryable)
   const message=error instanceof Error?error.message:'Object segmentation failed.'
