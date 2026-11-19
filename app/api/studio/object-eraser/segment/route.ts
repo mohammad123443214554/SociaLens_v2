@@ -26,6 +26,22 @@ export async function POST(request:NextRequest){
  if(!Number.isInteger(sourceWidth)||!Number.isInteger(sourceHeight)||sourceWidth<64||sourceHeight<64||sourceWidth*sourceHeight>9_437_184){
   return jsonError('The source image dimensions are invalid. Reopen Object Eraser and try again.',400,'invalid_image_dimensions')
  }
+ let brushPoints:Array<{x:number;y:number}>=[]
+ try{
+  const raw=JSON.parse(String(form.get('brushPoints')||'[]'))
+  if(Array.isArray(raw)){
+   brushPoints=raw.slice(0,256).map((point:unknown)=>{
+    if(!Array.isArray(point)||point.length!==2)return null
+    const x=Number(point[0]),y=Number(point[1])
+    return Number.isFinite(x)&&Number.isFinite(y)&&x>=0&&y>=0&&x<=sourceWidth&&y<=sourceHeight?{x,y}:null
+   }).filter((point):point is {x:number;y:number}=>point!==null)
+  }
+ }catch{return jsonError('The brush selection is invalid. Please paint the object again.',400,'invalid_brush_points')}
+ if(!brushPoints.length)return jsonError('Paint directly over the object before removing it.',400,'empty_brush_points')
+ // Keep a representative set of positive points so SAM2 segments the object
+ // the user actually painted, rather than an unrelated object inside a nearby box.
+ const stride=Math.max(1,Math.ceil(brushPoints.length/12))
+ const sampledBrushPoints=brushPoints.filter((_,index)=>index%stride===0).slice(0,12)
  let detections:ObjectEraserDetection[]
  try{
   const parsed=JSON.parse(String(form.get('detections')||'[]'))
@@ -50,7 +66,14 @@ export async function POST(request:NextRequest){
     sam2_version_id:'hiera_large',
     format:'json',
     multimask_output:false,
-    prompts:{prompts:batch.map(item=>({box:{x:item.x,y:item.y,width:item.width,height:item.height}}))}
+    prompts:{prompts:batch.map(item=>{
+     const right=item.x+item.width
+     const bottom=item.y+item.height
+     const inBox=sampledBrushPoints.filter(point=>point.x>=item.x&&point.x<=right&&point.y>=item.y&&point.y<=bottom)
+     const points=(inBox.length?inBox:[{x:item.x+item.width/2,y:item.y+item.height/2}])
+      .slice(0,12).map(point=>({x:point.x,y:point.y,positive:true}))
+     return {box:{x:item.x,y:item.y,width:item.width,height:item.height},points}
+    })}
    }),'application/json')
    let result:unknown
    try{result=await response.json()}catch{throw new RoboflowRequestError('SAM 2 returned unreadable mask data. Please retry segmentation.','provider_error',502,true)}
