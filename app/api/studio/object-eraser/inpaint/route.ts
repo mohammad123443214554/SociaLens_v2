@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     let upstream: Response
     try {
       const baseUrl = getStabilityImageApiBaseUrl()
-      upstream = await fetch(baseUrl + STABILITY_INPAINT_PATH, {
+      upstream = await fetch(baseUrl + STABILITY_ERASE_PATH, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + apiKey, Accept: 'image/*' },
         body: form,
