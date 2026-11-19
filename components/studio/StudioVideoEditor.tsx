@@ -639,22 +639,30 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const cachedEntry = Array.from(objectEraserResultCacheRef.current.values()).find(entry =>
       entry.sourceKey === sourceKey && entry.selectionKey === selectionKey
     )
-    const applyCachedResult = (entry: ObjectEraserCachedRemoval) => {
-      objectEraserUndoRef.current = { ...selectedElement }
-      objectEraserRedoRef.current = null
-      setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, ...entry.result } : item))
-      if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
-      objectEraserPreviewUrlRef.current = null
-      objectEraserSourceFileRef.current = null
-      setObjectEraserImageSize(null)
-      setObjectEraserManualPoints([])
-      setObjectEraserManualDrawing(false)
-      setObjectEraserCursor(null)
-      setObjectEraserError('')
-      setNotice('Reused the previous removal result. No additional AI editing credits were used.')
+    const applyCachedResult = async (entry: ObjectEraserCachedRemoval) => {
+      try {
+        // Signed Storage URLs expire. Refresh from the persisted path whenever
+        // a cached edit is reused instead of trusting the original preview URL.
+        const freshUrl = await createStudioAssetUrl(entry.result.storagePath)
+        const result = { ...entry.result, url: freshUrl }
+        objectEraserUndoRef.current = { ...selectedElement }
+        objectEraserRedoRef.current = null
+        setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, ...result } : item))
+        if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
+        objectEraserPreviewUrlRef.current = null
+        objectEraserSourceFileRef.current = null
+        setObjectEraserImageSize(null)
+        setObjectEraserManualPoints([])
+        setObjectEraserManualDrawing(false)
+        setObjectEraserCursor(null)
+        setObjectEraserError('')
+        setNotice('Reused the previous removal result. No additional AI editing credits were used.')
+      } catch {
+        setObjectEraserError('The saved removal result could not be reopened. Please try the removal again.')
+      }
     }
     if (cachedEntry) {
-      applyCachedResult(cachedEntry)
+      await applyCachedResult(cachedEntry)
       return
     }
 
@@ -684,7 +692,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const cacheKey = getObjectEraserTargetCacheKey(sourceKey, target.label, target.polygons, objectEraserImageSize.width, objectEraserImageSize.height, selection, objectEraserBrushSize)
       const exactCached = cacheKey ? objectEraserResultCacheRef.current.get(cacheKey) : undefined
       if (exactCached) {
-        applyCachedResult(exactCached)
+        await applyCachedResult(exactCached)
         return
       }
 
@@ -698,6 +706,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const maskContext = maskCanvas.getContext('2d')
       if (!maskContext) throw new Error('Could not prepare the object mask.')
 
+      // Stability expects a black background and white pixels for the inpaint area.
+      maskContext.fillStyle = '#000'
+      maskContext.fillRect(0, 0, maskCanvas.width, maskCanvas.height)
       // Clip the user's brush to the confirmed object silhouette so an
       // accidental brush overshoot cannot erase unrelated background pixels.
       maskContext.save()
