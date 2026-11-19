@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
     const form = new FormData()
     form.set('image', new Blob([imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength) as ArrayBuffer], { type: mimeType }), 'source-image')
     form.set('mask', new Blob([maskBytes.buffer.slice(maskBytes.byteOffset, maskBytes.byteOffset + maskBytes.byteLength) as ArrayBuffer], { type: 'image/png' }), 'object-mask.png')
-    form.set('prompt', 'A natural, photorealistic continuation of the surrounding scene where the selected ' + (label || 'object') + ' has been removed. Reconstruct the background using the nearby textures, patterns, edges, lighting, shadows, perspective and depth. Keep all other objects and the overall photographic appearance unchanged.')
-    form.set('negative_prompt', 'extra objects, duplicate objects, text, watermark, logo, distorted texture, visible patch, hard edge, blur, artifacts')
+    form.set('prompt', 'Photorealistic seamless continuation of the existing background. Reconstruct only the masked region by extending the immediately surrounding scene, textures, patterns, edges, lighting, shadows, perspective and depth. The masked region must contain background only; do not place or recreate any foreground object in it. Keep every unmasked pixel and all other objects unchanged.')
+    form.set('negative_prompt', 'cup, mug, plate, bowl, tableware, foreground object, extra object, duplicate object, replacement object, new subject, text, watermark, logo, distorted texture, visible patch, hard edge, blur, artifacts')
     form.set('output_format', 'png')
 
     let upstream: Response
