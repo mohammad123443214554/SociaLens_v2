@@ -38,8 +38,8 @@ export async function POST(request:NextRequest){
    id: crypto.randomUUID(),
    image:{type:'base64',value:prepared.base64},
    text:uniquePrompts,
-   box_threshold:0.28,
-   text_threshold:0.22
+   box_threshold:0.4,
+   text_threshold:0.32
   }),'application/json')
   let result:unknown
   try{result=await upstream.json()}catch{return jsonError('Roboflow returned unreadable detection data. Please try again.',502,'invalid_provider_response',true)}
