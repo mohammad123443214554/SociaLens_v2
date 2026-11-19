@@ -1,0 +1,132 @@
+export type ObjectEraserPoint = readonly [number, number]
+export type ObjectEraserPolygon = readonly ObjectEraserPoint[]
+
+function cross(a: ObjectEraserPoint, b: ObjectEraserPoint, c: ObjectEraserPoint) {
+  return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+}
+
+function onSegment(a: ObjectEraserPoint, b: ObjectEraserPoint, point: ObjectEraserPoint) {
+  const epsilon = 1e-7
+  return Math.abs(cross(a, b, point)) <= epsilon
+    && point[0] >= Math.min(a[0], b[0]) - epsilon
+    && point[0] <= Math.max(a[0], b[0]) + epsilon
+    && point[1] >= Math.min(a[1], b[1]) - epsilon
+    && point[1] <= Math.max(a[1], b[1]) + epsilon
+}
+
+function segmentsIntersect(a: ObjectEraserPoint, b: ObjectEraserPoint, c: ObjectEraserPoint, d: ObjectEraserPoint) {
+  const abC = cross(a, b, c)
+  const abD = cross(a, b, d)
+  const cdA = cross(c, d, a)
+  const cdB = cross(c, d, b)
+  if (((abC > 0 && abD < 0) || (abC < 0 && abD > 0))
+    && ((cdA > 0 && cdB < 0) || (cdA < 0 && cdB > 0))) return true
+  return (Math.abs(abC) <= 1e-7 && onSegment(a, b, c))
+    || (Math.abs(abD) <= 1e-7 && onSegment(a, b, d))
+    || (Math.abs(cdA) <= 1e-7 && onSegment(c, d, a))
+    || (Math.abs(cdB) <= 1e-7 && onSegment(c, d, b))
+}
+
+function pointSegmentDistance(point: ObjectEraserPoint, start: ObjectEraserPoint, end: ObjectEraserPoint) {
+  const dx = end[0] - start[0]
+  const dy = end[1] - start[1]
+  const lengthSquared = dx * dx + dy * dy
+  if (lengthSquared <= 1e-12) return Math.hypot(point[0] - start[0], point[1] - start[1])
+  const projection = Math.max(0, Math.min(1, ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / lengthSquared))
+  return Math.hypot(point[0] - (start[0] + projection * dx), point[1] - (start[1] + projection * dy))
+}
+
+export function isObjectEraserPointInsidePolygon(point: ObjectEraserPoint, polygon: ObjectEraserPolygon) {
+  if (polygon.length < 3) return false
+  let inside = false
+  for (let current = 0, previous = polygon.length - 1; current < polygon.length; previous = current++) {
+    const [x, y] = polygon[current]
+    const [previousX, previousY] = polygon[previous]
+    if (((y > point[1]) !== (previousY > point[1]))
+      && point[0] < ((previousX - x) * (point[1] - y)) / (previousY - y || Number.EPSILON) + x) {
+      inside = !inside
+    }
+  }
+  return inside
+}
+
+/**
+ * Checks the actual circular brush stroke (a polyline with a radius), not just
+ * its sampled vertices. This catches long strokes crossing an object even
+ * when both stroke endpoints are outside the segmentation polygon.
+ */
+export function brushStrokeIntersectsPolygons(
+  stroke: readonly ObjectEraserPoint[],
+  polygons: readonly ObjectEraserPolygon[],
+  brushRadius = 0,
+) {
+  if (!stroke.length || !polygons.length) return false
+  const radius = Number.isFinite(brushRadius) ? Math.max(0, brushRadius) : 0
+  for (const polygon of polygons) {
+    if (polygon.length < 3) continue
+    if (stroke.some(point => isObjectEraserPointInsidePolygon(point, polygon))) return true
+    const polygonEdges = polygon.map((point, index) => [point, polygon[(index + 1) % polygon.length]] as const)
+    if (stroke.length === 1) {
+      if (polygonEdges.some(([start, end]) => pointSegmentDistance(stroke[0], start, end) <= radius)) return true
+      continue
+    }
+    for (let index = 0; index < stroke.length - 1; index++) {
+      const start = stroke[index]
+      const end = stroke[index + 1]
+      for (const [edgeStart, edgeEnd] of polygonEdges) {
+        if (segmentsIntersect(start, end, edgeStart, edgeEnd)) return true
+        if (radius > 0 && (
+          pointSegmentDistance(start, edgeStart, edgeEnd) <= radius
+          || pointSegmentDistance(end, edgeStart, edgeEnd) <= radius
+          || pointSegmentDistance(edgeStart, start, end) <= radius
+          || pointSegmentDistance(edgeEnd, start, end) <= radius
+        )) return true
+      }
+    }
+  }
+  return false
+}
+
+export function brushStrokeIntersectsDetectionBox(
+  stroke: readonly ObjectEraserPoint[],
+  box: { x: number; y: number; width: number; height: number },
+  brushRadius = 0,
+) {
+  if (![box.x, box.y, box.width, box.height].every(Number.isFinite) || box.width <= 0 || box.height <= 0) return false
+  const polygon: ObjectEraserPoint[] = [
+    [box.x, box.y],
+    [box.x + box.width, box.y],
+    [box.x + box.width, box.y + box.height],
+    [box.x, box.y + box.height],
+  ]
+  return brushStrokeIntersectsPolygons(stroke, [polygon], brushRadius)
+}
+
+/** Stable cache key based on source image and normalized object position/size. */
+export function getObjectEraserTargetCacheKey(
+  sourceKey: string,
+  label: string,
+  polygons: readonly ObjectEraserPolygon[],
+  imageWidth: number,
+  imageHeight: number,
+) {
+  const points = polygons.flat().filter(point => point.length === 2 && point.every(Number.isFinite))
+  if (!sourceKey || !points.length || imageWidth <= 0 || imageHeight <= 0) return ''
+  const xs = points.map(point => point[0])
+  const ys = points.map(point => point[1])
+  const left = Math.min(...xs)
+  const top = Math.min(...ys)
+  const right = Math.max(...xs)
+  const bottom = Math.max(...ys)
+  // Two-percent buckets tolerate tiny SAM2 boundary differences while still
+  // separating different objects at different positions in the same image.
+  const quantize = (value: number, dimension: number) =>
+    Math.round(Math.max(0, Math.min(dimension, value)) / dimension * 50) * 2
+  const bounds = [
+    quantize(left, imageWidth),
+    quantize(top, imageHeight),
+    quantize(right, imageWidth),
+    quantize(bottom, imageHeight),
+  ].join(':')
+  return sourceKey + '::' + label.trim().toLocaleLowerCase() + '::' + bounds
+}
