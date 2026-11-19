@@ -71,7 +71,7 @@ test('rejects missing or mismatched SAM2 masks instead of fabricating cutouts', 
   const detections = [{ id: '1', label: 'cup', confidence: 0.95, x: 10, y: 10, width: 20, height: 20 }]
   assert.throws(
     () => normalizeRoboflowSegmentations({ predictions: [] }, detections),
-    (error: unknown) => error instanceof RoboflowRequestError && /every detected object/.test(error.message),
+    (error: unknown) => error instanceof RoboflowRequestError && /no masks for the detected objects/.test(error.message),
   )
 })
 
