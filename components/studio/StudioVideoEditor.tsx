@@ -492,6 +492,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     objectEraserPreviewUrlRef.current = null
     objectEraserLoadSequenceRef.current += 1
     objectEraserSourceFileRef.current = null
+    objectEraserUndoRef.current = null
+    objectEraserRedoRef.current = null
     setObjectEraserBusy(false)
     setObjectEraserImageSize(null)
     setObjectEraserManualPoints([])
