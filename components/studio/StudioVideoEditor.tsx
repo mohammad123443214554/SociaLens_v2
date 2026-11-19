@@ -22,7 +22,7 @@ import { CINEMATIC_LIGHT_ANIMATIONS } from '@/lib/studio/cinematic-light-animati
 import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-animations'
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
 import { extractStudioImagePalette, createStudioRecoloredCanvas, STUDIO_REPLACEMENT_SWATCHES, type StudioColorReplacement } from '@/lib/studio/color-replacement'
-import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserTargetCacheKey } from '@/lib/studio/object-eraser-selection'
+import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey } from '@/lib/studio/object-eraser-selection'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
@@ -51,7 +51,7 @@ type Clip = {
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
 type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; height?: number; fontSize: number; color: string; opacity?: number; animation?: Partial<TextAnimationSettings>; effect?: TextEffect; effectIntensity?: number; effectBlur?: number; effectDistance?: number; effectAngle?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
 type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; cropLeft?: number; cropRight?: number; cropTop?: number; cropBottom?: number; color?: string; colorStrength?: number; colorReplacements?: StudioColorReplacement[]; fileSize: number; storagePath?: string; originalStoragePath?: string; originalName?: string; originalFileSize?: number }
-type ObjectEraserCachedRemoval = { sourceKey: string; label: string; polygons: number[][][]; result: { url: string; storagePath: string; name: string; fileSize: number; originalStoragePath?: string; originalName?: string; originalFileSize?: number } }
+type ObjectEraserCachedRemoval = { sourceKey: string; label: string; polygons: number[][][]; selectionKey: string; result: { url: string; storagePath: string; name: string; fileSize: number; originalStoragePath?: string; originalName?: string; originalFileSize?: number } }
 type ElementDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'crop-left' | 'crop-right' | 'crop-top' | 'crop-bottom'; startX: number; startY: number; x: number; y: number; width: number; height: number; cropLeft: number; cropRight: number; cropTop: number; cropBottom: number }
 type TimelineTrack = { key: string; label: string; icon: ReactNode; tone: 'fuchsia' | 'sky' | 'violet' | 'emerald'; element?: ElementLayer; elementIndex?: number }
 type TimelineDragPreview = { x: number; y: number; width: number; label: string; kind: 'image' | 'video' }
@@ -620,9 +620,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       || objectEraserInpaintBusy || objectEraserBusy || objectEraserSegmentBusy) return
 
     const sourceKey = selectedElement.originalStoragePath || selectedElement.storagePath || selectedElement.id
+    const selectionKey = getObjectEraserBrushRegionKey(selection, objectEraserBrushSize, objectEraserImageSize.width, objectEraserImageSize.height)
     const cachedEntry = Array.from(objectEraserResultCacheRef.current.values()).find(entry =>
-      entry.sourceKey === sourceKey
-      && brushStrokeIntersectsPolygons(selection, entry.polygons, objectEraserBrushSize)
+      entry.sourceKey === sourceKey && entry.selectionKey === selectionKey
     )
     const applyCachedResult = (entry: ObjectEraserCachedRemoval) => {
       objectEraserUndoRef.current = { ...selectedElement }
@@ -666,7 +666,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         return
       }
       const target = detectedObjects.sort((a: any, b: any) => b.confidence - a.confidence)[0]
-      const cacheKey = getObjectEraserTargetCacheKey(sourceKey, target.label, target.polygons, objectEraserImageSize.width, objectEraserImageSize.height)
+      const cacheKey = getObjectEraserTargetCacheKey(sourceKey, target.label, target.polygons, objectEraserImageSize.width, objectEraserImageSize.height, selection, objectEraserBrushSize)
       const exactCached = cacheKey ? objectEraserResultCacheRef.current.get(cacheKey) : undefined
       if (exactCached) {
         applyCachedResult(exactCached)
@@ -747,6 +747,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           sourceKey,
           label: target.label,
           polygons: target.polygons,
+          selectionKey,
           result,
         })
       }
