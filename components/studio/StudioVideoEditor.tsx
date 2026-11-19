@@ -548,14 +548,19 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       setObjectEraserError(err instanceof Error ? err.message : 'Object detection or segmentation failed. Please try again.')
     } finally { setObjectEraserBusy(false); setObjectEraserSegmentBusy(false) }
   }
+  const clearObjectEraserResult = () => {
+    setObjectEraserResultUrl(current => {
+      if (current?.startsWith('blob:')) URL.revokeObjectURL(current)
+      return null
+    })
+  }
+
   const removeSelectedObjectWithAI = async () => {
     const target = objectEraserObjects.find(item => item.id === objectEraserSelectedId)
     if (!selectedElement || selectedElement.kind !== 'image' || !target || !objectEraserImageSize || objectEraserInpaintBusy) return
     if (!selectedElement.storagePath) { setObjectEraserError('This image is not saved in the Studio project yet. Re-import it and try again.'); return }
-    const megapixels = objectEraserImageSize.width * objectEraserImageSize.height / 1_000_000
-    const estimatedUsd = megapixels * 0.03
-    if (!window.confirm('AI Object Removal uses fal.ai Qwen Inpainting. Estimated model cost: about $' + estimatedUsd.toFixed(3) + ' for this image (pricing may change). Continue?')) return
-    setObjectEraserInpaintBusy(true); setObjectEraserError(''); setObjectEraserResultUrl(null)
+    if (!window.confirm('Stability AI Inpaint uses 5 credits (about $0.05) for this removal. Testing uses your available free credits first. Continue?')) return
+    setObjectEraserInpaintBusy(true); setObjectEraserError(''); clearObjectEraserResult()
     try {
       const maskCanvas = document.createElement('canvas')
       maskCanvas.width = objectEraserImageSize.width
@@ -579,24 +584,20 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         maskContext.stroke()
       }
       const maskDataUrl = maskCanvas.toDataURL('image/png')
-      const submitResponse = await fetch('/api/studio/object-eraser/inpaint', {
+      const response = await fetch('/api/studio/object-eraser/inpaint', {
         method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, storagePath: selectedElement.storagePath, label: target.label, maskDataUrl })
       })
-      const submitted = await submitResponse.json()
-      if (!submitResponse.ok || !submitted?.ok || !submitted.requestId) throw new Error(submitted?.error || 'Could not start AI object removal.')
-      let completed: any = null
-      for (let attempt = 0; attempt < 80; attempt++) {
-        await new Promise(resolve => setTimeout(resolve, 2500))
-        const statusResponse = await fetch('/api/studio/object-eraser/inpaint?requestId=' + encodeURIComponent(submitted.requestId), { credentials: 'same-origin', cache: 'no-store' })
-        const status = await statusResponse.json()
-        if (!statusResponse.ok || !status?.ok) throw new Error(status?.error || 'AI object removal failed.')
-        if (status.status === 'COMPLETED' && status.imageUrl) { completed = status; break }
+      if (!response.ok) {
+        let payload: any = null
+        try { payload = await response.json() } catch { /* keep the generic error below */ }
+        throw new Error(payload?.error || 'Stability AI object removal failed.')
       }
-      if (!completed?.imageUrl) throw new Error('AI is taking longer than expected. Your original image is unchanged; please try again later.')
-      setObjectEraserResultUrl(completed.imageUrl)
+      const blob = await response.blob()
+      if (!blob.type.startsWith('image/')) throw new Error('Stability AI returned an invalid image file.')
+      setObjectEraserResultUrl(URL.createObjectURL(blob))
     } catch (error) {
-      setObjectEraserError(error instanceof Error ? error.message : 'AI object removal failed. Your original image is unchanged.')
+      setObjectEraserError(error instanceof Error ? error.message : 'Stability AI object removal failed. Your original image is unchanged.')
     } finally { setObjectEraserInpaintBusy(false) }
   }
 
@@ -2066,7 +2067,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   {objectEraserObjects.find(item=>item.id===objectEraserSelectedId) && <div className="mt-3 flex items-center gap-3 rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/[0.06] p-3"><div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/20 p-1"><img src={objectEraserObjects.find(item=>item.id===objectEraserSelectedId)!.thumbnail} alt="Selected object cutout" className="max-h-full max-w-full object-contain"/></div><div className="min-w-0"><span className="block text-[8px] font-bold uppercase tracking-wider text-fuchsia-200">Selected object</span><span className="mt-1 block truncate text-[11px] font-bold capitalize text-white">{objectEraserObjects.find(item=>item.id===objectEraserSelectedId)!.label}</span><span className="mt-1 block text-[8px] text-slate-400">Isolated from the original image with a transparent background</span></div><Check className="ml-auto h-4 w-4 shrink-0 text-fuchsia-300"/></div>}
                 </div>}
                 {objectEraserSelectedId && objectEraserObjects.length>0 && <div className="mt-3 rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/[0.05] p-3">
-                  {!objectEraserResultUrl ? <><p className="text-[9px] leading-4 text-slate-300">Selected object will be removed and the masked background reconstructed by AI. Other image areas are intended to remain unchanged.</p><button type="button" onClick={removeSelectedObjectWithAI} disabled={objectEraserInpaintBusy || objectEraserApplyBusy} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:opacity-60">{objectEraserInpaintBusy ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"/>Removing object with AI…</> : <><Eraser className="h-3.5 w-3.5"/>Remove selected object</>}</button><p className="mt-2 text-[8px] leading-4 text-slate-500">fal.ai Qwen Inpainting: estimated $0.03 per megapixel. You must confirm each paid run.</p></> : <><p className="text-[9px] font-semibold text-emerald-200">AI removal preview ready. The Studio image has not changed yet.</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={applyObjectEraserResult} disabled={objectEraserApplyBusy} className="rounded-lg bg-emerald-600 px-3 py-2 text-[9px] font-bold text-white disabled:opacity-60">{objectEraserApplyBusy ? 'Applying…' : 'Apply to Studio'}</button><button type="button" onClick={()=>setObjectEraserResultUrl(null)} disabled={objectEraserApplyBusy} className="rounded-lg border border-white/15 px-3 py-2 text-[9px] font-semibold text-slate-200">Discard preview</button></div></>}
+                  {!objectEraserResultUrl ? <><p className="text-[9px] leading-4 text-slate-300">Selected object will be removed and the masked background reconstructed by AI. Other image areas are intended to remain unchanged.</p><button type="button" onClick={removeSelectedObjectWithAI} disabled={objectEraserInpaintBusy || objectEraserApplyBusy} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:opacity-60">{objectEraserInpaintBusy ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"/>Removing object with AI…</> : <><Eraser className="h-3.5 w-3.5"/>Remove selected object</>}</button><p className="mt-2 text-[8px] leading-4 text-slate-500">Stability AI Inpaint: 5 credits (about $0.05) per successful removal. Your original image stays unchanged until you apply the preview.</p></> : <><p className="text-[9px] font-semibold text-emerald-200">AI removal preview ready. The Studio image has not changed yet.</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={applyObjectEraserResult} disabled={objectEraserApplyBusy} className="rounded-lg bg-emerald-600 px-3 py-2 text-[9px] font-bold text-white disabled:opacity-60">{objectEraserApplyBusy ? 'Applying…' : 'Apply to Studio'}</button><button type="button" onClick={clearObjectEraserResult} disabled={objectEraserApplyBusy} className="rounded-lg border border-white/15 px-3 py-2 text-[9px] font-semibold text-slate-200">Discard preview</button></div></>}
                 </div>}
                 <p className="mt-2 text-[8px] leading-4 text-slate-500">AI segmentation selects an individual object. Review the generated result before applying it to your Studio project.</p>
               </div>
