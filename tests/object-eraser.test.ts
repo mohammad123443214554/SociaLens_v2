@@ -59,6 +59,13 @@ test('normalizes wrapped SAM2 polygon points returned as coordinate objects', ()
   assert.deepEqual(result[1].polygons[0], [[41, 12], [58, 12], [58, 29]])
 })
 
+test('does not misread binary raster mask rows as polygon vertices', () => {
+  const detections = [{ id: '1', label: 'mug', confidence: 0.9, x: 10, y: 10, width: 20, height: 20 }]
+  assert.throws(() => normalizeRoboflowSegmentations({
+    predictions: [{ masks: [[0, 0, 0, 1, 1], [0, 1, 1, 1, 0], [0, 0, 1, 0, 0]] }],
+  }, detections), /unsupported format|polygon/i)
+})
+
 test('rejects missing or mismatched SAM2 masks instead of fabricating cutouts', () => {
   const detections = [{ id: '1', label: 'cup', confidence: 0.95, x: 10, y: 10, width: 20, height: 20 }]
   assert.throws(
