@@ -70,8 +70,8 @@ export async function POST(request: NextRequest) {
     if (!mimeType) return fail('The original Studio asset is not a supported JPEG, PNG or WebP image.', 415, 'invalid_image')
 
     const form = new FormData()
-    form.set('image', new Blob([imageBytes], { type: mimeType }), 'source-image')
-    form.set('mask', new Blob([maskBytes], { type: 'image/png' }), 'object-mask.png')
+    form.set('image', new Blob([imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength) as ArrayBuffer], { type: mimeType }), 'source-image')
+    form.set('mask', new Blob([maskBytes.buffer.slice(maskBytes.byteOffset, maskBytes.byteOffset + maskBytes.byteLength) as ArrayBuffer], { type: 'image/png' }), 'object-mask.png')
     form.set('prompt', 'A natural, photorealistic continuation of the surrounding scene where the selected ' + (label || 'object') + ' has been removed. Reconstruct the background using the nearby textures, patterns, edges, lighting, shadows, perspective and depth. Keep all other objects and the overall photographic appearance unchanged.')
     form.set('negative_prompt', 'extra objects, duplicate objects, text, watermark, logo, distorted texture, visible patch, hard edge, blur, artifacts')
     form.set('output_format', 'png')
