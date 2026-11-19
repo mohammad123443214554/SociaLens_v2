@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type CSSProperties } from 'react'
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import { arrangeStudioClips, moveStudioClipWithoutOverlap, normalizeStudioClipGaps } from '@/lib/studio/timeline'
 import { StudioAnimationPanel } from './StudioAnimationPanel'
@@ -467,6 +467,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [objectEraserImageSize, setObjectEraserImageSize] = useState<{width:number;height:number}|null>(null)
   const objectEraserPreviewUrlRef = useRef<string|null>(null)
   const objectEraserSourceFileRef = useRef<File|null>(null)
+  const objectEraserLoadSequenceRef = useRef(0)
   const [objectEraserInpaintBusy, setObjectEraserInpaintBusy] = useState(false)
   const [objectEraserResultUrl, setObjectEraserResultUrl] = useState<string|null>(null)
   const [objectEraserApplyBusy, setObjectEraserApplyBusy] = useState(false)
@@ -489,7 +490,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   useEffect(() => {
     if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
     objectEraserPreviewUrlRef.current = null
+    objectEraserLoadSequenceRef.current += 1
     objectEraserSourceFileRef.current = null
+    setObjectEraserBusy(false)
     setObjectEraserImageSize(null)
     setObjectEraserManualPoints([])
     setObjectEraserManualDrawing(false)
@@ -497,34 +500,46 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setObjectEraserError('')
   }, [selectedElementId])
 
-  const loadObjectEraserImage = async () => {
+  const loadObjectEraserImage = useCallback(async () => {
     if (!selectedElement || selectedElement.kind !== 'image' || objectEraserBusy) return
+    const sequence = ++objectEraserLoadSequenceRef.current
     setObjectEraserBusy(true)
     setObjectEraserError('')
+    let previewUrl: string | null = null
     try {
       const source = await fetch(selectedElement.url, { cache: 'no-store' })
       if (!source.ok) throw new Error('Could not load the selected image. Please try again.')
       const blob = await source.blob()
       if (!blob.type.startsWith('image/')) throw new Error('The selected Studio asset is not a supported image.')
       const file = new File([blob], selectedElement.name || 'studio-image', { type: blob.type })
-      if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
-      const previewUrl = URL.createObjectURL(blob)
-      objectEraserPreviewUrlRef.current = previewUrl
+      previewUrl = URL.createObjectURL(blob)
       const image = new Image()
       image.src = previewUrl
       await new Promise<void>((resolve, reject) => {
         image.onload = () => resolve()
         image.onerror = () => reject(new Error('Could not prepare the selected image for Object Eraser.'))
       })
+      if (sequence !== objectEraserLoadSequenceRef.current) {
+        URL.revokeObjectURL(previewUrl)
+        previewUrl = null
+        return
+      }
       if (!image.naturalWidth || !image.naturalHeight) throw new Error('The selected image has invalid dimensions.')
+      if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
+      objectEraserPreviewUrlRef.current = previewUrl
       objectEraserSourceFileRef.current = file
       setObjectEraserImageSize({ width: image.naturalWidth, height: image.naturalHeight })
+      previewUrl = null
     } catch (error) {
-      setObjectEraserError(error instanceof Error ? error.message : 'Could not prepare the selected image.')
+      if (sequence === objectEraserLoadSequenceRef.current) {
+        setObjectEraserError(error instanceof Error ? error.message : 'Could not prepare the selected image.')
+      }
     } finally {
-      setObjectEraserBusy(false)
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      if (sequence === objectEraserLoadSequenceRef.current) setObjectEraserBusy(false)
     }
-  }
+  }, [selectedElement, objectEraserBusy, objectEraserLoadSequenceRef])
+
 
   // Detection and segmentation are deliberately deferred until the user presses
   // Remove object. Opening the panel only loads the image locally and never
@@ -533,7 +548,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (activePanel === 'object-eraser' && selectedElement?.kind === 'image' && !objectEraserBusy && !objectEraserImageSize && !objectEraserError) {
       void loadObjectEraserImage()
     }
-  }, [activePanel, selectedElementId, objectEraserImageSize, objectEraserBusy, objectEraserError])
+  }, [activePanel, selectedElementId, objectEraserImageSize, objectEraserBusy, objectEraserError, loadObjectEraserImage])
 
   const detectObjectsUnderBrush = async (file: File, stroke: number[][]) => {
     const form = new FormData()
