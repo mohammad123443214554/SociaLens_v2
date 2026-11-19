@@ -638,10 +638,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         originalFileSize: item.originalFileSize ?? item.fileSize,
       } : item))
       clearObjectEraserResult()
-      setObjectEraserObjects([])
-      setObjectEraserDetections([])
+      setObjectEraserObjects(items => items.filter(item => item.id !== target.id))
       setObjectEraserSelectedId(null)
-      setObjectEraserImageSize(null)
       setObjectEraserManualPoints([])
       setObjectEraserManualActive(false)
       setNotice('AI removal applied to the canvas and saved as the selected image layer. Export will use this edited image. The original can be restored.')
