@@ -21,7 +21,7 @@ function safeProviderMessage(payload: unknown, fallback: string) {
   const record = payload as Record<string, unknown>
   const errors = Array.isArray(record.errors) ? record.errors.filter(item => typeof item === 'string').join('; ') : ''
   const detail = errors || (typeof record.message === 'string' ? record.message : typeof record.detail === 'string' ? record.detail : '')
-  return (detail || fallback).replace(/https?:\/\/\S+/g, '[provider URL]').replace(/(?:api[_-]?key|authorization)[=: ]+[^&\\s,]+/gi, '[redacted]').slice(0, 400)
+  return (detail || fallback).replace(/https?:\/\/\S+/g, '[provider URL]').replace(/(?:api[_-]?key|authorization)[=: ]+[^&\s,]+/gi, '[redacted]').slice(0, 400)
 }
 
 function readPngDimensions(bytes: Uint8Array) {
