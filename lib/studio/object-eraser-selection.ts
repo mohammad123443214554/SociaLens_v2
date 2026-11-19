@@ -110,6 +110,54 @@ export function brushStrokeIntersectsDetectionBox(
   return brushStrokeIntersectsPolygons(stroke, [polygon], brushRadius)
 }
 
+/**
+ * Scores how much of a user's brush path lies inside a segmented object.
+ * Prefer the object actually painted over, not a nearby high-confidence box.
+ */
+export function scoreBrushStrokeAgainstPolygons(
+  stroke: readonly number[][],
+  polygons: readonly number[][][],
+  brushRadius = 0,
+) {
+  const points = stroke.map(asPoint).filter((point): point is ObjectEraserPoint => point !== null)
+  const validPolygons = polygons
+    .map(polygon => polygon.map(asPoint).filter((point): point is ObjectEraserPoint => point !== null))
+    .filter(polygon => polygon.length >= 3)
+  if (!points.length || !validPolygons.length) return 0
+
+  const radius = Number.isFinite(brushRadius) ? Math.max(0, brushRadius) : 0
+  const step = Math.max(2, Math.min(8, radius > 0 ? radius / 2 : 4))
+  const samples: ObjectEraserPoint[] = []
+  if (points.length === 1) {
+    samples.push(points[0])
+  } else {
+    for (let index = 0; index < points.length - 1; index++) {
+      const start = points[index]
+      const end = points[index + 1]
+      const distance = Math.hypot(end[0] - start[0], end[1] - start[1])
+      const count = Math.max(1, Math.ceil(distance / step))
+      for (let sample = 0; sample < count; sample++) {
+        const t = sample / count
+        samples.push([start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t])
+      }
+    }
+    samples.push(points[points.length - 1])
+  }
+
+  let matched = 0
+  for (const sample of samples) {
+    const touchesObject = validPolygons.some(polygon => {
+      if (isObjectEraserPointInsidePolygon(sample, polygon)) return true
+      if (radius <= 0) return false
+      return polygon.some((point, index) =>
+        pointSegmentDistance(sample, point, polygon[(index + 1) % polygon.length]) <= radius
+      )
+    })
+    if (touchesObject) matched++
+  }
+  return matched / samples.length
+}
+
 export function getObjectEraserBrushRegionKey(
   stroke: readonly number[][],
   brushRadius: number,
