@@ -21,8 +21,8 @@ function safeProviderMessage(payload: unknown, fallback: string) {
   const errors = Array.isArray(record.errors) ? record.errors.filter(item => typeof item === 'string').join('; ') : ''
   const detail = errors || (typeof record.message === 'string' ? record.message : typeof record.detail === 'string' ? record.detail : '')
   return (detail || fallback)
-    .replace(/https?:\\/\\/\\S+/g, '[provider URL]')
-    .replace(/(?:api[_-]?key|authorization)[=: ]+[^&\\s,]+/gi, '[redacted]')
+    .replace(/https?:[^\s]+/g, '[provider URL]')
+    .replace(/(?:api[_-]?key|authorization)[=: ]+[^&\s,]+/gi, '[redacted]')
     .slice(0, 400)
 }
 
