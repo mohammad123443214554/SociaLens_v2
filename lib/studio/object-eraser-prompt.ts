@@ -89,7 +89,7 @@ export async function generateGeminiObjectRemovalPrompt(args: {
   })
 
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) throw new Error('Gemini rejected the API key. Check GEMINI_API_KEY in Vercel Environment Variables.')
+    if (response.status === 401 || response.status === 403) throw new Error('Gemini rejected the API key. Check SOCIALENS_OBJECT_ERASER_GEMINI_API_KEY in Vercel Environment Variables.')
     if (response.status === 429) throw new Error('Gemini is rate limiting requests. Please wait a moment and try again.')
     if (response.status >= 500) throw new Error('Gemini is temporarily unavailable. Your original photo has not been changed.')
     throw new Error('Gemini could not analyze the selected object. Please try highlighting it again.')
