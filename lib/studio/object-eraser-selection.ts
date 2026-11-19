@@ -101,7 +101,7 @@ export function brushStrokeIntersectsDetectionBox(
   brushRadius = 0,
 ) {
   if (![box.x, box.y, box.width, box.height].every(Number.isFinite) || box.width <= 0 || box.height <= 0) return false
-  const polygon: ObjectEraserPoint[] = [
+  const polygon: number[][] = [
     [box.x, box.y],
     [box.x + box.width, box.y],
     [box.x + box.width, box.y + box.height],
