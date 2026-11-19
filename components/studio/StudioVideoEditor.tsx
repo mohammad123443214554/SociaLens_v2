@@ -777,7 +777,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         ...item,
         url: originalUrl,
         storagePath: originalStoragePath,
-        name: selectedElement.originalName || selectedElement.name.replace(/-background-removed\\.png$/i, ''),
+        name: selectedElement.originalName || selectedElement.name.replace(/-background-removed\.png$/i, ''),
         fileSize: selectedElement.originalFileSize ?? selectedElement.fileSize,
         originalStoragePath: undefined,
         originalName: undefined,
@@ -786,6 +786,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       setBackgroundEraserDownloadUrl(null)
       objectEraserSourceFileRef.current = null
       setObjectEraserImageSize(null)
+      void loadObjectEraserImage({
+        ...selectedElement,
+        url: originalUrl,
+        storagePath: originalStoragePath,
+        name: selectedElement.originalName || selectedElement.name.replace(/-background-removed\.png$/i, ''),
+        fileSize: selectedElement.originalFileSize ?? selectedElement.fileSize,
+      })
       setNotice('Original background restored. Your full photo is back in the Studio layer.')
     } catch (error) {
       setBackgroundEraserError(error instanceof Error ? error.message : 'Could not restore the original background. Your edited photo is unchanged.')
