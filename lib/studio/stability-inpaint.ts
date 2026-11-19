@@ -1,4 +1,5 @@
 export const STABILITY_ERASE_PATH = '/v2beta/stable-image/edit/erase'
+export const STABILITY_REMOVE_BACKGROUND_PATH = '/v2beta/stable-image/edit/remove-background'
 export const STABILITY_ERASE_CREDITS = 5
 
 const ALLOWED_API_HOSTS = new Set(['api.stability.ai', 'stability.comfy.org'])
@@ -24,6 +25,17 @@ export function mapStabilityApiError(status: number): { code: StabilityFailureCo
   if (status === 429) return { code: 'rate_limited', message: 'Stability AI is rate limiting requests. Wait a moment before trying again.', retryable: true, httpStatus: 429 }
   if (status >= 500) return { code: 'provider_unavailable', message: 'Stability AI is temporarily unavailable. Your original image is unchanged; please try again later.', retryable: true, httpStatus: 503 }
   return { code: 'provider_error', message: 'Stability AI could not complete this image edit.', retryable: false, httpStatus: status >= 400 && status < 600 ? status : 502 }
+}
+
+export function mapStabilityBackgroundError(status: number): { code: StabilityFailureCode; message: string; retryable: boolean; httpStatus: number } {
+  if (status === 401) return { code: 'unauthorized', message: 'Stability AI rejected the API key. Check STABILITY_API_KEY in Vercel.', retryable: false, httpStatus: 401 }
+  if (status === 402) return { code: 'insufficient_credits', message: 'The Stability AI account has insufficient credits. Add credits before trying again.', retryable: false, httpStatus: 402 }
+  if (status === 403) return { code: 'content_filtered', message: 'Stability AI could not process this photo. Your original image is unchanged.', retryable: false, httpStatus: 403 }
+  if (status === 413) return { code: 'image_too_large', message: 'This photo is too large for Stability AI background removal.', retryable: false, httpStatus: 413 }
+  if (status === 422 || status === 400) return { code: 'invalid_request', message: 'Stability AI could not process this photo. Use a clear JPEG, PNG or WebP image and try again.', retryable: false, httpStatus: status }
+  if (status === 429) return { code: 'rate_limited', message: 'Stability AI is rate limiting requests. Wait a moment before trying again.', retryable: true, httpStatus: 429 }
+  if (status >= 500) return { code: 'provider_unavailable', message: 'Stability AI is temporarily unavailable. Your original image is unchanged; please try again later.', retryable: true, httpStatus: 503 }
+  return { code: 'provider_error', message: 'Stability AI could not remove this background.', retryable: false, httpStatus: status >= 400 && status < 600 ? status : 502 }
 }
 
 // Redeploy trigger: pick up the Stability AI environment configuration.
