@@ -958,7 +958,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, storagePath: selectedElement.storagePath, label: target.label, maskDataUrl }),
+        body: JSON.stringify({ projectId, storagePath: selectedElement.storagePath, label: target.label, imageWidth: objectEraserImageSize.width, imageHeight: objectEraserImageSize.height, maskDataUrl }),
       })
       if (!response.ok) {
         let payload: any = null
