@@ -776,7 +776,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setElements(items=>items.map(item=>item.id===snapshot.id?{...snapshot}:item))
     objectEraserUndoRef.current=null
     objectEraserSourceFileRef.current = null
-    setBackgroundEraserForegroundMasks([])
     setBackgroundEraserError('')
     setObjectEraserManualPoints([])
     setObjectEraserImageSize(null)
@@ -790,7 +789,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setElements(items=>items.map(item=>item.id===snapshot.id?{...snapshot}:item))
     objectEraserRedoRef.current=null
     objectEraserSourceFileRef.current = null
-    setBackgroundEraserForegroundMasks([])
     setBackgroundEraserError('')
     setObjectEraserManualPoints([])
     setObjectEraserImageSize(null)
