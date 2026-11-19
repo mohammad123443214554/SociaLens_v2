@@ -22,7 +22,7 @@ import { CINEMATIC_LIGHT_ANIMATIONS } from '@/lib/studio/cinematic-light-animati
 import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-animations'
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
 import { extractStudioImagePalette, createStudioRecoloredCanvas, STUDIO_REPLACEMENT_SWATCHES, type StudioColorReplacement } from '@/lib/studio/color-replacement'
-import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey } from '@/lib/studio/object-eraser-selection'
+import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, scoreBrushStrokeAgainstPolygons } from '@/lib/studio/object-eraser-selection'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
@@ -348,6 +348,92 @@ function StudioRecoloredImage({ src, replacements, alt, className, style }: { sr
     return () => { active = false }
   }, [src, replacements])
   return <img src={renderedSrc} alt={alt} draggable={false} className={className} style={style} />
+}
+
+async function loadObjectEraserImageElement(src: string): Promise<HTMLImageElement> {
+  const image = new Image()
+  image.decoding = 'async'
+  image.src = src
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve()
+    image.onerror = () => reject(new Error('Could not prepare the original or generated image for compositing.'))
+  })
+  if (!image.naturalWidth || !image.naturalHeight) throw new Error('The image returned by the removal service is invalid.')
+  return image
+}
+
+/**
+ * Keep every pixel outside the selected object mask from the original image.
+ * The AI result is only allowed to contribute inside the segmented object.
+ */
+async function composeObjectEraserResult(
+  originalUrl: string,
+  generatedBlob: Blob,
+  maskDataUrl: string,
+  width: number,
+  height: number,
+): Promise<Blob> {
+  const generatedUrl = URL.createObjectURL(generatedBlob)
+  try {
+    const [originalImage, generatedImage, maskImage] = await Promise.all([
+      loadObjectEraserImageElement(originalUrl),
+      loadObjectEraserImageElement(generatedUrl),
+      loadObjectEraserImageElement(maskDataUrl),
+    ])
+    if (originalImage.naturalWidth !== width || originalImage.naturalHeight !== height) {
+      throw new Error('The original image dimensions changed. Please reopen Object Eraser and try again.')
+    }
+
+    const outputCanvas = document.createElement('canvas')
+    outputCanvas.width = width
+    outputCanvas.height = height
+    const outputContext = outputCanvas.getContext('2d', { willReadFrequently: true })
+    if (!outputContext) throw new Error('Could not preserve the original image pixels.')
+
+    const generatedCanvas = document.createElement('canvas')
+    generatedCanvas.width = width
+    generatedCanvas.height = height
+    const generatedContext = generatedCanvas.getContext('2d', { willReadFrequently: true })
+    if (!generatedContext) throw new Error('Could not isolate the AI removal result.')
+
+    const alphaMaskCanvas = document.createElement('canvas')
+    alphaMaskCanvas.width = width
+    alphaMaskCanvas.height = height
+    const alphaMaskContext = alphaMaskCanvas.getContext('2d', { willReadFrequently: true })
+    if (!alphaMaskContext) throw new Error('Could not read the object selection mask.')
+
+    outputContext.drawImage(originalImage, 0, 0, width, height)
+    generatedContext.drawImage(generatedImage, 0, 0, width, height)
+    alphaMaskContext.drawImage(maskImage, 0, 0, width, height)
+
+    // Stability's mask is black/white RGB. Convert its white luminance into
+    // alpha explicitly; destination-in alone would incorrectly treat black
+    // and white pixels as equally opaque.
+    const maskPixels = alphaMaskContext.getImageData(0, 0, width, height)
+    for (let index = 0; index < maskPixels.data.length; index += 4) {
+      const alpha = Math.round(maskPixels.data[index] * maskPixels.data[index + 3] / 255)
+      maskPixels.data[index] = 255
+      maskPixels.data[index + 1] = 255
+      maskPixels.data[index + 2] = 255
+      maskPixels.data[index + 3] = alpha
+    }
+    alphaMaskContext.putImageData(maskPixels, 0, 0)
+
+    generatedContext.globalCompositeOperation = 'destination-in'
+    generatedContext.filter = 'blur(1px)'
+    generatedContext.drawImage(alphaMaskCanvas, 0, 0)
+    generatedContext.filter = 'none'
+    generatedContext.globalCompositeOperation = 'source-over'
+    outputContext.drawImage(generatedCanvas, 0, 0)
+
+    const result = await new Promise<Blob>((resolve, reject) => {
+      outputCanvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not save the masked removal result.')), 'image/png')
+    })
+    if (result.size < 100) throw new Error('The masked removal result is empty.')
+    return result
+  } finally {
+    URL.revokeObjectURL(generatedUrl)
+  }
 }
 
 function readMediaDuration(file: File, url: string, kind: ClipKind): Promise<number> {
@@ -693,7 +779,15 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         setObjectEraserError('No object was found in the highlighted area. Please brush directly over an object, not the background.')
         return
       }
-      const target = detectedObjects.sort((a: any, b: any) => b.confidence - a.confidence)[0]
+      const rankedTargets = detectedObjects.map((item: any) => ({
+        ...item,
+        brushMatchScore: scoreBrushStrokeAgainstPolygons(selection, item.polygons, objectEraserBrushSize),
+      })).sort((a: any, b: any) => b.brushMatchScore - a.brushMatchScore || b.confidence - a.confidence)
+      const target = rankedTargets[0]
+      if (!target || target.brushMatchScore <= 0) {
+        setObjectEraserError('The highlighted area could not be matched to a clear object. Please brush over the object itself and try again.')
+        return
+      }
       const cacheKey = getObjectEraserTargetCacheKey(sourceKey, target.label, target.polygons, objectEraserImageSize.width, objectEraserImageSize.height, selection, objectEraserBrushSize)
       const exactCached = cacheKey ? objectEraserResultCacheRef.current.get(cacheKey) : undefined
       if (exactCached) {
@@ -711,36 +805,26 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const maskContext = maskCanvas.getContext('2d')
       if (!maskContext) throw new Error('Could not prepare the object mask.')
 
-      // Stability expects a black background and white pixels for the inpaint area.
+      // Stability expects a black background and white pixels to replace.
+      // Fill the complete SAM2 silhouette, not just the painted brush path:
+      // one short highlight should remove the entire selected object.
       maskContext.fillStyle = '#000'
       maskContext.fillRect(0, 0, maskCanvas.width, maskCanvas.height)
-      // Clip the user's brush to the confirmed object silhouette so an
-      // accidental brush overshoot cannot erase unrelated background pixels.
-      maskContext.save()
-      maskContext.beginPath()
+      maskContext.fillStyle = '#fff'
+      maskContext.strokeStyle = '#fff'
+      maskContext.lineJoin = 'round'
+      maskContext.lineCap = 'round'
+      maskContext.lineWidth = Math.max(2, Math.min(8, Math.round(Math.max(maskCanvas.width, maskCanvas.height) * 0.0015)))
       for (const polygon of target.polygons) {
         if (polygon.length < 3) continue
+        maskContext.beginPath()
         maskContext.moveTo(polygon[0][0], polygon[0][1])
         for (let index = 1; index < polygon.length; index++) maskContext.lineTo(polygon[index][0], polygon[index][1])
         maskContext.closePath()
-      }
-      maskContext.clip('evenodd')
-      maskContext.strokeStyle = '#fff'
-      maskContext.fillStyle = '#fff'
-      maskContext.lineWidth = Math.max(16, Math.min(96, objectEraserBrushSize * 2))
-      maskContext.lineJoin = 'round'
-      maskContext.lineCap = 'round'
-      if (selection.length === 1) {
-        maskContext.beginPath()
-        maskContext.arc(selection[0][0], selection[0][1], objectEraserBrushSize, 0, Math.PI * 2)
         maskContext.fill()
-      } else {
-        maskContext.beginPath()
-        maskContext.moveTo(selection[0][0], selection[0][1])
-        for (let index = 1; index < selection.length; index++) maskContext.lineTo(selection[index][0], selection[index][1])
+        // A very small edge expansion prevents leftover object outlines.
         maskContext.stroke()
       }
-      maskContext.restore()
 
       const maskDataUrl = maskCanvas.toDataURL('image/png')
       const response = await fetch('/api/studio/object-eraser/inpaint', {
@@ -754,11 +838,22 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         try { payload = await response.json() } catch { /* retain the generic error below */ }
         throw new Error(payload?.error || 'Stability AI object removal failed.')
       }
-      const blob = await response.blob()
-      if (!blob.type.startsWith('image/') || blob.size < 100) throw new Error('Stability AI returned an invalid or empty edited image.')
+      const generatedBlob = await response.blob()
+      if (!generatedBlob.type.startsWith('image/') || generatedBlob.size < 100) throw new Error('Stability AI returned an invalid or empty edited image.')
+      const originalPreviewUrl = objectEraserPreviewUrlRef.current
+      if (!originalPreviewUrl) throw new Error('The original image preview is no longer available. Reopen Object Eraser and try again.')
+      // Composite only within the SAM2 object mask so generated details can
+      // never overwrite unrelated people, objects, text, or background pixels.
+      const blob = await composeObjectEraserResult(
+        originalPreviewUrl,
+        generatedBlob,
+        maskDataUrl,
+        objectEraserImageSize.width,
+        objectEraserImageSize.height,
+      )
 
       const baseName = selectedElement.name.replace(/\.[^.]+$/, '') || 'studio-image'
-      const file = new File([blob], baseName + '-object-erased.png', { type: blob.type || 'image/png' })
+      const file = new File([blob], baseName + '-object-erased.png', { type: 'image/png' })
       const storagePath = await uploadStudioAsset(projectId, file)
       const url = await createStudioAssetUrl(storagePath)
       const result = {
