@@ -46,7 +46,7 @@ export async function POST(request:NextRequest){
  try{
   const parsed=JSON.parse(String(form.get('detections')||'[]'))
   if(!Array.isArray(parsed))return jsonError('Object detection data is invalid. Run detection again.',400,'invalid_detections')
-  detections=parsed.slice(0,30).map((item,index)=>{
+  detections=parsed.slice(0,100).map((item,index)=>{
    if(!item||typeof item!=='object')throw new Error('Invalid object detection data.')
    const x=Number(item.x),y=Number(item.y),width=Number(item.width),height=Number(item.height),confidence=Number(item.confidence)
    const label=String(item.label||'').trim()
