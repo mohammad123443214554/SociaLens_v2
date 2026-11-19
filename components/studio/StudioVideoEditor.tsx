@@ -784,7 +784,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         originalFileSize: undefined,
       } : item))
       setBackgroundEraserDownloadUrl(null)
-      setObjectEraserSourceFileRef.current = null
+      objectEraserSourceFileRef.current = null
       setObjectEraserImageSize(null)
       setNotice('Original background restored. Your full photo is back in the Studio layer.')
     } catch (error) {
