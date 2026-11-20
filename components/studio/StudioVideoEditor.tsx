@@ -562,8 +562,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [objectEraserManualDrawing, setObjectEraserManualDrawing] = useState(false)
   const [objectEraserBrushSize,setObjectEraserBrushSize] = useState(22)
   const [objectEraserCursor,setObjectEraserCursor] = useState<[number,number]|null>(null)
-  const objectEraserUndoRef = useRef<ElementLayer|null>(null)
-  const objectEraserRedoRef = useRef<ElementLayer|null>(null)
+  // Multi-step per-element Object Eraser history.
+  const objectEraserUndoRef = useRef<ElementLayer[]>([])
+  const objectEraserRedoRef = useRef<ElementLayer[]>([])
   const backgroundEraserUndoRef = useRef<ElementLayer|null>(null)
   const backgroundEraserRedoRef = useRef<ElementLayer|null>(null)
   const objectEraserResultCacheRef = useRef<Map<string,ObjectEraserCachedRemoval>>(new Map())
@@ -588,8 +589,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     objectEraserPreviewUrlRef.current = null
     objectEraserLoadSequenceRef.current += 1
     objectEraserSourceFileRef.current = null
-    objectEraserUndoRef.current = null
-    objectEraserRedoRef.current = null
+    objectEraserUndoRef.current = []
+    objectEraserRedoRef.current = []
     backgroundEraserUndoRef.current = null
     backgroundEraserRedoRef.current = null
     setObjectEraserBusy(false)
@@ -838,11 +839,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   }
 
   const undoObjectEraserStep = () => {
-    const snapshot=objectEraserUndoRef.current
-    if(!snapshot||!selectedElement)return
-    objectEraserRedoRef.current={...selectedElement}
-    setElements(items=>items.map(item=>item.id===snapshot.id?{...snapshot}:item))
-    objectEraserUndoRef.current=null
+    const history = objectEraserUndoRef.current
+    const snapshot = history[history.length - 1]
+    if (!snapshot || !selectedElement || snapshot.id !== selectedElement.id) return
+    objectEraserRedoRef.current = [...objectEraserRedoRef.current, { ...selectedElement }]
+    objectEraserUndoRef.current = history.slice(0, -1)
+    setElements(items => items.map(item => item.id === snapshot.id ? { ...snapshot } : item))
     objectEraserSourceFileRef.current = null
     setBackgroundEraserError('')
     setObjectEraserManualPoints([])
@@ -851,11 +853,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setNotice('Undid the last Object Eraser edit.')
   }
   const redoObjectEraserStep = () => {
-    const snapshot=objectEraserRedoRef.current
-    if(!snapshot||!selectedElement)return
-    objectEraserUndoRef.current={...selectedElement}
-    setElements(items=>items.map(item=>item.id===snapshot.id?{...snapshot}:item))
-    objectEraserRedoRef.current=null
+    const history = objectEraserRedoRef.current
+    const snapshot = history[history.length - 1]
+    if (!snapshot || !selectedElement || snapshot.id !== selectedElement.id) return
+    objectEraserUndoRef.current = [...objectEraserUndoRef.current, { ...selectedElement }]
+    objectEraserRedoRef.current = history.slice(0, -1)
+    setElements(items => items.map(item => item.id === snapshot.id ? { ...snapshot } : item))
     objectEraserSourceFileRef.current = null
     setBackgroundEraserError('')
     setObjectEraserManualPoints([])
@@ -882,8 +885,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         // a cached edit is reused instead of trusting the original preview URL.
         const freshUrl = await createStudioAssetUrl(entry.result.storagePath)
         const result = { ...entry.result, url: freshUrl }
-        objectEraserUndoRef.current = { ...selectedElement }
-        objectEraserRedoRef.current = null
+        objectEraserUndoRef.current = [...objectEraserUndoRef.current, { ...selectedElement }]
+        objectEraserRedoRef.current = []
         setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, ...result } : item))
         if (objectEraserPreviewUrlRef.current) URL.revokeObjectURL(objectEraserPreviewUrlRef.current)
         objectEraserPreviewUrlRef.current = null
@@ -1033,8 +1036,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         originalName: selectedElement.originalName || selectedElement.name,
         originalFileSize: selectedElement.originalFileSize ?? selectedElement.fileSize,
       }
-      objectEraserUndoRef.current = { ...selectedElement }
-      objectEraserRedoRef.current = null
+      objectEraserUndoRef.current = [...objectEraserUndoRef.current, { ...selectedElement }]
+      objectEraserRedoRef.current = []
       setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, ...result } : item))
       if (cacheKey) {
         objectEraserResultCacheRef.current.set(cacheKey, {
@@ -2550,8 +2553,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <div className="mb-3 flex items-center justify-between">
                   <div><h4 className="text-[10px] font-bold text-slate-100">Object Eraser</h4><p className="mt-1 text-[8px] text-slate-500">Brush directly over the object you want to remove.</p></div>
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={undoObjectEraserStep} disabled={!objectEraserUndoRef.current || objectEraserInpaintBusy || objectEraserBusy || objectEraserSegmentBusy} title="Undo one edit" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5"/></button>
-                    <button type="button" onClick={redoObjectEraserStep} disabled={!objectEraserRedoRef.current || objectEraserInpaintBusy || objectEraserBusy || objectEraserSegmentBusy} title="Redo one edit" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5"/></button>
+                    <button type="button" onClick={undoObjectEraserStep} disabled={!objectEraserUndoRef.current.length || objectEraserInpaintBusy || objectEraserBusy || objectEraserSegmentBusy} title="Undo one edit" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5"/></button>
+                    <button type="button" onClick={redoObjectEraserStep} disabled={!objectEraserRedoRef.current.length || objectEraserInpaintBusy || objectEraserBusy || objectEraserSegmentBusy} title="Redo one edit" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5"/></button>
                   </div>
                 </div>
                 {objectEraserImageSize && <div className="relative mx-auto w-full overflow-hidden rounded-lg bg-[#080b16]" style={{aspectRatio: objectEraserImageSize.width + '/' + objectEraserImageSize.height}}>
