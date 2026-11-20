@@ -268,3 +268,20 @@ export function getObjectEraserTargetCacheKey(
   const selectionKey = stroke?.length ? getObjectEraserBrushRegionKey(stroke, brushRadius, imageWidth, imageHeight) : ''
   return sourceKey + '::' + label.trim().toLocaleLowerCase() + '::' + bounds + '::' + selectionKey
 }
+
+/**
+ * Add a small, object-relative safety margin around SAM2's silhouette.
+ * Segmentation masks can omit thin rims, handles, shadows and antialiased
+ * boundary pixels. The margin is deliberately capped to avoid swallowing
+ * nearby objects in tightly packed scenes.
+ */
+export function getObjectEraserMaskPadding(polygons: readonly number[][][], maxPadding = 16) {
+  const points = polygons.flat().map(asPoint).filter((point): point is ObjectEraserPoint => point !== null)
+  if (points.length < 3) return 0
+  const xs = points.map(point => point[0])
+  const ys = points.map(point => point[1])
+  const objectWidth = Math.max(...xs) - Math.min(...xs)
+  const objectHeight = Math.max(...ys) - Math.min(...ys)
+  if (!Number.isFinite(objectWidth) || !Number.isFinite(objectHeight) || objectWidth <= 0 || objectHeight <= 0) return 0
+  return Math.max(3, Math.min(maxPadding, Math.round(Math.min(objectWidth, objectHeight) * 0.08)))
+}
