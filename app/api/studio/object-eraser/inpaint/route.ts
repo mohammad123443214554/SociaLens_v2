@@ -31,6 +31,7 @@ function readPngDimensions(bytes: Uint8Array) {
 }
 
 export async function POST(request: NextRequest) {
+  const requestDeadline = Date.now() + 58_000
   const user = await getUser()
   if (!user) return fail('Please sign in to use AI object removal.', 401, 'unauthorized')
 
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
   if (signedError || !signed?.signedUrl) return fail('Could not securely prepare the selected image for AI editing.', 400, 'asset_unavailable')
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 58_000)
+  const timeout = setTimeout(() => controller.abort(), Math.max(1_000, requestDeadline - Date.now()))
   try {
     const imageResponse = await fetch(signed.signedUrl, { cache: 'no-store', signal: controller.signal })
     if (!imageResponse.ok) return fail('Could not load the original Studio image for AI editing.', 400, 'asset_unavailable')
