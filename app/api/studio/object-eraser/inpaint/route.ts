@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { detectObjectEraserImageType, OBJECT_ERASER_MAX_IMAGE_BYTES } from '@/lib/studio/object-eraser'
-import { generateGroqObjectRemovalPrompt } from '@/lib/studio/object-eraser-prompt'
 import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_INPAINT_PATH } from '@/lib/studio/stability-inpaint'
 
 export const runtime = 'nodejs'
@@ -37,8 +36,6 @@ export async function POST(request: NextRequest) {
 
   const stabilityKey = process.env.STABILITY_API_KEY?.trim()
   if (!stabilityKey) return fail('Stability AI is not configured. Add STABILITY_API_KEY to Vercel Environment Variables.', 503, 'not_configured')
-  const groqKey = process.env.SOCIALENS_OBJECT_ERASER_GROQ_API_KEY?.trim()
-  if (!groqKey) return fail('Aperonix AI is not configured. Add SOCIALENS_OBJECT_ERASER_GROQ_API_KEY to Vercel Environment Variables.', 503, 'aperonix_not_configured')
 
   const contentLength = Number(request.headers.get('content-length') || 0)
   if (contentLength > 3 * 1024 * 1024) return fail('The object mask is too large. Please run detection again.', 413, 'mask_too_large')
@@ -85,33 +82,14 @@ export async function POST(request: NextRequest) {
     const mimeType = detectObjectEraserImageType(imageBytes)
     if (!mimeType) return fail('The original Studio asset is not a supported JPEG, PNG or WebP image.', 415, 'invalid_image')
 
-    // Aperonix AI vision sees the original photograph and the exact SAM2 binary mask.
-    // It returns prompt text only; it is never allowed to generate/edit pixels.
-    let promptResult
-    try {
-      promptResult = await generateGroqObjectRemovalPrompt({
-        apiKey: groqKey,
-        model: process.env.SOCIALENS_OBJECT_ERASER_GROQ_MODEL,
-        imageBytes,
-        imageMimeType: mimeType,
-        maskBytes: new Uint8Array(maskBytes),
-        objectLabel,
-        imageWidth,
-        imageHeight,
-        signal: controller.signal,
-      })
-    } catch (error) {
-      if (error instanceof Error && (error.name === 'AbortError' || /Aperonix AI analysis timed out/i.test(error.message))) {
-        return fail('Aperonix AI analysis took too long. Your original photo is unchanged; please try again.', 504, 'aperonix_analysis_timeout', true)
-      }
-      return fail(error instanceof Error ? error.message : 'Aperonix AI could not analyze the selected object. Please try again.', 502, 'aperonix_analysis_failed', true)
-    }
+    // Fixed expert retouching instruction: no vision-model call or extra API key.
+    const objectRemovalPrompt = 'Photorealistic seamless reconstruction of the scene behind the precisely masked object. Remove the masked object completely as though it was never present. Continue the immediately surrounding background naturally across the entire masked area, matching adjacent textures, patterns, material grain, perspective, geometry, camera viewpoint, depth of field, lighting direction, exposure, color temperature, reflections and soft shadows. Blend boundaries invisibly with no seams or halos. Preserve every unmasked pixel and every unmasked object exactly as in the source photograph. Do not add, replace, decorate, duplicate, reinterpret or invent any object, subject, text or detail. The masked area must contain only a believable continuation of the surrounding scene.'
 
     const form = new FormData()
     form.set('image', new Blob([imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength) as ArrayBuffer], { type: mimeType }), 'source-image')
     form.set('mask', new Blob([maskBytes.buffer.slice(maskBytes.byteOffset, maskBytes.byteOffset + maskBytes.byteLength) as ArrayBuffer], { type: 'image/png' }), 'object-mask.png')
-    form.set('prompt', promptResult.prompt)
-    form.set('negative_prompt', 'the selected object, any part or remnant of the selected object, duplicate edges, ghosting, distorted textures, unnatural patterns, text, watermark')
+    form.set('prompt', objectRemovalPrompt)
+    form.set('negative_prompt', 'the removed object, any object, replacement object, duplicate object, cup, mug, vase, teapot, decoration, new subject, object fragments, object silhouette, ghosting, halos, seams, blur, distorted texture, repeating pattern, text, watermark')
     form.set('grow_mask', '5')
     form.set('style_preset', 'photographic')
     form.set('output_format', 'png')
@@ -141,7 +119,7 @@ export async function POST(request: NextRequest) {
       try { payload = await upstream.json() } catch { /* provider returned no JSON body */ }
       const mapped = mapStabilityApiError(upstream.status)
       const providerMessage = safeProviderMessage(payload, mapped.message).replace(/^Stability AI/i, 'the image service')
-      return fail('Aperonix AI image processing failed: ' + providerMessage, mapped.httpStatus, mapped.code, mapped.retryable)
+      return fail('Object Eraser image processing failed: ' + providerMessage, mapped.httpStatus, mapped.code, mapped.retryable)
     }
 
     const outputBytes = new Uint8Array(await upstream.arrayBuffer())
@@ -159,8 +137,8 @@ export async function POST(request: NextRequest) {
         ...NO_STORE,
         'Content-Type': outputType,
         'Content-Length': String(outputBytes.length),
-        'X-Object-Eraser-Provider': 'aperonix+stability-ai-inpaint',
-        'X-Object-Eraser-Prompt-Source': 'aperonix-ai',
+        'X-Object-Eraser-Provider': 'stability-ai-inpaint',
+        'X-Object-Eraser-Prompt-Source': 'built-in-retouching-instruction',
       },
     })
   } catch (error) {
