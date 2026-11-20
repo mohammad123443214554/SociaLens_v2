@@ -10,7 +10,7 @@ import {
   RoboflowRequestError,
   prepareObjectEraserImage,
 } from '../lib/studio/object-eraser.ts'
-import { getStabilityImageApiBaseUrl, mapStabilityApiError, mapStabilityBackgroundError, STABILITY_ERASE_CREDITS, STABILITY_ERASE_PATH, STABILITY_INPAINT_PATH, STABILITY_REMOVE_BACKGROUND_PATH } from '../lib/studio/stability-inpaint.ts'
+import { getStabilityImageApiBaseUrl, mapStabilityApiError, mapStabilityBackgroundError, STABILITY_ERASE_CREDITS, STABILITY_ERASE_PATH, STABILITY_INPAINT_PATH, STABILITY_REMOVE_BACKGROUND_PATH, STABILITY_OBJECT_ERASER_PROMPT, STABILITY_OBJECT_ERASER_NEGATIVE_PROMPT } from '../lib/studio/stability-inpaint.ts'
 
 
 test('scales normalized SAM2 masks into the original image pixel space', () => {
@@ -134,6 +134,14 @@ test('configures Stability AI and the Comfy-compatible migration host safely', (
 
 test('configures Stability AI prompt-guided inpainting endpoint', () => {
   assert.equal(STABILITY_INPAINT_PATH, '/v2beta/stable-image/edit/inpaint')
+})
+
+test('uses a fixed prompt that removes only the masked object without a vision API', () => {
+  assert.match(STABILITY_OBJECT_ERASER_PROMPT, /Remove the masked object completely/)
+  assert.match(STABILITY_OBJECT_ERASER_PROMPT, /Preserve every unmasked pixel/)
+  assert.match(STABILITY_OBJECT_ERASER_PROMPT, /must contain only a believable continuation/)
+  assert.match(STABILITY_OBJECT_ERASER_NEGATIVE_PROMPT, /replacement object/)
+  assert.match(STABILITY_OBJECT_ERASER_NEGATIVE_PROMPT, /cup/)
 })
 
 test('uses fixed Stability AI inpainting without a vision-model dependency', () => {
