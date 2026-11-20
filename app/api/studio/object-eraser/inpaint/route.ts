@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { detectObjectEraserImageType, OBJECT_ERASER_MAX_IMAGE_BYTES } from '@/lib/studio/object-eraser'
-import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_INPAINT_PATH, STABILITY_OBJECT_ERASER_PROMPT, STABILITY_OBJECT_ERASER_NEGATIVE_PROMPT } from '@/lib/studio/stability-inpaint'
+import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_ERASE_PATH } from '@/lib/studio/stability-inpaint'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -82,13 +82,9 @@ export async function POST(request: NextRequest) {
     const mimeType = detectObjectEraserImageType(imageBytes)
     if (!mimeType) return fail('The original Studio asset is not a supported JPEG, PNG or WebP image.', 415, 'invalid_image')
 
-    // Fixed expert retouching instruction: no vision-model call or extra API key.
-
     const form = new FormData()
     form.set('image', new Blob([imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength) as ArrayBuffer], { type: mimeType }), 'source-image')
     form.set('mask', new Blob([maskBytes.buffer.slice(maskBytes.byteOffset, maskBytes.byteOffset + maskBytes.byteLength) as ArrayBuffer], { type: 'image/png' }), 'object-mask.png')
-    form.set('prompt', STABILITY_OBJECT_ERASER_PROMPT)
-    form.set('negative_prompt', STABILITY_OBJECT_ERASER_NEGATIVE_PROMPT)
     form.set('grow_mask', '5')
     form.set('style_preset', 'photographic')
     form.set('output_format', 'png')
@@ -96,7 +92,7 @@ export async function POST(request: NextRequest) {
     let upstream: Response
     try {
       const baseUrl = getStabilityImageApiBaseUrl()
-      upstream = await fetch(baseUrl + STABILITY_INPAINT_PATH, {
+      upstream = await fetch(baseUrl + STABILITY_ERASE_PATH, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + stabilityKey, Accept: 'image/*' },
         body: form,
@@ -118,7 +114,7 @@ export async function POST(request: NextRequest) {
       try { payload = await upstream.json() } catch { /* provider returned no JSON body */ }
       const mapped = mapStabilityApiError(upstream.status)
       const providerMessage = safeProviderMessage(payload, mapped.message).replace(/^Stability AI/i, 'the image service')
-      return fail('Object Eraser image processing failed: ' + providerMessage, mapped.httpStatus, mapped.code, mapped.retryable)
+      return fail('Object Eraser removal failed: ' + providerMessage, mapped.httpStatus, mapped.code, mapped.retryable)
     }
 
     const outputBytes = new Uint8Array(await upstream.arrayBuffer())
@@ -136,8 +132,8 @@ export async function POST(request: NextRequest) {
         ...NO_STORE,
         'Content-Type': outputType,
         'Content-Length': String(outputBytes.length),
-        'X-Object-Eraser-Provider': 'stability-ai-inpaint',
-        'X-Object-Eraser-Prompt-Source': 'built-in-retouching-instruction',
+        'X-Object-Eraser-Provider': 'stability-ai-erase',
+        'X-Object-Eraser-Mode': 'mask-guided-object-removal',
       },
     })
   } catch (error) {
