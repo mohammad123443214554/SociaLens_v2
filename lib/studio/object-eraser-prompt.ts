@@ -12,7 +12,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** Extracts only the final text output from the Gemini Interactions response. */
 export function parseGeminiObjectRemovalPrompt(payload: unknown): GeminiObjectRemovalPrompt {
-  if (!isRecord(payload)) throw new Error('Gemini returned an invalid response.')
+  if (!isRecord(payload)) throw new Error('Aperonix AI returned an invalid response.')
   let outputText = typeof payload.output_text === 'string' ? payload.output_text : ''
   if (!outputText && Array.isArray(payload.steps)) {
     for (const step of payload.steps) {
@@ -21,15 +21,15 @@ export function parseGeminiObjectRemovalPrompt(payload: unknown): GeminiObjectRe
       if (isRecord(textPart) && typeof textPart.text === 'string') outputText = textPart.text
     }
   }
-  if (!outputText.trim()) throw new Error('Gemini did not return an object-removal prompt.')
+  if (!outputText.trim()) throw new Error('Aperonix AI did not return an object-removal prompt.')
   let parsed: unknown
-  try { parsed = JSON.parse(outputText) } catch { throw new Error('Gemini returned an unreadable object-removal prompt.') }
-  if (!isRecord(parsed)) throw new Error('Gemini returned an invalid object-removal prompt.')
+  try { parsed = JSON.parse(outputText) } catch { throw new Error('Aperonix AI returned an unreadable object-removal prompt.') }
+  if (!isRecord(parsed)) throw new Error('Aperonix AI returned an invalid object-removal prompt.')
   const objectDescription = typeof parsed.object_description === 'string' ? parsed.object_description.trim() : ''
   const sceneDescription = typeof parsed.scene_description === 'string' ? parsed.scene_description.trim() : ''
   const prompt = typeof parsed.prompt === 'string' ? parsed.prompt.trim() : ''
   if (!objectDescription || objectDescription.length > 240 || !sceneDescription || sceneDescription.length > 500 || prompt.length < 30 || prompt.length > 1200) {
-    throw new Error('Gemini could not create a sufficiently detailed removal prompt. Please try highlighting the object again.')
+    throw new Error('Aperonix AI could not create a sufficiently detailed removal prompt. Please highlight the object again.')
   }
   return { objectDescription, sceneDescription, prompt }
 }
@@ -89,13 +89,13 @@ export async function generateGeminiObjectRemovalPrompt(args: {
   })
 
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) throw new Error('Gemini rejected the API key. Check SOCIALENS_OBJECT_ERASER_GEMINI_API_KEY in Vercel Environment Variables.')
-    if (response.status === 429) throw new Error('Gemini is rate limiting requests. Please wait a moment and try again.')
-    if (response.status >= 500) throw new Error('Gemini is temporarily unavailable. Your original photo has not been changed.')
-    throw new Error('Gemini could not analyze the selected object. Please try highlighting it again.')
+    if (response.status === 401 || response.status === 403) throw new Error('Aperonix AI authentication failed. Please check the Studio AI configuration.')
+    if (response.status === 429) throw new Error('Aperonix AI is receiving too many requests. Please wait a moment and try again.')
+    if (response.status >= 500) throw new Error('Aperonix AI is temporarily unavailable. Your original photo has not been changed.')
+    throw new Error('Aperonix AI could not analyze the selected object. Please try highlighting it again.')
   }
 
   let payload: unknown
-  try { payload = await response.json() } catch { throw new Error('Gemini returned an unreadable analysis response.') }
+  try { payload = await response.json() } catch { throw new Error('Aperonix AI returned an unreadable analysis response.') }
   return parseGeminiObjectRemovalPrompt(payload)
 }
