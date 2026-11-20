@@ -963,7 +963,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (!response.ok) {
         let payload: any = null
         try { payload = await response.json() } catch { /* retain the generic error below */ }
-        throw new Error(payload?.error || 'Stability AI object removal failed.')
+        throw new Error(payload?.error || 'Aperonix AI object removal failed.')
       }
       const generatedBlob = await response.blob()
       if (!generatedBlob.type.startsWith('image/') || generatedBlob.size < 100) throw new Error('Stability AI returned an invalid or empty edited image.')
