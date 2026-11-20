@@ -1,5 +1,5 @@
 import test from 'node:test'
-import { getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, scoreBrushStrokeAgainstPolygons, scaleObjectEraserPolygons, scoreBrushStrokeAgainstDetectionBox, getObjectEraserTargetsUnderBrush } from '../lib/studio/object-eraser-selection.ts'
+import { getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, scoreBrushStrokeAgainstPolygons, scaleObjectEraserPolygons, scoreBrushStrokeAgainstDetectionBox, getObjectEraserTargetsUnderBrush, getObjectEraserMaskPadding } from '../lib/studio/object-eraser-selection.ts'
 import assert from 'node:assert/strict'
 import {
   detectObjectEraserImageType,
@@ -39,6 +39,13 @@ test('includes common plant containers in Object Eraser detection prompts', () =
   assert.ok(OBJECT_ERASER_DEFAULT_PROMPTS.includes('pot'))
   assert.ok(OBJECT_ERASER_DEFAULT_PROMPTS.includes('flower pot'))
   assert.ok(OBJECT_ERASER_DEFAULT_PROMPTS.includes('planter'))
+})
+
+
+test('adds a bounded object-relative margin to erase masks', () => {
+  assert.equal(getObjectEraserMaskPadding([[[10, 10], [60, 10], [60, 70], [10, 70]]]), 4)
+  assert.equal(getObjectEraserMaskPadding([[[10, 10], [300, 10], [300, 310], [10, 310]]]), 16)
+  assert.equal(getObjectEraserMaskPadding([[[10, 10], [12, 10]]]), 0)
 })
 
 test('detects supported image signatures instead of trusting the filename', () => {
