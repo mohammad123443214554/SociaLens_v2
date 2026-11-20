@@ -936,9 +936,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         setObjectEraserError('The highlighted area could not be matched to a clear object. Please brush over the object itself and try again.')
         return
       }
-      // Union every SAM2 silhouette touched by the painted area. Do not pick
-      // only the top-ranked mask: a single brush selection can cover multiple
-      // distinct objects and multiple parts of a compound object.
       // One brush gesture means one intended object. Prefer the segmented
       // silhouette with the strongest overlap with the user's actual stroke;
       // unioning every nearby detection can accidentally erase a whole scene.
@@ -966,8 +963,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (!maskContext) throw new Error('Could not prepare the object mask.')
 
       // Stability expects a black background and white pixels to replace.
-      // Fill the union of every SAM2 silhouette touched by the brush, not
-      // only one ranked instance and not merely the narrow brush path.
+      // Fill only the primary segmented object silhouette.
       maskContext.fillStyle = '#000'
       maskContext.fillRect(0, 0, maskCanvas.width, maskCanvas.height)
       maskContext.fillStyle = '#fff'
