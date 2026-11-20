@@ -11,7 +11,6 @@ import {
   prepareObjectEraserImage,
 } from '../lib/studio/object-eraser.ts'
 import { getStabilityImageApiBaseUrl, mapStabilityApiError, mapStabilityBackgroundError, STABILITY_ERASE_CREDITS, STABILITY_ERASE_PATH, STABILITY_INPAINT_PATH, STABILITY_REMOVE_BACKGROUND_PATH } from '../lib/studio/stability-inpaint.ts'
-import { DEFAULT_GROQ_OBJECT_ERASER_MODEL, parseGroqObjectRemovalPrompt } from '../lib/studio/object-eraser-prompt.ts'
 
 
 test('scales normalized SAM2 masks into the original image pixel space', () => {
@@ -137,50 +136,8 @@ test('configures Stability AI prompt-guided inpainting endpoint', () => {
   assert.equal(STABILITY_INPAINT_PATH, '/v2beta/stable-image/edit/inpaint')
 })
 
-test('uses the Groq vision model for object-removal scene analysis', () => {
-  assert.equal(DEFAULT_GROQ_OBJECT_ERASER_MODEL, 'qwen/qwen3.8-27b')
-})
-
-test('parses Groq vision content returned as text blocks', () => {
-  const parsed = parseGroqObjectRemovalPrompt({
-    choices: [{ message: { content: [{ type: 'text', text: JSON.stringify({
-      object_description: 'A blue vase',
-      scene_description: 'A sunlit wooden shelf',
-      prompt: 'Continue the sunlit wooden shelf grain and soft natural shadows with matching perspective and realistic depth.',
-    }) }] } }],
-  })
-  assert.equal(parsed.objectDescription, 'A blue vase')
-})
-
-test('parses Groq structured object-removal prompt output', () => {
-  const parsed = parseGroqObjectRemovalPrompt({
-    choices: [{ message: { content: JSON.stringify({
-      object_description: 'A small red cup',
-      scene_description: 'A wooden desk with warm side lighting',
-      prompt: 'Photorealistic continuation of the warm wooden desk grain and soft side lighting, matching the camera perspective and natural depth of field.',
-    }) } }],
-  })
-  assert.equal(parsed.objectDescription, 'A small red cup')
-  assert.match(parsed.prompt, /Photorealistic continuation/)
-})
-
-test('accepts complete Groq prompts with camelCase fields and derives optional descriptions', () => {
-  const parsed = parseGroqObjectRemovalPrompt({
-    choices: [{ message: { content: JSON.stringify({
-      objectDescription: 'A ceramic cup',
-      inpaintingPrompt: 'Continue the pale wooden tabletop with matching grain, soft window light, perspective, and natural shadows.',
-    }) } }],
-  })
-  assert.equal(parsed.objectDescription, 'A ceramic cup')
-  assert.match(parsed.sceneDescription, /pale wooden tabletop/)
-  assert.match(parsed.prompt, /matching grain/)
-})
-
-test('rejects incomplete Groq object-removal prompts', () => {
-  assert.throws(
-    () => parseGroqObjectRemovalPrompt({ choices: [{ message: { content: JSON.stringify({ prompt: 'remove it' }) } }] }),
-    /sufficiently detailed removal prompt/,
-  )
+test('uses fixed Stability AI inpainting without a vision-model dependency', () => {
+  assert.equal(STABILITY_INPAINT_PATH, '/v2beta/stable-image/edit/inpaint')
 })
 
 test('configures Stability AI dedicated background removal and maps provider failures', () => {
