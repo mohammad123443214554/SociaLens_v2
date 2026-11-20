@@ -85,8 +85,9 @@ export async function POST(request: NextRequest) {
     const form = new FormData()
     form.set('image', new Blob([imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength) as ArrayBuffer], { type: mimeType }), 'source-image')
     form.set('mask', new Blob([maskBytes.buffer.slice(maskBytes.byteOffset, maskBytes.byteOffset + maskBytes.byteLength) as ArrayBuffer], { type: 'image/png' }), 'object-mask.png')
-    form.set('grow_mask', '5')
-    form.set('style_preset', 'photographic')
+    // The client already expands the silhouette with an object-relative margin.
+    // Keep provider growth disabled so the returned fill aligns with that exact mask.
+    form.set('grow_mask', '0')
     form.set('output_format', 'png')
 
     let upstream: Response
