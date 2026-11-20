@@ -11,7 +11,7 @@ import {
   prepareObjectEraserImage,
 } from '../lib/studio/object-eraser.ts'
 import { getStabilityImageApiBaseUrl, mapStabilityApiError, mapStabilityBackgroundError, STABILITY_ERASE_CREDITS, STABILITY_ERASE_PATH, STABILITY_INPAINT_PATH, STABILITY_REMOVE_BACKGROUND_PATH } from '../lib/studio/stability-inpaint.ts'
-import { DEFAULT_GEMINI_OBJECT_ERASER_MODEL, parseGeminiObjectRemovalPrompt } from '../lib/studio/object-eraser-prompt.ts'
+import { DEFAULT_GROQ_OBJECT_ERASER_MODEL, parseGroqObjectRemovalPrompt } from '../lib/studio/object-eraser-prompt.ts'
 
 
 test('scales normalized SAM2 masks into the original image pixel space', () => {
@@ -137,25 +137,25 @@ test('configures Stability AI prompt-guided inpainting endpoint', () => {
   assert.equal(STABILITY_INPAINT_PATH, '/v2beta/stable-image/edit/inpaint')
 })
 
-test('uses a current fast Gemini model for object-removal scene analysis', () => {
-  assert.equal(DEFAULT_GEMINI_OBJECT_ERASER_MODEL, 'gemini-3.8-flash')
+test('uses the Groq vision model for object-removal scene analysis', () => {
+  assert.equal(DEFAULT_GROQ_OBJECT_ERASER_MODEL, 'qwen/qwen3.8-27b')
 })
 
-test('parses Gemini structured object-removal prompt output', () => {
-  const parsed = parseGeminiObjectRemovalPrompt({
-    output_text: JSON.stringify({
+test('parses Groq structured object-removal prompt output', () => {
+  const parsed = parseGroqObjectRemovalPrompt({
+    choices: [{ message: { content: JSON.stringify({
       object_description: 'A small red cup',
       scene_description: 'A wooden desk with warm side lighting',
       prompt: 'Photorealistic continuation of the warm wooden desk grain and soft side lighting, matching the camera perspective and natural depth of field.',
-    }),
+    }) } }],
   })
   assert.equal(parsed.objectDescription, 'A small red cup')
   assert.match(parsed.prompt, /Photorealistic continuation/)
 })
 
-test('rejects incomplete Gemini object-removal prompts', () => {
+test('rejects incomplete Groq object-removal prompts', () => {
   assert.throws(
-    () => parseGeminiObjectRemovalPrompt({ output_text: JSON.stringify({ prompt: 'remove it' }) }),
+    () => parseGroqObjectRemovalPrompt({ choices: [{ message: { content: JSON.stringify({ prompt: 'remove it' }) } }] }),
     /sufficiently detailed removal prompt/,
   )
 })
