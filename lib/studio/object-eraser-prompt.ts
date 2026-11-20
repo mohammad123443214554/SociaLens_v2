@@ -1,6 +1,6 @@
-export const DEFAULT_GEMINI_OBJECT_ERASER_MODEL = 'gemini-3.8-flash'
+export const DEFAULT_GROQ_OBJECT_ERASER_MODEL = 'qwen/qwen3.8-27b'
 
-export type GeminiObjectRemovalPrompt = {
+export type GroqObjectRemovalPrompt = {
   objectDescription: string
   sceneDescription: string
   prompt: string
@@ -10,17 +10,28 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-/** Extracts only the final text output from the Gemini Interactions response. */
-export function parseGeminiObjectRemovalPrompt(payload: unknown): GeminiObjectRemovalPrompt {
-  if (!isRecord(payload)) throw new Error('Aperonix AI returned an invalid response.')
-  let outputText = typeof payload.output_text === 'string' ? payload.output_text : ''
-  if (!outputText && Array.isArray(payload.steps)) {
-    for (const step of payload.steps) {
-      if (!isRecord(step) || step.type !== 'model_output' || !Array.isArray(step.content)) continue
-      const textPart = step.content.find(part => isRecord(part) && part.type === 'text' && typeof part.text === 'string')
-      if (isRecord(textPart) && typeof textPart.text === 'string') outputText = textPart.text
+function extractGroqText(payload: Record<string, unknown>): string {
+  if (typeof payload.output_text === 'string') return payload.output_text
+  if (Array.isArray(payload.choices)) {
+    const choice = payload.choices.find(isRecord)
+    const message = choice && isRecord(choice.message) ? choice.message : null
+    const content = message?.content
+    if (typeof content === 'string') return content
+    if (Array.isArray(content)) {
+      return content
+        .filter(isRecord)
+        .map(part => typeof part.text === 'string' ? part.text : '')
+        .filter(Boolean)
+        .join('\n')
     }
   }
+  return ''
+}
+
+/** Parses the strict JSON response returned by Groq vision. */
+export function parseGroqObjectRemovalPrompt(payload: unknown): GroqObjectRemovalPrompt {
+  if (!isRecord(payload)) throw new Error('Aperonix AI returned an invalid response.')
+  const outputText = extractGroqText(payload)
   if (!outputText.trim()) throw new Error('Aperonix AI did not return an object-removal prompt.')
   let parsed: unknown
   try { parsed = JSON.parse(outputText) } catch { throw new Error('Aperonix AI returned an unreadable object-removal prompt.') }
@@ -34,7 +45,7 @@ export function parseGeminiObjectRemovalPrompt(payload: unknown): GeminiObjectRe
   return { objectDescription, sceneDescription, prompt }
 }
 
-export async function generateGeminiObjectRemovalPrompt(args: {
+export async function generateGroqObjectRemovalPrompt(args: {
   apiKey: string
   model?: string
   imageBytes: Uint8Array
@@ -44,8 +55,8 @@ export async function generateGeminiObjectRemovalPrompt(args: {
   imageWidth: number
   imageHeight: number
   signal?: AbortSignal
-}): Promise<GeminiObjectRemovalPrompt> {
-  const model = args.model?.trim() || DEFAULT_GEMINI_OBJECT_ERASER_MODEL
+}): Promise<GroqObjectRemovalPrompt> {
+  const model = args.model?.trim() || DEFAULT_GROQ_OBJECT_ERASER_MODEL
   const label = args.objectLabel.replace(/[\r\n\t]/g, ' ').trim().slice(0, 100) || 'selected object'
   const instruction = [
     'You are a professional photo-retouching scene analyst. Your only task is to write an image-inpainting prompt for removing the object selected by the white region in the second image.',
@@ -57,39 +68,44 @@ export async function generateGeminiObjectRemovalPrompt(args: {
     'Do not edit or generate an image. Do not return analysis, markdown, alternatives, or extra keys. Return only JSON matching the schema.',
   ].join('\n')
 
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': args.apiKey,
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        { type: 'text', text: instruction },
-        { type: 'image', data: Buffer.from(args.imageBytes).toString('base64'), mime_type: args.imageMimeType },
-        { type: 'image', data: Buffer.from(args.maskBytes).toString('base64'), mime_type: 'image/png' },
-      ],
-      response_format: {
-        type: 'text',
-        mime_type: 'application/json',
-        schema: {
-          type: 'object',
-          properties: {
-            object_description: { type: 'string', description: 'Short identification of the selected object or selected objects.' },
-            scene_description: { type: 'string', description: 'Short description of the visible surrounding scene that must continue naturally.' },
-            prompt: { type: 'string', description: 'A detailed but concise photorealistic inpainting prompt for the masked region only.' },
-          },
-          required: ['object_description', 'scene_description', 'prompt'],
-        },
+  const timeoutSignal = AbortSignal.timeout(22_000)
+  const signal = args.signal ? AbortSignal.any([args.signal, timeoutSignal]) : timeoutSignal
+  let response: Response
+  try {
+    response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + args.apiKey,
+        'Content-Type': 'application/json',
       },
-    }),
-    cache: 'no-store',
-    signal: args.signal,
-  })
+      body: JSON.stringify({
+        model,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: instruction },
+            { type: 'image_url', image_url: { url: 'data:' + args.imageMimeType + ';base64,' + Buffer.from(args.imageBytes).toString('base64') } },
+            { type: 'image_url', image_url: { url: 'data:image/png;base64,' + Buffer.from(args.maskBytes).toString('base64') } },
+          ],
+        }],
+        temperature: 0.1,
+        max_completion_tokens: 512,
+        reasoning_effort: 'none',
+        response_format: { type: 'json_object' },
+        stream: false,
+      }),
+      cache: 'no-store',
+      signal,
+    })
+  } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      throw new Error('Aperonix AI analysis timed out. Your original photo is unchanged; please try again.')
+    }
+    throw error
+  }
 
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) throw new Error('Aperonix AI authentication failed. Please check the Studio AI configuration.')
+    if (response.status === 401 || response.status === 403) throw new Error('Aperonix AI authentication failed. Please check SOCIALENS_OBJECT_ERASER_GROQ_API_KEY in Vercel.')
     if (response.status === 429) throw new Error('Aperonix AI is receiving too many requests. Please wait a moment and try again.')
     if (response.status >= 500) throw new Error('Aperonix AI is temporarily unavailable. Your original photo has not been changed.')
     throw new Error('Aperonix AI could not analyze the selected object. Please try highlighting it again.')
@@ -97,5 +113,5 @@ export async function generateGeminiObjectRemovalPrompt(args: {
 
   let payload: unknown
   try { payload = await response.json() } catch { throw new Error('Aperonix AI returned an unreadable analysis response.') }
-  return parseGeminiObjectRemovalPrompt(payload)
+  return parseGroqObjectRemovalPrompt(payload)
 }
