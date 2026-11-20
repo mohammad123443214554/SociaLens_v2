@@ -36,13 +36,13 @@ export function parseGroqObjectRemovalPrompt(payload: unknown): GroqObjectRemova
   let parsed: unknown
   try { parsed = JSON.parse(outputText) } catch { throw new Error('Aperonix AI returned an unreadable object-removal prompt.') }
   if (!isRecord(parsed)) throw new Error('Aperonix AI returned an invalid object-removal prompt.')
-  const objectDescription = typeof parsed.object_description === 'string' ? parsed.object_description.trim() : ''
-  const sceneDescription = typeof parsed.scene_description === 'string' ? parsed.scene_description.trim() : ''
-  const prompt = typeof parsed.prompt === 'string' ? parsed.prompt.trim() : ''
-  if (!objectDescription || objectDescription.length > 240 || !sceneDescription || sceneDescription.length > 500 || prompt.length < 30 || prompt.length > 1200) {
+  const objectDescription = typeof parsed.object_description === 'string' ? parsed.object_description.trim() : typeof parsed.objectDescription === 'string' ? parsed.objectDescription.trim() : typeof parsed.object === 'string' ? parsed.object.trim() : ''
+  const sceneDescription = typeof parsed.scene_description === 'string' ? parsed.scene_description.trim() : typeof parsed.sceneDescription === 'string' ? parsed.sceneDescription.trim() : typeof parsed.scene === 'string' ? parsed.scene.trim() : ''
+  const prompt = typeof parsed.prompt === 'string' ? parsed.prompt.trim() : typeof parsed.inpainting_prompt === 'string' ? parsed.inpainting_prompt.trim() : typeof parsed.inpaintingPrompt === 'string' ? parsed.inpaintingPrompt.trim() : ''
+  if (!prompt || prompt.length < 30 || prompt.length > 1200 || objectDescription.length > 240 || sceneDescription.length > 500) {
     throw new Error('Aperonix AI could not create a sufficiently detailed removal prompt. Please highlight the object again.')
   }
-  return { objectDescription, sceneDescription, prompt }
+  return { objectDescription: objectDescription || 'the highlighted object', sceneDescription: sceneDescription || prompt.slice(0, 500), prompt }
 }
 
 export async function generateGroqObjectRemovalPrompt(args: {
@@ -89,9 +89,25 @@ export async function generateGroqObjectRemovalPrompt(args: {
           ],
         }],
         temperature: 0.1,
-        max_completion_tokens: 512,
+        max_completion_tokens: 768,
         reasoning_effort: 'none',
-        response_format: { type: 'json_object' },
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'object_removal_scene_prompt',
+            strict: true,
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                object_description: { type: 'string' },
+                scene_description: { type: 'string' },
+                prompt: { type: 'string' },
+              },
+              required: ['object_description', 'scene_description', 'prompt'],
+            },
+          },
+        },
         stream: false,
       }),
       cache: 'no-store',
