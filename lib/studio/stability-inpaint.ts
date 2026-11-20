@@ -2,8 +2,6 @@ export const STABILITY_ERASE_PATH = '/v2beta/stable-image/edit/erase'
 export const STABILITY_INPAINT_PATH = '/v2beta/stable-image/edit/inpaint'
 export const STABILITY_REMOVE_BACKGROUND_PATH = '/v2beta/stable-image/edit/remove-background'
 export const STABILITY_ERASE_CREDITS = 5
-export const STABILITY_OBJECT_ERASER_PROMPT = 'Photorealistic seamless reconstruction of the scene behind the precisely masked object. Remove the masked object completely as though it was never present. Continue the immediately surrounding background naturally across the entire masked area, matching adjacent textures, patterns, material grain, perspective, geometry, camera viewpoint, depth of field, lighting direction, exposure, color temperature, reflections and soft shadows. Blend boundaries invisibly with no seams or halos. Preserve every unmasked pixel and every unmasked object exactly as in the source photograph. Do not add, replace, decorate, duplicate, reinterpret or invent any object, subject, text or detail. The masked area must contain only a believable continuation of the surrounding scene.'
-export const STABILITY_OBJECT_ERASER_NEGATIVE_PROMPT = 'the removed object, any object, replacement object, duplicate object, cup, mug, vase, teapot, decoration, new subject, object fragments, object silhouette, ghosting, halos, seams, blur, distorted texture, repeating pattern, text, watermark'
 
 const ALLOWED_API_HOSTS = new Set(['api.stability.ai', 'stability.comfy.org'])
 
