@@ -51,7 +51,7 @@ type Clip = {
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
 type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; height?: number; fontSize: number; color: string; opacity?: number; animation?: Partial<TextAnimationSettings>; effect?: TextEffect; effectIntensity?: number; effectBlur?: number; effectDistance?: number; effectAngle?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
-type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; cropLeft?: number; cropRight?: number; cropTop?: number; cropBottom?: number; color?: string; colorStrength?: number; colorReplacements?: StudioColorReplacement[]; fileSize: number; storagePath?: string; originalStoragePath?: string; originalName?: string; originalFileSize?: number }
+type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; cropLeft?: number; cropRight?: number; cropTop?: number; cropBottom?: number; color?: string; colorStrength?: number; colorReplacements?: StudioColorReplacement[]; fileSize: number; storagePath?: string; originalStoragePath?: string; originalName?: string; originalFileSize?: number; backgroundOriginalStoragePath?: string; backgroundOriginalName?: string; backgroundOriginalFileSize?: number }
 type ObjectEraserCachedRemoval = { sourceKey: string; label: string; polygons: number[][][]; selectionKey: string; result: { url: string; storagePath: string; name: string; fileSize: number; originalStoragePath?: string; originalName?: string; originalFileSize?: number } }
 type ElementDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'crop-left' | 'crop-right' | 'crop-top' | 'crop-bottom'; startX: number; startY: number; x: number; y: number; width: number; height: number; cropLeft: number; cropRight: number; cropTop: number; cropBottom: number }
 type TimelineTrack = { key: string; label: string; icon: ReactNode; tone: 'fuchsia' | 'sky' | 'violet' | 'emerald'; element?: ElementLayer; elementIndex?: number }
@@ -564,6 +564,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [objectEraserCursor,setObjectEraserCursor] = useState<[number,number]|null>(null)
   const objectEraserUndoRef = useRef<ElementLayer|null>(null)
   const objectEraserRedoRef = useRef<ElementLayer|null>(null)
+  const backgroundEraserUndoRef = useRef<ElementLayer|null>(null)
+  const backgroundEraserRedoRef = useRef<ElementLayer|null>(null)
   const objectEraserResultCacheRef = useRef<Map<string,ObjectEraserCachedRemoval>>(new Map())
   const [backgroundEraserRemoveBusy, setBackgroundEraserRemoveBusy] = useState(false)
   const [backgroundEraserError, setBackgroundEraserError] = useState('')
@@ -588,6 +590,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     objectEraserSourceFileRef.current = null
     objectEraserUndoRef.current = null
     objectEraserRedoRef.current = null
+    backgroundEraserUndoRef.current = null
+    backgroundEraserRedoRef.current = null
     setObjectEraserBusy(false)
     setObjectEraserImageSize(null)
     setObjectEraserManualPoints([])
@@ -741,12 +745,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         storagePath,
         name: file.name,
         fileSize: file.size,
-        originalStoragePath: selectedElement.originalStoragePath || selectedElement.storagePath,
-        originalName: selectedElement.originalName || selectedElement.name,
-        originalFileSize: selectedElement.originalFileSize ?? selectedElement.fileSize,
+        backgroundOriginalStoragePath: selectedElement.backgroundOriginalStoragePath || selectedElement.storagePath,
+        backgroundOriginalName: selectedElement.backgroundOriginalName || selectedElement.name,
+        backgroundOriginalFileSize: selectedElement.backgroundOriginalFileSize ?? selectedElement.fileSize,
       }
-      objectEraserUndoRef.current = { ...selectedElement }
-      objectEraserRedoRef.current = null
+      backgroundEraserUndoRef.current = { ...selectedElement }
+      backgroundEraserRedoRef.current = null
       setElements(items => items.map(item => item.id === selectedElement.id ? { ...item, ...result } : item))
       setBackgroundEraserDownloadUrl(URL.createObjectURL(blob))
       setBackgroundEraserError('')
@@ -763,25 +767,25 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   }
 
   const restoreBackgroundToOriginal = async () => {
-    if (!selectedElement || selectedElement.kind !== 'image' || !selectedElement.originalStoragePath || backgroundEraserRemoveBusy || objectEraserBusy) return
+    if (!selectedElement || selectedElement.kind !== 'image' || !selectedElement.backgroundOriginalStoragePath || backgroundEraserRemoveBusy || objectEraserBusy) return
     setBackgroundEraserRemoveBusy(true)
     setBackgroundEraserError('')
     try {
       // Restore the exact source asset saved before background removal. This
       // avoids another AI request and preserves the original photo unchanged.
-      const originalStoragePath = selectedElement.originalStoragePath
+      const originalStoragePath = selectedElement.backgroundOriginalStoragePath
       const originalUrl = await createStudioAssetUrl(originalStoragePath)
-      objectEraserUndoRef.current = { ...selectedElement }
-      objectEraserRedoRef.current = null
+      backgroundEraserUndoRef.current = { ...selectedElement }
+      backgroundEraserRedoRef.current = null
       setElements(items => items.map(item => item.id === selectedElement.id ? {
         ...item,
         url: originalUrl,
         storagePath: originalStoragePath,
-        name: selectedElement.originalName || selectedElement.name.replace(/-background-removed\.png$/i, ''),
-        fileSize: selectedElement.originalFileSize ?? selectedElement.fileSize,
-        originalStoragePath: undefined,
-        originalName: undefined,
-        originalFileSize: undefined,
+        name: selectedElement.backgroundOriginalName || selectedElement.name.replace(/-background-removed\.png$/i, ''),
+        fileSize: selectedElement.backgroundOriginalFileSize ?? selectedElement.fileSize,
+        backgroundOriginalStoragePath: undefined,
+        backgroundOriginalName: undefined,
+        backgroundOriginalFileSize: undefined,
       } : item))
       setBackgroundEraserDownloadUrl(null)
       objectEraserSourceFileRef.current = null
@@ -790,8 +794,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         ...selectedElement,
         url: originalUrl,
         storagePath: originalStoragePath,
-        name: selectedElement.originalName || selectedElement.name.replace(/-background-removed\.png$/i, ''),
-        fileSize: selectedElement.originalFileSize ?? selectedElement.fileSize,
+        name: selectedElement.backgroundOriginalName || selectedElement.name.replace(/-background-removed\.png$/i, ''),
+        fileSize: selectedElement.backgroundOriginalFileSize ?? selectedElement.fileSize,
       })
       setNotice('Original background restored. Your full photo is back in the Studio layer.')
     } catch (error) {
@@ -799,6 +803,31 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     } finally {
       setBackgroundEraserRemoveBusy(false)
     }
+  }
+
+  const undoBackgroundEraserStep = () => {
+    const snapshot = backgroundEraserUndoRef.current
+    if (!snapshot || !selectedElement) return
+    backgroundEraserRedoRef.current = { ...selectedElement }
+    setElements(items => items.map(item => item.id === snapshot.id ? { ...snapshot } : item))
+    backgroundEraserUndoRef.current = null
+    setBackgroundEraserDownloadUrl(null)
+    setBackgroundEraserError('')
+    objectEraserSourceFileRef.current = null
+    setObjectEraserImageSize(null)
+    setNotice('Undid the last Background Eraser edit. Object Eraser history is unchanged.')
+  }
+  const redoBackgroundEraserStep = () => {
+    const snapshot = backgroundEraserRedoRef.current
+    if (!snapshot || !selectedElement) return
+    backgroundEraserUndoRef.current = { ...selectedElement }
+    setElements(items => items.map(item => item.id === snapshot.id ? { ...snapshot } : item))
+    backgroundEraserRedoRef.current = null
+    setBackgroundEraserDownloadUrl(null)
+    setBackgroundEraserError('')
+    objectEraserSourceFileRef.current = null
+    setObjectEraserImageSize(null)
+    setNotice('Redid the last Background Eraser edit.')
   }
 
   const clearObjectEraserResult = () => {
@@ -1163,7 +1192,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           setClips(arrangedClips)
           if (closedAccidentalGaps) setNotice('Closed small accidental gaps between timeline clips.')
           if (Array.isArray(data.elements)) {
-            const restoredElements: ElementLayer[] = await Promise.all((data.elements as Array<Record<string, unknown>>).filter(item => typeof item.storagePath === 'string' && (item.kind === 'image' || item.kind === 'video')).map(async item => ({ id: String(item.id || makeId()), kind: item.kind as ClipKind, name: String(item.name || 'Overlay'), url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration) || 5, trimStart: Math.max(0, Number(item.trimStart) || 0), trimEnd: Math.max(0.1, Number(item.trimEnd) || Number(item.duration) || 5), timelineStart: Math.max(0, Number(item.timelineStart) || 0), x: Math.min(95, Math.max(0, Number(item.x) || 25)), y: Math.min(95, Math.max(0, Number(item.y) || 25)), width: Math.min(100, Math.max(5, Number(item.width) || 50)), height: Math.min(100, Math.max(5, Number(item.height) || 50)), cropLeft: Math.min(0.8, Math.max(0, Number(item.cropLeft) || 0)), cropRight: Math.min(0.8, Math.max(0, Number(item.cropRight) || 0)), cropTop: Math.min(0.8, Math.max(0, Number(item.cropTop) || 0)), cropBottom: Math.min(0.8, Math.max(0, Number(item.cropBottom) || 0)), color: typeof item.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(item.color) ? item.color : undefined, colorReplacements: Array.isArray(item.colorReplacements) ? (item.colorReplacements as StudioColorReplacement[]).filter(value => value && /^#[0-9a-fA-F]{6}$/.test(value.source) && /^#[0-9a-fA-F]{6}$/.test(value.target)) : [], colorStrength: typeof item.colorStrength === 'number' ? Math.min(1, Math.max(0, item.colorStrength)) : 0.72, fileSize: Number(item.fileSize) || 0, storagePath: String(item.storagePath), originalStoragePath: typeof item.originalStoragePath === 'string' ? item.originalStoragePath : undefined, originalName: typeof item.originalName === 'string' ? item.originalName : undefined, originalFileSize: Number.isFinite(Number(item.originalFileSize)) ? Number(item.originalFileSize) : undefined })))
+            const restoredElements: ElementLayer[] = await Promise.all((data.elements as Array<Record<string, unknown>>).filter(item => typeof item.storagePath === 'string' && (item.kind === 'image' || item.kind === 'video')).map(async item => ({ id: String(item.id || makeId()), kind: item.kind as ClipKind, name: String(item.name || 'Overlay'), url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration) || 5, trimStart: Math.max(0, Number(item.trimStart) || 0), trimEnd: Math.max(0.1, Number(item.trimEnd) || Number(item.duration) || 5), timelineStart: Math.max(0, Number(item.timelineStart) || 0), x: Math.min(95, Math.max(0, Number(item.x) || 25)), y: Math.min(95, Math.max(0, Number(item.y) || 25)), width: Math.min(100, Math.max(5, Number(item.width) || 50)), height: Math.min(100, Math.max(5, Number(item.height) || 50)), cropLeft: Math.min(0.8, Math.max(0, Number(item.cropLeft) || 0)), cropRight: Math.min(0.8, Math.max(0, Number(item.cropRight) || 0)), cropTop: Math.min(0.8, Math.max(0, Number(item.cropTop) || 0)), cropBottom: Math.min(0.8, Math.max(0, Number(item.cropBottom) || 0)), color: typeof item.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(item.color) ? item.color : undefined, colorReplacements: Array.isArray(item.colorReplacements) ? (item.colorReplacements as StudioColorReplacement[]).filter(value => value && /^#[0-9a-fA-F]{6}$/.test(value.source) && /^#[0-9a-fA-F]{6}$/.test(value.target)) : [], colorStrength: typeof item.colorStrength === 'number' ? Math.min(1, Math.max(0, item.colorStrength)) : 0.72, fileSize: Number(item.fileSize) || 0, storagePath: String(item.storagePath), originalStoragePath: typeof item.originalStoragePath === 'string' ? item.originalStoragePath : undefined, originalName: typeof item.originalName === 'string' ? item.originalName : undefined, originalFileSize: Number.isFinite(Number(item.originalFileSize)) ? Number(item.originalFileSize) : undefined, backgroundOriginalStoragePath: typeof item.backgroundOriginalStoragePath === 'string' ? item.backgroundOriginalStoragePath : undefined, backgroundOriginalName: typeof item.backgroundOriginalName === 'string' ? item.backgroundOriginalName : undefined, backgroundOriginalFileSize: Number.isFinite(Number(item.backgroundOriginalFileSize)) ? Number(item.backgroundOriginalFileSize) : undefined })))
             if (!active) return
             setElements(restoredElements)
             if (typeof data.selectedElementId === 'string') setSelectedElementId(data.selectedElementId)
@@ -2464,8 +2493,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <div className="mb-3 flex items-center justify-between">
                   <div><h4 className="text-[10px] font-bold text-slate-100">Background Eraser</h4><p className="mt-1 text-[8px] text-slate-500">Remove only the background and keep the original foreground subject.</p></div>
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={undoObjectEraserStep} disabled={!objectEraserUndoRef.current || backgroundEraserRemoveBusy} title="Undo background removal" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5"/></button>
-                    <button type="button" onClick={redoObjectEraserStep} disabled={!objectEraserRedoRef.current || backgroundEraserRemoveBusy} title="Redo background removal" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5"/></button>
+                    <button type="button" onClick={undoBackgroundEraserStep} disabled={!backgroundEraserUndoRef.current || backgroundEraserRemoveBusy} title="Undo background removal" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5"/></button>
+                    <button type="button" onClick={redoBackgroundEraserStep} disabled={!backgroundEraserRedoRef.current || backgroundEraserRemoveBusy} title="Redo background removal" className="rounded-md border border-white/10 p-2 text-slate-300 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5"/></button>
                   </div>
                 </div>
                 {objectEraserImageSize ? <div className="relative mx-auto w-full overflow-hidden rounded-lg bg-[#080b16]" style={{aspectRatio: objectEraserImageSize.width + '/' + objectEraserImageSize.height}}>
@@ -2492,7 +2521,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 </div> : <div className="flex aspect-[4/3] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] text-center text-[9px] text-slate-500">{objectEraserBusy ? 'Preparing original photo…' : 'Preparing photo preview…'}</div>}
                 <div className="mt-3 flex items-center justify-between gap-2"><span className="text-[8px] text-slate-500">{objectEraserImageSize ? objectEraserImageSize.width + ' × ' + objectEraserImageSize.height : objectEraserBusy ? 'Loading original image…' : 'Photo loading'}</span></div>
                 {backgroundEraserError && <p role="status" className="mt-2 rounded-lg border border-amber-300/15 bg-amber-300/[0.06] p-2 text-[9px] leading-4 text-amber-100">{backgroundEraserError}</p>}
-                {selectedElement?.kind === 'image' && selectedElement.originalStoragePath ? (
+                {selectedElement?.kind === 'image' && selectedElement.backgroundOriginalStoragePath ? (
                   <button type="button" onClick={() => void restoreBackgroundToOriginal()} disabled={objectEraserBusy || backgroundEraserRemoveBusy} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:opacity-60">{backgroundEraserRemoveBusy ? 'Restoring background…' : 'Restore background'}</button>
                 ) : (
                   <button type="button" onClick={() => void removeBackgroundWithStability()} disabled={!objectEraserImageSize || objectEraserBusy || backgroundEraserRemoveBusy} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:opacity-60">{backgroundEraserRemoveBusy ? 'Removing background…' : 'Remove background'}</button>
