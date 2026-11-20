@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     // It returns prompt text only; it is never allowed to generate/edit pixels.
     let promptResult
     try {
-      promptResult = await generateGeminiObjectRemovalPrompt({
+      promptResult = await generateGroqObjectRemovalPrompt({
         apiKey: groqKey,
         model: process.env.SOCIALENS_OBJECT_ERASER_GROQ_MODEL,
         imageBytes,
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
       if (error instanceof Error && (error.name === 'AbortError' || /Aperonix AI analysis timed out/i.test(error.message))) {
         return fail('Aperonix AI analysis took too long. Your original photo is unchanged; please try again.', 504, 'aperonix_analysis_timeout', true)
       }
-      return fail(error instanceof Error ? error.message : 'Aperonix AI could not analyze the selected object. Please try again.', 502, 'gemini_analysis_failed', true)
+      return fail(error instanceof Error ? error.message : 'Aperonix AI could not analyze the selected object. Please try again.', 502, 'aperonix_analysis_failed', true)
     }
 
     const form = new FormData()
@@ -139,7 +139,8 @@ export async function POST(request: NextRequest) {
       let payload: unknown = null
       try { payload = await upstream.json() } catch { /* provider returned no JSON body */ }
       const mapped = mapStabilityApiError(upstream.status)
-      return fail(safeProviderMessage(payload, mapped.message), mapped.httpStatus, mapped.code, mapped.retryable)
+      const providerMessage = safeProviderMessage(payload, mapped.message).replace(/^Stability AI/i, 'the image service')
+      return fail('Aperonix AI image processing failed: ' + providerMessage, mapped.httpStatus, mapped.code, mapped.retryable)
     }
 
     const outputBytes = new Uint8Array(await upstream.arrayBuffer())
