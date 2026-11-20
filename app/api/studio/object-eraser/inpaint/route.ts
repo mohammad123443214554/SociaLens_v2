@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   const stabilityKey = process.env.STABILITY_API_KEY?.trim()
   if (!stabilityKey) return fail('Stability AI is not configured. Add STABILITY_API_KEY to Vercel Environment Variables.', 503, 'not_configured')
   const geminiKey = process.env.SOCIALENS_OBJECT_ERASER_GEMINI_API_KEY?.trim()
-  if (!geminiKey) return fail('Gemini is not configured. Add SOCIALENS_OBJECT_ERASER_GEMINI_API_KEY to Vercel Environment Variables.', 503, 'gemini_not_configured')
+  if (!geminiKey) return fail('Aperonix AI is temporarily unavailable. Please check the Studio AI configuration and try again.', 503, 'gemini_not_configured')
 
   const contentLength = Number(request.headers.get('content-length') || 0)
   if (contentLength > 3 * 1024 * 1024) return fail('The object mask is too large. Please run detection again.', 413, 'mask_too_large')
@@ -101,9 +101,9 @@ export async function POST(request: NextRequest) {
       })
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        return fail('Gemini took too long to analyze the selected object. Your original photo is unchanged; please try again.', 504, 'gemini_timeout', true)
+        return fail('Aperonix AI could not finish analyzing this selection in time. Your original photo is unchanged; please try again with a smaller selection.', 504, 'gemini_timeout', true)
       }
-      return fail(error instanceof Error ? error.message : 'Gemini could not analyze the selected object. Please try again.', 502, 'gemini_analysis_failed', true)
+      return fail(error instanceof Error ? error.message : 'Aperonix AI could not analyze the selected object. Please try again.', 502, 'gemini_analysis_failed', true)
     }
 
     const form = new FormData()
