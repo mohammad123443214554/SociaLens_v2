@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { detectObjectEraserImageType, OBJECT_ERASER_MAX_IMAGE_BYTES } from '@/lib/studio/object-eraser'
-import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_INPAINT_PATH } from '@/lib/studio/stability-inpaint'
+import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_INPAINT_PATH, STABILITY_OBJECT_ERASER_PROMPT, STABILITY_OBJECT_ERASER_NEGATIVE_PROMPT } from '@/lib/studio/stability-inpaint'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -83,13 +83,12 @@ export async function POST(request: NextRequest) {
     if (!mimeType) return fail('The original Studio asset is not a supported JPEG, PNG or WebP image.', 415, 'invalid_image')
 
     // Fixed expert retouching instruction: no vision-model call or extra API key.
-    const objectRemovalPrompt = 'Photorealistic seamless reconstruction of the scene behind the precisely masked object. Remove the masked object completely as though it was never present. Continue the immediately surrounding background naturally across the entire masked area, matching adjacent textures, patterns, material grain, perspective, geometry, camera viewpoint, depth of field, lighting direction, exposure, color temperature, reflections and soft shadows. Blend boundaries invisibly with no seams or halos. Preserve every unmasked pixel and every unmasked object exactly as in the source photograph. Do not add, replace, decorate, duplicate, reinterpret or invent any object, subject, text or detail. The masked area must contain only a believable continuation of the surrounding scene.'
 
     const form = new FormData()
     form.set('image', new Blob([imageBytes.buffer.slice(imageBytes.byteOffset, imageBytes.byteOffset + imageBytes.byteLength) as ArrayBuffer], { type: mimeType }), 'source-image')
     form.set('mask', new Blob([maskBytes.buffer.slice(maskBytes.byteOffset, maskBytes.byteOffset + maskBytes.byteLength) as ArrayBuffer], { type: 'image/png' }), 'object-mask.png')
-    form.set('prompt', objectRemovalPrompt)
-    form.set('negative_prompt', 'the removed object, any object, replacement object, duplicate object, cup, mug, vase, teapot, decoration, new subject, object fragments, object silhouette, ghosting, halos, seams, blur, distorted texture, repeating pattern, text, watermark')
+    form.set('prompt', STABILITY_OBJECT_ERASER_PROMPT)
+    form.set('negative_prompt', STABILITY_OBJECT_ERASER_NEGATIVE_PROMPT)
     form.set('grow_mask', '5')
     form.set('style_preset', 'photographic')
     form.set('output_format', 'png')
