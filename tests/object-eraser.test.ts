@@ -164,6 +164,18 @@ test('parses Groq structured object-removal prompt output', () => {
   assert.match(parsed.prompt, /Photorealistic continuation/)
 })
 
+test('accepts complete Groq prompts with camelCase fields and derives optional descriptions', () => {
+  const parsed = parseGroqObjectRemovalPrompt({
+    choices: [{ message: { content: JSON.stringify({
+      objectDescription: 'A ceramic cup',
+      inpaintingPrompt: 'Continue the pale wooden tabletop with matching grain, soft window light, perspective, and natural shadows.',
+    }) } }],
+  })
+  assert.equal(parsed.objectDescription, 'A ceramic cup')
+  assert.match(parsed.sceneDescription, /pale wooden tabletop/)
+  assert.match(parsed.prompt, /matching grain/)
+})
+
 test('rejects incomplete Groq object-removal prompts', () => {
   assert.throws(
     () => parseGroqObjectRemovalPrompt({ choices: [{ message: { content: JSON.stringify({ prompt: 'remove it' }) } }] }),
