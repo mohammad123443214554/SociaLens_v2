@@ -141,6 +141,17 @@ test('uses the Groq vision model for object-removal scene analysis', () => {
   assert.equal(DEFAULT_GROQ_OBJECT_ERASER_MODEL, 'qwen/qwen3.8-27b')
 })
 
+test('parses Groq vision content returned as text blocks', () => {
+  const parsed = parseGroqObjectRemovalPrompt({
+    choices: [{ message: { content: [{ type: 'text', text: JSON.stringify({
+      object_description: 'A blue vase',
+      scene_description: 'A sunlit wooden shelf',
+      prompt: 'Continue the sunlit wooden shelf grain and soft natural shadows with matching perspective and realistic depth.',
+    }) }] } }],
+  })
+  assert.equal(parsed.objectDescription, 'A blue vase')
+})
+
 test('parses Groq structured object-removal prompt output', () => {
   const parsed = parseGroqObjectRemovalPrompt({
     choices: [{ message: { content: JSON.stringify({
