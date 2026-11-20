@@ -22,7 +22,7 @@ import { CINEMATIC_LIGHT_ANIMATIONS } from '@/lib/studio/cinematic-light-animati
 import { DIGITAL_CREATIVE_ANIMATIONS } from '@/lib/studio/digital-creative-animations'
 import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-animations'
 import { extractStudioImagePalette, createStudioRecoloredCanvas, STUDIO_REPLACEMENT_SWATCHES, type StudioColorReplacement } from '@/lib/studio/color-replacement'
-import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, scoreBrushStrokeAgainstPolygons, scoreBrushStrokeAgainstDetectionBox, getObjectEraserTargetsUnderBrush } from '@/lib/studio/object-eraser-selection'
+import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, scoreBrushStrokeAgainstPolygons, scoreBrushStrokeAgainstDetectionBox, getObjectEraserTargetsUnderBrush, getObjectEraserMaskPadding } from '@/lib/studio/object-eraser-selection'
 import { scaleObjectEraserPolygons } from '@/lib/studio/object-eraser-selection'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
@@ -962,15 +962,18 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const maskContext = maskCanvas.getContext('2d')
       if (!maskContext) throw new Error('Could not prepare the object mask.')
 
-      // Stability expects a black background and white pixels to replace.
-      // Fill only the primary segmented object silhouette.
+      // Stability Erase uses white pixels as the removal mask and black as
+      // protected pixels. SAM2 can miss thin rims, handles and edge pixels, so
+      // expand the selected silhouette by a small object-relative margin.
+      // The cap prevents this safety margin from swallowing nearby objects.
       maskContext.fillStyle = '#000'
       maskContext.fillRect(0, 0, maskCanvas.width, maskCanvas.height)
       maskContext.fillStyle = '#fff'
       maskContext.strokeStyle = '#fff'
       maskContext.lineJoin = 'round'
       maskContext.lineCap = 'round'
-      maskContext.lineWidth = Math.max(2, Math.min(8, Math.round(Math.max(maskCanvas.width, maskCanvas.height) * 0.0015)))
+      const maskPadding = getObjectEraserMaskPadding(target.polygons, 16)
+      maskContext.lineWidth = Math.max(2, maskPadding * 2)
       for (const polygon of target.polygons) {
         if (polygon.length < 3) continue
         maskContext.beginPath()
@@ -978,7 +981,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         for (let index = 1; index < polygon.length; index++) maskContext.lineTo(polygon[index][0], polygon[index][1])
         maskContext.closePath()
         maskContext.fill()
-        // A very small edge expansion prevents leftover object outlines.
         maskContext.stroke()
       }
 
