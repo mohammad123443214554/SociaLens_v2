@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { detectObjectEraserImageType, OBJECT_ERASER_MAX_IMAGE_BYTES } from '@/lib/studio/object-eraser'
-import { generateGeminiObjectRemovalPrompt } from '@/lib/studio/object-eraser-prompt'
+import { generateGroqObjectRemovalPrompt } from '@/lib/studio/object-eraser-prompt'
 import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_INPAINT_PATH } from '@/lib/studio/stability-inpaint'
 
 export const runtime = 'nodejs'
@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
 
   const stabilityKey = process.env.STABILITY_API_KEY?.trim()
   if (!stabilityKey) return fail('Stability AI is not configured. Add STABILITY_API_KEY to Vercel Environment Variables.', 503, 'not_configured')
-  const geminiKey = process.env.SOCIALENS_OBJECT_ERASER_GEMINI_API_KEY?.trim()
-  if (!geminiKey) return fail('Aperonix AI is temporarily unavailable. Please check the Studio AI configuration and try again.', 503, 'gemini_not_configured')
+  const groqKey = process.env.SOCIALENS_OBJECT_ERASER_GROQ_API_KEY?.trim()
+  if (!groqKey) return fail('Aperonix AI is not configured. Add SOCIALENS_OBJECT_ERASER_GROQ_API_KEY to Vercel Environment Variables.', 503, 'aperonix_not_configured')
 
   const contentLength = Number(request.headers.get('content-length') || 0)
   if (contentLength > 3 * 1024 * 1024) return fail('The object mask is too large. Please run detection again.', 413, 'mask_too_large')
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
   if (signedError || !signed?.signedUrl) return fail('Could not securely prepare the selected image for AI editing.', 400, 'asset_unavailable')
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 54_000)
+  const timeout = setTimeout(() => controller.abort(), 58_000)
   try {
     const imageResponse = await fetch(signed.signedUrl, { cache: 'no-store', signal: controller.signal })
     if (!imageResponse.ok) return fail('Could not load the original Studio image for AI editing.', 400, 'asset_unavailable')
@@ -84,13 +84,13 @@ export async function POST(request: NextRequest) {
     const mimeType = detectObjectEraserImageType(imageBytes)
     if (!mimeType) return fail('The original Studio asset is not a supported JPEG, PNG or WebP image.', 415, 'invalid_image')
 
-    // Gemini sees the original photograph and the exact SAM2 binary mask.
+    // Aperonix AI vision sees the original photograph and the exact SAM2 binary mask.
     // It returns prompt text only; it is never allowed to generate/edit pixels.
     let promptResult
     try {
       promptResult = await generateGeminiObjectRemovalPrompt({
-        apiKey: geminiKey,
-        model: process.env.GEMINI_OBJECT_ERASER_MODEL,
+        apiKey: groqKey,
+        model: process.env.SOCIALENS_OBJECT_ERASER_GROQ_MODEL,
         imageBytes,
         imageMimeType: mimeType,
         maskBytes: new Uint8Array(maskBytes),
@@ -100,8 +100,8 @@ export async function POST(request: NextRequest) {
         signal: controller.signal,
       })
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return fail('Aperonix AI could not finish analyzing this selection in time. Your original photo is unchanged; please try again with a smaller selection.', 504, 'gemini_timeout', true)
+      if (error instanceof Error && (error.name === 'AbortError' || /Aperonix AI analysis timed out/i.test(error.message))) {
+        return fail('Aperonix AI analysis took too long. Your original photo is unchanged; please try again.', 504, 'aperonix_analysis_timeout', true)
       }
       return fail(error instanceof Error ? error.message : 'Aperonix AI could not analyze the selected object. Please try again.', 502, 'gemini_analysis_failed', true)
     }
@@ -157,8 +157,8 @@ export async function POST(request: NextRequest) {
         ...NO_STORE,
         'Content-Type': outputType,
         'Content-Length': String(outputBytes.length),
-        'X-Object-Eraser-Provider': 'gemini+stability-ai-inpaint',
-        'X-Object-Eraser-Prompt-Source': 'gemini',
+        'X-Object-Eraser-Provider': 'aperonix+stability-ai-inpaint',
+        'X-Object-Eraser-Prompt-Source': 'aperonix-ai',
       },
     })
   } catch (error) {
