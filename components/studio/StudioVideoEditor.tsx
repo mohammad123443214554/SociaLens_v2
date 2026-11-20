@@ -939,10 +939,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       // Union every SAM2 silhouette touched by the painted area. Do not pick
       // only the top-ranked mask: a single brush selection can cover multiple
       // distinct objects and multiple parts of a compound object.
+      // One brush gesture means one intended object. Prefer the segmented
+      // silhouette with the strongest overlap with the user's actual stroke;
+      // unioning every nearby detection can accidentally erase a whole scene.
+      const primaryTarget = matchedTargets[0]
       const target = {
-        label: matchedTargets.length === 1 ? String(matchedTargets[0].label || 'object') : matchedTargets.length + ' selected objects',
-        confidence: Math.min(...matchedTargets.map((item: any) => Number(item.confidence) || 0)),
-        polygons: matchedTargets.flatMap((item: any) => item.polygons),
+        label: String(primaryTarget.label || 'object'),
+        confidence: Number(primaryTarget.confidence) || 0,
+        polygons: primaryTarget.polygons as number[][][],
       }
       const cacheKey = getObjectEraserTargetCacheKey(sourceKey, target.label, target.polygons, objectEraserImageSize.width, objectEraserImageSize.height, selection, objectEraserBrushSize)
       const exactCached = cacheKey ? objectEraserResultCacheRef.current.get(cacheKey) : undefined
@@ -982,6 +986,16 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         maskContext.stroke()
       }
 
+      // Fail safely if segmentation returned an oversized region. Never let
+      // a mistaken whole-scene mask replace most of the original photograph.
+      const maskPixels = maskContext.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data
+      let selectedPixels = 0
+      for (let index = 0; index < maskPixels.length; index += 4) {
+        if (maskPixels[index] > 127) selectedPixels++
+      }
+      const maskCoverage = selectedPixels / (maskCanvas.width * maskCanvas.height)
+      if (maskCoverage <= 0.0005) throw new Error('The selected object mask is empty. Please highlight the object again.')
+      if (maskCoverage > 0.45) throw new Error('The detected selection covers too much of the photo. Please highlight only the object you want to remove.')
       const maskDataUrl = maskCanvas.toDataURL('image/png')
       const response = await fetch('/api/studio/object-eraser/inpaint', {
         method: 'POST',
