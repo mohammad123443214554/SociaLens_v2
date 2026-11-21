@@ -24,8 +24,8 @@ export type SmartCutoutLayerAsset = {
   label?: string
 }
 
-export type SmartCutoutAlignedLayer<T extends SmartCutoutElementTransform = SmartCutoutElementTransform> =
-  T & SmartCutoutLayerAsset & {
+export type SmartCutoutAlignedLayer =
+  SmartCutoutElementTransform & SmartCutoutLayerAsset & {
     kind: 'image'
     smartCutoutGroupId: string
     smartCutoutRole: 'background' | 'object'
@@ -47,12 +47,12 @@ export type SmartCutoutPixelBounds = {
  * layer must inherit the exact same transform and crop values as its source.
  * The source element itself is never mutated or replaced by this helper.
  */
-export function createSmartCutoutAlignedLayers<T extends SmartCutoutElementTransform>(
-  source: T & { id: string; kind: 'image' },
+export function createSmartCutoutAlignedLayers(
+  source: SmartCutoutElementTransform & { id: string; kind: 'image' },
   groupId: string,
   background: SmartCutoutLayerAsset,
   objects: SmartCutoutLayerAsset[],
-): SmartCutoutAlignedLayer<T>[] {
+): SmartCutoutAlignedLayer[] {
   if (!source.id || !groupId || !background.storagePath || !background.url || !background.id) {
     throw new Error('Smart Cutout needs a source image, group ID and saved background plate.')
   }
