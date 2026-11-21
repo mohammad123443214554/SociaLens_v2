@@ -136,79 +136,12 @@ export async function POST(request: NextRequest) {
     return fail('Gemini image analysis failed: ' + detail, status, 'gemini_request_failed', status === 429 || status >= 500)
   }
 
-  if (!objects.length) {
-    return NextResponse.json({
-      ok: true,
-      provider: 'gemini+roboflow',
-      image: { mimeType: prepared.mimeType, size: prepared.size, sha256: prepared.sha256, width: imageWidth, height: imageHeight },
-      objects: [],
-      segmentations: [],
-      missingLabels: [],
-      message: 'No clear independently movable main objects were found in this photo.',
-    }, { headers: NO_STORE })
-
-  }
-
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 40_000)
-  try {
-    const upstream = await fetch('https://serverless.roboflow.com/sam3/concept_segment?api_key=' + encodeURIComponent(roboflowKey), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        image: { type: 'base64', value: prepared.base64 },
-        prompts: objects.map(object => ({ text: object.label })),
-        format: 'polygon',
-      }),
-      cache: 'no-store',
-      signal: controller.signal,
-    })
-
-    if (!upstream.ok) {
-      let payload: unknown = null
-      try { payload = await upstream.json() } catch { /* provider returned no JSON */ }
-      if (upstream.status === 401 || upstream.status === 403) {
-        return fail('Roboflow rejected the API key. Check the Vercel environment variable.', 502, 'roboflow_unauthorized')
-      }
-      if (upstream.status === 402 || upstream.status === 429) {
-        return fail('Roboflow usage limit has been reached. Check the workspace usage before retrying.', 429, 'roboflow_quota_exceeded', true)
-      }
-      if (upstream.status >= 500 || upstream.status === 408) {
-        return fail('Roboflow SAM 3 is temporarily unavailable. Please try again.', 503, 'roboflow_unavailable', true)
-      }
-      return fail(safeProviderMessage(payload, 'Roboflow SAM 3 could not segment this photo.'), 502, 'segmentation_failed')
-    }
-
-    let payload: unknown
-    try {
-      payload = await upstream.json()
-    } catch {
-      return fail('Roboflow SAM 3 returned unreadable mask data. Please try again.', 502, 'invalid_provider_response', true)
-    }
-
-    const normalized = normalizeSmartCutoutSegmentations(payload, objects, imageWidth, imageHeight)
-    if (!normalized.segmentations.length) {
-      return fail('The main objects were identified, but SAM 3 could not produce usable object masks for this photo. Try another photo or retry.', 502, 'no_usable_masks', true)
-    }
-
-    return NextResponse.json({
-      ok: true,
-      provider: 'gemini+roboflow',
-      models: { inventory: 'Gemini 3.8 Flash', segmentation: 'Roboflow SAM 3' },
-      image: { mimeType: prepared.mimeType, size: prepared.size, sha256: prepared.sha256, width: imageWidth, height: imageHeight },
-      objects,
-      segmentations: normalized.segmentations,
-      missingLabels: normalized.missingLabels,
-      warning: normalized.missingLabels.length
-        ? 'Some identified objects did not receive a usable mask. The available object masks are still returned.'
-        : undefined,
-    }, { headers: NO_STORE })
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      return fail('Roboflow SAM 3 took too long to segment this photo. Your original image is unchanged; please try again.', 504, 'segmentation_timeout', true)
-    }
-    return fail('Could not connect to Roboflow SAM 3. Please try again later.', 503, 'provider_unavailable', true)
-  } finally {
-    clearTimeout(timeout)
-  }
+  return NextResponse.json({
+    ok: true,
+    provider: 'gemini',
+    model: 'Gemini 3.8 Flash',
+    image: { mimeType: prepared.mimeType, size: prepared.size, sha256: prepared.sha256, width: imageWidth, height: imageHeight },
+    objects,
+    message: objects.length ? undefined : 'No clear independently movable main objects were found in this photo.',
+  }, { headers: NO_STORE })
 }
