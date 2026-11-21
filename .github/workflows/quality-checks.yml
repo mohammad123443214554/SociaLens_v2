@@ -51,3 +51,6 @@ jobs:
 
       - name: ShapeCut tests
         run: npm run test:shape-cut
+
+      - name: Smart Cutout tests
+        run: npm run test:smart-cutout
