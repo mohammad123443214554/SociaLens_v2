@@ -68,7 +68,19 @@ export function parseSmartCutoutObjectResponse(responseText: string): SmartCutou
 
 function isPoint(value: unknown): value is number[] {
   return Array.isArray(value) && value.length >= 2
-    && Number.isFinite(Number(value[0])) && Number.isFinite(Number(value[1]))
+    && typeof value[0] === 'number' && Number.isFinite(value[0])
+    && typeof value[1] === 'number' && Number.isFinite(value[1])
+}
+
+function hasUsablePolygonArea(polygon: number[][]): boolean {
+  if (polygon.length < 3) return false
+  let twiceArea = 0
+  for (let index = 0; index < polygon.length; index++) {
+    const current = polygon[index]
+    const next = polygon[(index + 1) % polygon.length]
+    twiceArea += current[0] * next[1] - next[0] * current[1]
+  }
+  return Number.isFinite(twiceArea) && Math.abs(twiceArea) >= 1
 }
 
 function extractPolygons(value: unknown): number[][][] {
@@ -76,8 +88,8 @@ function extractPolygons(value: unknown): number[][][] {
   const candidates = value.length >= 3 && value.every(isPoint) ? [value] : value
   return candidates.map(candidate => {
     if (!Array.isArray(candidate)) return []
-    return candidate.filter(isPoint).map(point => [Number(point[0]), Number(point[1])])
-  }).filter(polygon => polygon.length >= 3)
+    return candidate.filter(isPoint).map(point => [point[0], point[1]])
+  }).filter(hasUsablePolygonArea)
 }
 
 function readImageSize(payload: Record<string, unknown>) {
