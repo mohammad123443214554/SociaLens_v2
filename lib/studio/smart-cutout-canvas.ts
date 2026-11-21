@@ -1,4 +1,4 @@
-import { normalizeSmartCutoutPolygons } from '@/lib/studio/smart-cutout-processing'
+import { normalizeSmartCutoutPolygons, strengthenSmartCutoutAlpha } from '@/lib/studio/smart-cutout-processing'
 import type { SmartCutoutSegmentation } from '@/lib/studio/smart-cutout'
 
 export type SmartCutoutRaster = {
@@ -268,7 +268,7 @@ export async function composeSmartCutoutRefinedLayer(
       const alpha = mattePixels.data[index] / 255
       // Strengthen semi-transparent foreground interiors while retaining
       // soft antialiased edges and fully transparent background pixels.
-      mattePixels.data[index] = Math.round((1 - (1 - alpha) * (1 - alpha)) * 255)
+      mattePixels.data[index] = strengthenSmartCutoutAlpha(mattePixels.data[index])
     }
     matteContext.putImageData(mattePixels, 0, 0)
 
