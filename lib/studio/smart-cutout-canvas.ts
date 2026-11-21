@@ -235,26 +235,52 @@ export async function createSmartCutoutRefinementCrops(
   }
 }
 
-/** Rebuilds a full-source transparent layer without changing the crop's pixel placement. */
+/**
+ * Rebuilds a full-source transparent layer using the original photo's RGB
+ * pixels and Stability's refined alpha matte. This prevents the AI service's
+ * colour/lighting changes from making the extracted object look washed out.
+ */
 export async function composeSmartCutoutRefinedLayer(
   refinedBlob: Blob,
+  source: CanvasImageSource,
   crop: Pick<SmartCutoutRefinementCrop, 'x' | 'y' | 'width' | 'height' | 'aiWidth' | 'aiHeight'>,
   sourceWidth: number,
   sourceHeight: number,
 ): Promise<Blob> {
   const bitmap = await createImageBitmap(refinedBlob)
-  const canvas = createCanvas(sourceWidth, sourceHeight)
+  const output = createCanvas(sourceWidth, sourceHeight)
+  const matte = createCanvas(crop.aiWidth, crop.aiHeight)
   try {
     if (bitmap.width !== crop.aiWidth || bitmap.height !== crop.aiHeight) {
       throw new Error('Stability AI changed an object crop size; exact layer alignment cannot be guaranteed.')
     }
-    const context = canvas.getContext('2d')
-    if (!context) throw new Error('Could not rebuild the transparent object layer.')
-    context.drawImage(bitmap, crop.x, crop.y, crop.width, crop.height)
-    return await canvasToPng(canvas)
+    const outputContext = output.getContext('2d')
+    const matteContext = matte.getContext('2d', { willReadFrequently: true })
+    if (!outputContext || !matteContext) throw new Error('Could not rebuild the transparent object layer.')
+
+    // Keep the exact source colours, texture, highlights and shadows.
+    outputContext.drawImage(source, crop.x, crop.y, crop.width, crop.height, crop.x, crop.y, crop.width, crop.height)
+
+    // Use only the AI-generated alpha matte, not its potentially altered RGB.
+    matteContext.drawImage(bitmap, 0, 0, crop.aiWidth, crop.aiHeight)
+    const mattePixels = matteContext.getImageData(0, 0, crop.aiWidth, crop.aiHeight)
+    for (let index = 3; index < mattePixels.data.length; index += 4) {
+      const alpha = mattePixels.data[index] / 255
+      // Strengthen semi-transparent foreground interiors while retaining
+      // soft antialiased edges and fully transparent background pixels.
+      mattePixels.data[index] = Math.round((1 - (1 - alpha) * (1 - alpha)) * 255)
+    }
+    matteContext.putImageData(mattePixels, 0, 0)
+
+    outputContext.globalCompositeOperation = 'destination-in'
+    outputContext.drawImage(matte, crop.x, crop.y, crop.width, crop.height)
+    outputContext.globalCompositeOperation = 'source-over'
+    return await canvasToPng(output)
   } finally {
     bitmap.close()
-    canvas.width = 1
-    canvas.height = 1
+    output.width = 1
+    output.height = 1
+    matte.width = 1
+    matte.height = 1
   }
 }
