@@ -83,3 +83,51 @@ export function strengthenSmartCutoutAlpha(alpha: number): number {
   const normalized = Math.max(0, Math.min(255, alpha)) / 255
   return Math.round((1 - (1 - normalized) * (1 - normalized)) * 255)
 }
+
+/**
+ * Use SAM3's instance mask as the authoritative opaque object interior.
+ * Stability's alpha is retained only in a narrow dilation band around that
+ * mask, where it can contribute antialiased fine edges without washing out
+ * the object's body or allowing distant background pixels through.
+ */
+export function combineSmartCutoutAlpha(
+  refinedAlpha: Uint8ClampedArray | Uint8Array,
+  instanceMask: Uint8ClampedArray | Uint8Array,
+  width: number,
+  height: number,
+  edgeRadius = 4,
+): Uint8Array {
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height)
+    || width < 1 || height < 1 || width * height > SMART_CUTOUT_MAX_PIXELS
+    || refinedAlpha.length !== width * height || instanceMask.length !== width * height
+    || !Number.isSafeInteger(edgeRadius) || edgeRadius < 0 || edgeRadius > 12) {
+    throw new Error('Smart Cutout alpha masks have invalid dimensions.')
+  }
+  const output = new Uint8Array(width * height)
+  const radiusSquared = edgeRadius * edgeRadius
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const index = y * width + x
+      if (instanceMask[index] >= 128) {
+        output[index] = 255
+        continue
+      }
+      let nearInstance = false
+      for (let dy = -edgeRadius; dy <= edgeRadius && !nearInstance; dy++) {
+        const ny = y + dy
+        if (ny < 0 || ny >= height) continue
+        for (let dx = -edgeRadius; dx <= edgeRadius; dx++) {
+          if (dx * dx + dy * dy > radiusSquared) continue
+          const nx = x + dx
+          if (nx < 0 || nx >= width) continue
+          if (instanceMask[ny * width + nx] >= 128) {
+            nearInstance = true
+            break
+          }
+        }
+      }
+      output[index] = nearInstance ? refinedAlpha[index] : 0
+    }
+  }
+  return output
+}
