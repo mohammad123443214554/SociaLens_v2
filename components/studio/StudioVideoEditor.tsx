@@ -24,6 +24,9 @@ import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-ani
 import { extractStudioImagePalette, createStudioRecoloredCanvas, STUDIO_REPLACEMENT_SWATCHES, type StudioColorReplacement } from '@/lib/studio/color-replacement'
 import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, scoreBrushStrokeAgainstPolygons, scoreBrushStrokeAgainstDetectionBox, getObjectEraserTargetsUnderBrush, getObjectEraserMaskPadding } from '@/lib/studio/object-eraser-selection'
 import { scaleObjectEraserPolygons } from '@/lib/studio/object-eraser-selection'
+import { createSmartCutoutRasterBundle } from '@/lib/studio/smart-cutout-canvas'
+import { createSmartCutoutAlignedLayers } from '@/lib/studio/smart-cutout-alignment'
+import type { SmartCutoutSegmentation } from '@/lib/studio/smart-cutout'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
@@ -31,7 +34,7 @@ const STUDIO_TEXT_ANIMATION_BY_ID = new Map(STUDIO_TEXT_ANIMATIONS.map(definitio
 import {
   ArrowLeft, AudioLines, Check, Clapperboard, Undo2, Redo2, Download,
   Bold, CaseUpper, ChevronDown, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
-  Eraser, ImageMinus, ScanSearch, Palette, Pause, Play, Plus, Search, Sparkles, Strikethrough, Trash2, Type, Underline, Video, Move,
+  Eraser, ImageMinus, ScanSearch, Layers3, Palette, Pause, Play, Plus, Search, Sparkles, Strikethrough, Trash2, Type, Underline, Video, Move,
   Volume2, VolumeX, X
 } from 'lucide-react'
 
@@ -553,7 +556,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
   const [saveStatus, setSaveStatus] = useState('Loading project…')
-  const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects' | 'animation' | 'position' | 'element-color' | 'eraser' | 'object-eraser' | 'background-eraser'>('media')
+  const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects' | 'animation' | 'position' | 'element-color' | 'eraser' | 'object-eraser' | 'background-eraser' | 'smart-cutout'>('media')
   const [customElementColor, setCustomElementColor] = useState('#ec4899')
   const [elementPalette, setElementPalette] = useState<string[]>([])
   const [selectedSourceColor, setSelectedSourceColor] = useState<string | null>(null)
@@ -580,6 +583,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [backgroundEraserRemoveBusy, setBackgroundEraserRemoveBusy] = useState(false)
   const [backgroundEraserError, setBackgroundEraserError] = useState('')
   const [backgroundEraserDownloadUrl, setBackgroundEraserDownloadUrl] = useState<string | null>(null)
+  const [smartCutoutBusy, setSmartCutoutBusy] = useState(false)
+  const [smartCutoutError, setSmartCutoutError] = useState('')
+  const [smartCutoutObjects, setSmartCutoutObjects] = useState<Array<{ id: string; label: string }>>([])
   const [animationSearch, setAnimationSearch] = useState('')
   const [isAnimationPreviewing, setIsAnimationPreviewing] = useState(false)
   const [animationPreviewTime, setAnimationPreviewTime] = useState(0)
@@ -611,6 +617,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setBackgroundEraserRemoveBusy(false)
     setBackgroundEraserError('')
     setBackgroundEraserDownloadUrl(null)
+    setSmartCutoutBusy(false)
+    setSmartCutoutError('')
+    setSmartCutoutObjects([])
   }, [selectedElementId])
 
   const loadObjectEraserImage = useCallback(async (element: ElementLayer) => {
@@ -657,7 +666,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   // Object and background detection are deferred until the user explicitly starts them.
   // Opening either panel only loads the selected photo locally.
   useEffect(() => {
-    if ((activePanel === 'object-eraser' || activePanel === 'background-eraser') && selectedElement?.kind === 'image' && !objectEraserBusy && !objectEraserImageSize && !objectEraserError) {
+    if ((activePanel === 'object-eraser' || activePanel === 'background-eraser' || activePanel === 'smart-cutout') && selectedElement?.kind === 'image' && !objectEraserBusy && !objectEraserImageSize && !objectEraserError) {
       void loadObjectEraserImage(selectedElement)
     }
   }, [activePanel, selectedElementId, objectEraserImageSize, objectEraserBusy, objectEraserError, loadObjectEraserImage])
@@ -1095,6 +1104,85 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     } catch (error) {
       setObjectEraserError(error instanceof Error ? error.message : 'Could not apply the edited image to Studio.')
     } finally { setObjectEraserApplyBusy(false) }
+  }
+
+  const runSmartCutout = async () => {
+    if (!selectedElement || selectedElement.kind !== 'image' || !objectEraserImageSize || !objectEraserSourceFileRef.current || smartCutoutBusy) return
+    if (!selectedElement.storagePath) {
+      setSmartCutoutError('This photo is not saved in the Studio project yet. Save or re-import it before using Smart Cutout.')
+      return
+    }
+    setSmartCutoutBusy(true)
+    setSmartCutoutError('')
+    setSmartCutoutObjects([])
+    try {
+      const sourceFile = objectEraserSourceFileRef.current
+      const detectForm = new FormData()
+      detectForm.append('image', sourceFile, sourceFile.name || selectedElement.name || 'element-photo')
+      detectForm.append('imageWidth', String(objectEraserImageSize.width))
+      detectForm.append('imageHeight', String(objectEraserImageSize.height))
+      const detectResponse = await fetch('/api/studio/smart-cutout/detect', { method: 'POST', body: detectForm, credentials: 'same-origin', cache: 'no-store' })
+      const detection = await detectResponse.json()
+      if (!detectResponse.ok || !detection?.ok) throw new Error(detection?.error || 'Smart Cutout could not identify the main objects in this photo.')
+      const segmentations = Array.isArray(detection.segmentations) ? detection.segmentations as SmartCutoutSegmentation[] : []
+      if (!segmentations.length) throw new Error(detection.message || 'No clear independently movable main objects were found in this photo.')
+      setSmartCutoutObjects(segmentations.map(item => ({ id: item.id, label: item.label })))
+
+      const previewUrl = objectEraserPreviewUrlRef.current
+      if (!previewUrl) throw new Error('The original photo preview is no longer available. Reopen Smart Cutout and try again.')
+      const sourceImage = new Image()
+      sourceImage.src = previewUrl
+      await new Promise<void>((resolve, reject) => {
+        sourceImage.onload = () => resolve()
+        sourceImage.onerror = () => reject(new Error('Could not decode the original photo for Smart Cutout.'))
+      })
+      if (sourceImage.naturalWidth !== objectEraserImageSize.width || sourceImage.naturalHeight !== objectEraserImageSize.height) {
+        throw new Error('The original photo dimensions changed. Reopen Smart Cutout and try again.')
+      }
+
+      const rasterBundle = await createSmartCutoutRasterBundle(sourceImage, objectEraserImageSize.width, objectEraserImageSize.height, segmentations)
+      const backgroundForm = new FormData()
+      backgroundForm.append('mask', rasterBundle.combinedMask, 'smart-cutout-mask.png')
+      backgroundForm.append('projectId', projectId)
+      backgroundForm.append('storagePath', selectedElement.storagePath)
+      backgroundForm.append('imageWidth', String(rasterBundle.width))
+      backgroundForm.append('imageHeight', String(rasterBundle.height))
+      const backgroundResponse = await fetch('/api/studio/smart-cutout/process', { method: 'POST', body: backgroundForm, credentials: 'same-origin', cache: 'no-store' })
+      if (!backgroundResponse.ok) {
+        let payload: any = null
+        try { payload = await backgroundResponse.json() } catch { /* retain a safe fallback */ }
+        throw new Error(payload?.error || 'Smart Cutout could not rebuild the clean background.')
+      }
+      const backgroundBlob = await backgroundResponse.blob()
+      if (backgroundBlob.type !== 'image/png' || backgroundBlob.size < 100) throw new Error('Smart Cutout received an invalid clean background image.')
+
+      const baseName = selectedElement.name.replace(/\.[^.]+$/, '') || 'element-photo'
+      const backgroundFile = new File([backgroundBlob], baseName + '-clean-background.png', { type: 'image/png' })
+      const backgroundPath = await uploadStudioAsset(projectId, backgroundFile)
+      const backgroundAsset = {
+        id: makeId(), name: backgroundFile.name, url: await createStudioAssetUrl(backgroundPath),
+        storagePath: backgroundPath, fileSize: backgroundFile.size,
+      }
+      const objectAssets = []
+      for (const cutout of rasterBundle.cutouts) {
+        const safeLabel = cutout.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 36) || 'object'
+        const file = new File([cutout.blob], baseName + '-' + safeLabel + '-cutout.png', { type: 'image/png' })
+        const storagePath = await uploadStudioAsset(projectId, file)
+        objectAssets.push({
+          id: makeId(), name: file.name, url: await createStudioAssetUrl(storagePath), storagePath,
+          fileSize: file.size, objectId: cutout.objectId, label: cutout.label,
+        })
+      }
+      const alignedLayers = createSmartCutoutAlignedLayers(selectedElement, makeId(), backgroundAsset, objectAssets)
+      setElements(items => [...items, ...alignedLayers])
+      const firstObjectLayer = alignedLayers.find(layer => layer.smartCutoutRole === 'object')
+      if (firstObjectLayer) setSelectedElementId(firstObjectLayer.id)
+      setNotice('Smart Cutout created ' + objectAssets.length + ' independent object layer' + (objectAssets.length === 1 ? '' : 's') + ' and a clean background. The original photo is preserved.')
+    } catch (cause) {
+      setSmartCutoutError(cause instanceof Error ? cause.message : 'Smart Cutout failed. Your original photo is unchanged.')
+    } finally {
+      setSmartCutoutBusy(false)
+    }
   }
 
   const selectedElement = elements.find(item => item.id === selectedElementId) || null
@@ -2460,10 +2548,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           <div className="mt-auto flex flex-col items-center gap-1 pb-2"><span className="text-[8px] text-slate-600">SOCIALENS</span><span className="h-1 w-1 rounded-full bg-fuchsia-400" /></div>
         </nav>
 
-        <aside className={(activePanel === 'position' || activePanel === 'element-color' || activePanel === 'eraser' || activePanel === 'object-eraser' || activePanel === 'background-eraser' ? 'fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] top-[calc(58px+env(safe-area-inset-top))] z-[90] flex w-auto overflow-hidden rounded-2xl border border-white/10 shadow-2xl lg:relative lg:inset-auto lg:z-20 lg:w-[260px] lg:rounded-none lg:border-0 lg:shadow-none' : 'hidden w-[260px] lg:flex') + ' shrink-0 flex-col border-r border-white/[0.08] bg-[#0d1020]'}>
+        <aside className={(activePanel === 'position' || activePanel === 'element-color' || activePanel === 'eraser' || activePanel === 'object-eraser' || activePanel === 'background-eraser' || activePanel === 'smart-cutout' ? 'fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] top-[calc(58px+env(safe-area-inset-top))] z-[90] flex w-auto overflow-hidden rounded-2xl border border-white/10 shadow-2xl lg:relative lg:inset-auto lg:z-20 lg:w-[260px] lg:rounded-none lg:border-0 lg:shadow-none' : 'hidden w-[260px] lg:flex') + ' shrink-0 flex-col border-r border-white/[0.08] bg-[#0d1020]'}>
           <div className="border-b border-white/[0.07] px-4 py-4">
-            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : activePanel === 'audio' ? 'Audio library' : activePanel === 'effects' ? 'Text effects' : activePanel === 'position' ? 'Text position' : activePanel === 'element-color' ? 'Element colour' : activePanel === 'eraser' ? 'Eraser' : activePanel === 'object-eraser' ? 'Object Eraser' : activePanel === 'background-eraser' ? 'Background Eraser' : 'Text animations'}</h2>{activePanel !== 'animation' && activePanel !== 'element-color' && activePanel !== 'eraser' && activePanel !== 'object-eraser' && activePanel !== 'background-eraser' && <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : activePanel === 'effects' ? '40 effects' : activePanel === 'position' ? 'PX controls' : ''}</span>}{(activePanel === 'position' || activePanel === 'element-color' || activePanel === 'eraser' || activePanel === 'object-eraser' || activePanel === 'background-eraser') && <button type="button" onClick={() => setActivePanel('media')} aria-label="Close element panel" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 lg:hidden"><X className="h-4 w-4" /></button>}</div>
-            <p className="mt-1 text-[9px] text-slate-500">{activePanel === 'media' ? 'Import and manage your video and photo clips.' : activePanel === 'text' ? 'Edit the text currently shown on your canvas.' : activePanel === 'audio' ? 'Add a music track and control its volume.' : activePanel === 'animation' ? 'Explore motion families for the selected text layer.' : activePanel === 'position' ? 'Set exact placement and align text to the canvas.' : activePanel === 'element-color' ? 'Choose a colour for the selected canvas element.' : activePanel === 'eraser' ? 'Choose an erasing tool for your selected image element.' : activePanel === 'object-eraser' ? 'Select objects to remove from your image.' : activePanel === 'background-eraser' ? 'Remove the background from your selected photo.' : 'Style the appearance of your selected text.'}</p>
+            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : activePanel === 'audio' ? 'Audio library' : activePanel === 'effects' ? 'Text effects' : activePanel === 'position' ? 'Text position' : activePanel === 'element-color' ? 'Element colour' : activePanel === 'eraser' ? 'Eraser' : activePanel === 'object-eraser' ? 'Object Eraser' : activePanel === 'background-eraser' ? 'Background Eraser' : activePanel === 'smart-cutout' ? 'Smart Cutout' : 'Text animations'}</h2>{activePanel !== 'animation' && activePanel !== 'element-color' && activePanel !== 'eraser' && activePanel !== 'object-eraser' && activePanel !== 'background-eraser' && <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : activePanel === 'effects' ? '40 effects' : activePanel === 'position' ? 'PX controls' : ''}</span>}{(activePanel === 'position' || activePanel === 'element-color' || activePanel === 'eraser' || activePanel === 'object-eraser' || activePanel === 'background-eraser' || activePanel === 'smart-cutout') && <button type="button" onClick={() => setActivePanel('media')} aria-label="Close element panel" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 lg:hidden"><X className="h-4 w-4" /></button>}</div>
+            <p className="mt-1 text-[9px] text-slate-500">{activePanel === 'media' ? 'Import and manage your video and photo clips.' : activePanel === 'text' ? 'Edit the text currently shown on your canvas.' : activePanel === 'audio' ? 'Add a music track and control its volume.' : activePanel === 'animation' ? 'Explore motion families for the selected text layer.' : activePanel === 'position' ? 'Set exact placement and align text to the canvas.' : activePanel === 'element-color' ? 'Choose a colour for the selected canvas element.' : activePanel === 'eraser' ? 'Choose an erasing tool for your selected image element.' : activePanel === 'object-eraser' ? 'Select objects to remove from your image.' : activePanel === 'background-eraser' ? 'Remove the background from your selected photo.' : activePanel === 'smart-cutout' ? 'Separate the main objects into editable image layers.' : 'Style the appearance of your selected text.'}</p>
           </div>
 
           {activePanel === 'element-color' && <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
@@ -2505,6 +2593,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-fuchsia-300/20 bg-fuchsia-400/10 text-fuchsia-200"><ScanSearch className="h-5 w-5" /></span>
                 <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold text-white">Object Eraser</span><span className="mt-1 block text-[9px] leading-4 text-slate-400">Detect and remove selected objects while preserving the rest of your image.</span><span className="mt-2 inline-flex items-center gap-1 text-[9px] font-semibold text-fuchsia-200">Open object eraser <span aria-hidden="true">→</span></span></span>
               </button>
+              <button type="button" onClick={() => { setSmartCutoutError(''); setSmartCutoutObjects([]); setActivePanel('smart-cutout') }} className="group flex w-full items-start gap-3 rounded-xl border border-violet-400/25 bg-gradient-to-br from-violet-500/[0.12] to-sky-500/[0.08] p-3 text-left transition hover:border-violet-300/55 hover:from-violet-500/[0.18] hover:to-sky-500/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-violet-300/20 bg-violet-400/10 text-violet-200"><Layers3 className="h-5 w-5" /></span>
+                <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold text-white">Smart Cutout</span><span className="mt-1 block text-[9px] leading-4 text-slate-400">Separate the main objects and rebuild the clean background as editable layers.</span><span className="mt-2 inline-flex items-center gap-1 text-[9px] font-semibold text-violet-200">Open Smart Cutout <span aria-hidden="true">→</span></span></span>
+              </button>
               <button type="button" onClick={() => { setBackgroundEraserDownloadUrl(null); setBackgroundEraserError(''); setObjectEraserError(''); setActivePanel('background-eraser') }} className="group flex w-full items-start gap-3 rounded-xl border border-white/[0.10] bg-gradient-to-br from-pink-500/[0.10] to-violet-500/[0.07] p-3 text-left transition hover:border-pink-300/45 hover:from-pink-500/[0.15] hover:to-violet-500/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-pink-300/20 bg-pink-400/10 text-pink-200"><ImageMinus className="h-5 w-5" /></span>
                 <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold text-white">Background Eraser</span><span className="mt-1 block text-[9px] leading-4 text-slate-400">Detect the foreground subject and remove the background.</span><span className="mt-2 inline-flex items-center gap-1 text-[9px] font-semibold text-pink-200">Open background eraser <span aria-hidden="true">→</span></span></span>
@@ -2512,7 +2604,24 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             </> : <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 p-5 text-center"><Eraser className="mb-3 h-7 w-7 text-slate-500" /><p className="text-[11px] font-semibold text-slate-200">Select a photo element</p><p className="mt-1 text-[9px] leading-4 text-slate-500">Eraser tools are available for image elements. Select a photo overlay on the canvas or timeline to continue.</p></div>}
           </div>}
 
-          {activePanel === 'background-eraser' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+          {activePanel === 'smart-cutout' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+             <button type="button" onClick={() => setActivePanel('eraser')} className="inline-flex w-fit items-center gap-1.5 rounded-lg px-2 py-1.5 text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> Back to Eraser</button>
+             {selectedElement?.kind === 'image' ? <>
+               <section className="rounded-xl border border-white/10 bg-black/20 p-3">
+                 <div className="mb-2 flex items-center gap-2"><Layers3 className="h-4 w-4 text-violet-300" /><h4 className="text-[10px] font-bold text-slate-100">Smart Cutout</h4></div>
+                 <p className="mb-3 truncate text-[8px] text-slate-500">{selectedElement.name}</p>
+                 {objectEraserImageSize ? <div className="relative mx-auto w-full overflow-hidden rounded-lg bg-[#080b16]" style={{ aspectRatio: objectEraserImageSize.width + '/' + objectEraserImageSize.height }}><img src={objectEraserPreviewUrlRef.current || selectedElement.url} alt="Selected Element Photo" draggable={false} className="absolute inset-0 h-full w-full select-none object-fill" /></div> : <div className="flex aspect-[4/3] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] text-center text-[9px] text-slate-500">{objectEraserBusy ? 'Preparing original photo…' : 'Preparing photo preview…'}</div>}
+                 <p className="mt-2 text-[8px] text-slate-500">{objectEraserImageSize ? objectEraserImageSize.width + ' × ' + objectEraserImageSize.height : 'Loading original image…'}</p>
+                 <p className="mt-3 text-[9px] leading-4 text-slate-400">Smart Cutout finds the main foreground objects, creates transparent object layers, and rebuilds the area behind them. Your original photo stays in the project.</p>
+                 {smartCutoutObjects.length > 0 && <div className="mt-3 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2"><p className="mb-2 text-[8px] font-semibold uppercase tracking-wide text-slate-500">Detected objects</p><div className="flex flex-wrap gap-1.5">{smartCutoutObjects.map(item => <span key={item.id} className="rounded-full border border-violet-300/20 bg-violet-400/[0.08] px-2 py-1 text-[8px] text-violet-100">{item.label}</span>)}</div></div>}
+                 {smartCutoutError && <p role="status" className="mt-3 rounded-lg border border-amber-300/15 bg-amber-300/[0.06] p-2 text-[9px] leading-4 text-amber-100">{smartCutoutError}</p>}
+                 <button type="button" onClick={() => void runSmartCutout()} disabled={!objectEraserImageSize || objectEraserBusy || smartCutoutBusy || selectedElement.smartCutoutRole === 'object'} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{smartCutoutBusy ? 'Separating objects and rebuilding background…' : 'Separate objects'}</button>
+                 <p className="mt-2 text-center text-[8px] text-slate-500">Processing uses AI and may take a little time. Nothing is applied unless every output is saved.</p>
+               </section>
+             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an Element Photo to use Smart Cutout.</div>}
+           </div>}
+
+           {activePanel === 'background-eraser' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <button type="button" onClick={() => setActivePanel('eraser')} className="inline-flex w-fit items-center gap-1.5 rounded-lg px-2 py-1.5 text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> Back to Eraser</button>
             {selectedElement?.kind === 'image' ? <>
               <section className="rounded-xl border border-white/10 bg-black/20 p-3">
