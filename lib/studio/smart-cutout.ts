@@ -1,4 +1,5 @@
 export const SMART_CUTOUT_MAX_OBJECTS = 8
+export const SMART_CUTOUT_MAX_SEGMENTATIONS = 8
 
 export type SmartCutoutImportance = 'high' | 'medium'
 export type SmartCutoutObject = {
@@ -130,6 +131,7 @@ export function normalizeSmartCutoutSegmentations(
 
     let instanceIndex = 0
     for (const prediction of promptResult.predictions) {
+      if (segmentations.length >= SMART_CUTOUT_MAX_SEGMENTATIONS) break
       if (!isRecord(prediction)) continue
       const polygons = extractPolygons(prediction.masks)
       if (!polygons.length) continue
@@ -151,6 +153,7 @@ export function normalizeSmartCutoutSegmentations(
       instanceIndex++
       matched.add(object.id)
     }
+    if (segmentations.length >= SMART_CUTOUT_MAX_SEGMENTATIONS) break
   }
 
   return {
