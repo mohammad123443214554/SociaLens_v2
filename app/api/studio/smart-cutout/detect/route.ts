@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
             { inlineData: { mimeType: prepared.mimeType, data: prepared.base64 } },
           ],
         }],
-        config: { responseMimeType: 'application/json', maxOutputTokens: 400, thinkingConfig: { thinkingLevel: 'minimal' } },
+        config: { responseMimeType: 'application/json', maxOutputTokens: 400 },
       })
       const responseText = inventory.text || ''
       if (!responseText.trim()) throw new Error('Gemini returned an empty object inventory.')
@@ -129,8 +129,7 @@ export async function POST(request: NextRequest) {
       break
     } catch (error) {
       inventoryError = error
-      const providerStatus = Number((error as { status?: number; code?: number })?.status ?? (error as { code?: number })?.code)
-      break
+      // Do not retry another model inside this Vercel request; the client can retry safely.
     }
   }
   if (inventoryError) {
