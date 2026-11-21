@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type CSSProperties } from 'react'
-import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
+import { createStudioAssetUrl, deleteStudioAssets, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import { arrangeStudioClips, moveStudioClipWithoutOverlap, normalizeStudioClipGaps } from '@/lib/studio/timeline'
 import { StudioAnimationPanel } from './StudioAnimationPanel'
 import { StudioTimelineThumbnail } from './StudioTimelineThumbnail'
@@ -1151,6 +1151,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setSmartCutoutBusy(true)
     setSmartCutoutError('')
     setSmartCutoutObjects([])
+    const uploadedSmartCutoutPaths: string[] = []
     try {
       const sourceFile = objectEraserSourceFileRef.current
       const detectForm = new FormData()
@@ -1195,6 +1196,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const baseName = selectedElement.name.replace(/\.[^.]+$/, '') || 'element-photo'
       const backgroundFile = new File([backgroundBlob], baseName + '-clean-background.png', { type: 'image/png' })
       const backgroundPath = await uploadStudioAsset(projectId, backgroundFile)
+      uploadedSmartCutoutPaths.push(backgroundPath)
       const backgroundAsset = {
         id: makeId(), name: backgroundFile.name, url: await createStudioAssetUrl(backgroundPath),
         storagePath: backgroundPath, fileSize: backgroundFile.size,
@@ -1204,6 +1206,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         const safeLabel = cutout.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 36) || 'object'
         const file = new File([cutout.blob], baseName + '-' + safeLabel + '-cutout.png', { type: 'image/png' })
         const storagePath = await uploadStudioAsset(projectId, file)
+        uploadedSmartCutoutPaths.push(storagePath)
         objectAssets.push({
           id: makeId(), name: file.name, url: await createStudioAssetUrl(storagePath), storagePath,
           fileSize: file.size, objectId: cutout.objectId, label: cutout.label,
@@ -1218,6 +1221,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       if (firstObjectLayer) setSelectedElementId(firstObjectLayer.id)
       setNotice('Smart Cutout created ' + objectAssets.length + ' independent object layer' + (objectAssets.length === 1 ? '' : 's') + ' and a clean background. The original photo is preserved.')
     } catch (cause) {
+      if (uploadedSmartCutoutPaths.length) {
+        try { await deleteStudioAssets(projectId, uploadedSmartCutoutPaths) } catch { /* keep the original operation error visible */ }
+      }
       setSmartCutoutError(cause instanceof Error ? cause.message : 'Smart Cutout failed. Your original photo is unchanged.')
     } finally {
       setSmartCutoutBusy(false)
