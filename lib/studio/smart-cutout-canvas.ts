@@ -123,7 +123,7 @@ export async function createSmartCutoutRasterBundle(
       })
     }
 
-    if (!cutouts.length) throw new Error('Smart Cutout could not rasterize any object masks.')
+    if (includeCutouts && !cutouts.length) throw new Error('Smart Cutout could not rasterize any object masks.')
     const combinedMask = await canvasToPng(combined)
     return { width, height, cutouts, combinedMask }
   } finally {
