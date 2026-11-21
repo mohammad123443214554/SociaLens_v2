@@ -1207,7 +1207,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           setClips(arrangedClips)
           if (closedAccidentalGaps) setNotice('Closed small accidental gaps between timeline clips.')
           if (Array.isArray(data.elements)) {
-            const restoredElements: ElementLayer[] = await Promise.all((data.elements as Array<Record<string, unknown>>).filter(item => typeof item.storagePath === 'string' && (item.kind === 'image' || item.kind === 'video')).map(async item => ({ id: String(item.id || makeId()), kind: item.kind as ClipKind, name: String(item.name || 'Overlay'), url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration) || 5, trimStart: Math.max(0, Number(item.trimStart) || 0), trimEnd: Math.max(0.1, Number(item.trimEnd) || Number(item.duration) || 5), timelineStart: Math.max(0, Number(item.timelineStart) || 0), x: Math.min(95, Math.max(0, Number(item.x) || 25)), y: Math.min(95, Math.max(0, Number(item.y) || 25)), width: Math.min(100, Math.max(5, Number(item.width) || 50)), height: Math.min(100, Math.max(5, Number(item.height) || 50)), cropLeft: Math.min(0.8, Math.max(0, Number(item.cropLeft) || 0)), cropRight: Math.min(0.8, Math.max(0, Number(item.cropRight) || 0)), cropTop: Math.min(0.8, Math.max(0, Number(item.cropTop) || 0)), cropBottom: Math.min(0.8, Math.max(0, Number(item.cropBottom) || 0)), color: typeof item.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(item.color) ? item.color : undefined, colorReplacements: Array.isArray(item.colorReplacements) ? (item.colorReplacements as StudioColorReplacement[]).filter(value => value && /^#[0-9a-fA-F]{6}$/.test(value.source) && /^#[0-9a-fA-F]{6}$/.test(value.target)) : [], colorStrength: typeof item.colorStrength === 'number' ? Math.min(1, Math.max(0, item.colorStrength)) : 0.72, fileSize: Number(item.fileSize) || 0, storagePath: String(item.storagePath), originalStoragePath: typeof item.originalStoragePath === 'string' ? item.originalStoragePath : undefined, originalName: typeof item.originalName === 'string' ? item.originalName : undefined, originalFileSize: Number.isFinite(Number(item.originalFileSize)) ? Number(item.originalFileSize) : undefined, backgroundOriginalStoragePath: typeof item.backgroundOriginalStoragePath === 'string' ? item.backgroundOriginalStoragePath : undefined, backgroundOriginalName: typeof item.backgroundOriginalName === 'string' ? item.backgroundOriginalName : undefined, backgroundOriginalFileSize: Number.isFinite(Number(item.backgroundOriginalFileSize)) ? Number(item.backgroundOriginalFileSize) : undefined })))
+            const restoredElements: ElementLayer[] = await Promise.all((data.elements as Array<Record<string, unknown>>).filter(item => typeof item.storagePath === 'string' && (item.kind === 'image' || item.kind === 'video')).map(async item => ({ id: String(item.id || makeId()), kind: item.kind as ClipKind, name: String(item.name || 'Overlay'), url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration) || 5, trimStart: Math.max(0, Number(item.trimStart) || 0), trimEnd: Math.max(0.1, Number(item.trimEnd) || Number(item.duration) || 5), timelineStart: Math.max(0, Number(item.timelineStart) || 0), x: Math.min(500, Math.max(-500, Number.isFinite(Number(item.x)) ? Number(item.x) : 25)), y: Math.min(500, Math.max(-500, Number.isFinite(Number(item.y)) ? Number(item.y) : 25)), width: Math.min(100, Math.max(5, Number(item.width) || 50)), height: Math.min(100, Math.max(5, Number(item.height) || 50)), cropLeft: Math.min(0.8, Math.max(0, Number(item.cropLeft) || 0)), cropRight: Math.min(0.8, Math.max(0, Number(item.cropRight) || 0)), cropTop: Math.min(0.8, Math.max(0, Number(item.cropTop) || 0)), cropBottom: Math.min(0.8, Math.max(0, Number(item.cropBottom) || 0)), color: typeof item.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(item.color) ? item.color : undefined, colorReplacements: Array.isArray(item.colorReplacements) ? (item.colorReplacements as StudioColorReplacement[]).filter(value => value && /^#[0-9a-fA-F]{6}$/.test(value.source) && /^#[0-9a-fA-F]{6}$/.test(value.target)) : [], colorStrength: typeof item.colorStrength === 'number' ? Math.min(1, Math.max(0, item.colorStrength)) : 0.72, fileSize: Number(item.fileSize) || 0, storagePath: String(item.storagePath), originalStoragePath: typeof item.originalStoragePath === 'string' ? item.originalStoragePath : undefined, originalName: typeof item.originalName === 'string' ? item.originalName : undefined, originalFileSize: Number.isFinite(Number(item.originalFileSize)) ? Number(item.originalFileSize) : undefined, backgroundOriginalStoragePath: typeof item.backgroundOriginalStoragePath === 'string' ? item.backgroundOriginalStoragePath : undefined, backgroundOriginalName: typeof item.backgroundOriginalName === 'string' ? item.backgroundOriginalName : undefined, backgroundOriginalFileSize: Number.isFinite(Number(item.backgroundOriginalFileSize)) ? Number(item.backgroundOriginalFileSize) : undefined })))
             if (!active) return
             setElements(restoredElements)
             if (typeof data.selectedElementId === 'string') setSelectedElementId(data.selectedElementId)
@@ -1228,7 +1228,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           if (Array.isArray(data.textLayers)) {
             const restoredText: TextLayer[] = (data.textLayers as Array<Record<string, unknown>>).filter(item => typeof item.id === 'string' && typeof item.text === 'string').map((item): TextLayer => ({
               id: String(item.id), kind: (item.kind === 'heading' || item.kind === 'subheading' ? item.kind : 'body') as TextLayer['kind'],
-              text: String(item.text), x: Math.min(95, Math.max(0, Number(item.x) || 0)), y: Math.min(95, Math.max(0, Number(item.y) || 0)),
+              text: String(item.text), x: Math.min(500, Math.max(-500, Number.isFinite(Number(item.x)) ? Number(item.x) : 0)), y: Math.min(500, Math.max(-500, Number.isFinite(Number(item.y)) ? Number(item.y) : 0)),
               width: Math.min(100, Math.max(12, Number(item.width) || 80)), fontSize: Math.min(160, Math.max(10, Number(item.fontSize) || 24)),
               color: typeof item.color === 'string' ? item.color : '#ffffff', effect: TEXT_EFFECTS.some(effect => effect.name === item.effect) ? item.effect as TextEffect : 'Simple', effectIntensity: Number.isFinite(Number(item.effectIntensity)) ? Math.min(100, Math.max(0, Number(item.effectIntensity))) : 60, effectBlur: Number.isFinite(Number(item.effectBlur)) ? Math.min(40, Math.max(0, Number(item.effectBlur))) : 8, effectDistance: Number.isFinite(Number(item.effectDistance)) ? Math.min(40, Math.max(0, Number(item.effectDistance))) : 4, effectAngle: Number.isFinite(Number(item.effectAngle)) ? Number(item.effectAngle) : 45, effectColor: typeof item.effectColor === 'string' ? item.effectColor : '#a855f7', effectSecondaryColor: typeof item.effectSecondaryColor === 'string' ? item.effectSecondaryColor : '#22d3ee', opacity: Number.isFinite(Number(item.opacity)) ? Math.min(100, Math.max(0, Number(item.opacity))) : 100, bold: item.bold !== false, italic: item.italic === true,
               underline: item.underline === true, fontFamily: typeof item.fontFamily === 'string' ? item.fontFamily : 'Default', align: item.align === 'left' || item.align === 'right' ? item.align : 'center', rotation: typeof item.rotation === 'number' && Number.isFinite(item.rotation) ? item.rotation : 0,
@@ -1678,7 +1678,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     if (!drag || drag.pointerId !== event.pointerId || !rect) return
     const dx = event.clientX - drag.startX
     const dy = event.clientY - drag.startY
-    if (drag.mode === 'move') updateTextLayer(drag.id, { x: Math.min(100, Math.max(0, drag.originX + dx / rect.width * 100)), y: Math.min(96, Math.max(0, drag.originY + dy / rect.height * 100)) })
+    if (drag.mode === 'move') updateTextLayer(drag.id, { x: Math.min(500, Math.max(-500, drag.originX + dx / rect.width * 100)), y: Math.min(500, Math.max(-500, drag.originY + dy / rect.height * 100)) })
     else if (drag.mode === 'resize') updateTextLayer(drag.id, { width: Math.min(100, Math.max(12, drag.originWidth + dx / rect.width * 100)), fontSize: Math.min(160, Math.max(10, drag.originFontSize + dy * 0.35)) })
     else {
       const centerX = rect.left + (drag.originX + drag.originWidth / 2) / 100 * rect.width
@@ -1708,8 +1708,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     const dy = (event.clientY - drag.startY) / rect.height * 100
     let snappedMove: { x: number; y: number } | null = null
     if (drag.mode === 'move') {
-      const rawX = Math.min(100 - drag.width, Math.max(0, drag.x + dx))
-      const rawY = Math.min(100 - drag.height, Math.max(0, drag.y + dy))
+      const rawX = Math.min(500, Math.max(-500, drag.x + dx))
+      const rawY = Math.min(500, Math.max(-500, drag.y + dy))
       const peers = elements.filter(other => other.id !== drag.id)
       const xTargets = [
         { value: 0, guide: 0 }, { value: 50 - drag.width / 2, guide: 50 }, { value: 100 - drag.width, guide: 100 },
@@ -1739,19 +1739,19 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setElements(items => items.map(item => {
       if (item.id !== drag.id) return item
       if (drag.mode === 'move') return { ...item, x: snappedMove?.x ?? drag.x, y: snappedMove?.y ?? drag.y }
-      if (drag.mode === 'resize') return { ...item, width: Math.min(100 - drag.x, Math.max(5, drag.width + dx)), height: Math.min(100 - drag.y, Math.max(5, drag.height + dy)) }
+      if (drag.mode === 'resize') return { ...item, width: Math.min(600, Math.max(5, drag.width + dx)), height: Math.min(600, Math.max(5, drag.height + dy)) }
       if (drag.mode === 'resize-nw') {
-        const x = Math.min(drag.x + drag.width - 5, Math.max(0, drag.x + dx))
-        const y = Math.min(drag.y + drag.height - 5, Math.max(0, drag.y + dy))
+        const x = Math.min(drag.x + drag.width - 5, Math.max(-500, drag.x + dx))
+        const y = Math.min(drag.y + drag.height - 5, Math.max(-500, drag.y + dy))
         return { ...item, x, y, width: drag.x + drag.width - x, height: drag.y + drag.height - y }
       }
       if (drag.mode === 'resize-ne') {
-        const y = Math.min(drag.y + drag.height - 5, Math.max(0, drag.y + dy))
-        return { ...item, y, width: Math.min(100 - drag.x, Math.max(5, drag.width + dx)), height: drag.y + drag.height - y }
+        const y = Math.min(drag.y + drag.height - 5, Math.max(-500, drag.y + dy))
+        return { ...item, y, width: Math.min(600, Math.max(5, drag.width + dx)), height: drag.y + drag.height - y }
       }
       if (drag.mode === 'resize-sw') {
-        const x = Math.min(drag.x + drag.width - 5, Math.max(0, drag.x + dx))
-        return { ...item, x, width: drag.x + drag.width - x, height: Math.min(100 - drag.y, Math.max(5, drag.height + dy)) }
+        const x = Math.min(drag.x + drag.width - 5, Math.max(-500, drag.x + dx))
+        return { ...item, x, width: drag.x + drag.width - x, height: Math.min(600, Math.max(5, drag.height + dy)) }
       }
       const cropDeltaX = dx / Math.max(5, drag.width)
       const cropDeltaY = dy / Math.max(5, drag.height)
@@ -2671,8 +2671,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   const layerElement = Array.from(canvasRef.current?.children || []).find(node => (node as HTMLElement).dataset.textLayerId === selectedText.id) as HTMLElement | undefined
                   const measuredHeight = Math.round((layerElement?.offsetHeight || (selectedText.height ? selectedText.height * previewHeight / canvasHeight : selectedText.fontSize * 1.4)) * canvasHeight / previewHeight)
                   const fields = [
-                    { label: 'X', value: Math.round(selectedText.x / 100 * canvasWidth), min: 0, max: Math.round(canvasWidth), change: (value: number) => updateTextLayer(selectedText.id, { x: Math.max(0, Math.min(100, value / canvasWidth * 100)) }) },
-                    { label: 'Y', value: Math.round(selectedText.y / 100 * canvasHeight), min: 0, max: Math.round(canvasHeight), change: (value: number) => updateTextLayer(selectedText.id, { y: Math.max(0, Math.min(100, value / canvasHeight * 100)) }) },
+                    { label: 'X', value: Math.round(selectedText.x / 100 * canvasWidth), min: -Math.round(canvasWidth * 5), max: Math.round(canvasWidth * 5), change: (value: number) => updateTextLayer(selectedText.id, { x: Math.max(-500, Math.min(500, value / canvasWidth * 100)) }) },
+                    { label: 'Y', value: Math.round(selectedText.y / 100 * canvasHeight), min: -Math.round(canvasHeight * 5), max: Math.round(canvasHeight * 5), change: (value: number) => updateTextLayer(selectedText.id, { y: Math.max(-500, Math.min(500, value / canvasHeight * 100)) }) },
                     { label: 'Width', value: Math.round(selectedText.width / 100 * canvasWidth), min: 12, max: Math.round(canvasWidth), change: (value: number) => updateTextLayer(selectedText.id, { width: Math.max(1, Math.min(100, value / canvasWidth * 100)) }) },
                     { label: 'Height', value: Math.round(measuredHeight), min: 1, max: Math.round(canvasHeight), change: (value: number) => updateTextLayer(selectedText.id, { height: Math.max(1, value) }) },
                   ]
@@ -2810,15 +2810,17 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             </>}
           </div>
 
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3 sm:p-5">
-            <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-xl border border-white/[0.07] bg-[#05060d] shadow-[0_20px_70px_rgba(0,0,0,0.42)]">
-              <div ref={canvasRef} onPointerDown={event => { const target = event.target as HTMLElement; if (!target.closest("[data-text-layer-id], [data-text-toolbar]")) { setSelectedTextId(null); setEditingTextId(null) } }} className={'relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-md bg-black ring-1 ring-violet-400/20 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-5xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(72dvh, 720px)' }}>
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-visible p-7 sm:p-10">
+            <div className="flex h-full w-full items-center justify-center overflow-visible rounded-xl border border-white/[0.07] bg-[#05060d] shadow-[0_20px_70px_rgba(0,0,0,0.42)]">
+              <div ref={canvasRef} onPointerDown={event => { const target = event.target as HTMLElement; if (!target.closest("[data-text-layer-id], [data-text-toolbar]")) { setSelectedTextId(null); setEditingTextId(null) } }} className={'relative flex max-h-full max-w-full items-center justify-center overflow-visible rounded-md bg-black ring-1 ring-violet-400/20 ' + (aspect === '9:16' ? 'h-full aspect-[9/16]' : aspect === '16:9' ? 'w-full max-w-5xl aspect-video' : 'h-full aspect-square')} style={{ maxHeight: 'min(72dvh, 720px)' }}>
+                <div className="absolute inset-0 z-0 overflow-hidden rounded-md bg-black">
                 {clips.filter(clip => clip.kind === 'video').map(clip => {
                   const isActiveVideo = activeTimelineClip?.kind === 'video' && activeTimelineClip.id === clip.id
                   const shouldPreload = isActiveVideo || upcomingVideoClip?.id === clip.id
                   return <video key={clip.id} ref={getPreviewVideoRef(clip.id)} data-preview-clip-id={clip.id} src={clip.url} playsInline preload={shouldPreload ? 'auto' : 'metadata'} className="absolute inset-0 h-full w-full object-contain" style={{ display: isActiveVideo ? 'block' : 'none' }} />
                 })}
                 {activeTimelineClip?.kind === 'image' ? <img src={activeTimelineClip.url} alt={activeTimelineClip.name} className="absolute inset-0 h-full w-full object-contain" /> : !activeTimelineClip ? <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"><Clapperboard className="h-10 w-10 text-violet-400/60" /><p className="text-sm font-semibold text-slate-300">{clips.length ? 'Timeline gap' : 'Your video canvas'}</p><p className="max-w-xs text-[10px] leading-4 text-slate-500">{clips.length ? 'No media clip is placed at this point in the timeline.' : 'Import a video or photo to start editing your project.'}</p>{!clips.length && <button type="button" onClick={() => videoInput.current?.click()} className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-[10px] font-bold"><Plus className="mr-1 inline h-3 w-3" /> Import video</button>}</div> : null}
+                </div>
                 {elements.filter(element => playhead >= element.timelineStart && playhead < element.timelineStart + element.trimEnd-element.trimStart).map(element => {
                   const cropLeft = element.kind === 'image' ? Math.min(0.95, Math.max(0, element.cropLeft || 0)) : 0
                   const cropRight = element.kind === 'image' ? Math.min(0.95 - cropLeft, Math.max(0, element.cropRight || 0)) : 0
