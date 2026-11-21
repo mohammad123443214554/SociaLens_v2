@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { detectObjectEraserImageType, OBJECT_ERASER_MAX_IMAGE_BYTES, prepareObjectEraserImage } from '@/lib/studio/object-eraser'
+import { detectObjectEraserImageType, OBJECT_ERASER_MAX_IMAGE_BYTES } from '@/lib/studio/object-eraser'
 import {
   isSmartCutoutMaskValid,
   readSmartCutoutPngDimensions,
@@ -108,12 +108,9 @@ export async function POST(request: NextRequest) {
       imageBytes.byteOffset,
       imageBytes.byteOffset + imageBytes.byteLength,
     ) as ArrayBuffer
-    const sourceFile = new File([sourceBuffer], 'smart-cutout-source', { type: mimeType })
-    const prepared = await prepareObjectEraserImage(sourceFile)
-
     const upstreamForm = new FormData()
     const maskBuffer = maskBytes.buffer.slice(maskBytes.byteOffset, maskBytes.byteOffset + maskBytes.byteLength) as ArrayBuffer
-    upstreamForm.set('image', new Blob([sourceBuffer], { type: prepared.mimeType }), 'source-image')
+    upstreamForm.set('image', new Blob([sourceBuffer], { type: mimeType }), 'source-image')
     upstreamForm.set('mask', new Blob([maskBuffer], { type: 'image/png' }), 'smart-cutout-mask.png')
     // The client mask is a full-resolution union of all selected object masks.
     // A small provider growth closes antialiased edge gaps before background fill.
