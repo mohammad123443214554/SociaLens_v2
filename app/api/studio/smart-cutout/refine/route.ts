@@ -54,9 +54,9 @@ export async function POST(request: NextRequest) {
     return fail('This object crop is too large to refine. Try a smaller source photo.', 413, 'object_crop_too_large')
   }
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height)
-    || width < 64 || height < 64 || width * height > 9_437_184
+    || width < 64 || height < 64 || width * height > 4_194_304
     || width / height > 2.5 || height / width > 2.5) {
-    return fail('The object crop dimensions are outside Stability AI limits.', 400, 'invalid_crop_dimensions')
+    return fail('The object crop dimensions are outside Stability AI's four-megapixel limits.', 400, 'invalid_crop_dimensions')
   }
 
   const inputBytes = new Uint8Array(await image.arrayBuffer())
