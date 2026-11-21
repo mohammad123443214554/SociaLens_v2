@@ -49,20 +49,6 @@ export async function createStudioAssetUrl(path: string) {
   return data.signedUrl
 }
 
-/** Remove only generated assets owned by the signed-in user and target project. */
-export async function deleteStudioAssets(projectId: string, paths: string[]) {
-  if (!projectId || !Array.isArray(paths) || !paths.length) return
-  const userId = await getStudioUserId()
-  const prefix = userId + '/' + projectId + '/'
-  const safePaths = [...new Set(paths)].filter(path =>
-    typeof path === 'string' && path.startsWith(prefix) && !path.split('/').some(segment => segment === '.' || segment === '..'),
-  )
-  if (!safePaths.length) return
-  const supabase = createClient()
-  const { error } = await supabase.storage.from(BUCKET).remove(safePaths)
-  if (error) throw error
-}
-
 export async function saveStudioProject(input: {
   id: string
   project_type: StudioProjectType
