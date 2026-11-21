@@ -55,6 +55,7 @@ export async function createSmartCutoutRasterBundle(
   width: number,
   height: number,
   segmentations: SmartCutoutSegmentation[],
+  includeCutouts = true,
 ): Promise<SmartCutoutRasterBundle> {
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height)
     || width < 64 || height < 64 || width * height > 9_437_184) {
@@ -79,6 +80,7 @@ export async function createSmartCutoutRasterBundle(
       if (!polygons.length) continue
 
       paintPolygons(combinedContext, polygons, '#fff')
+      if (!includeCutouts) continue
 
       const alpha = createCanvas(width, height)
       temporaryCanvases.push(alpha)
