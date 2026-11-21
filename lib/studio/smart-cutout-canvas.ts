@@ -118,3 +118,105 @@ export async function createSmartCutoutRasterBundle(
     }
   }
 }
+
+
+export type SmartCutoutRefinementCrop = {
+  id: string
+  objectId: string
+  label: string
+  x: number
+  y: number
+  width: number
+  height: number
+  blob: Blob
+}
+
+/**
+ * Creates a padded, source-resolution crop around each SAM3 instance.
+ * The full photo pixels are retained in the crop so Stability can refine
+ * fine edges (hair, leaves and thin stems) instead of being limited to the
+ * coarse polygon alpha boundary.
+ */
+export async function createSmartCutoutRefinementCrops(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  segmentations: SmartCutoutSegmentation[],
+): Promise<SmartCutoutRefinementCrop[]> {
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height)
+    || width < 64 || height < 64 || width * height > 9_437_184
+    || !Array.isArray(segmentations) || !segmentations.length || segmentations.length > 8) {
+    throw new Error('Smart Cutout cannot prepare the selected object crops.')
+  }
+
+  const crops: SmartCutoutRefinementCrop[] = []
+  const temporaryCanvases: HTMLCanvasElement[] = []
+  try {
+    for (const segmentation of segmentations) {
+      const polygons = normalizeSmartCutoutPolygons(segmentation.polygons, width, height)
+      const points = polygons.flat()
+      if (!points.length) continue
+      const minX = Math.min(...points.map(point => point[0]))
+      const maxX = Math.max(...points.map(point => point[0]))
+      const minY = Math.min(...points.map(point => point[1]))
+      const maxY = Math.max(...points.map(point => point[1]))
+      const subjectWidth = Math.max(1, maxX - minX)
+      const subjectHeight = Math.max(1, maxY - minY)
+      const padding = Math.max(18, Math.round(Math.max(subjectWidth, subjectHeight) * 0.18))
+      let cropWidth = Math.min(width, Math.ceil(subjectWidth + padding * 2))
+      let cropHeight = Math.min(height, Math.ceil(subjectHeight + padding * 2))
+      // Stability Remove Background requires an aspect ratio between 1:2.5 and 2.5:1.
+      if (cropWidth / cropHeight > 2.5) cropHeight = Math.min(height, Math.ceil(cropWidth / 2.5))
+      if (cropHeight / cropWidth > 2.5) cropWidth = Math.min(width, Math.ceil(cropHeight / 2.5))
+      cropWidth = Math.max(Math.min(width, 64), cropWidth)
+      cropHeight = Math.max(Math.min(height, 64), cropHeight)
+      const centerX = (minX + maxX) / 2
+      const centerY = (minY + maxY) / 2
+      const x = Math.max(0, Math.min(width - cropWidth, Math.round(centerX - cropWidth / 2)))
+      const y = Math.max(0, Math.min(height - cropHeight, Math.round(centerY - cropHeight / 2)))
+      const canvas = createCanvas(cropWidth, cropHeight)
+      temporaryCanvases.push(canvas)
+      const context = canvas.getContext('2d')
+      if (!context) throw new Error('Could not prepare an object crop for edge refinement.')
+      context.drawImage(source, x, y, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight)
+      crops.push({
+        id: segmentation.id,
+        objectId: segmentation.objectId,
+        label: segmentation.label,
+        x, y, width: cropWidth, height: cropHeight,
+        blob: await canvasToPng(canvas),
+      })
+    }
+    if (!crops.length) throw new Error('Smart Cutout could not prepare any object crops.')
+    return crops
+  } finally {
+    for (const canvas of temporaryCanvases) {
+      canvas.width = 1
+      canvas.height = 1
+    }
+  }
+}
+
+/** Rebuilds a full-source transparent layer without changing the crop's pixel placement. */
+export async function composeSmartCutoutRefinedLayer(
+  refinedBlob: Blob,
+  crop: Pick<SmartCutoutRefinementCrop, 'x' | 'y' | 'width' | 'height'>,
+  sourceWidth: number,
+  sourceHeight: number,
+): Promise<Blob> {
+  const bitmap = await createImageBitmap(refinedBlob)
+  const canvas = createCanvas(sourceWidth, sourceHeight)
+  try {
+    if (bitmap.width !== crop.width || bitmap.height !== crop.height) {
+      throw new Error('Stability AI changed an object crop size; exact layer alignment cannot be guaranteed.')
+    }
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Could not rebuild the transparent object layer.')
+    context.drawImage(bitmap, crop.x, crop.y)
+    return await canvasToPng(canvas)
+  } finally {
+    bitmap.close()
+    canvas.width = 1
+    canvas.height = 1
+  }
+}
