@@ -97,8 +97,10 @@ export async function POST(request: NextRequest) {
   const timeout = setTimeout(() => controller.abort(), Math.max(1_000, deadline - Date.now()))
   try {
     const upstreamForm = new FormData()
-    upstreamForm.set('image', new Blob([prepared.base64 ? await image.arrayBuffer() : new ArrayBuffer(0)], { type: prepared.mimeType }), 'source-image')
-    upstreamForm.set('mask', new Blob([maskBytes], { type: 'image/png' }), 'smart-cutout-mask.png')
+    const sourceBytes = await image.arrayBuffer()
+    const maskBuffer = maskBytes.buffer.slice(maskBytes.byteOffset, maskBytes.byteOffset + maskBytes.byteLength) as ArrayBuffer
+    upstreamForm.set('image', new Blob([sourceBytes], { type: prepared.mimeType }), 'source-image')
+    upstreamForm.set('mask', new Blob([maskBuffer], { type: 'image/png' }), 'smart-cutout-mask.png')
     // The client mask is a full-resolution union of all selected object masks.
     // A small provider growth closes antialiased edge gaps before background fill.
     upstreamForm.set('grow_mask', String(SMART_CUTOUT_BACKGROUND_GROW_MASK))
