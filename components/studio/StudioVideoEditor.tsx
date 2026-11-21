@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type CSSProperties } from 'react'
-import { createStudioAssetUrl, deleteStudioAssets, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
+import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import { arrangeStudioClips, moveStudioClipWithoutOverlap, normalizeStudioClipGaps } from '@/lib/studio/timeline'
 import { StudioAnimationPanel } from './StudioAnimationPanel'
 import { StudioTimelineThumbnail } from './StudioTimelineThumbnail'
@@ -24,18 +24,14 @@ import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-ani
 import { extractStudioImagePalette, createStudioRecoloredCanvas, STUDIO_REPLACEMENT_SWATCHES, type StudioColorReplacement } from '@/lib/studio/color-replacement'
 import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, scoreBrushStrokeAgainstPolygons, scoreBrushStrokeAgainstDetectionBox, getObjectEraserTargetsUnderBrush, getObjectEraserMaskPadding } from '@/lib/studio/object-eraser-selection'
 import { scaleObjectEraserPolygons } from '@/lib/studio/object-eraser-selection'
-import { composeSmartCutoutRefinedLayer, createSmartCutoutRasterBundle, createSmartCutoutRefinementCrops } from '@/lib/studio/smart-cutout-canvas'
-import { createSmartCutoutAlignedLayers } from '@/lib/studio/smart-cutout-alignment'
-import { getSmartCutoutTimelineLabel, getSmartCutoutTimelineOrder, removeSmartCutoutGroup, restoreSmartCutoutGroup } from '@/lib/studio/smart-cutout-project'
-import type { SmartCutoutSegmentation } from '@/lib/studio/smart-cutout'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
 const STUDIO_TEXT_ANIMATION_BY_ID = new Map(STUDIO_TEXT_ANIMATIONS.map(definition => [definition.id, definition]))
 import {
-  ArrowLeft, AudioLines, Check, Clapperboard, Undo2, Redo2, Download,
+  AudioLines, Check, Clapperboard, Undo2, Redo2, Download,
   Bold, CaseUpper, ChevronDown, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
-  Eraser, ImageMinus, ScanSearch, Layers3, Palette, Pause, Play, Plus, Search, Sparkles, Strikethrough, Trash2, Type, Underline, Video, Move,
+  Eraser, ImageMinus, ScanSearch, Palette, Pause, Play, Plus, Search, Sparkles, Strikethrough, Trash2, Type, Underline, Video, Move,
   Volume2, VolumeX, X
 } from 'lucide-react'
 
@@ -55,7 +51,7 @@ type Clip = {
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
 type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; height?: number; fontSize: number; color: string; opacity?: number; animation?: Partial<TextAnimationSettings>; effect?: TextEffect; effectIntensity?: number; effectBlur?: number; effectDistance?: number; effectAngle?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
-type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; cropLeft?: number; cropRight?: number; cropTop?: number; cropBottom?: number; rotation?: number; smartCutoutGroupId?: string; smartCutoutRole?: 'background' | 'object'; smartCutoutSourceElementId?: string; smartCutoutObjectId?: string; smartCutoutObjectLabel?: string; color?: string; colorStrength?: number; colorReplacements?: StudioColorReplacement[]; fileSize: number; storagePath?: string; originalStoragePath?: string; originalName?: string; originalFileSize?: number; backgroundOriginalStoragePath?: string; backgroundOriginalName?: string; backgroundOriginalFileSize?: number }
+type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; cropLeft?: number; cropRight?: number; cropTop?: number; cropBottom?: number; rotation?: number; color?: string; colorStrength?: number; colorReplacements?: StudioColorReplacement[]; fileSize: number; storagePath?: string; originalStoragePath?: string; originalName?: string; originalFileSize?: number; backgroundOriginalStoragePath?: string; backgroundOriginalName?: string; backgroundOriginalFileSize?: number }
 type ObjectEraserCachedRemoval = { sourceKey: string; label: string; polygons: number[][][]; selectionKey: string; result: { url: string; storagePath: string; name: string; fileSize: number; originalStoragePath?: string; originalName?: string; originalFileSize?: number } }
 type ElementDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'crop-left' | 'crop-right' | 'crop-top' | 'crop-bottom'; startX: number; startY: number; x: number; y: number; width: number; height: number; cropLeft: number; cropRight: number; cropTop: number; cropBottom: number }
 type TimelineTrack = { key: string; label: string; icon: ReactNode; tone: 'fuchsia' | 'sky' | 'violet' | 'emerald'; element?: ElementLayer; elementIndex?: number }
@@ -557,7 +553,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
   const [saveStatus, setSaveStatus] = useState('Loading project…')
-  const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects' | 'animation' | 'position' | 'element-color' | 'eraser' | 'object-eraser' | 'background-eraser' | 'smart-cutout'>('media')
+  const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects' | 'animation' | 'position' | 'element-color' | 'eraser' | 'object-eraser' | 'background-eraser'>('media')
   const [customElementColor, setCustomElementColor] = useState('#ec4899')
   const [elementPalette, setElementPalette] = useState<string[]>([])
   const [selectedSourceColor, setSelectedSourceColor] = useState<string | null>(null)
@@ -584,12 +580,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [backgroundEraserRemoveBusy, setBackgroundEraserRemoveBusy] = useState(false)
   const [backgroundEraserError, setBackgroundEraserError] = useState('')
   const [backgroundEraserDownloadUrl, setBackgroundEraserDownloadUrl] = useState<string | null>(null)
-  const [smartCutoutBusy, setSmartCutoutBusy] = useState(false)
-  const [smartCutoutError, setSmartCutoutError] = useState('')
-  const [smartCutoutObjects, setSmartCutoutObjects] = useState<Array<{ id: string; label: string }>>([])
-  const smartCutoutUndoRef = useRef<ElementLayer[][]>([])
-  const smartCutoutRedoRef = useRef<ElementLayer[][]>([])
-  const [smartCutoutHistoryVersion, setSmartCutoutHistoryVersion] = useState(0)
   const [animationSearch, setAnimationSearch] = useState('')
   const [isAnimationPreviewing, setIsAnimationPreviewing] = useState(false)
   const [animationPreviewTime, setAnimationPreviewTime] = useState(0)
@@ -621,9 +611,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     setBackgroundEraserRemoveBusy(false)
     setBackgroundEraserError('')
     setBackgroundEraserDownloadUrl(null)
-    setSmartCutoutBusy(false)
-    setSmartCutoutError('')
-    setSmartCutoutObjects([])
   }, [selectedElementId])
 
   const loadObjectEraserImage = useCallback(async (element: ElementLayer) => {
@@ -670,7 +657,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   // Object and background detection are deferred until the user explicitly starts them.
   // Opening either panel only loads the selected photo locally.
   useEffect(() => {
-    if ((activePanel === 'object-eraser' || activePanel === 'background-eraser' || activePanel === 'smart-cutout') && selectedElement?.kind === 'image' && !objectEraserBusy && !objectEraserImageSize && !objectEraserError) {
+    if ((activePanel === 'object-eraser' || activePanel === 'background-eraser') && selectedElement?.kind === 'image' && !objectEraserBusy && !objectEraserImageSize && !objectEraserError) {
       void loadObjectEraserImage(selectedElement)
     }
   }, [activePanel, selectedElementId, objectEraserImageSize, objectEraserBusy, objectEraserError, loadObjectEraserImage])
@@ -1110,188 +1097,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     } finally { setObjectEraserApplyBusy(false) }
   }
 
-  const undoSmartCutoutGroup = () => {
-    const snapshot = smartCutoutUndoRef.current.pop()
-    const groupId = snapshot?.[0]?.smartCutoutGroupId
-    if (!snapshot?.length || !groupId) return
-    const result = removeSmartCutoutGroup(elements, groupId)
-    if (!result.removed.length) return
-    smartCutoutRedoRef.current = [...smartCutoutRedoRef.current.slice(-19), result.removed]
-    setElements(result.layers)
-    setSelectedElementId(result.removed[0]?.smartCutoutSourceElementId || null)
-    setSmartCutoutHistoryVersion(value => value + 1)
-    setNotice('Undid Smart Cutout. The original photo and saved output assets are preserved.')
-  }
-
-  const redoSmartCutoutGroup = () => {
-    const snapshot = smartCutoutRedoRef.current.pop()
-    if (!snapshot?.length) return
-    try {
-      const restored = restoreSmartCutoutGroup(elements, snapshot)
-      const groupId = snapshot[0].smartCutoutGroupId
-      const added = restored.filter(layer => layer.smartCutoutGroupId === groupId && !elements.some(existing => existing.id === layer.id))
-      if (!added.length) return
-      smartCutoutUndoRef.current = [...smartCutoutUndoRef.current.slice(-19), added]
-      setElements(restored)
-      const firstObject = added.find(layer => layer.smartCutoutRole === 'object')
-      setSelectedElementId(firstObject?.id || added[0].id)
-      setSmartCutoutHistoryVersion(value => value + 1)
-      setNotice('Redid Smart Cutout. All generated layers were restored.')
-    } catch (cause) {
-      setSmartCutoutError(cause instanceof Error ? cause.message : 'Could not restore this Smart Cutout group.')
-    }
-  }
-
-  const runSmartCutout = async () => {
-    if (!selectedElement || selectedElement.kind !== 'image' || !objectEraserImageSize || !objectEraserSourceFileRef.current || smartCutoutBusy) return
-    if (!selectedElement.storagePath) {
-      setSmartCutoutError('This photo is not saved in the Studio project yet. Save or re-import it before using Smart Cutout.')
-      return
-    }
-    setSmartCutoutBusy(true)
-    setSmartCutoutError('')
-    setSmartCutoutObjects([])
-    const uploadedSmartCutoutPaths: string[] = []
-    try {
-      const sourceFile = objectEraserSourceFileRef.current
-      const detectForm = new FormData()
-      detectForm.append('image', sourceFile, sourceFile.name || selectedElement.name || 'element-photo')
-      detectForm.append('imageWidth', String(objectEraserImageSize.width))
-      detectForm.append('imageHeight', String(objectEraserImageSize.height))
-      const detectResponse = await fetch('/api/studio/smart-cutout/detect', { method: 'POST', body: detectForm, credentials: 'same-origin', cache: 'no-store' })
-      let detection: any
-      try {
-        detection = await detectResponse.json()
-      } catch {
-        throw new Error(detectResponse.status === 504
-          ? 'Gemini object analysis timed out. Your original photo is unchanged; please retry.'
-          : 'Gemini object analysis returned an unreadable response. Please retry.')
-      }
-      if (!detectResponse.ok || !detection?.ok) throw new Error(detection?.error || 'Smart Cutout could not identify the main objects in this photo.')
-      const detectedObjects = Array.isArray(detection.objects) ? detection.objects : []
-      if (!detectedObjects.length) throw new Error(detection.message || 'No clear independently movable main objects were found in this photo.')
-
-      // Keep Gemini inventory and Roboflow SAM 3 segmentation in separate
-      // Vercel requests so a slow segmentation cold start cannot time out the
-      // combined detection request.
-      const segmentForm = new FormData()
-      segmentForm.append('image', sourceFile, sourceFile.name || selectedElement.name || 'element-photo')
-      segmentForm.append('imageWidth', String(objectEraserImageSize.width))
-      segmentForm.append('imageHeight', String(objectEraserImageSize.height))
-      segmentForm.append('objects', JSON.stringify(detectedObjects))
-      const segmentResponse = await fetch('/api/studio/smart-cutout/segment', { method: 'POST', body: segmentForm, credentials: 'same-origin', cache: 'no-store' })
-      let segmentation: any
-      try {
-        segmentation = await segmentResponse.json()
-      } catch {
-        throw new Error(segmentResponse.status === 504
-          ? 'SAM 3 segmentation timed out. Your original photo is unchanged; please retry.'
-          : 'SAM 3 returned an unreadable response. Please retry.')
-      }
-      if (!segmentResponse.ok || !segmentation?.ok) throw new Error(segmentation?.error || 'Smart Cutout could not segment the detected objects.')
-      const segmentations = Array.isArray(segmentation.segmentations) ? segmentation.segmentations as SmartCutoutSegmentation[] : []
-      if (!segmentations.length) throw new Error('No usable object masks were returned. Your original photo is unchanged; please try again.')
-      setSmartCutoutObjects(segmentations.map(item => ({ id: item.id, label: item.label })))
-
-      const previewUrl = objectEraserPreviewUrlRef.current
-      if (!previewUrl) throw new Error('The original photo preview is no longer available. Reopen Smart Cutout and try again.')
-      const sourceImage = new Image()
-      sourceImage.src = previewUrl
-      await new Promise<void>((resolve, reject) => {
-        sourceImage.onload = () => resolve()
-        sourceImage.onerror = () => reject(new Error('Could not decode the original photo for Smart Cutout.'))
-      })
-      if (sourceImage.naturalWidth !== objectEraserImageSize.width || sourceImage.naturalHeight !== objectEraserImageSize.height) {
-        throw new Error('The original photo dimensions changed. Reopen Smart Cutout and try again.')
-      }
-
-      const rasterBundle = await createSmartCutoutRasterBundle(sourceImage, objectEraserImageSize.width, objectEraserImageSize.height, segmentations, false)
-      const refinementCrops = await createSmartCutoutRefinementCrops(sourceImage, objectEraserImageSize.width, objectEraserImageSize.height, segmentations)
-      if (refinementCrops.length !== segmentations.length) {
-        throw new Error('Not every detected object could be prepared for high-quality edge refinement. No layers were added.')
-      }
-
-      // Rebuild the background and refine each foreground object from the
-      // same original pixels. Each crop is recomposed at its exact source
-      // offset before it is saved, preserving the original layer alignment.
-      const backgroundForm = new FormData()
-      backgroundForm.append('mask', rasterBundle.combinedMask, 'smart-cutout-mask.png')
-      backgroundForm.append('projectId', projectId)
-      backgroundForm.append('storagePath', selectedElement.storagePath)
-      backgroundForm.append('imageWidth', String(rasterBundle.width))
-      backgroundForm.append('imageHeight', String(rasterBundle.height))
-      backgroundForm.append('prompt', 'Remove the selected foreground objects and reconstruct the original scene naturally. Preserve the exact surrounding background perspective, texture, colours, depth of field, lighting, shadows and reflections. Do not add or alter anything outside the removed-object regions.')
-      const backgroundRequest = fetch('/api/studio/smart-cutout/process', { method: 'POST', body: backgroundForm, credentials: 'same-origin', cache: 'no-store' })
-      const refinementRequests = refinementCrops.map(async crop => {
-        const form = new FormData()
-        form.append('image', crop.blob, 'smart-cutout-' + crop.id + '.jpg')
-        form.append('imageWidth', String(crop.aiWidth))
-        form.append('imageHeight', String(crop.aiHeight))
-        form.append('mask', crop.maskBlob, 'smart-cutout-preserve-' + crop.id + '.png')
-        form.append('label', crop.label)
-        const response = await fetch('/api/studio/smart-cutout/refine', { method: 'POST', body: form, credentials: 'same-origin', cache: 'no-store' })
-        if (!response.ok) {
-          let payload: any = null
-          try { payload = await response.json() } catch { /* retain a safe fallback */ }
-          throw new Error(payload?.error || 'Stability AI could not refine the ' + crop.label + ' cutout.')
-        }
-        const refinedBlob = await response.blob()
-        if (refinedBlob.type !== 'image/png' || refinedBlob.size < 100) {
-          throw new Error('Stability AI returned an invalid transparent PNG for ' + crop.label + '.')
-        }
-        return {
-          id: crop.id,
-          objectId: crop.objectId,
-          label: crop.label,
-          blob: await composeSmartCutoutRefinedLayer(refinedBlob, sourceImage, crop, rasterBundle.width, rasterBundle.height),
-        }
-      })
-      const [backgroundResponse, refinedCutouts] = await Promise.all([backgroundRequest, Promise.all(refinementRequests)])
-      if (!backgroundResponse.ok) {
-        let payload: any = null
-        try { payload = await backgroundResponse.json() } catch { /* retain a safe fallback */ }
-        throw new Error(payload?.error || 'Smart Cutout could not rebuild the clean background.')
-      }
-      const backgroundBlob = await backgroundResponse.blob()
-      if (backgroundBlob.type !== 'image/png' || backgroundBlob.size < 100) throw new Error('Smart Cutout received an invalid clean background image.')
-
-      const baseName = selectedElement.name.replace(/\\.[^.]+$/, '') || 'element-photo'
-      const backgroundFile = new File([backgroundBlob], baseName + '-clean-background.png', { type: 'image/png' })
-      const backgroundPath = await uploadStudioAsset(projectId, backgroundFile)
-      uploadedSmartCutoutPaths.push(backgroundPath)
-      const backgroundAsset = {
-        id: makeId(), name: backgroundFile.name, url: await createStudioAssetUrl(backgroundPath),
-        storagePath: backgroundPath, fileSize: backgroundFile.size,
-      }
-      const objectAssets = []
-      for (const cutout of refinedCutouts) {
-        const safeLabel = cutout.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 36) || 'object'
-        const file = new File([cutout.blob], baseName + '-' + safeLabel + '-cutout.png', { type: 'image/png' })
-        const storagePath = await uploadStudioAsset(projectId, file)
-        uploadedSmartCutoutPaths.push(storagePath)
-        objectAssets.push({
-          id: makeId(), name: file.name, url: await createStudioAssetUrl(storagePath), storagePath,
-          fileSize: file.size, objectId: cutout.objectId, label: cutout.label,
-        })
-      }
-      const alignedLayers = createSmartCutoutAlignedLayers(selectedElement as ElementLayer & { kind: 'image' }, makeId(), backgroundAsset, objectAssets) as ElementLayer[]
-      smartCutoutUndoRef.current = [...smartCutoutUndoRef.current.slice(-19), alignedLayers]
-      smartCutoutRedoRef.current = []
-      setSmartCutoutHistoryVersion(value => value + 1)
-      setElements(items => [...items, ...alignedLayers])
-      const firstObjectLayer = alignedLayers.find(layer => layer.smartCutoutRole === 'object')
-      if (firstObjectLayer) setSelectedElementId(firstObjectLayer.id)
-      setNotice('Smart Cutout created ' + objectAssets.length + ' independent object layer' + (objectAssets.length === 1 ? '' : 's') + ' and a clean background. The original photo is preserved.')
-    } catch (cause) {
-      if (uploadedSmartCutoutPaths.length) {
-        try { await deleteStudioAssets(projectId, uploadedSmartCutoutPaths) } catch { /* keep the original operation error visible */ }
-      }
-      setSmartCutoutError(cause instanceof Error ? cause.message : 'Smart Cutout failed. Your original photo is unchanged.')
-    } finally {
-      setSmartCutoutBusy(false)
-    }
-  }
-
   const selectedElement = elements.find(item => item.id === selectedElementId) || null
   const selected = clips.find(item => item.id === selectedId) || null
   useEffect(() => {
@@ -1411,7 +1216,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           setClips(arrangedClips)
           if (closedAccidentalGaps) setNotice('Closed small accidental gaps between timeline clips.')
           if (Array.isArray(data.elements)) {
-            const restoredElements: ElementLayer[] = await Promise.all((data.elements as Array<Record<string, unknown>>).filter(item => typeof item.storagePath === 'string' && (item.kind === 'image' || item.kind === 'video')).map(async item => ({ id: String(item.id || makeId()), kind: item.kind as ClipKind, name: String(item.name || 'Overlay'), url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration) || 5, trimStart: Math.max(0, Number(item.trimStart) || 0), trimEnd: Math.max(0.1, Number(item.trimEnd) || Number(item.duration) || 5), timelineStart: Math.max(0, Number(item.timelineStart) || 0), x: Math.min(500, Math.max(-500, Number.isFinite(Number(item.x)) ? Number(item.x) : 25)), y: Math.min(500, Math.max(-500, Number.isFinite(Number(item.y)) ? Number(item.y) : 25)), width: Math.min(100, Math.max(5, Number(item.width) || 50)), height: Math.min(100, Math.max(5, Number(item.height) || 50)), cropLeft: Math.min(0.8, Math.max(0, Number(item.cropLeft) || 0)), cropRight: Math.min(0.8, Math.max(0, Number(item.cropRight) || 0)), cropTop: Math.min(0.8, Math.max(0, Number(item.cropTop) || 0)), cropBottom: Math.min(0.8, Math.max(0, Number(item.cropBottom) || 0)), rotation: Number.isFinite(Number(item.rotation)) ? Number(item.rotation) : 0, smartCutoutGroupId: typeof item.smartCutoutGroupId === 'string' ? item.smartCutoutGroupId : undefined, smartCutoutRole: item.smartCutoutRole === 'background' || item.smartCutoutRole === 'object' ? item.smartCutoutRole : undefined, smartCutoutSourceElementId: typeof item.smartCutoutSourceElementId === 'string' ? item.smartCutoutSourceElementId : undefined, smartCutoutObjectId: typeof item.smartCutoutObjectId === 'string' ? item.smartCutoutObjectId : undefined, smartCutoutObjectLabel: typeof item.smartCutoutObjectLabel === 'string' ? item.smartCutoutObjectLabel : undefined, color: typeof item.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(item.color) ? item.color : undefined, colorReplacements: Array.isArray(item.colorReplacements) ? (item.colorReplacements as StudioColorReplacement[]).filter(value => value && /^#[0-9a-fA-F]{6}$/.test(value.source) && /^#[0-9a-fA-F]{6}$/.test(value.target)) : [], colorStrength: typeof item.colorStrength === 'number' ? Math.min(1, Math.max(0, item.colorStrength)) : 0.72, fileSize: Number(item.fileSize) || 0, storagePath: String(item.storagePath), originalStoragePath: typeof item.originalStoragePath === 'string' ? item.originalStoragePath : undefined, originalName: typeof item.originalName === 'string' ? item.originalName : undefined, originalFileSize: Number.isFinite(Number(item.originalFileSize)) ? Number(item.originalFileSize) : undefined, backgroundOriginalStoragePath: typeof item.backgroundOriginalStoragePath === 'string' ? item.backgroundOriginalStoragePath : undefined, backgroundOriginalName: typeof item.backgroundOriginalName === 'string' ? item.backgroundOriginalName : undefined, backgroundOriginalFileSize: Number.isFinite(Number(item.backgroundOriginalFileSize)) ? Number(item.backgroundOriginalFileSize) : undefined })))
+            const restoredElements: ElementLayer[] = await Promise.all((data.elements as Array<Record<string, unknown>>).filter(item => typeof item.storagePath === 'string' && (item.kind === 'image' || item.kind === 'video')).map(async item => ({ id: String(item.id || makeId()), kind: item.kind as ClipKind, name: String(item.name || 'Overlay'), url: await createStudioAssetUrl(String(item.storagePath)), duration: Number(item.duration) || 5, trimStart: Math.max(0, Number(item.trimStart) || 0), trimEnd: Math.max(0.1, Number(item.trimEnd) || Number(item.duration) || 5), timelineStart: Math.max(0, Number(item.timelineStart) || 0), x: Math.min(500, Math.max(-500, Number.isFinite(Number(item.x)) ? Number(item.x) : 25)), y: Math.min(500, Math.max(-500, Number.isFinite(Number(item.y)) ? Number(item.y) : 25)), width: Math.min(100, Math.max(5, Number(item.width) || 50)), height: Math.min(100, Math.max(5, Number(item.height) || 50)), cropLeft: Math.min(0.8, Math.max(0, Number(item.cropLeft) || 0)), cropRight: Math.min(0.8, Math.max(0, Number(item.cropRight) || 0)), cropTop: Math.min(0.8, Math.max(0, Number(item.cropTop) || 0)), cropBottom: Math.min(0.8, Math.max(0, Number(item.cropBottom) || 0)), rotation: Number.isFinite(Number(item.rotation)) ? Number(item.rotation) : 0, color: typeof item.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(item.color) ? item.color : undefined, colorReplacements: Array.isArray(item.colorReplacements) ? (item.colorReplacements as StudioColorReplacement[]).filter(value => value && /^#[0-9a-fA-F]{6}$/.test(value.source) && /^#[0-9a-fA-F]{6}$/.test(value.target)) : [], colorStrength: typeof item.colorStrength === 'number' ? Math.min(1, Math.max(0, item.colorStrength)) : 0.72, fileSize: Number(item.fileSize) || 0, storagePath: String(item.storagePath), originalStoragePath: typeof item.originalStoragePath === 'string' ? item.originalStoragePath : undefined, originalName: typeof item.originalName === 'string' ? item.originalName : undefined, originalFileSize: Number.isFinite(Number(item.originalFileSize)) ? Number(item.originalFileSize) : undefined, backgroundOriginalStoragePath: typeof item.backgroundOriginalStoragePath === 'string' ? item.backgroundOriginalStoragePath : undefined, backgroundOriginalName: typeof item.backgroundOriginalName === 'string' ? item.backgroundOriginalName : undefined, backgroundOriginalFileSize: Number.isFinite(Number(item.backgroundOriginalFileSize)) ? Number(item.backgroundOriginalFileSize) : undefined })))
             if (!active) return
             setElements(restoredElements)
             if (typeof data.selectedElementId === 'string') setSelectedElementId(data.selectedElementId)
@@ -1494,7 +1299,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           id: projectId, project_type: 'video', name: projectName, template_id: templateId || null,
           data: {
             clips: clips.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane, fileSize, storagePath }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, lane: 0, fileSize, storagePath })),
-            elements: elements.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, rotation, smartCutoutGroupId, smartCutoutRole, smartCutoutSourceElementId, smartCutoutObjectId, smartCutoutObjectLabel, color, colorStrength, colorReplacements, fileSize, storagePath, originalStoragePath, originalName, originalFileSize }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, rotation, smartCutoutGroupId, smartCutoutRole, smartCutoutSourceElementId, smartCutoutObjectId, smartCutoutObjectLabel, color, colorStrength, colorReplacements, fileSize, storagePath, originalStoragePath, originalName, originalFileSize })), selectedElementId,
+            elements: elements.map(({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, rotation, color, colorStrength, colorReplacements, fileSize, storagePath, originalStoragePath, originalName, originalFileSize }) => ({ id, kind, name, duration, trimStart, trimEnd, timelineStart, x, y, width, height, cropLeft, cropRight, cropTop, cropBottom, rotation, color, colorStrength, colorReplacements, fileSize, storagePath, originalStoragePath, originalName, originalFileSize })), selectedElementId,
             audioPath: audio?.storagePath || null, audioId: audio?.id || null, audioName: audio?.name || null,
             audioDuration: audio?.duration || 0, audioTrimStart: audio?.trimStart || 0, audioTrimEnd: audio?.trimEnd || 0, audioTimelineStart: audio?.timelineStart || 0, audioFileSize: audio?.fileSize || 0, selectedId, muted, volume,
             audioVolume, aspect, titleText, subtitleText, ctaText, showTitle, textLayers, selectedTextId, exportWidth, exportHeight,
@@ -2655,10 +2460,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           <div className="mt-auto flex flex-col items-center gap-1 pb-2"><span className="text-[8px] text-slate-600">SOCIALENS</span><span className="h-1 w-1 rounded-full bg-fuchsia-400" /></div>
         </nav>
 
-        <aside className={(activePanel === 'position' || activePanel === 'element-color' || activePanel === 'eraser' || activePanel === 'object-eraser' || activePanel === 'background-eraser' || activePanel === 'smart-cutout' ? 'fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] top-[calc(58px+env(safe-area-inset-top))] z-[90] flex w-auto overflow-hidden rounded-2xl border border-white/10 shadow-2xl lg:relative lg:inset-auto lg:z-20 lg:w-[260px] lg:rounded-none lg:border-0 lg:shadow-none' : 'hidden w-[260px] lg:flex') + ' shrink-0 flex-col border-r border-white/[0.08] bg-[#0d1020]'}>
+        <aside className={(activePanel === 'position' || activePanel === 'element-color' || activePanel === 'eraser' || activePanel === 'object-eraser' || activePanel === 'background-eraser' ? 'fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] top-[calc(58px+env(safe-area-inset-top))] z-[90] flex w-auto overflow-hidden rounded-2xl border border-white/10 shadow-2xl lg:relative lg:inset-auto lg:z-20 lg:w-[260px] lg:rounded-none lg:border-0 lg:shadow-none' : 'hidden w-[260px] lg:flex') + ' shrink-0 flex-col border-r border-white/[0.08] bg-[#0d1020]'}>
           <div className="border-b border-white/[0.07] px-4 py-4">
-            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : activePanel === 'audio' ? 'Audio library' : activePanel === 'effects' ? 'Text effects' : activePanel === 'position' ? 'Text position' : activePanel === 'element-color' ? 'Element colour' : activePanel === 'eraser' ? 'Eraser' : activePanel === 'object-eraser' ? 'Object Eraser' : activePanel === 'background-eraser' ? 'Background Eraser' : activePanel === 'smart-cutout' ? 'Smart Cutout' : 'Text animations'}</h2>{activePanel !== 'animation' && activePanel !== 'element-color' && activePanel !== 'eraser' && activePanel !== 'object-eraser' && activePanel !== 'background-eraser' && <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : activePanel === 'effects' ? '40 effects' : activePanel === 'position' ? 'PX controls' : ''}</span>}{(activePanel === 'position' || activePanel === 'element-color' || activePanel === 'eraser' || activePanel === 'object-eraser' || activePanel === 'background-eraser' || activePanel === 'smart-cutout') && <button type="button" onClick={() => setActivePanel('media')} aria-label="Close element panel" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 lg:hidden"><X className="h-4 w-4" /></button>}</div>
-            <p className="mt-1 text-[9px] text-slate-500">{activePanel === 'media' ? 'Import and manage your video and photo clips.' : activePanel === 'text' ? 'Edit the text currently shown on your canvas.' : activePanel === 'audio' ? 'Add a music track and control its volume.' : activePanel === 'animation' ? 'Explore motion families for the selected text layer.' : activePanel === 'position' ? 'Set exact placement and align text to the canvas.' : activePanel === 'element-color' ? 'Choose a colour for the selected canvas element.' : activePanel === 'eraser' ? 'Choose an erasing tool for your selected image element.' : activePanel === 'object-eraser' ? 'Select objects to remove from your image.' : activePanel === 'background-eraser' ? 'Remove the background from your selected photo.' : activePanel === 'smart-cutout' ? 'Separate the main objects into editable image layers.' : 'Style the appearance of your selected text.'}</p>
+            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : activePanel === 'audio' ? 'Audio library' : activePanel === 'effects' ? 'Text effects' : activePanel === 'position' ? 'Text position' : activePanel === 'element-color' ? 'Element colour' : activePanel === 'eraser' ? 'Eraser' : activePanel === 'object-eraser' ? 'Object Eraser' : activePanel === 'background-eraser' ? 'Background Eraser' : 'Text animations'}</h2>{activePanel !== 'animation' && activePanel !== 'element-color' && activePanel !== 'eraser' && activePanel !== 'object-eraser' && activePanel !== 'background-eraser' && <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : activePanel === 'effects' ? '40 effects' : activePanel === 'position' ? 'PX controls' : ''}</span>}{(activePanel === 'position' || activePanel === 'element-color' || activePanel === 'eraser' || activePanel === 'object-eraser' || activePanel === 'background-eraser') && <button type="button" onClick={() => setActivePanel('media')} aria-label="Close element panel" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 lg:hidden"><X className="h-4 w-4" /></button>}</div>
+            <p className="mt-1 text-[9px] text-slate-500">{activePanel === 'media' ? 'Import and manage your video and photo clips.' : activePanel === 'text' ? 'Edit the text currently shown on your canvas.' : activePanel === 'audio' ? 'Add a music track and control its volume.' : activePanel === 'animation' ? 'Explore motion families for the selected text layer.' : activePanel === 'position' ? 'Set exact placement and align text to the canvas.' : activePanel === 'element-color' ? 'Choose a colour for the selected canvas element.' : activePanel === 'eraser' ? 'Choose an erasing tool for your selected image element.' : activePanel === 'object-eraser' ? 'Select objects to remove from your image.' : activePanel === 'background-eraser' ? 'Remove the background from your selected photo.' : 'Style the appearance of your selected text.'}</p>
           </div>
 
           {activePanel === 'element-color' && <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
@@ -2706,23 +2511,6 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               </button>
             </> : <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 p-5 text-center"><Eraser className="mb-3 h-7 w-7 text-slate-500" /><p className="text-[11px] font-semibold text-slate-200">Select a photo element</p><p className="mt-1 text-[9px] leading-4 text-slate-500">Eraser tools are available for image elements. Select a photo overlay on the canvas or timeline to continue.</p></div>}
           </div>}
-
-          {activePanel === 'smart-cutout' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-             <div data-history-version={smartCutoutHistoryVersion} className="flex items-center justify-between rounded-lg border border-white/[0.08] bg-white/[0.025] p-2"><div><p className="text-[9px] font-semibold text-slate-200">Smart Cutout history</p><p className="mt-0.5 text-[8px] text-slate-500">Undo or restore the latest cutout group</p></div><div className="flex gap-1.5"><button type="button" onClick={undoSmartCutoutGroup} disabled={!smartCutoutUndoRef.current.length || smartCutoutBusy} title="Undo Smart Cutout" className="rounded-md border border-white/10 p-2 text-slate-200 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5" /></button><button type="button" onClick={redoSmartCutoutGroup} disabled={!smartCutoutRedoRef.current.length || smartCutoutBusy} title="Redo Smart Cutout" className="rounded-md border border-white/10 p-2 text-slate-200 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5" /></button></div></div>
-             {selectedElement?.kind === 'image' ? <>
-               <section className="rounded-xl border border-white/10 bg-black/20 p-3">
-                 <div className="mb-2 flex items-center gap-2"><Layers3 className="h-4 w-4 text-violet-300" /><h4 className="text-[10px] font-bold text-slate-100">Smart Cutout</h4></div>
-                 <p className="mb-3 truncate text-[8px] text-slate-500">{selectedElement.name}</p>
-                 {objectEraserImageSize ? <div className="relative mx-auto w-full overflow-hidden rounded-lg bg-[#080b16]" style={{ aspectRatio: objectEraserImageSize.width + '/' + objectEraserImageSize.height }}><img src={objectEraserPreviewUrlRef.current || selectedElement.url} alt="Selected Element Photo" draggable={false} className="absolute inset-0 h-full w-full select-none object-fill" /></div> : <div className="flex aspect-[4/3] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] text-center text-[9px] text-slate-500">{objectEraserBusy ? 'Preparing original photo…' : 'Preparing photo preview…'}</div>}
-                 <p className="mt-2 text-[8px] text-slate-500">{objectEraserImageSize ? objectEraserImageSize.width + ' × ' + objectEraserImageSize.height : 'Loading original image…'}</p>
-                 <p className="mt-3 text-[9px] leading-4 text-slate-400">Smart Cutout identifies each main object, uses Stability AI to refine its transparent edges, and rebuilds the clean background. Your original photo stays untouched.</p>
-                 {smartCutoutObjects.length > 0 && <div className="mt-3 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2"><p className="mb-2 text-[8px] font-semibold uppercase tracking-wide text-slate-500">Detected objects</p><div className="flex flex-wrap gap-1.5">{smartCutoutObjects.map(item => <span key={item.id} className="rounded-full border border-violet-300/20 bg-violet-400/[0.08] px-2 py-1 text-[8px] text-violet-100">{item.label}</span>)}</div></div>}
-                 {smartCutoutError && <p role="status" className="mt-3 rounded-lg border border-amber-300/15 bg-amber-300/[0.06] p-2 text-[9px] leading-4 text-amber-100">{smartCutoutError}</p>}
-                 <button type="button" onClick={() => void runSmartCutout()} disabled={!objectEraserImageSize || objectEraserBusy || smartCutoutBusy || selectedElement.smartCutoutRole === 'object'} className="mt-3 w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-[10px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{smartCutoutBusy ? 'Separating objects and rebuilding background…' : 'Separate objects'}</button>
-                 <p className="mt-2 text-center text-[8px] text-slate-500">Stability AI uses 5 credits for the clean background plus 5 credits per object. Nothing is applied unless every output is saved.</p>
-               </section>
-             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an Element Photo to use Smart Cutout.</div>}
-           </div>}
 
            {activePanel === 'background-eraser' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <button type="button" onClick={() => setActivePanel('eraser')} className="inline-flex w-fit items-center gap-1.5 rounded-lg px-2 py-1.5 text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> Back to Eraser</button>
@@ -2964,7 +2752,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             {audio ? <><span className="max-w-[140px] truncate text-[9px] text-cyan-100">{audio.name}</span><label className="flex min-w-[120px] flex-1 items-center gap-2 text-[9px] text-slate-400">Volume<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="w-full accent-cyan-400" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="text-[9px] text-red-300">Remove</button></> : <span className="text-[9px] text-slate-500">No audio track added yet.</span>}
           </div>}
           <div data-text-toolbar="true" className="sticky top-0 z-50 flex min-h-[48px] shrink-0 flex-wrap items-center gap-1.5 overflow-visible border-b border-fuchsia-400/20 bg-[#111629] px-3 py-2 shadow-xl sm:px-5" role="toolbar" aria-label="Selected object formatting">
-            {selectedElement && !selectedText && <><button type="button" onClick={() => { setActivePanel('element-color'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Element colour" title="Colour" className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'element-color' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10')}><Palette className="h-4 w-4" /> Colour</button><button type="button" disabled={selectedElement.kind !== 'image'} onClick={() => { if (selectedElement?.kind !== 'image') { const fallbackImage = elements.find(item => item.kind === 'image'); if (fallbackImage) setSelectedElementId(fallbackImage.id) } setActivePanel('eraser'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Eraser tools" title={selectedElement.kind === 'image' ? 'Open eraser tools' : 'Eraser is available for photo elements'} className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'eraser' || activePanel === 'object-eraser' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10') + ' disabled:cursor-not-allowed disabled:opacity-40'}><Eraser className="h-4 w-4" /> Eraser</button><button type="button" disabled={selectedElement.kind !== 'image'} onClick={() => { if (selectedElement?.kind !== 'image') { const fallbackImage = elements.find(item => item.kind === 'image'); if (fallbackImage) setSelectedElementId(fallbackImage.id) } setSmartCutoutError(''); setSmartCutoutObjects([]); setActivePanel('smart-cutout'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Smart Cutout" title="Separate photo objects into editable layers" className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'smart-cutout' ? 'border-violet-400/50 bg-violet-500/15 text-violet-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10') + ' disabled:cursor-not-allowed disabled:opacity-40'}><Layers3 className="h-4 w-4" /> Smart Cutout</button></>}
+            {selectedElement && !selectedText && <><button type="button" onClick={() => { setActivePanel('element-color'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Element colour" title="Colour" className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'element-color' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10')}><Palette className="h-4 w-4" /> Colour</button><button type="button" disabled={selectedElement.kind !== 'image'} onClick={() => { if (selectedElement?.kind !== 'image') { const fallbackImage = elements.find(item => item.kind === 'image'); if (fallbackImage) setSelectedElementId(fallbackImage.id) } setActivePanel('eraser'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Eraser tools" title={selectedElement.kind === 'image' ? 'Open eraser tools' : 'Eraser is available for photo elements'} className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'eraser' || activePanel === 'object-eraser' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10') + ' disabled:cursor-not-allowed disabled:opacity-40'}><Eraser className="h-4 w-4" /> Eraser</button></>}
             {selectedText && <>
             <button type="button" onClick={() => removeTextLayer(selectedText.id)} title="Delete text" aria-label="Delete text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-300 transition hover:bg-red-400/10"><Trash2 className="h-4 w-4" /></button>
             <button type="button" onClick={() => duplicateTextLayer(selectedText.id)} title="Duplicate text" aria-label="Duplicate text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-200 transition hover:bg-white/10"><Copy className="h-4 w-4" /></button>
@@ -3108,7 +2896,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 </div>
                 {([
                   { key: 'text', label: 'Text', icon: <Type className="h-3 w-3" />, tone: 'fuchsia' },
-                  ...(elements.length ? getSmartCutoutTimelineOrder(elements).map((element, index) => ({ key: 'element-' + element.id, label: getSmartCutoutTimelineLabel(element, elements.length - index), icon: <Move className="h-3 w-3" />, tone: 'sky' as const, element, elementIndex: elements.length - index })) : [{ key: 'element', label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' as const }]),
+                  ...(elements.length ? elements.map((element, index) => ({ key: 'element-' + element.id, label: 'Element ' + (elements.length - index), icon: <Move className="h-3 w-3" />, tone: 'sky' as const, element, elementIndex: elements.length - index })) : [{ key: 'element', label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' as const }]),
                   { key: 'media', label: 'Media', icon: <Clapperboard className="h-3 w-3" />, tone: 'violet' },
                   { key: 'audio', label: 'Audio', icon: <Music2 className="h-3 w-3" />, tone: 'emerald' },
                 ] as TimelineTrack[]).map((track, trackIndex, tracks) => <div key={track.key} data-element-track-row={track.key === 'element' || track.key.startsWith('element-') ? 'true' : undefined} data-media-track-row={track.key === 'media' ? 'true' : undefined} className={'flex min-h-[34px] bg-[#101426] ' + (track.key.startsWith('element') && tracks[trackIndex + 1]?.key.startsWith('element') ? 'border-b-0' : 'border-b border-fuchsia-400/30')}>
@@ -3120,7 +2908,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/30" />
                     </div>)}
                     {track.key.startsWith('element') && <div data-element-dropzone="true" className="absolute inset-0 z-0 rounded" />}
-                    {track.element && <div onPointerDown={event => beginTimelineDrag(event,'element',track.element!.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedElementId(track.element!.id)} title={(track.element.smartCutoutRole === 'object' ? 'Smart Cutout object · ' + (track.element.smartCutoutObjectLabel || track.element.name) : track.element.smartCutoutRole === 'background' ? 'Smart Cutout clean background · ' + track.element.name : 'Element · ' + track.element.name)} className={'absolute top-[6px] flex h-[22px] min-w-[14px] items-center overflow-hidden rounded bg-sky-500/35 text-[8px] font-semibold text-sky-100 cursor-grab touch-none '+(selectedElementId===track.element.id?'ring-1 ring-sky-200':'')} style={{left:track.element.timelineStart*TIMELINE_PX_PER_SECOND,width:Math.max(14,(track.element.trimEnd-track.element.trimStart)*TIMELINE_PX_PER_SECOND)}}><span className="pointer-events-none absolute inset-0"><StudioTimelineThumbnail src={track.element.url} kind={track.element.kind} trimStart={track.element.trimStart} trimEnd={track.element.trimEnd} count={8}/></span><span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-sky-950/65 via-sky-950/35 to-sky-950/65"/><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/45"/><span className="relative z-[1] min-w-0 flex-1 truncate px-2 drop-shadow">{track.element.smartCutoutRole === 'object' ? 'Cutout · ' + (track.element.smartCutoutObjectLabel || track.element.name) : track.element.smartCutoutRole === 'background' ? 'Clean BG · ' + track.element.name : track.elementIndex + '. ' + (track.element.kind==='image'?'Photo':'Video') + ' · ' + track.element.name}</span><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/45"/></div>}
+                    {track.element && <div onPointerDown={event => beginTimelineDrag(event,'element',track.element!.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedElementId(track.element!.id)} title={'Element · ' + track.element.name} className={'absolute top-[6px] flex h-[22px] min-w-[14px] items-center overflow-hidden rounded bg-sky-500/35 text-[8px] font-semibold text-sky-100 cursor-grab touch-none '+(selectedElementId===track.element.id?'ring-1 ring-sky-200':'')} style={{left:track.element.timelineStart*TIMELINE_PX_PER_SECOND,width:Math.max(14,(track.element.trimEnd-track.element.trimStart)*TIMELINE_PX_PER_SECOND)}}><span className="pointer-events-none absolute inset-0"><StudioTimelineThumbnail src={track.element.url} kind={track.element.kind} trimStart={track.element.trimStart} trimEnd={track.element.trimEnd} count={8}/></span><span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-sky-950/65 via-sky-950/35 to-sky-950/65"/><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/45"/><span className="relative z-[1] min-w-0 flex-1 truncate px-2 drop-shadow">{track.elementIndex + '. ' + (track.element.kind==='image'?'Photo':'Video') + ' · ' + track.element.name}</span><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/45"/></div>}
                     {track.key === 'media' && [...clips].sort((a,b) => a.timelineStart - b.timelineStart).map((clip, index) => <div key={clip.id} onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedId(clip.id)} title={(clip.kind === 'image' ? 'Photo · ' : 'Video · ') + clip.name} className={'absolute flex min-w-[14px] items-center overflow-hidden rounded text-[8px] font-semibold cursor-grab touch-none h-[44px] ' + (clip.kind === 'image' ? 'bg-sky-500/35 text-sky-100' : 'bg-violet-500/40 text-violet-100') + (selected?.id === clip.id ? ' ring-1 ring-white/70' : '')} style={{ top: 3, left: clip.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(14, (clip.trimEnd - clip.trimStart) * TIMELINE_PX_PER_SECOND) }}>
                       <span className="pointer-events-none absolute inset-0"><StudioTimelineThumbnail src={clip.url} kind={clip.kind} trimStart={clip.trimStart} trimEnd={clip.trimEnd} count={10} /></span>
                       <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#160d32]/65 via-[#160d32]/35 to-[#160d32]/55" />
