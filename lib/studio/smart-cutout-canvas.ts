@@ -156,22 +156,35 @@ export async function createSmartCutoutRefinementCrops(
   try {
     for (const segmentation of segmentations) {
       const polygons = normalizeSmartCutoutPolygons(segmentation.polygons, width, height)
-      const points = polygons.flat()
-      if (!points.length) continue
-      const minX = Math.min(...points.map(point => point[0]))
-      const maxX = Math.max(...points.map(point => point[0]))
-      const minY = Math.min(...points.map(point => point[1]))
-      const maxY = Math.max(...points.map(point => point[1]))
+      if (!polygons.length) continue
+      let minX = width
+      let maxX = 0
+      let minY = height
+      let maxY = 0
+      for (const polygon of polygons) {
+        for (const point of polygon) {
+          minX = Math.min(minX, point[0])
+          maxX = Math.max(maxX, point[0])
+          minY = Math.min(minY, point[1])
+          maxY = Math.max(maxY, point[1])
+        }
+      }
       const subjectWidth = Math.max(1, maxX - minX)
       const subjectHeight = Math.max(1, maxY - minY)
       const padding = Math.max(18, Math.round(Math.max(subjectWidth, subjectHeight) * 0.18))
-      let cropWidth = Math.min(width, Math.ceil(subjectWidth + padding * 2))
-      let cropHeight = Math.min(height, Math.ceil(subjectHeight + padding * 2))
+      let cropWidth = Math.min(width, Math.max(64, Math.ceil(subjectWidth + padding * 2)))
+      let cropHeight = Math.min(height, Math.max(64, Math.ceil(subjectHeight + padding * 2)))
       // Stability Remove Background requires an aspect ratio between 1:2.5 and 2.5:1.
-      if (cropWidth / cropHeight > 2.5) cropHeight = Math.min(height, Math.ceil(cropWidth / 2.5))
-      if (cropHeight / cropWidth > 2.5) cropWidth = Math.min(width, Math.ceil(cropHeight / 2.5))
-      cropWidth = Math.max(Math.min(width, 64), cropWidth)
-      cropHeight = Math.max(Math.min(height, 64), cropHeight)
+      if (cropWidth / cropHeight > 2.5) {
+        cropHeight = Math.min(height, Math.ceil(cropWidth / 2.5))
+        if (cropWidth / cropHeight > 2.5) cropWidth = Math.floor(cropHeight * 2.5)
+      }
+      if (cropHeight / cropWidth > 2.5) {
+        cropWidth = Math.min(width, Math.ceil(cropHeight / 2.5))
+        if (cropHeight / cropWidth > 2.5) cropHeight = Math.floor(cropWidth * 2.5)
+      }
+      cropWidth = Math.max(64, cropWidth)
+      cropHeight = Math.max(64, cropHeight)
       const centerX = (minX + maxX) / 2
       const centerY = (minY + maxY) / 2
       const x = Math.max(0, Math.min(width - cropWidth, Math.round(centerX - cropWidth / 2)))
