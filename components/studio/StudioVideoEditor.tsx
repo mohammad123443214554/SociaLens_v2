@@ -1195,7 +1195,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const backgroundRequest = fetch('/api/studio/smart-cutout/process', { method: 'POST', body: backgroundForm, credentials: 'same-origin', cache: 'no-store' })
       const refinementRequests = refinementCrops.map(async crop => {
         const form = new FormData()
-        form.append('image', crop.blob, 'smart-cutout-' + crop.id + '.png')
+        form.append('image', crop.blob, 'smart-cutout-' + crop.id + '.jpg')
         form.append('imageWidth', String(crop.width))
         form.append('imageHeight', String(crop.height))
         const response = await fetch('/api/studio/smart-cutout/refine', { method: 'POST', body: form, credentials: 'same-origin', cache: 'no-store' })
