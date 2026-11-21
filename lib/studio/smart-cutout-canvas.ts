@@ -1,4 +1,4 @@
-import { normalizeSmartCutoutPolygons, strengthenSmartCutoutAlpha } from '@/lib/studio/smart-cutout-processing'
+import { combineSmartCutoutAlpha, normalizeSmartCutoutPolygons } from '@/lib/studio/smart-cutout-processing'
 import type { SmartCutoutSegmentation } from '@/lib/studio/smart-cutout'
 
 export type SmartCutoutRaster = {
@@ -147,6 +147,7 @@ export type SmartCutoutRefinementCrop = {
   height: number
   aiWidth: number
   aiHeight: number
+  maskPolygons: number[][][]
   blob: Blob
 }
 
@@ -222,6 +223,10 @@ export async function createSmartCutoutRefinementCrops(
         objectId: segmentation.objectId,
         label: segmentation.label,
         x, y, width: cropWidth, height: cropHeight, aiWidth, aiHeight,
+        maskPolygons: polygons.map(polygon => polygon.map(([pointX, pointY]) => [
+          (pointX - x) * aiWidth / cropWidth,
+          (pointY - y) * aiHeight / cropHeight,
+        ])),
         blob: await canvasToJpeg(canvas),
       })
     }
@@ -243,7 +248,7 @@ export async function createSmartCutoutRefinementCrops(
 export async function composeSmartCutoutRefinedLayer(
   refinedBlob: Blob,
   source: CanvasImageSource,
-  crop: Pick<SmartCutoutRefinementCrop, 'x' | 'y' | 'width' | 'height' | 'aiWidth' | 'aiHeight'>,
+  crop: Pick<SmartCutoutRefinementCrop, 'x' | 'y' | 'width' | 'height' | 'aiWidth' | 'aiHeight' | 'maskPolygons'>,
   sourceWidth: number,
   sourceHeight: number,
 ): Promise<Blob> {
@@ -264,13 +269,27 @@ export async function composeSmartCutoutRefinedLayer(
     // Use only the AI-generated alpha matte, not its potentially altered RGB.
     matteContext.drawImage(bitmap, 0, 0, crop.aiWidth, crop.aiHeight)
     const mattePixels = matteContext.getImageData(0, 0, crop.aiWidth, crop.aiHeight)
-    for (let index = 3; index < mattePixels.data.length; index += 4) {
-      const alpha = mattePixels.data[index] / 255
-      // Strengthen semi-transparent foreground interiors while retaining
-      // soft antialiased edges and fully transparent background pixels.
-      mattePixels.data[index] = strengthenSmartCutoutAlpha(mattePixels.data[index])
+    const instanceMask = createCanvas(crop.aiWidth, crop.aiHeight)
+    try {
+      const maskContext = instanceMask.getContext('2d', { willReadFrequently: true })
+      if (!maskContext) throw new Error('Could not rebuild the SAM3 instance mask.')
+      paintPolygons(maskContext, crop.maskPolygons, '#fff')
+      const maskPixels = maskContext.getImageData(0, 0, crop.aiWidth, crop.aiHeight)
+      const refinedAlpha = new Uint8Array(crop.aiWidth * crop.aiHeight)
+      const hardMask = new Uint8Array(crop.aiWidth * crop.aiHeight)
+      for (let pixel = 0; pixel < refinedAlpha.length; pixel++) {
+        refinedAlpha[pixel] = mattePixels.data[pixel * 4 + 3]
+        hardMask[pixel] = maskPixels.data[pixel * 4 + 3]
+      }
+      const combinedAlpha = combineSmartCutoutAlpha(refinedAlpha, hardMask, crop.aiWidth, crop.aiHeight, 4)
+      for (let pixel = 0; pixel < combinedAlpha.length; pixel++) {
+        mattePixels.data[pixel * 4 + 3] = combinedAlpha[pixel]
+      }
+      matteContext.putImageData(mattePixels, 0, 0)
+    } finally {
+      instanceMask.width = 1
+      instanceMask.height = 1
     }
-    matteContext.putImageData(mattePixels, 0, 0)
 
     outputContext.globalCompositeOperation = 'destination-in'
     outputContext.drawImage(matte, crop.x, crop.y, crop.width, crop.height)
