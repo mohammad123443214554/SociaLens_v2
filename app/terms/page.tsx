@@ -207,4 +207,4 @@ export default function TermsPage() {
       </main>
     </div>
   )
-}
+} 
