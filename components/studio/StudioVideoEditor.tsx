@@ -26,6 +26,7 @@ import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getOb
 import { scaleObjectEraserPolygons } from '@/lib/studio/object-eraser-selection'
 import { createSmartCutoutRasterBundle } from '@/lib/studio/smart-cutout-canvas'
 import { createSmartCutoutAlignedLayers } from '@/lib/studio/smart-cutout-alignment'
+import { getSmartCutoutTimelineLabel, removeSmartCutoutGroup, restoreSmartCutoutGroup } from '@/lib/studio/smart-cutout-project'
 import type { SmartCutoutSegmentation } from '@/lib/studio/smart-cutout'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
@@ -586,6 +587,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [smartCutoutBusy, setSmartCutoutBusy] = useState(false)
   const [smartCutoutError, setSmartCutoutError] = useState('')
   const [smartCutoutObjects, setSmartCutoutObjects] = useState<Array<{ id: string; label: string }>>([])
+  const smartCutoutUndoRef = useRef<ElementLayer[][]>([])
+  const smartCutoutRedoRef = useRef<ElementLayer[][]>([])
+  const [smartCutoutHistoryVersion, setSmartCutoutHistoryVersion] = useState(0)
   const [animationSearch, setAnimationSearch] = useState('')
   const [isAnimationPreviewing, setIsAnimationPreviewing] = useState(false)
   const [animationPreviewTime, setAnimationPreviewTime] = useState(0)
@@ -1106,6 +1110,38 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     } finally { setObjectEraserApplyBusy(false) }
   }
 
+  const undoSmartCutoutGroup = () => {
+    const snapshot = smartCutoutUndoRef.current.pop()
+    const groupId = snapshot?.[0]?.smartCutoutGroupId
+    if (!snapshot?.length || !groupId) return
+    const result = removeSmartCutoutGroup(elements, groupId)
+    if (!result.removed.length) return
+    smartCutoutRedoRef.current = [...smartCutoutRedoRef.current.slice(-19), result.removed]
+    setElements(result.layers)
+    setSelectedElementId(result.removed[0]?.smartCutoutSourceElementId || null)
+    setSmartCutoutHistoryVersion(value => value + 1)
+    setNotice('Undid Smart Cutout. The original photo and saved output assets are preserved.')
+  }
+
+  const redoSmartCutoutGroup = () => {
+    const snapshot = smartCutoutRedoRef.current.pop()
+    if (!snapshot?.length) return
+    try {
+      const restored = restoreSmartCutoutGroup(elements, snapshot)
+      const groupId = snapshot[0].smartCutoutGroupId
+      const added = restored.filter(layer => layer.smartCutoutGroupId === groupId && !elements.some(existing => existing.id === layer.id))
+      if (!added.length) return
+      smartCutoutUndoRef.current = [...smartCutoutUndoRef.current.slice(-19), added]
+      setElements(restored)
+      const firstObject = added.find(layer => layer.smartCutoutRole === 'object')
+      setSelectedElementId(firstObject?.id || added[0].id)
+      setSmartCutoutHistoryVersion(value => value + 1)
+      setNotice('Redid Smart Cutout. All generated layers were restored.')
+    } catch (cause) {
+      setSmartCutoutError(cause instanceof Error ? cause.message : 'Could not restore this Smart Cutout group.')
+    }
+  }
+
   const runSmartCutout = async () => {
     if (!selectedElement || selectedElement.kind !== 'image' || !objectEraserImageSize || !objectEraserSourceFileRef.current || smartCutoutBusy) return
     if (!selectedElement.storagePath) {
@@ -1173,7 +1209,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           fileSize: file.size, objectId: cutout.objectId, label: cutout.label,
         })
       }
-      const alignedLayers = createSmartCutoutAlignedLayers(selectedElement as ElementLayer & { kind: 'image' }, makeId(), backgroundAsset, objectAssets)
+      const alignedLayers = createSmartCutoutAlignedLayers(selectedElement as ElementLayer & { kind: 'image' }, makeId(), backgroundAsset, objectAssets) as ElementLayer[]
+      smartCutoutUndoRef.current = [...smartCutoutUndoRef.current.slice(-19), alignedLayers]
+      smartCutoutRedoRef.current = []
+      setSmartCutoutHistoryVersion(value => value + 1)
       setElements(items => [...items, ...alignedLayers])
       const firstObjectLayer = alignedLayers.find(layer => layer.smartCutoutRole === 'object')
       if (firstObjectLayer) setSelectedElementId(firstObjectLayer.id)
@@ -2606,6 +2645,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
 
           {activePanel === 'smart-cutout' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
              <button type="button" onClick={() => setActivePanel('eraser')} className="inline-flex w-fit items-center gap-1.5 rounded-lg px-2 py-1.5 text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> Back to Eraser</button>
+             <div className="flex items-center justify-between rounded-lg border border-white/[0.08] bg-white/[0.025] p-2"><div><p className="text-[9px] font-semibold text-slate-200">Smart Cutout history</p><p className="mt-0.5 text-[8px] text-slate-500">Undo or restore the latest cutout group</p></div><div className="flex gap-1.5"><button type="button" onClick={undoSmartCutoutGroup} disabled={!smartCutoutUndoRef.current.length || smartCutoutBusy} title="Undo Smart Cutout" className="rounded-md border border-white/10 p-2 text-slate-200 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5" /></button><button type="button" onClick={redoSmartCutoutGroup} disabled={!smartCutoutRedoRef.current.length || smartCutoutBusy} title="Redo Smart Cutout" className="rounded-md border border-white/10 p-2 text-slate-200 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5" /></button></div></div>
              {selectedElement?.kind === 'image' ? <>
                <section className="rounded-xl border border-white/10 bg-black/20 p-3">
                  <div className="mb-2 flex items-center gap-2"><Layers3 className="h-4 w-4 text-violet-300" /><h4 className="text-[10px] font-bold text-slate-100">Smart Cutout</h4></div>
@@ -3005,7 +3045,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 </div>
                 {([
                   { key: 'text', label: 'Text', icon: <Type className="h-3 w-3" />, tone: 'fuchsia' },
-                  ...(elements.length ? [...elements].reverse().map((element, index) => ({ key: 'element-' + element.id, label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' as const, element, elementIndex: elements.length - index })) : [{ key: 'element', label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' as const }]),
+                  ...(elements.length ? [...elements].reverse().map((element, index) => ({ key: 'element-' + element.id, label: getSmartCutoutTimelineLabel(element, elements.length - index), icon: <Move className="h-3 w-3" />, tone: 'sky' as const, element, elementIndex: elements.length - index })) : [{ key: 'element', label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' as const }]),
                   { key: 'media', label: 'Media', icon: <Clapperboard className="h-3 w-3" />, tone: 'violet' },
                   { key: 'audio', label: 'Audio', icon: <Music2 className="h-3 w-3" />, tone: 'emerald' },
                 ] as TimelineTrack[]).map((track, trackIndex, tracks) => <div key={track.key} data-element-track-row={track.key === 'element' || track.key.startsWith('element-') ? 'true' : undefined} data-media-track-row={track.key === 'media' ? 'true' : undefined} className={'flex min-h-[34px] bg-[#101426] ' + (track.key.startsWith('element') && tracks[trackIndex + 1]?.key.startsWith('element') ? 'border-b-0' : 'border-b border-fuchsia-400/30')}>
@@ -3017,7 +3057,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                       <span onPointerDown={event => beginTimelineDrag(event,'text',layer.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/30" />
                     </div>)}
                     {track.key.startsWith('element') && <div data-element-dropzone="true" className="absolute inset-0 z-0 rounded" />}
-                    {track.element && <div onPointerDown={event => beginTimelineDrag(event,'element',track.element!.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedElementId(track.element!.id)} title={'Element · '+track.element.name} className={'absolute top-[6px] flex h-[22px] min-w-[14px] items-center overflow-hidden rounded bg-sky-500/35 text-[8px] font-semibold text-sky-100 cursor-grab touch-none '+(selectedElementId===track.element.id?'ring-1 ring-sky-200':'')} style={{left:track.element.timelineStart*TIMELINE_PX_PER_SECOND,width:Math.max(14,(track.element.trimEnd-track.element.trimStart)*TIMELINE_PX_PER_SECOND)}}><span className="pointer-events-none absolute inset-0"><StudioTimelineThumbnail src={track.element.url} kind={track.element.kind} trimStart={track.element.trimStart} trimEnd={track.element.trimEnd} count={8}/></span><span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-sky-950/65 via-sky-950/35 to-sky-950/65"/><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/45"/><span className="relative z-[1] min-w-0 flex-1 truncate px-2 drop-shadow">{track.elementIndex}. {track.element.kind==='image'?'Photo':'Video'} · {track.element.name}</span><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/45"/></div>}
+                    {track.element && <div onPointerDown={event => beginTimelineDrag(event,'element',track.element!.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedElementId(track.element!.id)} title={(track.element.smartCutoutRole === 'object' ? 'Smart Cutout object · ' + (track.element.smartCutoutObjectLabel || track.element.name) : track.element.smartCutoutRole === 'background' ? 'Smart Cutout clean background · ' + track.element.name : 'Element · ' + track.element.name)} className={'absolute top-[6px] flex h-[22px] min-w-[14px] items-center overflow-hidden rounded bg-sky-500/35 text-[8px] font-semibold text-sky-100 cursor-grab touch-none '+(selectedElementId===track.element.id?'ring-1 ring-sky-200':'')} style={{left:track.element.timelineStart*TIMELINE_PX_PER_SECOND,width:Math.max(14,(track.element.trimEnd-track.element.trimStart)*TIMELINE_PX_PER_SECOND)}}><span className="pointer-events-none absolute inset-0"><StudioTimelineThumbnail src={track.element.url} kind={track.element.kind} trimStart={track.element.trimStart} trimEnd={track.element.trimEnd} count={8}/></span><span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-sky-950/65 via-sky-950/35 to-sky-950/65"/><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'left')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -left-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-l bg-white/45"/><span className="relative z-[1] min-w-0 flex-1 truncate px-2 drop-shadow">{track.element.smartCutoutRole === 'object' ? 'Cutout · ' + (track.element.smartCutoutObjectLabel || track.element.name) : track.element.smartCutoutRole === 'background' ? 'Clean BG · ' + track.element.name : track.elementIndex + '. ' + (track.element.kind==='image'?'Photo':'Video') + ' · ' + track.element.name}</span><span onPointerDown={event=>beginTimelineDrag(event,'element',track.element!.id,'right')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="absolute -right-0.5 top-0 z-10 h-full w-2 cursor-ew-resize rounded-r bg-white/45"/></div>}
                     {track.key === 'media' && [...clips].sort((a,b) => a.timelineStart - b.timelineStart).map((clip, index) => <div key={clip.id} onPointerDown={event => beginTimelineDrag(event,'clip',clip.id,'move')} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} onClick={() => setSelectedId(clip.id)} title={(clip.kind === 'image' ? 'Photo · ' : 'Video · ') + clip.name} className={'absolute flex min-w-[14px] items-center overflow-hidden rounded text-[8px] font-semibold cursor-grab touch-none h-[44px] ' + (clip.kind === 'image' ? 'bg-sky-500/35 text-sky-100' : 'bg-violet-500/40 text-violet-100') + (selected?.id === clip.id ? ' ring-1 ring-white/70' : '')} style={{ top: 3, left: clip.timelineStart * TIMELINE_PX_PER_SECOND, width: Math.max(14, (clip.trimEnd - clip.trimStart) * TIMELINE_PX_PER_SECOND) }}>
                       <span className="pointer-events-none absolute inset-0"><StudioTimelineThumbnail src={clip.url} kind={clip.kind} trimStart={clip.trimStart} trimEnd={clip.trimEnd} count={10} /></span>
                       <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#160d32]/65 via-[#160d32]/35 to-[#160d32]/55" />
