@@ -64,6 +64,54 @@ test('Smart Cutout normalizes SAM 3 masks and keeps separate instances distinct'
   assert.deepEqual(result.missingLabels, [])
 })
 
+test('Smart Cutout preserves multiple people, animals and products as independent instances', () => {
+  const objects = normalizeSmartCutoutObjects({ objects: [
+    { label: 'person', importance: 'high' },
+    { label: 'golden retriever', importance: 'high' },
+    { label: 'ceramic vase', importance: 'medium' },
+  ] })
+  const result = normalizeSmartCutoutSegmentations({
+    image: { width: 300, height: 200 },
+    prompt_results: [
+      { echo: { text: 'person' }, predictions: [
+        { confidence: 1.4, masks: [[[5, 5], [40, 5], [40, 90], [5, 90]]] },
+        { confidence: -0.2, masks: [[[60, 5], [95, 5], [95, 90], [60, 90]]] },
+      ] },
+      { echo: { text: 'golden retriever' }, predictions: [
+        { confidence: 0.93, masks: [[[110, 40], [180, 40], [180, 120], [110, 120]]] },
+      ] },
+      { echo: { text: 'ceramic vase' }, predictions: [
+        { confidence: 0.87, masks: [[[210, 20], [260, 20], [260, 100], [210, 100]]] },
+      ] },
+    ],
+  }, objects, 300, 200)
+
+  assert.equal(result.segmentations.length, 4)
+  assert.deepEqual(result.segmentations.map(item => item.label), [
+    'person', 'person', 'golden retriever', 'ceramic vase',
+  ])
+  assert.deepEqual(result.segmentations.map(item => item.confidence), [1, 0, 0.93, 0.87])
+  assert.equal(new Set(result.segmentations.map(item => item.id)).size, 4)
+  assert.deepEqual(result.missingLabels, [])
+})
+
+test('Smart Cutout ignores malformed SAM 3 predictions without fabricating polygons', () => {
+  const objects = normalizeSmartCutoutObjects({ objects: [{ label: 'wooden chair' }] })
+  const result = normalizeSmartCutoutSegmentations({
+    prompt_results: [{
+      echo: { text: 'wooden chair' },
+      predictions: [
+        { confidence: 'not-a-number', masks: [[[1, 1], [1, 1], [1, 1]]] },
+        { confidence: 0.8, masks: [[[0, 0], [10, 0], ['bad', 8]]] },
+        { confidence: 0.8, masks: [[[0, 0], [10, 0], [10, 10], [0, 10]]] },
+      ],
+    }],
+  }, objects, 100, 100)
+  assert.equal(result.segmentations.length, 1)
+  assert.deepEqual(result.segmentations[0].polygons, [[[0, 0], [10, 0], [10, 10], [0, 10]]])
+  assert.deepEqual(result.missingLabels, [])
+})
+
 test('Smart Cutout reports objects for which SAM 3 returned no masks', () => {
   const objects = normalizeSmartCutoutObjects({
     objects: [
