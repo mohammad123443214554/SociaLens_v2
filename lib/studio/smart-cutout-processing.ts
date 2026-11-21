@@ -35,3 +35,37 @@ export function isSmartCutoutMaskValid(
   const dimensions = readSmartCutoutPngDimensions(bytes)
   return Boolean(dimensions && dimensions.width === expectedWidth && dimensions.height === expectedHeight)
 }
+
+export function normalizeSmartCutoutPolygons(
+  value: unknown,
+  width: number,
+  height: number,
+): number[][][] {
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height)
+    || width < 64 || height < 64 || width * height > SMART_CUTOUT_MAX_PIXELS
+    || !Array.isArray(value)) return []
+
+  const polygons: number[][][] = []
+  let totalPoints = 0
+  for (const candidate of value.slice(0, 128)) {
+    if (!Array.isArray(candidate) || candidate.length < 3) continue
+    const points: number[][] = []
+    for (const point of candidate.slice(0, 12_000)) {
+      if (!Array.isArray(point) || point.length < 2) continue
+      const x = Number(point[0])
+      const y = Number(point[1])
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+      const next: [number, number] = [
+        Math.max(0, Math.min(width, x)),
+        Math.max(0, Math.min(height, y)),
+      ]
+      const previous = points[points.length - 1]
+      if (!previous || previous[0] !== next[0] || previous[1] !== next[1]) points.push(next)
+      totalPoints++
+      if (totalPoints >= 50_000) break
+    }
+    if (points.length >= 3) polygons.push(points)
+    if (totalPoints >= 50_000) break
+  }
+  return polygons
+}
