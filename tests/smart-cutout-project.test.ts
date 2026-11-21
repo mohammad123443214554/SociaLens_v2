@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   getSmartCutoutTimelineLabel,
+  getSmartCutoutTimelineOrder,
   removeSmartCutoutGroup,
   restoreSmartCutoutGroup,
 } from '../lib/studio/smart-cutout-project.ts'
@@ -28,6 +29,14 @@ test('redo restores the complete group without duplicate IDs', () => {
 
 test('redo rejects a mixed or incomplete group snapshot', () => {
   assert.throws(() => restoreSmartCutoutGroup([], [group[0], { id: 'broken' }]), /snapshot is incomplete/)
+})
+
+test('timeline groups every extracted layer directly above its original source photo', () => {
+  const before = { id: 'before' }
+  const source = { id: 'source' }
+  const after = { id: 'after' }
+  const ordered = getSmartCutoutTimelineOrder([before, source, after, ...group])
+  assert.deepEqual(ordered.map(layer => layer.id), ['object-2', 'object-1', 'bg', 'source', 'after', 'before'])
 })
 
 test('timeline labels distinguish cutout objects, clean background and regular elements', () => {
