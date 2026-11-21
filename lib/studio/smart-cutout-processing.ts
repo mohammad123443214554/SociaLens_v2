@@ -69,3 +69,9 @@ export function normalizeSmartCutoutPolygons(
   }
   return polygons
 }
+
+
+/** Returns true only for PNG encodings that can retain a real alpha channel. */
+export function hasSmartCutoutPngAlpha(bytes: Uint8Array): boolean {
+  return bytes.length >= 26 && (bytes[25] === 4 || bytes[25] === 6)
+}
