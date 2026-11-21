@@ -2,11 +2,7 @@ import { GoogleGenAI } from '@google/genai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { OBJECT_ERASER_MAX_IMAGE_BYTES, prepareObjectEraserImage } from '@/lib/studio/object-eraser'
-import {
-  normalizeSmartCutoutSegmentations,
-  parseSmartCutoutObjectResponse,
-  type SmartCutoutObject,
-} from '@/lib/studio/smart-cutout'
+import { parseSmartCutoutObjectResponse, type SmartCutoutObject } from '@/lib/studio/smart-cutout'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -60,9 +56,7 @@ export async function POST(request: NextRequest) {
   if (!user) return fail('Please sign in to use Smart Cutout.', 401, 'unauthorized')
 
   const geminiKey = process.env.GEMINI_API_KEY?.trim() || process.env.GEMINI_API_KEY_GENERATE?.trim()
-  const roboflowKey = process.env.ROBOFLOW_API_KEY?.trim()
   if (!geminiKey) return fail('Gemini image analysis is not configured. Add GEMINI_API_KEY to Vercel Environment Variables.', 503, 'gemini_not_configured')
-  if (!roboflowKey) return fail('Roboflow SAM 3 segmentation is not configured. Add ROBOFLOW_API_KEY to Vercel Environment Variables.', 503, 'roboflow_not_configured')
 
   const contentLength = Number(request.headers.get('content-length') || 0)
   if (contentLength > OBJECT_ERASER_MAX_IMAGE_BYTES + 512 * 1024) {
