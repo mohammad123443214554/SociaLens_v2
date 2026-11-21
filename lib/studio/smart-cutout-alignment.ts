@@ -7,6 +7,7 @@ export type SmartCutoutElementTransform = {
   cropRight?: number
   cropTop?: number
   cropBottom?: number
+  rotation?: number
   timelineStart: number
   trimStart: number
   trimEnd: number
@@ -77,6 +78,7 @@ export function createSmartCutoutAlignedLayers<T extends SmartCutoutElementTrans
     cropRight: source.cropRight || 0,
     cropTop: source.cropTop || 0,
     cropBottom: source.cropBottom || 0,
+    rotation: source.rotation || 0,
     timelineStart: source.timelineStart,
     trimStart: source.trimStart,
     trimEnd: source.trimEnd,
@@ -84,7 +86,7 @@ export function createSmartCutoutAlignedLayers<T extends SmartCutoutElementTrans
   }
 
   if (![transform.x, transform.y, transform.width, transform.height, transform.timelineStart,
-    transform.trimStart, transform.trimEnd, transform.duration,
+    transform.trimStart, transform.trimEnd, transform.duration, transform.rotation,
     transform.cropLeft, transform.cropRight, transform.cropTop, transform.cropBottom].every(Number.isFinite)
     || transform.width <= 0 || transform.height <= 0 || transform.duration <= 0
     || transform.trimEnd <= transform.trimStart
