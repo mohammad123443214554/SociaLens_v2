@@ -75,3 +75,11 @@ export function normalizeSmartCutoutPolygons(
 export function hasSmartCutoutPngAlpha(bytes: Uint8Array): boolean {
   return bytes.length >= 26 && (bytes[25] === 4 || bytes[25] === 6)
 }
+
+
+/** Strengthens semi-transparent foreground alpha while preserving feathered edges. */
+export function strengthenSmartCutoutAlpha(alpha: number): number {
+  if (!Number.isFinite(alpha)) return 0
+  const normalized = Math.max(0, Math.min(255, alpha)) / 255
+  return Math.round((1 - (1 - normalized) * (1 - normalized)) * 255)
+}
