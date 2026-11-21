@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { readSmartCutoutPngDimensions, SMART_CUTOUT_MAX_OUTPUT_BYTES } from '@/lib/studio/smart-cutout-processing'
+import { detectObjectEraserImageType } from '@/lib/studio/object-eraser'
 import { getStabilityImageApiBaseUrl, mapStabilityBackgroundError, STABILITY_REMOVE_BACKGROUND_PATH } from '@/lib/studio/stability-inpaint'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
 const NO_STORE = { 'Cache-Control': 'no-store, max-age=0' }
-const MAX_CROP_BYTES = 12 * 1024 * 1024
+const MAX_CROP_BYTES = 4 * 1024 * 1024
 const fail = (message: string, status: number, code: string, retryable = false) =>
   NextResponse.json({ ok: false, error: message, code, retryable }, { status, headers: NO_STORE })
 
@@ -46,8 +47,8 @@ export async function POST(request: NextRequest) {
   const image = form.get('image')
   const width = Number(form.get('imageWidth'))
   const height = Number(form.get('imageHeight'))
-  if (!(image instanceof File) || image.type !== 'image/png') {
-    return fail('Attach the PNG crop for this object.', 400, 'missing_object_crop')
+  if (!(image instanceof File) || !['image/jpeg', 'image/png', 'image/webp'].includes(image.type)) {
+    return fail('Attach a supported JPEG, PNG or WebP crop for this object.', 400, 'missing_object_crop')
   }
   if (image.size < 26 || image.size > MAX_CROP_BYTES) {
     return fail('This object crop is too large to refine. Try a smaller source photo.', 413, 'object_crop_too_large')
@@ -59,16 +60,22 @@ export async function POST(request: NextRequest) {
   }
 
   const inputBytes = new Uint8Array(await image.arrayBuffer())
-  const inputDimensions = readSmartCutoutPngDimensions(inputBytes)
-  if (!inputDimensions || inputDimensions.width !== width || inputDimensions.height !== height) {
-    return fail('The object crop PNG dimensions do not match its metadata.', 400, 'invalid_object_crop')
+  const detectedMimeType = detectObjectEraserImageType(inputBytes)
+  if (!detectedMimeType || detectedMimeType !== image.type) {
+    return fail('The object crop image data is invalid or its file type does not match.', 400, 'invalid_object_crop')
+  }
+  if (detectedMimeType === 'image/png') {
+    const inputDimensions = readSmartCutoutPngDimensions(inputBytes)
+    if (!inputDimensions || inputDimensions.width !== width || inputDimensions.height !== height) {
+      return fail('The object crop PNG dimensions do not match its metadata.', 400, 'invalid_object_crop')
+    }
   }
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 52_000)
   try {
     const upstreamForm = new FormData()
-    upstreamForm.set('image', new Blob([inputBytes], { type: 'image/png' }), 'smart-cutout-object.png')
+    upstreamForm.set('image', new Blob([inputBytes], { type: detectedMimeType }), 'smart-cutout-object')
     upstreamForm.set('output_format', 'png')
     const upstream = await fetch(getStabilityImageApiBaseUrl() + STABILITY_REMOVE_BACKGROUND_PATH, {
       method: 'POST',
