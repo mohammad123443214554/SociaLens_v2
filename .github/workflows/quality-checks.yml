@@ -60,3 +60,6 @@ jobs:
 
       - name: Smart Cutout alignment tests
         run: npm run test:smart-cutout-alignment
+
+      - name: Smart Cutout project history tests
+        run: npm run test:smart-cutout-project
