@@ -1173,7 +1173,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           fileSize: file.size, objectId: cutout.objectId, label: cutout.label,
         })
       }
-      const alignedLayers = createSmartCutoutAlignedLayers(selectedElement, makeId(), backgroundAsset, objectAssets)
+      const alignedLayers = createSmartCutoutAlignedLayers(selectedElement as ElementLayer & { kind: 'image' }, makeId(), backgroundAsset, objectAssets)
       setElements(items => [...items, ...alignedLayers])
       const firstObjectLayer = alignedLayers.find(layer => layer.smartCutoutRole === 'object')
       if (firstObjectLayer) setSelectedElementId(firstObjectLayer.id)
