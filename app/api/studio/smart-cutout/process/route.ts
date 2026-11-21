@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
   const mask = form.get('mask')
   const projectId = String(form.get('projectId') || '')
   const storagePath = String(form.get('storagePath') || '')
+  const backgroundPrompt = String(form.get('prompt') || '').replace(/[\\r\\n]/g, ' ').trim().slice(0, 1200)
   if (!(mask instanceof File)) return fail('Attach the combined white-on-black object mask.', 400, 'missing_mask')
   if (mask.size <= 0 || mask.size > SMART_CUTOUT_MAX_MASK_BYTES) {
     return fail('The combined object mask is too large. Please reopen Smart Cutout and try again.', 413, 'mask_too_large')
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
 
   const imageWidth = Number(form.get('imageWidth'))
   const imageHeight = Number(form.get('imageHeight'))
-  if (!projectId || projectId.length > 100 || !storagePath.startsWith(user.id + '/' + projectId + '/')) {
+  if (!backgroundPrompt || !projectId || projectId.length > 100 || !storagePath.startsWith(user.id + '/' + projectId + '/')) {
     return fail('The selected Studio photo does not belong to this project.', 403, 'invalid_asset')
   }
   if (!Number.isSafeInteger(imageWidth) || !Number.isSafeInteger(imageHeight)
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
     // The client mask is a full-resolution union of all selected object masks.
     // A small provider growth closes antialiased edge gaps before background fill.
     upstreamForm.set('grow_mask', String(SMART_CUTOUT_BACKGROUND_GROW_MASK))
-    upstreamForm.set('prompt', 'Reconstruct the original scene naturally only inside the masked object regions. Continue the existing background from the immediately surrounding pixels with matching perspective, geometry, texture, colour, depth of field, lighting, shadows and reflections. Preserve every unmasked pixel exactly. Do not add objects, text, patterns or invented details. The result must look like the same original photograph captured without the removed foreground object.')
+    upstreamForm.set('prompt', backgroundPrompt)
     upstreamForm.set('output_format', 'png')
 
     let upstream: Response
