@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
   }
 
 
-  let objects: SmartCutoutObject[]
+  let objects: SmartCutoutObject[] = []
   let inventoryError: unknown = null
   const gemini = new GoogleGenAI({ apiKey: geminiKey })
   // Try the current Flash model first, then the supported Flash-Lite model
