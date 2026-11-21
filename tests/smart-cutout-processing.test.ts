@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  hasSmartCutoutPngAlpha,
   isSmartCutoutMaskValid,
   readSmartCutoutPngDimensions,
   normalizeSmartCutoutPolygons,
@@ -8,7 +9,7 @@ import {
 } from '../lib/studio/smart-cutout-processing.ts'
 
 function pngHeader(width: number, height: number) {
-  const bytes = new Uint8Array(24)
+  const bytes = new Uint8Array(26)
   bytes.set([137, 80, 78, 71, 13, 10, 26, 10], 0)
   bytes.set([0, 0, 0, 13], 8)
   bytes.set([73, 72, 68, 82], 12)
@@ -61,4 +62,18 @@ test('Smart Cutout clamps polygon coordinates to the source image bounds', () =>
 test('Smart Cutout ignores invalid polygon coordinates and unsupported canvas dimensions', () => {
   assert.deepEqual(normalizeSmartCutoutPolygons([[[0, 0], ['bad', 2], [3, 4]]], 100, 100), [])
   assert.deepEqual(normalizeSmartCutoutPolygons([[[0, 0], [10, 0], [10, 10]]], 5000, 5000), [])
+})
+
+
+test('Smart Cutout accepts only PNG encodings with a real alpha channel', () => {
+  const rgba = pngHeader(128, 128)
+  rgba[25] = 6
+  const grayscaleAlpha = pngHeader(128, 128)
+  grayscaleAlpha[25] = 4
+  const rgb = pngHeader(128, 128)
+  rgb[25] = 2
+  assert.equal(hasSmartCutoutPngAlpha(rgba), true)
+  assert.equal(hasSmartCutoutPngAlpha(grayscaleAlpha), true)
+  assert.equal(hasSmartCutoutPngAlpha(rgb), false)
+  assert.equal(hasSmartCutoutPngAlpha(new Uint8Array(25)), false)
 })
