@@ -95,10 +95,18 @@ export async function POST(request: NextRequest) {
 
   let objects: SmartCutoutObject[] = []
   let inventoryError: unknown = null
-  const gemini = new GoogleGenAI({ apiKey: geminiKey })
-  // Try the current Flash model first, then the supported Flash-Lite model
-  // if the first model is unavailable to this API project.
-  for (const model of ['gemini-3.8-flash', 'gemini-3.5-flash-lite']) {
+  // This route has a 60-second Vercel execution ceiling. Use the low-latency
+  // Flash-Lite vision model, disable SDK retries, and fail before the platform
+  // kills the function with an opaque 504 response.
+  const gemini = new GoogleGenAI({
+    apiKey: geminiKey,
+    httpOptions: {
+      timeout: 42_000,
+      retryOptions: { attempts: 1 },
+    },
+  })
+  const model = 'gemini-3.5-flash-lite'
+  {
     try {
       const inventory = await gemini.models.generateContent({
         model,
@@ -109,7 +117,7 @@ export async function POST(request: NextRequest) {
             { inlineData: { mimeType: prepared.mimeType, data: prepared.base64 } },
           ],
         }],
-        config: { responseMimeType: 'application/json', maxOutputTokens: 1200 },
+        config: { responseMimeType: 'application/json', maxOutputTokens: 400, thinkingConfig: { thinkingLevel: 'minimal' } },
       })
       const responseText = inventory.text || ''
       if (!responseText.trim()) throw new Error('Gemini returned an empty object inventory.')
@@ -122,21 +130,22 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       inventoryError = error
       const providerStatus = Number((error as { status?: number; code?: number })?.status ?? (error as { code?: number })?.code)
-      if (providerStatus === 401 || providerStatus === 403 || providerStatus === 429) break
+      break
     }
   }
   if (inventoryError) {
     const providerStatus = Number((inventoryError as { status?: number; code?: number })?.status ?? (inventoryError as { code?: number })?.code)
-    const status = providerStatus === 429 ? 429 : providerStatus === 401 || providerStatus === 403 ? 503 : 502
-    const detail = safeProviderMessage(inventoryError, 'Gemini image analysis could not complete the request.')
-    console.error('[Smart Cutout] Gemini inventory request failed', { status: providerStatus || 'unknown', detail })
-    return fail('Gemini image analysis failed: ' + detail, status, 'gemini_request_failed', status === 429 || status >= 500)
+    const timedOut = inventoryError instanceof Error && /timeout|timed out|abort/i.test(inventoryError.name + ' ' + inventoryError.message)
+    const status = timedOut ? 504 : providerStatus === 429 ? 429 : providerStatus === 401 || providerStatus === 403 ? 503 : 502
+    const detail = safeProviderMessage(inventoryError, timedOut ? 'The vision model exceeded its 42-second request budget.' : 'Gemini image analysis could not complete the request.')
+    console.error('[Smart Cutout] Gemini inventory request failed', { status: providerStatus || 'unknown', timedOut, detail })
+    return fail(timedOut ? 'Image analysis took too long. Your original photo is unchanged; please retry once.' : 'Gemini image analysis failed: ' + detail, status, timedOut ? 'gemini_timeout' : 'gemini_request_failed', status === 429 || status >= 500)
   }
 
   return NextResponse.json({
     ok: true,
     provider: 'gemini',
-    model: 'Gemini 3.8 Flash',
+    model: 'Gemini 3.5 Flash-Lite',
     image: { mimeType: prepared.mimeType, size: prepared.size, sha256: prepared.sha256, width: imageWidth, height: imageHeight },
     objects,
     message: objects.length ? undefined : 'No clear independently movable main objects were found in this photo.',
