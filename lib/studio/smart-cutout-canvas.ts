@@ -1,4 +1,4 @@
-import { combineSmartCutoutAlpha, normalizeSmartCutoutPolygons } from '@/lib/studio/smart-cutout-processing'
+import { normalizeSmartCutoutPolygons, strengthenSmartCutoutAlpha } from '@/lib/studio/smart-cutout-processing'
 import type { SmartCutoutSegmentation } from '@/lib/studio/smart-cutout'
 
 export type SmartCutoutRaster = {
@@ -148,6 +148,7 @@ export type SmartCutoutRefinementCrop = {
   aiWidth: number
   aiHeight: number
   maskPolygons: number[][][]
+  maskBlob: Blob
   blob: Blob
 }
 
@@ -218,6 +219,19 @@ export async function createSmartCutoutRefinementCrops(
       const context = canvas.getContext('2d')
       if (!context) throw new Error('Could not prepare an object crop for edge refinement.')
       context.drawImage(source, x, y, cropWidth, cropHeight, 0, 0, aiWidth, aiHeight)
+      const objectMask = createCanvas(aiWidth, aiHeight)
+      temporaryCanvases.push(objectMask)
+      const maskContext = objectMask.getContext('2d')
+      if (!maskContext) throw new Error('Could not prepare the object-preservation mask for Stability AI.')
+      // Stability Inpaint regenerates white/transparent mask pixels and preserves black/opaque pixels.
+      // Keep the detected object black and let the prompt replace only its surrounding crop.
+      maskContext.fillStyle = '#fff'
+      maskContext.fillRect(0, 0, aiWidth, aiHeight)
+      paintPolygons(maskContext, polygons.map(polygon => polygon.map(([px, py]) => [
+        (px - x) * aiWidth / cropWidth,
+        (py - y) * aiHeight / cropHeight,
+      ])), '#000')
+      const maskBlob = await canvasToPng(objectMask)
       crops.push({
         id: segmentation.id,
         objectId: segmentation.objectId,
@@ -227,6 +241,7 @@ export async function createSmartCutoutRefinementCrops(
           (pointX - x) * aiWidth / cropWidth,
           (pointY - y) * aiHeight / cropHeight,
         ])),
+        maskBlob,
         blob: await canvasToJpeg(canvas),
       })
     }
@@ -248,7 +263,7 @@ export async function createSmartCutoutRefinementCrops(
 export async function composeSmartCutoutRefinedLayer(
   refinedBlob: Blob,
   source: CanvasImageSource,
-  crop: Pick<SmartCutoutRefinementCrop, 'x' | 'y' | 'width' | 'height' | 'aiWidth' | 'aiHeight' | 'maskPolygons'>,
+  crop: Pick<SmartCutoutRefinementCrop, 'x' | 'y' | 'width' | 'height' | 'aiWidth' | 'aiHeight'>,
   sourceWidth: number,
   sourceHeight: number,
 ): Promise<Blob> {
@@ -263,34 +278,16 @@ export async function composeSmartCutoutRefinedLayer(
     const matteContext = matte.getContext('2d', { willReadFrequently: true })
     if (!outputContext || !matteContext) throw new Error('Could not rebuild the transparent object layer.')
 
-    // Keep the exact source colours, texture, highlights and shadows.
+    // Keep original source RGB, texture, reflections and lighting. Only use
+    // Stability's prompt-guided inpaint + background-removal alpha as matte.
     outputContext.drawImage(source, crop.x, crop.y, crop.width, crop.height, crop.x, crop.y, crop.width, crop.height)
-
-    // Use only the AI-generated alpha matte, not its potentially altered RGB.
     matteContext.drawImage(bitmap, 0, 0, crop.aiWidth, crop.aiHeight)
-    const mattePixels = matteContext.getImageData(0, 0, crop.aiWidth, crop.aiHeight)
-    const instanceMask = createCanvas(crop.aiWidth, crop.aiHeight)
-    try {
-      const maskContext = instanceMask.getContext('2d', { willReadFrequently: true })
-      if (!maskContext) throw new Error('Could not rebuild the SAM3 instance mask.')
-      paintPolygons(maskContext, crop.maskPolygons, '#fff')
-      const maskPixels = maskContext.getImageData(0, 0, crop.aiWidth, crop.aiHeight)
-      const refinedAlpha = new Uint8Array(crop.aiWidth * crop.aiHeight)
-      const hardMask = new Uint8Array(crop.aiWidth * crop.aiHeight)
-      for (let pixel = 0; pixel < refinedAlpha.length; pixel++) {
-        refinedAlpha[pixel] = mattePixels.data[pixel * 4 + 3]
-        hardMask[pixel] = maskPixels.data[pixel * 4 + 3]
-      }
-      const combinedAlpha = combineSmartCutoutAlpha(refinedAlpha, hardMask, crop.aiWidth, crop.aiHeight, 4)
-      for (let pixel = 0; pixel < combinedAlpha.length; pixel++) {
-        mattePixels.data[pixel * 4 + 3] = combinedAlpha[pixel]
-      }
-      matteContext.putImageData(mattePixels, 0, 0)
-    } finally {
-      instanceMask.width = 1
-      instanceMask.height = 1
+    const pixels = matteContext.getImageData(0, 0, crop.aiWidth, crop.aiHeight)
+    for (let pixel = 0; pixel < crop.aiWidth * crop.aiHeight; pixel++) {
+      const alphaIndex = pixel * 4 + 3
+      pixels.data[alphaIndex] = strengthenSmartCutoutAlpha(pixels.data[alphaIndex])
     }
-
+    matteContext.putImageData(pixels, 0, 0)
     outputContext.globalCompositeOperation = 'destination-in'
     outputContext.drawImage(matte, crop.x, crop.y, crop.width, crop.height)
     outputContext.globalCompositeOperation = 'source-over'
