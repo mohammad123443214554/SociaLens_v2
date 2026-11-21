@@ -24,7 +24,7 @@ import { ARTISTIC_ADVANCED_ANIMATIONS } from '@/lib/studio/artistic-advanced-ani
 import { extractStudioImagePalette, createStudioRecoloredCanvas, STUDIO_REPLACEMENT_SWATCHES, type StudioColorReplacement } from '@/lib/studio/color-replacement'
 import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getObjectEraserBrushRegionKey, getObjectEraserTargetCacheKey, scoreBrushStrokeAgainstPolygons, scoreBrushStrokeAgainstDetectionBox, getObjectEraserTargetsUnderBrush, getObjectEraserMaskPadding } from '@/lib/studio/object-eraser-selection'
 import { scaleObjectEraserPolygons } from '@/lib/studio/object-eraser-selection'
-import { createSmartCutoutRasterBundle } from '@/lib/studio/smart-cutout-canvas'
+import { composeSmartCutoutRefinedLayer, createSmartCutoutRasterBundle, createSmartCutoutRefinementCrops } from '@/lib/studio/smart-cutout-canvas'
 import { createSmartCutoutAlignedLayers } from '@/lib/studio/smart-cutout-alignment'
 import { getSmartCutoutTimelineLabel, getSmartCutoutTimelineOrder, removeSmartCutoutGroup, restoreSmartCutoutGroup } from '@/lib/studio/smart-cutout-project'
 import type { SmartCutoutSegmentation } from '@/lib/studio/smart-cutout'
@@ -1177,14 +1177,45 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         throw new Error('The original photo dimensions changed. Reopen Smart Cutout and try again.')
       }
 
-      const rasterBundle = await createSmartCutoutRasterBundle(sourceImage, objectEraserImageSize.width, objectEraserImageSize.height, segmentations)
+      const rasterBundle = await createSmartCutoutRasterBundle(sourceImage, objectEraserImageSize.width, objectEraserImageSize.height, segmentations, false)
+      const refinementCrops = await createSmartCutoutRefinementCrops(sourceImage, objectEraserImageSize.width, objectEraserImageSize.height, segmentations)
+      if (refinementCrops.length !== segmentations.length) {
+        throw new Error('Not every detected object could be prepared for high-quality edge refinement. No layers were added.')
+      }
+
+      // Rebuild the background and refine each foreground object from the
+      // same original pixels. Each crop is recomposed at its exact source
+      // offset before it is saved, preserving the original layer alignment.
       const backgroundForm = new FormData()
       backgroundForm.append('mask', rasterBundle.combinedMask, 'smart-cutout-mask.png')
       backgroundForm.append('projectId', projectId)
       backgroundForm.append('storagePath', selectedElement.storagePath)
       backgroundForm.append('imageWidth', String(rasterBundle.width))
       backgroundForm.append('imageHeight', String(rasterBundle.height))
-      const backgroundResponse = await fetch('/api/studio/smart-cutout/process', { method: 'POST', body: backgroundForm, credentials: 'same-origin', cache: 'no-store' })
+      const backgroundRequest = fetch('/api/studio/smart-cutout/process', { method: 'POST', body: backgroundForm, credentials: 'same-origin', cache: 'no-store' })
+      const refinementRequests = refinementCrops.map(async crop => {
+        const form = new FormData()
+        form.append('image', crop.blob, 'smart-cutout-' + crop.id + '.png')
+        form.append('imageWidth', String(crop.width))
+        form.append('imageHeight', String(crop.height))
+        const response = await fetch('/api/studio/smart-cutout/refine', { method: 'POST', body: form, credentials: 'same-origin', cache: 'no-store' })
+        if (!response.ok) {
+          let payload: any = null
+          try { payload = await response.json() } catch { /* retain a safe fallback */ }
+          throw new Error(payload?.error || 'Stability AI could not refine the ' + crop.label + ' cutout.')
+        }
+        const refinedBlob = await response.blob()
+        if (refinedBlob.type !== 'image/png' || refinedBlob.size < 100) {
+          throw new Error('Stability AI returned an invalid transparent PNG for ' + crop.label + '.')
+        }
+        return {
+          id: crop.id,
+          objectId: crop.objectId,
+          label: crop.label,
+          blob: await composeSmartCutoutRefinedLayer(refinedBlob, crop, rasterBundle.width, rasterBundle.height),
+        }
+      })
+      const [backgroundResponse, refinedCutouts] = await Promise.all([backgroundRequest, Promise.all(refinementRequests)])
       if (!backgroundResponse.ok) {
         let payload: any = null
         try { payload = await backgroundResponse.json() } catch { /* retain a safe fallback */ }
@@ -1193,7 +1224,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const backgroundBlob = await backgroundResponse.blob()
       if (backgroundBlob.type !== 'image/png' || backgroundBlob.size < 100) throw new Error('Smart Cutout received an invalid clean background image.')
 
-      const baseName = selectedElement.name.replace(/\.[^.]+$/, '') || 'element-photo'
+      const baseName = selectedElement.name.replace(/\\.[^.]+$/, '') || 'element-photo'
       const backgroundFile = new File([backgroundBlob], baseName + '-clean-background.png', { type: 'image/png' })
       const backgroundPath = await uploadStudioAsset(projectId, backgroundFile)
       uploadedSmartCutoutPaths.push(backgroundPath)
@@ -1202,7 +1233,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         storagePath: backgroundPath, fileSize: backgroundFile.size,
       }
       const objectAssets = []
-      for (const cutout of rasterBundle.cutouts) {
+      for (const cutout of refinedCutouts) {
         const safeLabel = cutout.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 36) || 'object'
         const file = new File([cutout.blob], baseName + '-' + safeLabel + '-cutout.png', { type: 'image/png' })
         const storagePath = await uploadStudioAsset(projectId, file)
