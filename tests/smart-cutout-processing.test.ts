@@ -77,3 +77,17 @@ test('Smart Cutout accepts only PNG encodings with a real alpha channel', () => 
   assert.equal(hasSmartCutoutPngAlpha(rgb), false)
   assert.equal(hasSmartCutoutPngAlpha(new Uint8Array(25)), false)
 })
+
+
+import { strengthenSmartCutoutAlpha } from '../lib/studio/smart-cutout-processing.ts'
+
+test('Smart Cutout restores strong foreground opacity without hardening antialiased edges', () => {
+  assert.equal(strengthenSmartCutoutAlpha(0), 0)
+  assert.equal(strengthenSmartCutoutAlpha(255), 255)
+  assert.ok(strengthenSmartCutoutAlpha(128) > 128)
+  assert.ok(strengthenSmartCutoutAlpha(128) < 255)
+  assert.ok(strengthenSmartCutoutAlpha(32) > 32)
+  assert.equal(strengthenSmartCutoutAlpha(-10), 0)
+  assert.equal(strengthenSmartCutoutAlpha(300), 255)
+  assert.equal(strengthenSmartCutoutAlpha(Number.NaN), 0)
+})
