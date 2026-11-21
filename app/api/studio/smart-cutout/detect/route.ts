@@ -97,25 +97,43 @@ export async function POST(request: NextRequest) {
 
 
   let objects: SmartCutoutObject[]
-  try {
-    const gemini = new GoogleGenAI({ apiKey: geminiKey })
-    const inventory = await gemini.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: [{
-        role: 'user',
-        parts: [
-          { text: OBJECT_INVENTORY_PROMPT },
-          { inlineData: { mimeType: prepared.mimeType, data: prepared.base64 } },
-        ],
-      }],
-      config: {
-        responseMimeType: 'application/json',
-        maxOutputTokens: 1200,
-      },
-    })
-    objects = parseSmartCutoutObjectResponse(inventory.text || '')
-  } catch {
-    return fail('Smart Cutout could not identify the main objects in this photo. Your original image is unchanged; please try again.', 502, 'object_analysis_failed', true)
+  let inventoryError: unknown = null
+  const gemini = new GoogleGenAI({ apiKey: geminiKey })
+  // Try the current Flash model first, then the supported Flash-Lite model
+  // if the first model is unavailable to this API project.
+  for (const model of ['gemini-3.8-flash', 'gemini-3.5-flash-lite']) {
+    try {
+      const inventory = await gemini.models.generateContent({
+        model,
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: OBJECT_INVENTORY_PROMPT },
+            { inlineData: { mimeType: prepared.mimeType, data: prepared.base64 } },
+          ],
+        }],
+        config: { responseMimeType: 'application/json', maxOutputTokens: 1200 },
+      })
+      const responseText = inventory.text || ''
+      if (!responseText.trim()) throw new Error('Gemini returned an empty object inventory.')
+      objects = parseSmartCutoutObjectResponse(responseText)
+      if (!objects.length) {
+        return fail('Gemini analysed the photo but did not return any clear main foreground objects. Try a photo with a more distinct subject.', 422, 'no_main_objects')
+      }
+      inventoryError = null
+      break
+    } catch (error) {
+      inventoryError = error
+      const providerStatus = Number((error as { status?: number; code?: number })?.status ?? (error as { code?: number })?.code)
+      if (providerStatus === 401 || providerStatus === 403 || providerStatus === 429) break
+    }
+  }
+  if (inventoryError) {
+    const providerStatus = Number((inventoryError as { status?: number; code?: number })?.status ?? (inventoryError as { code?: number })?.code)
+    const status = providerStatus === 429 ? 429 : providerStatus === 401 || providerStatus === 403 ? 503 : 502
+    const detail = safeProviderMessage(inventoryError, 'Gemini image analysis could not complete the request.')
+    console.error('[Smart Cutout] Gemini inventory request failed', { status: providerStatus || 'unknown', detail })
+    return fail('Gemini image analysis failed: ' + detail, status, 'gemini_request_failed', status === 429 || status >= 500)
   }
 
   if (!objects.length) {
