@@ -126,7 +126,6 @@ export async function POST(request: NextRequest) {
         return fail('Gemini analysed the photo but did not return any clear main foreground objects. Try a photo with a more distinct subject.', 422, 'no_main_objects')
       }
       inventoryError = null
-      break
     } catch (error) {
       inventoryError = error
       // Do not retry another model inside this Vercel request; the client can retry safely.
