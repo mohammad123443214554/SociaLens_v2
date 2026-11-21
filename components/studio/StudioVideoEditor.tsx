@@ -1161,8 +1161,22 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const detectResponse = await fetch('/api/studio/smart-cutout/detect', { method: 'POST', body: detectForm, credentials: 'same-origin', cache: 'no-store' })
       const detection = await detectResponse.json()
       if (!detectResponse.ok || !detection?.ok) throw new Error(detection?.error || 'Smart Cutout could not identify the main objects in this photo.')
-      const segmentations = Array.isArray(detection.segmentations) ? detection.segmentations as SmartCutoutSegmentation[] : []
-      if (!segmentations.length) throw new Error(detection.message || 'No clear independently movable main objects were found in this photo.')
+      const detectedObjects = Array.isArray(detection.objects) ? detection.objects : []
+      if (!detectedObjects.length) throw new Error(detection.message || 'No clear independently movable main objects were found in this photo.')
+
+      // Keep Gemini inventory and Roboflow SAM 3 segmentation in separate
+      // Vercel requests so a slow segmentation cold start cannot time out the
+      // combined detection request.
+      const segmentForm = new FormData()
+      segmentForm.append('image', sourceFile, sourceFile.name || selectedElement.name || 'element-photo')
+      segmentForm.append('imageWidth', String(objectEraserImageSize.width))
+      segmentForm.append('imageHeight', String(objectEraserImageSize.height))
+      segmentForm.append('objects', JSON.stringify(detectedObjects))
+      const segmentResponse = await fetch('/api/studio/smart-cutout/segment', { method: 'POST', body: segmentForm, credentials: 'same-origin', cache: 'no-store' })
+      const segmentation = await segmentResponse.json()
+      if (!segmentResponse.ok || !segmentation?.ok) throw new Error(segmentation?.error || 'Smart Cutout could not segment the detected objects.')
+      const segmentations = Array.isArray(segmentation.segmentations) ? segmentation.segmentations as SmartCutoutSegmentation[] : []
+      if (!segmentations.length) throw new Error('No usable object masks were returned. Your original photo is unchanged; please try again.')
       setSmartCutoutObjects(segmentations.map(item => ({ id: item.id, label: item.label })))
 
       const previewUrl = objectEraserPreviewUrlRef.current
