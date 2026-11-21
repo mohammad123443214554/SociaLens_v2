@@ -16,6 +16,21 @@ export type SmartCutoutRasterBundle = {
   combinedMask: Blob
 }
 
+function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const qualities = [0.94, 0.9, 0.86, 0.82]
+    const encode = (index: number) => {
+      canvas.toBlob(blob => {
+        if (!blob) return reject(new Error('The browser could not encode the object crop for Stability AI.'))
+        if (blob.size <= 3.8 * 1024 * 1024) return resolve(blob)
+        if (index + 1 < qualities.length) return encode(index + 1)
+        reject(new Error('An object crop is too large to send safely. Use a smaller photo or crop the source image first.'))
+      }, 'image/jpeg', qualities[index])
+    }
+    encode(0)
+  })
+}
+
 function canvasToPng(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(blob => {
@@ -199,7 +214,7 @@ export async function createSmartCutoutRefinementCrops(
         objectId: segmentation.objectId,
         label: segmentation.label,
         x, y, width: cropWidth, height: cropHeight,
-        blob: await canvasToPng(canvas),
+        blob: await canvasToJpeg(canvas),
       })
     }
     if (!crops.length) throw new Error('Smart Cutout could not prepare any object crops.')
