@@ -8,7 +8,7 @@ import {
   SMART_CUTOUT_MAX_MASK_BYTES,
   SMART_CUTOUT_MAX_OUTPUT_BYTES,
 } from '@/lib/studio/smart-cutout-processing'
-import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_ERASE_PATH } from '@/lib/studio/stability-inpaint'
+import { getStabilityImageApiBaseUrl, mapStabilityApiError, STABILITY_INPAINT_PATH } from '@/lib/studio/stability-inpaint'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
   const user = await requireUser()
   if (!user) return fail('Please sign in to use Smart Cutout.', 401, 'unauthorized')
 
-  const stabilityKey = process.env.STABILITY_API_KEY?.trim()
-  if (!stabilityKey) return fail('Stability AI is not configured. Add STABILITY_API_KEY to Vercel Environment Variables.', 503, 'not_configured')
+  const stabilityKey = process.env.STABILITY_SMART_CUTOUT_API_KEY?.trim()
+  if (!stabilityKey) return fail('Stability AI is not configured. Add STABILITY_SMART_CUTOUT_API_KEY to Vercel Environment Variables.', 503, 'not_configured')
 
   const contentLength = Number(request.headers.get('content-length') || 0)
   if (contentLength > SMART_CUTOUT_MAX_MASK_BYTES + 256 * 1024) {
@@ -115,11 +115,12 @@ export async function POST(request: NextRequest) {
     // The client mask is a full-resolution union of all selected object masks.
     // A small provider growth closes antialiased edge gaps before background fill.
     upstreamForm.set('grow_mask', String(SMART_CUTOUT_BACKGROUND_GROW_MASK))
+    upstreamForm.set('prompt', 'Reconstruct the original scene naturally only inside the masked object regions. Continue the existing background from the immediately surrounding pixels with matching perspective, geometry, texture, colour, depth of field, lighting, shadows and reflections. Preserve every unmasked pixel exactly. Do not add objects, text, patterns or invented details. The result must look like the same original photograph captured without the removed foreground object.')
     upstreamForm.set('output_format', 'png')
 
     let upstream: Response
     try {
-      upstream = await fetch(getStabilityImageApiBaseUrl() + STABILITY_ERASE_PATH, {
+      upstream = await fetch(getStabilityImageApiBaseUrl() + STABILITY_INPAINT_PATH, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + stabilityKey, Accept: 'image/*' },
         body: upstreamForm,
@@ -165,7 +166,7 @@ export async function POST(request: NextRequest) {
         ...NO_STORE,
         'Content-Type': 'image/png',
         'Content-Length': String(outputBytes.length),
-        'X-Smart-Cutout-Provider': 'stability-ai-erase',
+        'X-Smart-Cutout-Provider': 'stability-ai-prompt-inpaint',
         'X-Smart-Cutout-Stage': 'clean-background-plate',
         'X-Smart-Cutout-Width': String(imageWidth),
         'X-Smart-Cutout-Height': String(imageHeight),
