@@ -20,14 +20,17 @@ Return ONLY valid JSON in this exact shape:
 Rules:
 - List only distinct, real, physical foreground objects that a user would reasonably want to separate and move independently.
 - Prioritize the obvious main subjects, not every visible thing.
-- Return at most 8 objects, ordered from most visually prominent to least prominent.
+- Return at most 4 objects, ordered from most visually prominent to least prominent.
+- If one clearly dominant hero object is present, return ONLY that object; do not add small decorative props just because they are recognizable.
+- Exclude small plants, loose flowers, sprigs, crumbs, utensils, desk ornaments and other secondary details unless the user-facing composition clearly treats them as a co-equal main subject.
+- A candidate should normally occupy a meaningful visible area (roughly 5% or more of the image) or be unmistakably the primary subject. Never split one assembled item into components.
 - Use concise English noun phrases suitable for a visual segmentation model, such as "red apple", "ceramic coffee mug", "person", "golden retriever".
 - If several separate objects belong to the same category, include that category once; the segmentation model will find its separate instances.
 - Treat a whole person as one object. Do not split body parts, clothing, accessories attached to a person, or parts of one assembled object.
 - Exclude background scenery, floors, walls, sky, tables used only as a surface, shadows, reflections, textures, lighting, patterns, text, watermarks, logos, and tiny incidental details.
 - Do not invent hidden objects or infer objects outside the visible image.
 - Do not list an object merely because it is detectable; it must be a meaningful main subject.
-- Mark the most prominent subjects as "high" and any other clearly meaningful foreground object as "medium".
+- Mark the main subject as "high". Only include a second subject when it is visually co-dominant, not merely adjacent to the main subject.
 - If there are no clear independently movable foreground objects, return {"objects":[]}.
 `.trim()
 
