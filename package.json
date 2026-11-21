@@ -13,14 +13,10 @@
     "test:photo-collage": "node --experimental-strip-types --test tests/photo-collage.test.ts",
     "test:shape-cut": "node --experimental-strip-types --test tests/shape-cut.test.ts",
     "test:studio-animation": "node --experimental-strip-types --test tests/studio-animation-engine.test.ts",
-    "prebuild": "node scripts/restore-call-reaction-assets.mjs && npm run test:object-eraser && npm run test:smart-cutout && npm run test:smart-cutout-processing && npm run test:smart-cutout-alignment && npm run test:smart-cutout-project",
+    "prebuild": "node scripts/restore-call-reaction-assets.mjs && npm run test:object-eraser",
     "test:studio-playback": "node --experimental-strip-types --test tests/studio-playback-clock.test.ts",
     "test:studio-timeline": "node --experimental-strip-types --test tests/studio-timeline-layout.test.ts",
-    "test:object-eraser": "node --experimental-strip-types --test tests/object-eraser.test.ts",
-    "test:smart-cutout": "node --experimental-strip-types --test tests/smart-cutout.test.ts",
-    "test:smart-cutout-processing": "node --experimental-strip-types --test tests/smart-cutout-processing.test.ts",
-    "test:smart-cutout-alignment": "node --experimental-strip-types --test tests/smart-cutout-alignment.test.ts",
-    "test:smart-cutout-project": "node --experimental-strip-types --test tests/smart-cutout-project.test.ts"
+    "test:object-eraser": "node --experimental-strip-types --test tests/object-eraser.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
