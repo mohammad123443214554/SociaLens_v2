@@ -91,3 +91,24 @@ test('Smart Cutout restores strong foreground opacity without hardening antialia
   assert.equal(strengthenSmartCutoutAlpha(300), 255)
   assert.equal(strengthenSmartCutoutAlpha(Number.NaN), 0)
 })
+
+
+import { combineSmartCutoutAlpha } from '../lib/studio/smart-cutout-processing.ts'
+
+test('SAM3 mask keeps object interiors fully opaque and limits AI alpha to a soft edge band', () => {
+  const width = 9
+  const height = 9
+  const refined = new Uint8Array(width * height).fill(90)
+  const mask = new Uint8Array(width * height)
+  for (let y = 2; y <= 6; y++) for (let x = 2; x <= 6; x++) mask[y * width + x] = 255
+  const combined = combineSmartCutoutAlpha(refined, mask, width, height, 1)
+  assert.equal(combined[4 * width + 4], 255)
+  assert.equal(combined[2 * width + 2], 255)
+  assert.equal(combined[1 * width + 4], 90)
+  assert.equal(combined[0 * width + 4], 0)
+})
+
+test('SAM3 alpha composition rejects mismatched masks and invalid dilation radii', () => {
+  assert.throws(() => combineSmartCutoutAlpha(new Uint8Array(4), new Uint8Array(3), 2, 2))
+  assert.throws(() => combineSmartCutoutAlpha(new Uint8Array(4), new Uint8Array(4), 2, 2, 13))
+})
