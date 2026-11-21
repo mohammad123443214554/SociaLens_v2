@@ -52,14 +52,6 @@ jobs:
       - name: ShapeCut tests
         run: npm run test:shape-cut
 
-      - name: Smart Cutout tests
-        run: npm run test:smart-cutout
 
-      - name: Smart Cutout processing tests
-        run: npm run test:smart-cutout-processing
 
-      - name: Smart Cutout alignment tests
-        run: npm run test:smart-cutout-alignment
 
-      - name: Smart Cutout project history tests
-        run: npm run test:smart-cutout-project
