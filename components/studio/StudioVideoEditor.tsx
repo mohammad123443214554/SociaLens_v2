@@ -1240,7 +1240,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           id: crop.id,
           objectId: crop.objectId,
           label: crop.label,
-          blob: await composeSmartCutoutRefinedLayer(refinedBlob, crop, rasterBundle.width, rasterBundle.height),
+          blob: await composeSmartCutoutRefinedLayer(refinedBlob, sourceImage, crop, rasterBundle.width, rasterBundle.height),
         }
       })
       const [backgroundResponse, refinedCutouts] = await Promise.all([backgroundRequest, Promise.all(refinementRequests)])
