@@ -25,11 +25,7 @@ function canvasToPng(canvas: HTMLCanvasElement): Promise<Blob> {
   })
 }
 
-function paintPolygons(
-  context: CanvasRenderingContext2D,
-  polygons: number[][][],
-  color: string,
-) {
+function paintPolygons(context: CanvasRenderingContext2D, polygons: number[][][], color: string) {
   context.beginPath()
   for (const polygon of polygons) {
     if (polygon.length < 3) continue
@@ -51,10 +47,8 @@ function createCanvas(width: number, height: number) {
 }
 
 /**
- * Rasterizes SAM 3 polygons at the source image's native pixel dimensions.
- * Each returned PNG has transparent pixels outside its own object mask.
- * The combined mask is opaque black with all selected objects in white,
- * matching Stability AI's erase-mask convention.
+ * Rasterizes masks at source-native dimensions. Temporary canvases are always
+ * released, including when PNG encoding or an individual canvas allocation fails.
  */
 export async function createSmartCutoutRasterBundle(
   source: CanvasImageSource,
@@ -70,52 +64,57 @@ export async function createSmartCutoutRasterBundle(
     throw new Error('Smart Cutout needs between 1 and 32 usable object masks.')
   }
 
-  const combined = createCanvas(width, height)
-  const combinedContext = combined.getContext('2d', { alpha: false })
-  if (!combinedContext) throw new Error('Could not create the combined Smart Cutout mask.')
-  combinedContext.fillStyle = '#000'
-  combinedContext.fillRect(0, 0, width, height)
+  const temporaryCanvases: HTMLCanvasElement[] = []
+  try {
+    const combined = createCanvas(width, height)
+    temporaryCanvases.push(combined)
+    const combinedContext = combined.getContext('2d', { alpha: false })
+    if (!combinedContext) throw new Error('Could not create the combined Smart Cutout mask.')
+    combinedContext.fillStyle = '#000'
+    combinedContext.fillRect(0, 0, width, height)
 
-  const cutouts: SmartCutoutRaster[] = []
-  for (const segmentation of segmentations) {
-    const polygons = normalizeSmartCutoutPolygons(segmentation.polygons, width, height)
-    if (!polygons.length) continue
+    const cutouts: SmartCutoutRaster[] = []
+    for (const segmentation of segmentations) {
+      const polygons = normalizeSmartCutoutPolygons(segmentation.polygons, width, height)
+      if (!polygons.length) continue
 
-    paintPolygons(combinedContext, polygons, '#fff')
+      paintPolygons(combinedContext, polygons, '#fff')
 
-    const alpha = createCanvas(width, height)
-    const alphaContext = alpha.getContext('2d')
-    if (!alphaContext) throw new Error('Could not create an object transparency mask.')
-    paintPolygons(alphaContext, polygons, '#fff')
+      const alpha = createCanvas(width, height)
+      temporaryCanvases.push(alpha)
+      const alphaContext = alpha.getContext('2d')
+      if (!alphaContext) throw new Error('Could not create an object transparency mask.')
+      paintPolygons(alphaContext, polygons, '#fff')
 
-    const cutout = createCanvas(width, height)
-    const cutoutContext = cutout.getContext('2d')
-    if (!cutoutContext) throw new Error('Could not create a transparent object layer.')
-    cutoutContext.drawImage(source, 0, 0, width, height)
-    cutoutContext.globalCompositeOperation = 'destination-in'
-    cutoutContext.filter = 'blur(0.55px)'
-    cutoutContext.drawImage(alpha, 0, 0)
-    cutoutContext.filter = 'none'
-    cutoutContext.globalCompositeOperation = 'source-over'
+      const cutout = createCanvas(width, height)
+      temporaryCanvases.push(cutout)
+      const cutoutContext = cutout.getContext('2d')
+      if (!cutoutContext) throw new Error('Could not create a transparent object layer.')
+      cutoutContext.drawImage(source, 0, 0, width, height)
+      cutoutContext.globalCompositeOperation = 'destination-in'
+      cutoutContext.filter = 'blur(0.55px)'
+      cutoutContext.drawImage(alpha, 0, 0)
+      cutoutContext.filter = 'none'
+      cutoutContext.globalCompositeOperation = 'source-over'
 
-    cutouts.push({
-      id: segmentation.id,
-      objectId: segmentation.objectId,
-      label: segmentation.label,
-      confidence: segmentation.confidence,
-      blob: await canvasToPng(cutout),
-    })
+      cutouts.push({
+        id: segmentation.id,
+        objectId: segmentation.objectId,
+        label: segmentation.label,
+        confidence: segmentation.confidence,
+        blob: await canvasToPng(cutout),
+      })
+    }
 
-    // Release the large temporary canvases before processing the next mask.
-    alpha.width = 1
-    alpha.height = 1
-    cutout.width = 1
-    cutout.height = 1
+    if (!cutouts.length) throw new Error('Smart Cutout could not rasterize any object masks.')
+    const combinedMask = await canvasToPng(combined)
+    return { width, height, cutouts, combinedMask }
+  } finally {
+    // A 4K canvas can retain tens of megabytes. Release every temporary surface
+    // even when one mask or PNG conversion fails part-way through the batch.
+    for (const canvas of temporaryCanvases) {
+      canvas.width = 1
+      canvas.height = 1
+    }
   }
-
-  if (!cutouts.length) throw new Error('Smart Cutout could not rasterize any object masks.')
-  const combinedMask = await canvasToPng(combined)
-  combined.width = 1
-  combined.height = 1
-  return { width, height, cutouts, combinedMask }
 }
