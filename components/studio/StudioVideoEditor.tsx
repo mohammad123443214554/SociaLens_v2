@@ -1220,12 +1220,15 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       backgroundForm.append('storagePath', selectedElement.storagePath)
       backgroundForm.append('imageWidth', String(rasterBundle.width))
       backgroundForm.append('imageHeight', String(rasterBundle.height))
+      backgroundForm.append('prompt', 'Remove the selected foreground objects and reconstruct the original scene naturally. Preserve the exact surrounding background perspective, texture, colours, depth of field, lighting, shadows and reflections. Do not add or alter anything outside the removed-object regions.')
       const backgroundRequest = fetch('/api/studio/smart-cutout/process', { method: 'POST', body: backgroundForm, credentials: 'same-origin', cache: 'no-store' })
       const refinementRequests = refinementCrops.map(async crop => {
         const form = new FormData()
         form.append('image', crop.blob, 'smart-cutout-' + crop.id + '.jpg')
         form.append('imageWidth', String(crop.aiWidth))
         form.append('imageHeight', String(crop.aiHeight))
+        form.append('mask', crop.maskBlob, 'smart-cutout-preserve-' + crop.id + '.png')
+        form.append('label', crop.label)
         const response = await fetch('/api/studio/smart-cutout/refine', { method: 'POST', body: form, credentials: 'same-origin', cache: 'no-store' })
         if (!response.ok) {
           let payload: any = null
