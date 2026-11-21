@@ -33,8 +33,8 @@ function safeProviderMessage(payload: unknown, fallback: string) {
     ? record.message
     : typeof record.detail === 'string' ? record.detail : '')
   return (detail || fallback)
-    .replace(/https?:\\/\\/\\S+/g, '[provider URL]')
-    .replace(/(?:api[_-]?key|authorization)[=: ]+[^&\\s,]+/gi, '[redacted]')
+    .replace(/https?:\/\/\S+/g, '[provider URL]')
+    .replace(/(?:api[_-]?key|authorization)[=: ]+[^&\s,]+/gi, '[redacted]')
     .slice(0, 400)
 }
 
