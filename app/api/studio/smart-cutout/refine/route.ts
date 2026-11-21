@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { readSmartCutoutPngDimensions, SMART_CUTOUT_MAX_OUTPUT_BYTES } from '@/lib/studio/smart-cutout-processing'
+import { hasSmartCutoutPngAlpha, readSmartCutoutPngDimensions, SMART_CUTOUT_MAX_OUTPUT_BYTES } from '@/lib/studio/smart-cutout-processing'
 import { detectObjectEraserImageType } from '@/lib/studio/object-eraser'
 import { getStabilityImageApiBaseUrl, mapStabilityBackgroundError, STABILITY_REMOVE_BACKGROUND_PATH } from '@/lib/studio/stability-inpaint'
 
@@ -11,11 +11,6 @@ const NO_STORE = { 'Cache-Control': 'no-store, max-age=0' }
 const MAX_CROP_BYTES = 4 * 1024 * 1024
 const fail = (message: string, status: number, code: string, retryable = false) =>
   NextResponse.json({ ok: false, error: message, code, retryable }, { status, headers: NO_STORE })
-
-function hasPngAlpha(bytes: Uint8Array) {
-  // PNG IHDR colour type 4 = grayscale+alpha, 6 = RGBA.
-  return bytes.length >= 26 && bytes[25] === 6 || bytes.length >= 26 && bytes[25] === 4
-}
 
 function safeProviderMessage(payload: unknown, fallback: string) {
   if (!payload || typeof payload !== 'object') return fallback
@@ -96,7 +91,7 @@ export async function POST(request: NextRequest) {
     const outputDimensions = readSmartCutoutPngDimensions(outputBytes)
     if (!outputBytes.length || outputBytes.length > SMART_CUTOUT_MAX_OUTPUT_BYTES
       || !outputDimensions || outputDimensions.width !== width || outputDimensions.height !== height
-      || !hasPngAlpha(outputBytes)) {
+      || !hasSmartCutoutPngAlpha(outputBytes)) {
       return fail('Stability AI returned an invalid object PNG or changed its dimensions/transparency. The original photo was not changed.', 502, 'invalid_refined_object')
     }
     const outputBuffer = outputBytes.buffer.slice(
