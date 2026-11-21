@@ -227,6 +227,10 @@ export async function createSmartCutoutRefinementCrops(
       // Keep the detected object black and let the prompt replace only its surrounding crop.
       maskContext.fillStyle = '#fff'
       maskContext.fillRect(0, 0, aiWidth, aiHeight)
+      // Expand the protected object edge slightly so antialiased boundaries,
+      // handles and thin rims are not exposed to generative inpainting.
+      maskContext.shadowColor = '#000'
+      maskContext.shadowBlur = 5
       paintPolygons(maskContext, polygons.map(polygon => polygon.map(([px, py]) => [
         (px - x) * aiWidth / cropWidth,
         (py - y) * aiHeight / cropHeight,
