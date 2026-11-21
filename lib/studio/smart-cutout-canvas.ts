@@ -145,6 +145,8 @@ export type SmartCutoutRefinementCrop = {
   y: number
   width: number
   height: number
+  aiWidth: number
+  aiHeight: number
   blob: Blob
 }
 
@@ -204,16 +206,22 @@ export async function createSmartCutoutRefinementCrops(
       const centerY = (minY + maxY) / 2
       const x = Math.max(0, Math.min(width - cropWidth, Math.round(centerX - cropWidth / 2)))
       const y = Math.max(0, Math.min(height - cropHeight, Math.round(centerY - cropHeight / 2)))
-      const canvas = createCanvas(cropWidth, cropHeight)
+      // The Stability Remove Background endpoint has a 4-megapixel input cap.
+      // Keep source-pixel placement separately so the returned matte can be
+      // composited back into the exact original-size canvas without shifting.
+      const scale = Math.min(1, Math.sqrt(4_194_304 / (cropWidth * cropHeight)))
+      const aiWidth = Math.max(64, Math.floor(cropWidth * scale))
+      const aiHeight = Math.max(64, Math.floor(cropHeight * scale))
+      const canvas = createCanvas(aiWidth, aiHeight)
       temporaryCanvases.push(canvas)
       const context = canvas.getContext('2d')
       if (!context) throw new Error('Could not prepare an object crop for edge refinement.')
-      context.drawImage(source, x, y, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight)
+      context.drawImage(source, x, y, cropWidth, cropHeight, 0, 0, aiWidth, aiHeight)
       crops.push({
         id: segmentation.id,
         objectId: segmentation.objectId,
         label: segmentation.label,
-        x, y, width: cropWidth, height: cropHeight,
+        x, y, width: cropWidth, height: cropHeight, aiWidth, aiHeight,
         blob: await canvasToJpeg(canvas),
       })
     }
@@ -230,19 +238,19 @@ export async function createSmartCutoutRefinementCrops(
 /** Rebuilds a full-source transparent layer without changing the crop's pixel placement. */
 export async function composeSmartCutoutRefinedLayer(
   refinedBlob: Blob,
-  crop: Pick<SmartCutoutRefinementCrop, 'x' | 'y' | 'width' | 'height'>,
+  crop: Pick<SmartCutoutRefinementCrop, 'x' | 'y' | 'width' | 'height' | 'aiWidth' | 'aiHeight'>,
   sourceWidth: number,
   sourceHeight: number,
 ): Promise<Blob> {
   const bitmap = await createImageBitmap(refinedBlob)
   const canvas = createCanvas(sourceWidth, sourceHeight)
   try {
-    if (bitmap.width !== crop.width || bitmap.height !== crop.height) {
+    if (bitmap.width !== crop.aiWidth || bitmap.height !== crop.aiHeight) {
       throw new Error('Stability AI changed an object crop size; exact layer alignment cannot be guaranteed.')
     }
     const context = canvas.getContext('2d')
     if (!context) throw new Error('Could not rebuild the transparent object layer.')
-    context.drawImage(bitmap, crop.x, crop.y)
+    context.drawImage(bitmap, crop.x, crop.y, crop.width, crop.height)
     return await canvasToPng(canvas)
   } finally {
     bitmap.close()
