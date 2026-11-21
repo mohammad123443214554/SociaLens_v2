@@ -1159,7 +1159,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       detectForm.append('imageWidth', String(objectEraserImageSize.width))
       detectForm.append('imageHeight', String(objectEraserImageSize.height))
       const detectResponse = await fetch('/api/studio/smart-cutout/detect', { method: 'POST', body: detectForm, credentials: 'same-origin', cache: 'no-store' })
-      const detection = await detectResponse.json()
+      let detection: any
+      try {
+        detection = await detectResponse.json()
+      } catch {
+        throw new Error(detectResponse.status === 504
+          ? 'Gemini object analysis timed out. Your original photo is unchanged; please retry.'
+          : 'Gemini object analysis returned an unreadable response. Please retry.')
+      }
       if (!detectResponse.ok || !detection?.ok) throw new Error(detection?.error || 'Smart Cutout could not identify the main objects in this photo.')
       const detectedObjects = Array.isArray(detection.objects) ? detection.objects : []
       if (!detectedObjects.length) throw new Error(detection.message || 'No clear independently movable main objects were found in this photo.')
@@ -1173,7 +1180,14 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       segmentForm.append('imageHeight', String(objectEraserImageSize.height))
       segmentForm.append('objects', JSON.stringify(detectedObjects))
       const segmentResponse = await fetch('/api/studio/smart-cutout/segment', { method: 'POST', body: segmentForm, credentials: 'same-origin', cache: 'no-store' })
-      const segmentation = await segmentResponse.json()
+      let segmentation: any
+      try {
+        segmentation = await segmentResponse.json()
+      } catch {
+        throw new Error(segmentResponse.status === 504
+          ? 'SAM 3 segmentation timed out. Your original photo is unchanged; please retry.'
+          : 'SAM 3 returned an unreadable response. Please retry.')
+      }
       if (!segmentResponse.ok || !segmentation?.ok) throw new Error(segmentation?.error || 'Smart Cutout could not segment the detected objects.')
       const segmentations = Array.isArray(segmentation.segmentations) ? segmentation.segmentations as SmartCutoutSegmentation[] : []
       if (!segmentations.length) throw new Error('No usable object masks were returned. Your original photo is unchanged; please try again.')
