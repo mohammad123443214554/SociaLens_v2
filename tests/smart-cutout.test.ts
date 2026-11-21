@@ -8,14 +8,12 @@ import {
 } from '../lib/studio/smart-cutout.ts'
 
 test('Smart Cutout parses Gemini JSON and keeps only distinct meaningful objects', () => {
-  const objects = parseSmartCutoutObjectResponse(```json
-  {"objects":[
-    {"label":" Red Apple ","importance":"high","reason":"Main foreground subject"},
-    {"label":"red apple","importance":"medium","reason":"Duplicate label"},
-    {"label":"background","importance":"high","reason":"Not an object"},
-    {"label":"Ceramic coffee mug","importance":"high","reason":"Separate foreground object"}
-  ]}
-  ```)
+  const objects = parseSmartCutoutObjectResponse(JSON.stringify({ objects: [
+    { label: ' Red Apple ', importance: 'high', reason: 'Main foreground subject' },
+    { label: 'red apple', importance: 'medium', reason: 'Duplicate label' },
+    { label: 'background', importance: 'high', reason: 'Not an object' },
+    { label: 'Ceramic coffee mug', importance: 'high', reason: 'Separate foreground object' },
+  ] }))
   assert.deepEqual(objects.map(item => item.label), ['Red Apple', 'Ceramic coffee mug'])
   assert.equal(objects[0].importance, 'high')
   assert.equal(objects[0].id, 'smart-object-1')
