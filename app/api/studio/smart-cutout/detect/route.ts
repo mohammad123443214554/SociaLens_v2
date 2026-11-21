@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { detectObjectEraserImageType, OBJECT_ERASER_MAX_IMAGE_BYTES, prepareObjectEraserImage } from '@/lib/studio/object-eraser'
+import { OBJECT_ERASER_MAX_IMAGE_BYTES, prepareObjectEraserImage } from '@/lib/studio/object-eraser'
 import {
   normalizeSmartCutoutSegmentations,
   parseSmartCutoutObjectResponse,
@@ -95,8 +95,6 @@ export async function POST(request: NextRequest) {
     return fail(message, /too large/i.test(message) ? 413 : 415, 'invalid_image')
   }
 
-  const imageType = detectObjectEraserImageType(new Uint8Array(await image.arrayBuffer()))
-  if (!imageType) return fail('The selected file is not a valid JPEG, PNG or WebP photo.', 415, 'invalid_image')
 
   let objects: SmartCutoutObject[]
   try {
