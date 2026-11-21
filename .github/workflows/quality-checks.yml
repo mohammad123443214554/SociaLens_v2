@@ -54,3 +54,6 @@ jobs:
 
       - name: Smart Cutout tests
         run: npm run test:smart-cutout
+
+      - name: Smart Cutout processing tests
+        run: npm run test:smart-cutout-processing
