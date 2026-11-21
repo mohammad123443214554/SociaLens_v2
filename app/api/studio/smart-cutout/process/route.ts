@@ -47,59 +47,73 @@ export async function POST(request: NextRequest) {
   if (!stabilityKey) return fail('Stability AI is not configured. Add STABILITY_API_KEY to Vercel Environment Variables.', 503, 'not_configured')
 
   const contentLength = Number(request.headers.get('content-length') || 0)
-  if (contentLength > OBJECT_ERASER_MAX_IMAGE_BYTES + SMART_CUTOUT_MAX_MASK_BYTES + 256 * 1024) {
-    return fail('The photo and cutout mask are too large. Please run Smart Cutout again.', 413, 'upload_too_large')
+  if (contentLength > SMART_CUTOUT_MAX_MASK_BYTES + 256 * 1024) {
+    return fail('The combined object mask is too large. Please run Smart Cutout again.', 413, 'mask_too_large')
   }
 
   let form: FormData
   try {
     form = await request.formData()
   } catch {
-    return fail('Could not read the Smart Cutout image and mask. Please try again.', 400, 'invalid_upload')
+    return fail('Could not read the Smart Cutout mask. Please try again.', 400, 'invalid_upload')
   }
 
-  const image = form.get('image')
   const mask = form.get('mask')
-  if (!(image instanceof File) || !(mask instanceof File)) {
-    return fail('Attach both the original photo and the combined white-on-black object mask.', 400, 'missing_image_or_mask')
-  }
-  if (image.size <= 0 || image.size > OBJECT_ERASER_MAX_IMAGE_BYTES) {
-    return fail('The original photo must be 4 MB or smaller for Smart Cutout.', 413, 'image_too_large')
-  }
+  const projectId = String(form.get('projectId') || '')
+  const storagePath = String(form.get('storagePath') || '')
+  if (!(mask instanceof File)) return fail('Attach the combined white-on-black object mask.', 400, 'missing_mask')
   if (mask.size <= 0 || mask.size > SMART_CUTOUT_MAX_MASK_BYTES) {
     return fail('The combined object mask is too large. Please reopen Smart Cutout and try again.', 413, 'mask_too_large')
   }
 
   const imageWidth = Number(form.get('imageWidth'))
   const imageHeight = Number(form.get('imageHeight'))
+  if (!projectId || projectId.length > 100 || !storagePath.startsWith(user.id + '/' + projectId + '/')) {
+    return fail('The selected Studio photo does not belong to this project.', 403, 'invalid_asset')
+  }
   if (!Number.isSafeInteger(imageWidth) || !Number.isSafeInteger(imageHeight)
     || imageWidth < 64 || imageHeight < 64 || imageWidth * imageHeight > 9_437_184) {
     return fail('The original photo dimensions are invalid. Reopen Smart Cutout and try again.', 400, 'invalid_dimensions')
   }
-
-  let prepared
-  try {
-    prepared = await prepareObjectEraserImage(image)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'The selected photo is invalid.'
-    return fail(message, /too large/i.test(message) ? 413 : 415, 'invalid_image')
-  }
-
   if (mask.type && mask.type !== 'image/png') {
     return fail('The combined object mask must be a PNG image.', 415, 'invalid_mask_type')
   }
+
   const maskBytes = new Uint8Array(await mask.arrayBuffer())
   if (!isSmartCutoutMaskValid(maskBytes, imageWidth, imageHeight)) {
     return fail('The object mask is invalid or its dimensions do not match the original photo. Reopen Smart Cutout and try again.', 400, 'invalid_mask')
   }
 
+  const supabase = await createClient()
+  const { data: signed, error: signedError } = await supabase.storage
+    .from('studio-projects')
+    .createSignedUrl(storagePath, 60 * 5)
+  if (signedError || !signed?.signedUrl) {
+    return fail('Could not securely prepare the selected Studio photo for background reconstruction.', 400, 'asset_unavailable')
+  }
+
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), Math.max(1_000, deadline - Date.now()))
   try {
+    const imageResponse = await fetch(signed.signedUrl, { cache: 'no-store', signal: controller.signal })
+    if (!imageResponse.ok) return fail('Could not load the original Studio photo for background reconstruction.', 400, 'asset_unavailable')
+    const imageBytes = new Uint8Array(await imageResponse.arrayBuffer())
+    if (!imageBytes.length || imageBytes.length > OBJECT_ERASER_MAX_IMAGE_BYTES) {
+      return fail('The original photo must be 4 MB or smaller for Smart Cutout.', 413, 'image_too_large')
+    }
+
+    const mimeType = detectObjectEraserImageType(imageBytes)
+    if (!mimeType) return fail('The original Studio asset is not a supported JPEG, PNG or WebP image.', 415, 'invalid_image')
+    const sourceBuffer = imageBytes.buffer.slice(
+      imageBytes.byteOffset,
+      imageBytes.byteOffset + imageBytes.byteLength,
+    ) as ArrayBuffer
+    const sourceFile = new File([sourceBuffer], 'smart-cutout-source', { type: mimeType })
+    const prepared = await prepareObjectEraserImage(sourceFile)
+
     const upstreamForm = new FormData()
-    const sourceBytes = await image.arrayBuffer()
     const maskBuffer = maskBytes.buffer.slice(maskBytes.byteOffset, maskBytes.byteOffset + maskBytes.byteLength) as ArrayBuffer
-    upstreamForm.set('image', new Blob([sourceBytes], { type: prepared.mimeType }), 'source-image')
+    upstreamForm.set('image', new Blob([sourceBuffer], { type: prepared.mimeType }), 'source-image')
     upstreamForm.set('mask', new Blob([maskBuffer], { type: 'image/png' }), 'smart-cutout-mask.png')
     // The client mask is a full-resolution union of all selected object masks.
     // A small provider growth closes antialiased edge gaps before background fill.
@@ -162,7 +176,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      return fail('Stability AI took too long to rebuild the background. Your original photo is unchanged; please try again.', 504, 'request_timeout', true)
+      return fail('Loading the original photo timed out. Your original photo is unchanged; please try again.', 504, 'request_timeout', true)
     }
     return fail('Could not prepare the clean background plate. Your original photo is unchanged.', 500, 'processing_failed')
   } finally {
