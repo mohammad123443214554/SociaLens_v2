@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   SMART_CUTOUT_MAX_OBJECTS,
+  SMART_CUTOUT_MAX_SEGMENTATIONS,
   normalizeSmartCutoutObjects,
   normalizeSmartCutoutSegmentations,
   parseSmartCutoutObjectResponse,
@@ -134,4 +135,17 @@ test('Smart Cutout does not fabricate masks from malformed provider output', () 
   const result = normalizeSmartCutoutSegmentations({ predictions: [] }, objects, 100, 100)
   assert.deepEqual(result.segmentations, [])
   assert.deepEqual(result.missingLabels, ['dog'])
+})
+
+
+test('Smart Cutout caps independent instances at the paid refinement limit', () => {
+  const objects = normalizeSmartCutoutObjects({ objects: [{ label: 'person', importance: 'high' }] })
+  const predictions = Array.from({ length: SMART_CUTOUT_MAX_SEGMENTATIONS + 5 }, (_, index) => ({
+    confidence: 0.9,
+    masks: [[[index * 10, 0], [index * 10 + 5, 0], [index * 10 + 5, 5], [index * 10, 5]]],
+  }))
+  const result = normalizeSmartCutoutSegmentations({
+    prompt_results: [{ echo: { text: 'person' }, predictions }],
+  }, objects, 200, 100)
+  assert.equal(result.segmentations.length, SMART_CUTOUT_MAX_SEGMENTATIONS)
 })
