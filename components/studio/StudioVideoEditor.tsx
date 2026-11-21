@@ -26,7 +26,7 @@ import { brushStrokeIntersectsDetectionBox, brushStrokeIntersectsPolygons, getOb
 import { scaleObjectEraserPolygons } from '@/lib/studio/object-eraser-selection'
 import { createSmartCutoutRasterBundle } from '@/lib/studio/smart-cutout-canvas'
 import { createSmartCutoutAlignedLayers } from '@/lib/studio/smart-cutout-alignment'
-import { getSmartCutoutTimelineLabel, removeSmartCutoutGroup, restoreSmartCutoutGroup } from '@/lib/studio/smart-cutout-project'
+import { getSmartCutoutTimelineLabel, getSmartCutoutTimelineOrder, removeSmartCutoutGroup, restoreSmartCutoutGroup } from '@/lib/studio/smart-cutout-project'
 import type { SmartCutoutSegmentation } from '@/lib/studio/smart-cutout'
 import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, studioFrameTimeFromElapsedMs, canAdvanceStudioAudio, lastStudioFrameBeforeEnd, keepStudioTimeMonotonic, studioPlaybackTimeFromElapsedMs, studioPlaybackStartTime } from '@/lib/studio/frame-clock'
 
@@ -3045,7 +3045,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 </div>
                 {([
                   { key: 'text', label: 'Text', icon: <Type className="h-3 w-3" />, tone: 'fuchsia' },
-                  ...(elements.length ? [...elements].reverse().map((element, index) => ({ key: 'element-' + element.id, label: getSmartCutoutTimelineLabel(element, elements.length - index), icon: <Move className="h-3 w-3" />, tone: 'sky' as const, element, elementIndex: elements.length - index })) : [{ key: 'element', label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' as const }]),
+                  ...(elements.length ? getSmartCutoutTimelineOrder(elements).map((element, index) => ({ key: 'element-' + element.id, label: getSmartCutoutTimelineLabel(element, elements.length - index), icon: <Move className="h-3 w-3" />, tone: 'sky' as const, element, elementIndex: elements.length - index })) : [{ key: 'element', label: 'Element', icon: <Move className="h-3 w-3" />, tone: 'sky' as const }]),
                   { key: 'media', label: 'Media', icon: <Clapperboard className="h-3 w-3" />, tone: 'violet' },
                   { key: 'audio', label: 'Audio', icon: <Music2 className="h-3 w-3" />, tone: 'emerald' },
                 ] as TimelineTrack[]).map((track, trackIndex, tracks) => <div key={track.key} data-element-track-row={track.key === 'element' || track.key.startsWith('element-') ? 'true' : undefined} data-media-track-row={track.key === 'media' ? 'true' : undefined} className={'flex min-h-[34px] bg-[#101426] ' + (track.key.startsWith('element') && tracks[trackIndex + 1]?.key.startsWith('element') ? 'border-b-0' : 'border-b border-fuchsia-400/30')}>
