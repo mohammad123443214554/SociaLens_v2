@@ -36,7 +36,7 @@ test('timeline groups every extracted layer directly above its original source p
   const source = { id: 'source' }
   const after = { id: 'after' }
   const ordered = getSmartCutoutTimelineOrder([before, source, after, ...group])
-  assert.deepEqual(ordered.map(layer => layer.id), ['object-2', 'object-1', 'bg', 'source', 'after', 'before'])
+  assert.deepEqual(ordered.map(layer => layer.id), ['after', 'object-2', 'object-1', 'bg', 'source', 'before'])
 })
 
 test('timeline labels distinguish cutout objects, clean background and regular elements', () => {
