@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   isSmartCutoutMaskValid,
   readSmartCutoutPngDimensions,
+  normalizeSmartCutoutPolygons,
   SMART_CUTOUT_MAX_MASK_BYTES,
 } from '../lib/studio/smart-cutout-processing.ts'
 
@@ -43,4 +44,21 @@ test('Smart Cutout rejects masks above the upload size limit', () => {
   const mask = new Uint8Array(SMART_CUTOUT_MAX_MASK_BYTES + 1)
   mask.set(pngHeader(1280, 720))
   assert.equal(isSmartCutoutMaskValid(mask, 1280, 720), false)
+})
+
+test('Smart Cutout clamps polygon coordinates to the source image bounds', () => {
+  const polygons = normalizeSmartCutoutPolygons([
+    [[-10, 20], [120, 20], [120, 90], [20, 90]],
+    [[Number.NaN, 10], [30, 30], [40, 40]],
+    [[10, 10], [10, 10], [20, 20]],
+  ], 100, 80)
+  assert.deepEqual(polygons, [
+    [[0, 20], [100, 20], [100, 80], [20, 80]],
+    [[10, 10], [20, 20]],
+  ].filter(polygon => polygon.length >= 3))
+})
+
+test('Smart Cutout ignores invalid polygon coordinates and unsupported canvas dimensions', () => {
+  assert.deepEqual(normalizeSmartCutoutPolygons([[[0, 0], ['bad', 2], [3, 4]]], 100, 100), [])
+  assert.deepEqual(normalizeSmartCutoutPolygons([[[0, 0], [10, 0], [10, 10]]], 5000, 5000), [])
 })
