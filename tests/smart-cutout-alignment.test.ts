@@ -16,6 +16,7 @@ const source = {
   cropRight: 0.12,
   cropTop: 0.04,
   cropBottom: 0.06,
+  rotation: 17.5,
   timelineStart: 2.5,
   trimStart: 0.4,
   trimEnd: 8.4,
@@ -40,7 +41,7 @@ test('Smart Cutout layers inherit identical position, size, crop and timeline ti
   const layers = createSmartCutoutAlignedLayers(source, 'group-1', background, objects)
   assert.equal(layers.length, 3)
   for (const layer of layers) {
-    for (const key of ['x', 'y', 'width', 'height', 'cropLeft', 'cropRight', 'cropTop', 'cropBottom', 'timelineStart', 'trimStart', 'trimEnd', 'duration'] as const) {
+    for (const key of ['x', 'y', 'width', 'height', 'cropLeft', 'cropRight', 'cropTop', 'cropBottom', 'rotation', 'timelineStart', 'trimStart', 'trimEnd', 'duration'] as const) {
       assert.equal(layer[key], source[key] ?? 0, key)
     }
     assert.equal(layer.smartCutoutSourceElementId, source.id)
