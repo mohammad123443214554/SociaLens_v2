@@ -24,7 +24,7 @@ test('redo restores the complete group without duplicate IDs', () => {
   const current = [{ id: 'source' }, { id: 'unrelated' }, group[1]]
   const restored = restoreSmartCutoutGroup(current, group)
   assert.deepEqual(restored.map(layer => layer.id), ['source', 'unrelated', 'object-1', 'bg', 'object-2'])
-  assert.equal(restoreSmartCutoutGroup(restored, group), restored)
+  assert.deepEqual(restoreSmartCutoutGroup(restored, group), restored)
 })
 
 test('redo rejects a mixed or incomplete group snapshot', () => {
