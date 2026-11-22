@@ -508,6 +508,8 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [clips, setClips] = useState<Clip[]>([])
   const [elements, setElements] = useState<ElementLayer[]>([])
   const [replaceBusy, setReplaceBusy] = useState(false)
+  const [replaceCategory, setReplaceCategory] = useState<'Recently' | 'Graphic' | 'Sketch' | 'Photo' | 'Video' | 'GIF'>('Recently')
+  const [replaceSearch, setReplaceSearch] = useState('')
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [elementGuides, setElementGuides] = useState<{ vertical: number | null; horizontal: number | null }>({ vertical: null, horizontal: null })
   const elementDrag = useRef<ElementDrag | null>(null)
@@ -2575,17 +2577,47 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
           </div>}
 
-          {activePanel === 'replace' && <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+          {activePanel === 'replace' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             {selectedElement ? <>
-              <section className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <section className="shrink-0 rounded-xl border border-white/10 bg-black/20 p-3">
                 <div className="mb-3 flex items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-fuchsia-300/20 bg-fuchsia-400/10"><StudioReplaceIcon className="h-6 w-6" /></div>
                   <div className="min-w-0"><h3 className="text-[11px] font-bold text-white">Replace selected element</h3></div>
                 </div>
-                <p className="text-[9px] leading-4 text-slate-400">Choose a photo or video from your device. The new media will take this element’s place while keeping its canvas position, size, rotation and timeline start.</p>
-                <button type="button" onClick={() => replaceInput.current?.click()} disabled={replaceBusy} className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[10px] font-bold text-white transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60">
+                <p className="text-[9px] leading-4 text-slate-400">Choose a new asset or upload your own. The replacement keeps this element’s canvas position, size, rotation and timeline start.</p>
+                <button type="button" onClick={() => replaceInput.current?.click()} disabled={replaceBusy} className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[10px] font-bold text-white transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60">
                   {replaceBusy ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Uploading and replacing…</> : <><ImagePlus className="h-4 w-4" /> Upload from device</>}
                 </button>
+              </section>
+
+              <div className="shrink-0">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h4 className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">Element category</h4>
+                  <span className="text-[9px] text-slate-500">Browse assets</span>
+                </div>
+                <div role="tablist" aria-label="Replace asset categories" className="flex gap-1.5 overflow-x-auto pb-1">
+                  {(['Recently', 'Graphic', 'Sketch', 'Photo', 'Video', 'GIF'] as const).map(category => (
+                    <button key={category} type="button" role="tab" aria-selected={replaceCategory === category} onClick={() => setReplaceCategory(category)} className={'shrink-0 rounded-lg border px-2.5 py-2 text-[9px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 ' + (replaceCategory === category ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:bg-white/[0.07] hover:text-slate-200')}>{category}</button>
+                  ))}
+                </div>
+              </div>
+
+              <label className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 transition focus-within:border-fuchsia-400/50">
+                <Search className="h-4 w-4 shrink-0 text-slate-500" />
+                <input value={replaceSearch} onChange={event => setReplaceSearch(event.target.value)} placeholder={'Search ' + (replaceCategory === 'Recently' ? 'recent assets' : replaceCategory.toLowerCase() + ' assets') + '…'} aria-label={'Search ' + replaceCategory + ' assets'} className="h-full min-w-0 flex-1 bg-transparent text-[11px] text-white outline-none placeholder:text-slate-500" />
+                {replaceSearch && <button type="button" onClick={() => setReplaceSearch('')} aria-label="Clear asset search" className="rounded-md p-1 text-slate-400 transition hover:bg-white/10 hover:text-white"><X className="h-3.5 w-3.5" /></button>}
+              </label>
+
+              <section className="flex min-h-[170px] flex-1 flex-col rounded-xl border border-white/[0.08] bg-black/10 p-3" aria-live="polite">
+                <div className="flex items-center justify-between gap-2">
+                  <div><h4 className="text-[11px] font-semibold text-white">{replaceCategory}</h4><p className="mt-0.5 text-[9px] text-slate-500">{replaceCategory === 'Recently' ? 'Your recently used assets' : replaceCategory === 'Graphic' ? 'Icons and vector graphics' : replaceCategory === 'Sketch' ? 'Sketches and hand-drawn artwork' : replaceCategory === 'Photo' ? 'Photography and images' : replaceCategory === 'Video' ? 'Stock video clips' : 'Animated GIFs'}</p></div>
+                  {replaceCategory !== 'Recently' && <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[8px] font-medium text-slate-400">{replaceCategory === 'Graphic' ? 'Iconify' : replaceCategory === 'Sketch' ? 'Openverse' : replaceCategory === 'GIF' ? 'GIPHY' : 'Pixabay'}</span>}
+                </div>
+                <div className="flex flex-1 flex-col items-center justify-center py-7 text-center">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]"><Search className="h-4 w-4 text-slate-500" /></div>
+                  <p className="mt-3 text-[10px] font-semibold text-slate-300">{replaceCategory === 'Recently' ? 'Your recent assets will appear here' : 'Asset search will be connected in Part 2'}</p>
+                  <p className="mt-1 max-w-[230px] text-[9px] leading-4 text-slate-500">{replaceCategory === 'Recently' ? 'Assets you use from this library will be easy to find again.' : 'This category is ready for its dedicated library and smart search.'}</p>
+                </div>
               </section>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
           </div>}
