@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import { createStudioAssetUrl, loadStudioProject, saveStudioProject, uploadStudioAsset } from '@/lib/studio/persistence'
 import { arrangeStudioClips, moveStudioClipWithoutOverlap, normalizeStudioClipGaps } from '@/lib/studio/timeline'
 import { StudioAnimationPanel } from './StudioAnimationPanel'
+import { StudioReplaceAssetBrowser } from './StudioReplaceAssetBrowser'
 import { StudioTimelineThumbnail } from './StudioTimelineThumbnail'
 import { normalizeTextAnimationSettings, sampleTextAnimation, type TextAnimationDefinition, type TextAnimationSettings } from '@/lib/studio/animation-engine'
 import { BASIC_ENTRANCE_ANIMATIONS } from '@/lib/studio/basic-entrance-animations'
@@ -2609,15 +2610,11 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               </label>
 
               <section className="flex min-h-[170px] flex-1 flex-col rounded-xl border border-white/[0.08] bg-black/10 p-3" aria-live="polite">
-                <div className="flex items-center justify-between gap-2">
+                <div className="mb-3 flex items-center justify-between gap-2">
                   <div><h4 className="text-[11px] font-semibold text-white">{replaceCategory}</h4><p className="mt-0.5 text-[9px] text-slate-500">{replaceCategory === 'Recently' ? 'Your recently used assets' : replaceCategory === 'Graphic' ? 'Icons and vector graphics' : replaceCategory === 'Sketch' ? 'Sketches and hand-drawn artwork' : replaceCategory === 'Photo' ? 'Photography and images' : replaceCategory === 'Video' ? 'Stock video clips' : 'Animated GIFs'}</p></div>
                   {replaceCategory !== 'Recently' && <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[8px] font-medium text-slate-400">{replaceCategory === 'Graphic' ? 'Iconify' : replaceCategory === 'Sketch' ? 'Openverse' : replaceCategory === 'GIF' ? 'GIPHY' : 'Pixabay'}</span>}
                 </div>
-                <div className="flex flex-1 flex-col items-center justify-center py-7 text-center">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]"><Search className="h-4 w-4 text-slate-500" /></div>
-                  <p className="mt-3 text-[10px] font-semibold text-slate-300">{replaceCategory === 'Recently' ? 'Your recent assets will appear here' : 'Asset search will be connected in Part 2'}</p>
-                  <p className="mt-1 max-w-[230px] text-[9px] leading-4 text-slate-500">{replaceCategory === 'Recently' ? 'Assets you use from this library will be easy to find again.' : 'This category is ready for its dedicated library and smart search.'}</p>
-                </div>
+                <StudioReplaceAssetBrowser category={replaceCategory} query={replaceSearch} />
               </section>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
           </div>}
