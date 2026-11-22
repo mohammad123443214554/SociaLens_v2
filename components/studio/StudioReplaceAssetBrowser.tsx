@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { LoaderCircle, Search, ExternalLink, Play, Image as ImageIcon, Sparkles } from 'lucide-react'
 
 type Category = 'Recently' | 'Graphic' | 'Sketch' | 'Photo' | 'Video' | 'GIF'
@@ -20,7 +21,7 @@ type Asset = {
 }
 type SearchResponse = { ok: boolean; assets?: Asset[]; hasMore?: boolean; total?: number; error?: string; code?: string; provider?: string }
 
-const GIPHY_API_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || ''
+const GIPHY_API_KEY = Capacitor.isNativePlatform() ? (process.env.NEXT_PUBLIC_GIPHY_API_KEY_ANDROID || '') : (process.env.NEXT_PUBLIC_GIPHY_API_KEY_WEB || '')
 
 function normalizeGiphy(data: any): Asset[] {
   return (Array.isArray(data?.data) ? data.data : []).map((item: any) => {
@@ -66,7 +67,7 @@ export function StudioReplaceAssetBrowser({ category, query }: { category: Categ
       setLoading(true)
       try {
         if (category === 'GIF') {
-          if (!GIPHY_API_KEY) throw new Error('GIPHY is not configured yet. Add NEXT_PUBLIC_GIPHY_API_KEY in Vercel Environment Variables.')
+          if (!GIPHY_API_KEY) throw new Error('GIPHY is not configured yet. Add the platform-specific GIPHY API key in Vercel Environment Variables.')
           const url = new URL('https://api.giphy.com/v1/gifs/search')
           url.searchParams.set('api_key', GIPHY_API_KEY)
           url.searchParams.set('q', trimmedQuery.slice(0, 50))
