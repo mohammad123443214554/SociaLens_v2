@@ -509,6 +509,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [clips, setClips] = useState<Clip[]>([])
   const [elements, setElements] = useState<ElementLayer[]>([])
   const [replaceBusy, setReplaceBusy] = useState(false)
+  const [replaceImportingId, setReplaceImportingId] = useState<string | null>(null)
   const [replaceCategory, setReplaceCategory] = useState<'Recently' | 'Graphic' | 'Sketch' | 'Photo' | 'Video' | 'GIF'>('Recently')
   const [replaceSearch, setReplaceSearch] = useState('')
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
@@ -1496,9 +1497,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     }
   }
 
-  const replaceSelectedElement = async (file?: File) => {
+  const replaceSelectedElement = async (file?: File): Promise<boolean> => {
     const target = selectedElement
-    if (!file || !target) return
+    if (!file || !target) return false
     setError('')
     setNotice('')
     const kind: ClipKind | null = file.type.startsWith('video/')
@@ -1506,9 +1507,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       : ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'].includes(file.type)
         ? 'image'
         : null
-    if (!kind) { setError('Choose a supported photo (JPG, PNG, WebP, AVIF or GIF) or video file.'); return }
+    if (!kind) { setError('Choose a supported photo (JPG, PNG, WebP, AVIF or GIF) or video file.'); return false }
     const limit = kind === 'video' ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES
-    if (file.size > limit) { setError(file.name + ' exceeds the ' + (kind === 'video' ? '250 MB' : '20 MB') + ' limit.'); return }
+    if (file.size > limit) { setError(file.name + ' exceeds the ' + (kind === 'video' ? '250 MB' : '20 MB') + ' limit.'); return false }
 
     setReplaceBusy(true)
     const url = URL.createObjectURL(file)
@@ -1550,12 +1551,74 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       }
       setNotice('Element replaced. Its position, size, rotation and timeline placement have been preserved.')
       setActivePanel('media')
+      return true
     } catch (cause) {
       URL.revokeObjectURL(url)
       objectUrls.current.delete(url)
       setError(cause instanceof Error ? cause.message : 'Could not replace this element.')
+      return false
     } finally {
       setReplaceBusy(false)
+    }
+  }
+
+  const replaceFromLibrary = async (asset: { id: string; title: string; kind: 'image' | 'video' | 'icon' | 'gif'; assetUrl: string }) => {
+    if (asset.kind === 'gif') {
+      throw new Error('GIPHY media must remain streamed directly from GIPHY and cannot be copied into Studio storage. It is shown as a preview only.')
+    }
+    setReplaceImportingId(asset.id)
+    setError('')
+    try {
+      const response = await fetch(asset.assetUrl, { mode: 'cors', credentials: 'omit', cache: 'no-store' })
+      if (!response.ok) throw new Error('The asset provider could not deliver this file. Try another result or upload it from your device.')
+      let blob = await response.blob()
+      let fileType = blob.type.split(';')[0].toLowerCase()
+      if (asset.kind === 'icon' || fileType === 'image/svg+xml' || asset.assetUrl.toLowerCase().includes('.svg')) {
+        const svgText = await blob.text()
+        if (svgText.length > 2 * 1024 * 1024) throw new Error('This vector graphic is too large to import.')
+        const parser = new DOMParser()
+        const documentSvg = parser.parseFromString(svgText, 'image/svg+xml')
+        const root = documentSvg.documentElement
+        if (root.localName !== 'svg' || documentSvg.querySelector('parsererror')) throw new Error('This vector graphic is invalid.')
+        documentSvg.querySelectorAll('script, foreignObject, iframe, object, embed').forEach(node => node.remove())
+        documentSvg.querySelectorAll('*').forEach(node => {
+          for (const attribute of Array.from(node.attributes)) {
+            const name = attribute.name.toLowerCase()
+            const value = attribute.value.trim()
+            if (name.startsWith('on') || ((name === 'href' || name.endsWith(':href')) && value && !value.startsWith('#') && !value.startsWith('data:image/'))) node.removeAttribute(attribute.name)
+          }
+        })
+        root.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+        if (!root.getAttribute('viewBox')) root.setAttribute('viewBox', '0 0 512 512')
+        const safeSvg = new Blob([new XMLSerializer().serializeToString(root)], { type: 'image/svg+xml' })
+        const svgUrl = URL.createObjectURL(safeSvg)
+        try {
+          const image = new Image()
+          image.src = svgUrl
+          await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('Could not render this vector graphic.')) })
+          const canvas = document.createElement('canvas')
+          canvas.width = 1024
+          canvas.height = 1024
+          const context = canvas.getContext('2d')
+          if (!context) throw new Error('Your browser could not prepare this vector graphic.')
+          context.drawImage(image, 0, 0, 1024, 1024)
+          blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Could not convert this vector graphic.')), 'image/png'))
+          fileType = 'image/png'
+        } finally { URL.revokeObjectURL(svgUrl) }
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime'].includes(fileType)) {
+        throw new Error('This provider returned an unsupported file format. Choose another asset.')
+      }
+      const isVideo = fileType.startsWith('video/')
+      const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES
+      if (!blob.size || blob.size > maxBytes) throw new Error('This asset is empty or exceeds the Studio ' + (isVideo ? '250 MB video' : '20 MB image') + ' import limit.')
+      const extension = fileType === 'image/jpeg' ? '.jpg' : fileType === 'image/png' ? '.png' : fileType === 'image/webp' ? '.webp' : fileType === 'image/avif' ? '.avif' : fileType === 'image/gif' ? '.gif' : fileType === 'video/webm' ? '.webm' : fileType === 'video/quicktime' ? '.mov' : isVideo ? '.mp4' : '.png'
+      const safeTitle = asset.title.replace(/[^a-z0-9-_]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 70) || 'studio-asset'
+      const file = new File([blob], safeTitle + extension, { type: fileType })
+      const replaced = await replaceSelectedElement(file)
+      if (!replaced) throw new Error('The asset could not be imported. Your current element has not been changed.')
+    } finally {
+      setReplaceImportingId(null)
     }
   }
 
@@ -2614,7 +2677,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                   <div><h4 className="text-[11px] font-semibold text-white">{replaceCategory}</h4><p className="mt-0.5 text-[9px] text-slate-500">{replaceCategory === 'Recently' ? 'Your recently used assets' : replaceCategory === 'Graphic' ? 'Icons and vector graphics' : replaceCategory === 'Sketch' ? 'Sketches and hand-drawn artwork' : replaceCategory === 'Photo' ? 'Photography and images' : replaceCategory === 'Video' ? 'Stock video clips' : 'Animated GIFs'}</p></div>
                   {replaceCategory !== 'Recently' && <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[8px] font-medium text-slate-400">{replaceCategory === 'Graphic' ? 'Iconify' : replaceCategory === 'Sketch' ? 'Openverse' : replaceCategory === 'GIF' ? 'GIPHY' : 'Pixabay'}</span>}
                 </div>
-                <StudioReplaceAssetBrowser category={replaceCategory} query={replaceSearch} />
+                <StudioReplaceAssetBrowser category={replaceCategory} query={replaceSearch} onSelectAsset={replaceFromLibrary} importingId={replaceImportingId} />
               </section>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
           </div>}
