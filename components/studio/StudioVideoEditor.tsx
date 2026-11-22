@@ -63,7 +63,7 @@ type Clip = {
 }
 type AudioTrack = { id: string; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; fileSize: number; storagePath?: string }
 type TextLayer = { id: string; kind: 'heading' | 'subheading' | 'body'; text: string; x: number; y: number; width: number; height?: number; fontSize: number; color: string; opacity?: number; animation?: Partial<TextAnimationSettings>; effect?: TextEffect; effectIntensity?: number; effectBlur?: number; effectDistance?: number; effectAngle?: number; effectColor?: string; effectSecondaryColor?: string; bold: boolean; italic: boolean; underline: boolean; strikethrough?: boolean; uppercase?: boolean; listStyle?: 'none' | 'bullet' | 'number'; align: 'left' | 'center' | 'right'; rotation: number; timelineStart: number; timelineDuration: number; fontFamily?: string }
-type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; cropLeft?: number; cropRight?: number; cropTop?: number; cropBottom?: number; rotation?: number; color?: string; colorStrength?: number; colorReplacements?: StudioColorReplacement[]; fileSize: number; storagePath?: string; originalStoragePath?: string; originalName?: string; originalFileSize?: number; backgroundOriginalStoragePath?: string; backgroundOriginalName?: string; backgroundOriginalFileSize?: number }
+type ElementLayer = { id: string; kind: ClipKind; name: string; url: string; duration: number; trimStart: number; trimEnd: number; timelineStart: number; x: number; y: number; width: number; height: number; cropLeft?: number; cropRight?: number; cropTop?: number; cropBottom?: number; rotation?: number; color?: string; colorStrength?: number; colorReplacements?: StudioColorReplacement[]; fileSize: number; storagePath?: string; originalStoragePath?: string; originalName?: string; originalFileSize?: number; backgroundOriginalStoragePath?: string; backgroundOriginalName?: string; backgroundOriginalFileSize?: number; sourceUrl?: string; creator?: string; license?: string; licenseUrl?: string }
 type ObjectEraserCachedRemoval = { sourceKey: string; label: string; polygons: number[][][]; selectionKey: string; result: { url: string; storagePath: string; name: string; fileSize: number; originalStoragePath?: string; originalName?: string; originalFileSize?: number } }
 type ElementDrag = { id: string; pointerId: number; mode: 'move' | 'resize' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'crop-left' | 'crop-right' | 'crop-top' | 'crop-bottom'; startX: number; startY: number; x: number; y: number; width: number; height: number; cropLeft: number; cropRight: number; cropTop: number; cropBottom: number }
 type TimelineTrack = { key: string; label: string; icon: ReactNode; tone: 'fuchsia' | 'sky' | 'violet' | 'emerald'; element?: ElementLayer; elementIndex?: number }
@@ -1497,7 +1497,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     }
   }
 
-  const replaceSelectedElement = async (file?: File): Promise<boolean> => {
+  const replaceSelectedElement = async (file?: File, attribution?: { sourceUrl?: string; creator?: string; license?: string; licenseUrl?: string }): Promise<boolean> => {
     const target = selectedElement
     if (!file || !target) return false
     setError('')
@@ -1544,6 +1544,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         color: undefined,
         colorStrength: undefined,
         colorReplacements: undefined,
+        sourceUrl: attribution?.sourceUrl,
+        creator: attribution?.creator,
+        license: attribution?.license,
+        licenseUrl: attribution?.licenseUrl,
       }))
       if (objectUrls.current.has(target.url)) {
         URL.revokeObjectURL(target.url)
@@ -1562,7 +1566,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
     }
   }
 
-  const replaceFromLibrary = async (asset: { id: string; title: string; kind: 'image' | 'video' | 'icon' | 'gif'; assetUrl: string }) => {
+  const replaceFromLibrary = async (asset: { id: string; title: string; kind: 'image' | 'video' | 'icon' | 'gif'; assetUrl: string; sourceUrl?: string; creator?: string; license?: string; licenseUrl?: string }) => {
     if (asset.kind === 'gif') {
       throw new Error('GIPHY media must remain streamed directly from GIPHY and cannot be copied into Studio storage. It is shown as a preview only.')
     }
@@ -1615,7 +1619,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       const extension = fileType === 'image/jpeg' ? '.jpg' : fileType === 'image/png' ? '.png' : fileType === 'image/webp' ? '.webp' : fileType === 'image/avif' ? '.avif' : fileType === 'image/gif' ? '.gif' : fileType === 'video/webm' ? '.webm' : fileType === 'video/quicktime' ? '.mov' : isVideo ? '.mp4' : '.png'
       const safeTitle = asset.title.replace(/[^a-z0-9-_]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 70) || 'studio-asset'
       const file = new File([blob], safeTitle + extension, { type: fileType })
-      const replaced = await replaceSelectedElement(file)
+      const replaced = await replaceSelectedElement(file, { sourceUrl: asset.sourceUrl, creator: asset.creator, license: asset.license, licenseUrl: asset.licenseUrl })
       if (!replaced) throw new Error('The asset could not be imported. Your current element has not been changed.')
     } finally {
       setReplaceImportingId(null)
