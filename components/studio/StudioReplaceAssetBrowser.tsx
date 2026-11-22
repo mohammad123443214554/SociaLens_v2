@@ -42,7 +42,7 @@ function normalizeGiphy(data: any): Asset[] {
   }).filter((item: Asset) => item.previewUrl && item.assetUrl && item.sourceUrl)
 }
 
-export function StudioReplaceAssetBrowser({ category, query }: { category: Category; query: string }) {
+export function StudioReplaceAssetBrowser({ category, query, onSelectAsset, importingId = null }: { category: Category; query: string; onSelectAsset: (asset: Asset) => Promise<void>; importingId?: string | null }) {
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -50,8 +50,38 @@ export function StudioReplaceAssetBrowser({ category, query }: { category: Categ
   const [hasMore, setHasMore] = useState(false)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [recentAssets, setRecentAssets] = useState<Asset[]>([])
+  const [recentError, setRecentError] = useState('')
   const requestSequence = useRef(0)
   const trimmedQuery = query.trim()
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('socialens-studio-replace-recent-v1')
+      const parsed = raw ? JSON.parse(raw) : []
+      setRecentAssets(Array.isArray(parsed) ? parsed.slice(0, 30) : [])
+    } catch { setRecentAssets([]) }
+  }, [])
+
+  const rememberAsset = (asset: Asset) => {
+    if (asset.kind === 'gif') return
+    setRecentAssets(current => {
+      const next = [asset, ...current.filter(item => item.id !== asset.id)].slice(0, 30)
+      try { window.localStorage.setItem('socialens-studio-replace-recent-v1', JSON.stringify(next)) } catch { /* Recent history is optional when browser storage is unavailable. */ }
+      return next
+    })
+  }
+
+  const chooseAsset = async (asset: Asset) => {
+    if (importingId) return
+    setRecentError('')
+    try {
+      await onSelectAsset(asset)
+      rememberAsset(asset)
+    } catch (cause) {
+      setRecentError(cause instanceof Error ? cause.message : 'Could not import this asset.')
+    }
+  }
 
   useEffect(() => {
     const sequence = ++requestSequence.current
@@ -146,10 +176,10 @@ export function StudioReplaceAssetBrowser({ category, query }: { category: Categ
   }
 
   return <div className="min-h-0 flex-1">
-    <div className="mb-2 flex items-center justify-between gap-2"><p className="text-[9px] text-slate-500">{loading ? 'Searching…' : total ? total.toLocaleString() + ' results found' : assets.length ? assets.length + ' results' : 'Search results'}</p>{assets.length > 0 && <span className="text-[8px] text-slate-500">Preview only · Import in Part 3</span>}</div>
+    <div className="mb-2 flex items-center justify-between gap-2"><p className="text-[9px] text-slate-500">{loading ? 'Searching…' : total ? total.toLocaleString() + ' results found' : assets.length ? assets.length + ' results' : 'Search results'}</p>{assets.length > 0 && <span className="text-[8px] text-slate-500">Select to import</span>}</div>
     {loading && !assets.length ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><div className="aspect-square animate-pulse rounded-lg bg-white/[0.05]" /><div className="aspect-square animate-pulse rounded-lg bg-white/[0.05]" /><div className="aspect-square animate-pulse rounded-lg bg-white/[0.05]" /><div className="aspect-square animate-pulse rounded-lg bg-white/[0.05]" /></div>
       : error ? <div className="rounded-lg border border-red-400/15 bg-red-400/[0.05] p-3 text-[10px] leading-4 text-red-200" role="alert">{error}</div>
-      : assets.length ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{assets.map(asset => <article key={asset.id} className="group min-w-0 overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.025]"><div className="relative aspect-square overflow-hidden bg-black/20">{asset.kind === 'icon' ? <img src={asset.previewUrl} alt={asset.title} loading="lazy" className="h-full w-full object-contain p-5" /> : <img src={asset.previewUrl} alt={asset.title} loading="lazy" className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]" />}{asset.kind === 'video' && <span className="absolute bottom-2 left-2 rounded-md bg-black/70 p-1"><Play className="h-3 w-3 text-white" /></span>}{asset.kind === 'gif' && <span className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[8px] font-bold text-white">GIF</span>}</div><div className="p-2"><p className="truncate text-[9px] font-medium text-slate-200" title={asset.title}>{asset.title}</p><p className="mt-0.5 truncate text-[8px] text-slate-500">{asset.creator || 'Community asset'}{asset.duration ? ' · ' + asset.duration + 's' : ''}</p>{asset.license && <p className="mt-1 truncate text-[8px] text-slate-500" title={asset.license}>{asset.license}</p>}<a href={asset.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[8px] text-fuchsia-300 hover:text-fuchsia-200">Source <ExternalLink className="h-2.5 w-2.5" /></a></div></article>)}</div>
+      : assets.length ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{assets.map(asset => <article key={asset.id} className="group min-w-0 overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.025]"><div className="relative aspect-square overflow-hidden bg-black/20">{asset.kind === 'icon' ? <img src={asset.previewUrl} alt={asset.title} loading="lazy" className="h-full w-full object-contain p-5" /> : <img src={asset.previewUrl} alt={asset.title} loading="lazy" className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]" />}{asset.kind === 'video' && <span className="absolute bottom-2 left-2 rounded-md bg-black/70 p-1"><Play className="h-3 w-3 text-white" /></span>}{asset.kind === 'gif' && <span className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[8px] font-bold text-white">GIF</span>}</div><div className="p-2"><p className="truncate text-[9px] font-medium text-slate-200" title={asset.title}>{asset.title}</p><p className="mt-0.5 truncate text-[8px] text-slate-500">{asset.creator || 'Community asset'}{asset.duration ? ' · ' + asset.duration + 's' : ''}</p>{asset.license && <p className="mt-1 truncate text-[8px] text-slate-500" title={asset.license}>{asset.license}</p>}<a href={asset.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[8px] text-fuchsia-300 hover:text-fuchsia-200">Source <ExternalLink className="h-2.5 w-2.5" /></a>{asset.kind === 'gif' ? <p className="mt-2 text-[8px] leading-3 text-slate-500">Powered by GIPHY · Preview only</p> : <button type="button" onClick={() => void chooseAsset(asset)} disabled={Boolean(importingId)} className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[9px] font-bold text-white disabled:opacity-50">{importingId === asset.id ? <><LoaderCircle className="h-3 w-3 animate-spin" /> Importing…</> : 'Use this asset'}</button>}</div></article>)}</div>
       : <div className="py-10 text-center"><ImageIcon className="mx-auto h-5 w-5 text-slate-600" /><p className="mt-3 text-[10px] font-semibold text-slate-300">No assets found</p><p className="mt-1 text-[9px] text-slate-500">Try a shorter or more specific search.</p></div>}
     {hasMore && <button type="button" onClick={loadMore} disabled={loadingMore} className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.07] disabled:opacity-50">{loadingMore && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}Load more</button>}
   </div>
