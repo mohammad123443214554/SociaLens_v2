@@ -49,12 +49,34 @@ async function fetchJson(url: URL, revalidate: number) {
   return response.json()
 }
 
+const SEARCH_SYNONYMS: Record<string, string[]> = {
+  rose: ['roses', 'bloom', 'floral', 'petals'],
+  flower: ['flowers', 'bloom', 'blossom', 'floral'],
+  cat: ['cats', 'kitten', 'feline'],
+  dog: ['dogs', 'puppy', 'canine'],
+  mountain: ['mountains', 'landscape', 'hills'],
+  beach: ['coast', 'seaside', 'ocean'],
+  car: ['automobile', 'vehicle'],
+  food: ['cuisine', 'dish', 'meal'],
+  tree: ['trees', 'forest', 'woodland'],
+  sketch: ['drawing', 'line art', 'pencil art'],
+  logo: ['symbol', 'brand mark', 'emblem'],
+}
+
+function expandSearchQuery(query: string, extras: string[] = []) {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean)
+  const expanded = [...terms]
+  for (const term of terms) expanded.push(...(SEARCH_SYNONYMS[term] || []))
+  expanded.push(...extras)
+  return [...new Set(expanded)].join(' ').slice(0, 100)
+}
+
 async function searchPixabay(query: string, page: number, kind: 'image' | 'video'): Promise<{ assets: Asset[]; hasMore: boolean; total: number }> {
   const key = process.env.PIXABAY_API_KEY?.trim()
   if (!key) throw Object.assign(new Error('Pixabay is not configured yet. Add PIXABAY_API_KEY in Vercel Environment Variables.'), { status: 503, code: 'not_configured' })
   const url = new URL(kind === 'video' ? 'https://pixabay.com/api/videos/' : 'https://pixabay.com/api/')
   url.searchParams.set('key', key)
-  url.searchParams.set('q', query)
+  url.searchParams.set('q', expandSearchQuery(query))
   url.searchParams.set('page', String(page))
   url.searchParams.set('per_page', '40')
   url.searchParams.set('safesearch', 'true')
@@ -105,7 +127,7 @@ async function searchPixabay(query: string, page: number, kind: 'image' | 'video
 }
 
 async function searchOpenverse(query: string, page: number): Promise<{ assets: Asset[]; hasMore: boolean; total: number }> {
-  const expandedQuery = query + ' sketch drawing illustration line art'
+  const expandedQuery = expandSearchQuery(query, ['sketch', 'drawing', 'illustration', 'line art', 'pencil art'])
   const url = new URL('https://api.openverse.org/v1/images/')
   url.searchParams.set('q', expandedQuery)
   url.searchParams.set('page', String(page))
@@ -160,7 +182,7 @@ async function searchOpenverse(query: string, page: number): Promise<{ assets: A
 async function searchIconify(query: string, page: number): Promise<{ assets: Asset[]; hasMore: boolean; total: number }> {
   const start = (page - 1) * 48
   const url = new URL('https://api.iconify.design/search')
-  url.searchParams.set('query', query)
+  url.searchParams.set('query', expandSearchQuery(query))
   url.searchParams.set('limit', '48')
   url.searchParams.set('start', String(start))
   const data = await fetchJson(url, 86400) as { icons?: string[]; total?: number; limit?: number }
@@ -180,7 +202,7 @@ async function searchIconify(query: string, page: number): Promise<{ assets: Ass
     }
   }).filter((item): item is NonNullable<typeof item> => Boolean(item))
   const total = Number(data.total) || 0
-  return { assets, hasMore: icons.length === 48 && start + icons.length < total, total }
+  return { assets, hasMore: icons.length === 48, total }
 }
 
 export async function GET(request: NextRequest) {
