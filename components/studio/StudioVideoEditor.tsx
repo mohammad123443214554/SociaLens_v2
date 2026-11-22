@@ -1584,12 +1584,12 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
         const documentSvg = parser.parseFromString(svgText, 'image/svg+xml')
         const root = documentSvg.documentElement
         if (root.localName !== 'svg' || documentSvg.querySelector('parsererror')) throw new Error('This vector graphic is invalid.')
-        documentSvg.querySelectorAll('script, foreignObject, iframe, object, embed').forEach(node => node.remove())
+        documentSvg.querySelectorAll('script, style, foreignObject, iframe, object, embed').forEach(node => node.remove())
         documentSvg.querySelectorAll('*').forEach(node => {
           for (const attribute of Array.from(node.attributes)) {
             const name = attribute.name.toLowerCase()
             const value = attribute.value.trim()
-            if (name.startsWith('on') || ((name === 'href' || name.endsWith(':href')) && value && !value.startsWith('#') && !value.startsWith('data:image/'))) node.removeAttribute(attribute.name)
+            if (name.startsWith('on') || name === 'style' || (/url\\s*\\(/i.test(value) && !/^url\\(\\s*#[^)]+\\s*\\)$/i.test(value)) || ((name === 'href' || name.endsWith(':href')) && value && !value.startsWith('#'))) node.removeAttribute(attribute.name)
           }
         })
         root.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
