@@ -29,7 +29,7 @@ import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, s
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
 const STUDIO_TEXT_ANIMATION_BY_ID = new Map(STUDIO_TEXT_ANIMATIONS.map(definition => [definition.id, definition]))
 import {
-  ArrowLeft, AudioLines, Check, Clapperboard, Undo2, Redo2, Download,
+  ArrowLeft, AudioLines, Check, Clapperboard, Undo2, Redo2, Download, RefreshCw,
   Bold, CaseUpper, ChevronDown, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
   Eraser, ImageMinus, ScanSearch, Palette, Pause, Play, Plus, Search, Sparkles, Strikethrough, Trash2, Type, Underline, Video, Move,
   Volume2, VolumeX, X
@@ -472,6 +472,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const videoInput = useRef<HTMLInputElement>(null)
   const imageInput = useRef<HTMLInputElement>(null)
   const audioInput = useRef<HTMLInputElement>(null)
+  const replaceInput = useRef<HTMLInputElement>(null)
   const previewRef = useRef<HTMLVideoElement>(null)
   const previewVideoElements = useRef(new Map<string, HTMLVideoElement>())
   const previewVideoRefCallbacks = useRef(new Map<string, (element: HTMLVideoElement | null) => void>())
@@ -495,6 +496,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const objectUrls = useRef<Set<string>>(new Set())
   const [clips, setClips] = useState<Clip[]>([])
   const [elements, setElements] = useState<ElementLayer[]>([])
+  const [replaceBusy, setReplaceBusy] = useState(false)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [elementGuides, setElementGuides] = useState<{ vertical: number | null; horizontal: number | null }>({ vertical: null, horizontal: null })
   const elementDrag = useRef<ElementDrag | null>(null)
@@ -553,7 +555,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
   const [saveStatus, setSaveStatus] = useState('Loading project…')
-  const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects' | 'animation' | 'position' | 'element-color' | 'eraser' | 'object-eraser' | 'background-eraser'>('media')
+  const [activePanel, setActivePanel] = useState<'media' | 'text' | 'audio' | 'effects' | 'animation' | 'position' | 'element-color' | 'eraser' | 'object-eraser' | 'background-eraser' | 'replace'>('media')
   const [customElementColor, setCustomElementColor] = useState('#ec4899')
   const [elementPalette, setElementPalette] = useState<string[]>([])
   const [selectedSourceColor, setSelectedSourceColor] = useState<string | null>(null)
@@ -1477,6 +1479,69 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       setClips(items => [...items, ...additions])
       setSelectedId(additions[0].id)
       setNotice(additions.length + ' media ' + (additions.length === 1 ? 'clip added' : 'clips added') + ' to your timeline.')
+    }
+  }
+
+  const replaceSelectedElement = async (file?: File) => {
+    const target = selectedElement
+    if (!file || !target) return
+    setError('')
+    setNotice('')
+    const kind: ClipKind | null = file.type.startsWith('video/')
+      ? 'video'
+      : ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'].includes(file.type)
+        ? 'image'
+        : null
+    if (!kind) { setError('Choose a supported photo (JPG, PNG, WebP, AVIF or GIF) or video file.'); return }
+    const limit = kind === 'video' ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES
+    if (file.size > limit) { setError(file.name + ' exceeds the ' + (kind === 'video' ? '250 MB' : '20 MB') + ' limit.'); return }
+
+    setReplaceBusy(true)
+    const url = URL.createObjectURL(file)
+    objectUrls.current.add(url)
+    try {
+      const storagePath = await uploadStudioAsset(projectId, file)
+      const detectedDuration = await readMediaDuration(file, url, kind)
+      if (kind === 'video' && detectedDuration <= 0) throw new Error('This video could not be read. Try another MP4, WebM or MOV file.')
+      const previousSegmentDuration = Math.max(0.1, target.trimEnd - target.trimStart)
+      const nextDuration = kind === 'image' ? previousSegmentDuration : detectedDuration
+      const nextTrimEnd = kind === 'image' ? previousSegmentDuration : Math.min(detectedDuration, previousSegmentDuration)
+      setElements(items => items.map(item => item.id !== target.id ? item : {
+        ...item,
+        kind,
+        name: file.name,
+        url,
+        duration: nextDuration,
+        trimStart: 0,
+        trimEnd: Math.max(0.1, nextTrimEnd),
+        fileSize: file.size,
+        storagePath,
+        originalStoragePath: undefined,
+        originalName: undefined,
+        originalFileSize: undefined,
+        backgroundOriginalStoragePath: undefined,
+        backgroundOriginalName: undefined,
+        backgroundOriginalFileSize: undefined,
+        cropLeft: undefined,
+        cropRight: undefined,
+        cropTop: undefined,
+        cropBottom: undefined,
+        color: undefined,
+        colorStrength: undefined,
+        colorReplacements: undefined,
+      }))
+      if (objectUrls.current.has(target.url)) {
+        URL.revokeObjectURL(target.url)
+        objectUrls.current.delete(target.url)
+      }
+      setNotice('Element replaced. Its position, size, rotation and timeline placement have been preserved.')
+      setActivePanel('media')
+    } catch (cause) {
+      URL.revokeObjectURL(url)
+      objectUrls.current.delete(url)
+      setError(cause instanceof Error ? cause.message : 'Could not replace this element.')
+    } finally {
+      setReplaceBusy(false)
     }
   }
 
@@ -2460,10 +2525,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
           <div className="mt-auto flex flex-col items-center gap-1 pb-2"><span className="text-[8px] text-slate-600">SOCIALENS</span><span className="h-1 w-1 rounded-full bg-fuchsia-400" /></div>
         </nav>
 
-        <aside className={(activePanel === 'position' || activePanel === 'element-color' || activePanel === 'eraser' || activePanel === 'object-eraser' || activePanel === 'background-eraser' ? 'fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] top-[calc(58px+env(safe-area-inset-top))] z-[90] flex w-auto overflow-hidden rounded-2xl border border-white/10 shadow-2xl lg:relative lg:inset-auto lg:z-20 lg:w-[260px] lg:rounded-none lg:border-0 lg:shadow-none' : 'hidden w-[260px] lg:flex') + ' shrink-0 flex-col border-r border-white/[0.08] bg-[#0d1020]'}>
+        <aside className={(activePanel === 'position' || activePanel === 'element-color' || activePanel === 'eraser' || activePanel === 'object-eraser' || activePanel === 'background-eraser' || activePanel === 'replace' ? 'fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] top-[calc(58px+env(safe-area-inset-top))] z-[90] flex w-auto overflow-hidden rounded-2xl border border-white/10 shadow-2xl lg:relative lg:inset-auto lg:z-20 lg:w-[260px] lg:rounded-none lg:border-0 lg:shadow-none' : 'hidden w-[260px] lg:flex') + ' shrink-0 flex-col border-r border-white/[0.08] bg-[#0d1020]'}>
           <div className="border-b border-white/[0.07] px-4 py-4">
-            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : activePanel === 'audio' ? 'Audio library' : activePanel === 'effects' ? 'Text effects' : activePanel === 'position' ? 'Text position' : activePanel === 'element-color' ? 'Element colour' : activePanel === 'eraser' ? 'Eraser' : activePanel === 'object-eraser' ? 'Object Eraser' : activePanel === 'background-eraser' ? 'Background Eraser' : 'Text animations'}</h2>{activePanel !== 'animation' && activePanel !== 'element-color' && activePanel !== 'eraser' && activePanel !== 'object-eraser' && activePanel !== 'background-eraser' && <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : activePanel === 'effects' ? '40 effects' : activePanel === 'position' ? 'PX controls' : ''}</span>}{(activePanel === 'position' || activePanel === 'element-color' || activePanel === 'eraser' || activePanel === 'object-eraser' || activePanel === 'background-eraser') && <button type="button" onClick={() => setActivePanel('media')} aria-label="Close element panel" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 lg:hidden"><X className="h-4 w-4" /></button>}</div>
-            <p className="mt-1 text-[9px] text-slate-500">{activePanel === 'media' ? 'Import and manage your video and photo clips.' : activePanel === 'text' ? 'Edit the text currently shown on your canvas.' : activePanel === 'audio' ? 'Add a music track and control its volume.' : activePanel === 'animation' ? 'Explore motion families for the selected text layer.' : activePanel === 'position' ? 'Set exact placement and align text to the canvas.' : activePanel === 'element-color' ? 'Choose a colour for the selected canvas element.' : activePanel === 'eraser' ? 'Choose an erasing tool for your selected image element.' : activePanel === 'object-eraser' ? 'Select objects to remove from your image.' : activePanel === 'background-eraser' ? 'Remove the background from your selected photo.' : 'Style the appearance of your selected text.'}</p>
+            <div className="flex items-center justify-between"><h2 className="text-[12px] font-bold text-white">{activePanel === 'media' ? 'Project media' : activePanel === 'text' ? 'Text editor' : activePanel === 'audio' ? 'Audio library' : activePanel === 'effects' ? 'Text effects' : activePanel === 'position' ? 'Text position' : activePanel === 'element-color' ? 'Element colour' : activePanel === 'eraser' ? 'Eraser' : activePanel === 'object-eraser' ? 'Object Eraser' : activePanel === 'background-eraser' ? 'Background Eraser' : activePanel === 'replace' ? 'Replace element' : 'Text animations'}</h2>{activePanel !== 'animation' && activePanel !== 'element-color' && activePanel !== 'eraser' && activePanel !== 'object-eraser' && activePanel !== 'background-eraser' && activePanel !== 'replace' && <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-slate-500">{activePanel === 'media' ? clips.length + ' clips' : activePanel === 'audio' ? (audio ? '1 track' : '0 tracks') : activePanel === 'effects' ? '40 effects' : activePanel === 'position' ? 'PX controls' : ''}</span>}{(activePanel === 'position' || activePanel === 'element-color' || activePanel === 'eraser' || activePanel === 'object-eraser' || activePanel === 'background-eraser' || activePanel === 'replace') && <button type="button" onClick={() => setActivePanel('media')} aria-label="Close element panel" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 lg:hidden"><X className="h-4 w-4" /></button>}</div>
+            <p className="mt-1 text-[9px] text-slate-500">{activePanel === 'media' ? 'Import and manage your video and photo clips.' : activePanel === 'text' ? 'Edit the text currently shown on your canvas.' : activePanel === 'audio' ? 'Add a music track and control its volume.' : activePanel === 'animation' ? 'Explore motion families for the selected text layer.' : activePanel === 'position' ? 'Set exact placement and align text to the canvas.' : activePanel === 'element-color' ? 'Choose a colour for the selected canvas element.' : activePanel === 'eraser' ? 'Choose an erasing tool for your selected image element.' : activePanel === 'object-eraser' ? 'Select objects to remove from your image.' : activePanel === 'background-eraser' ? 'Remove the background from your selected photo.' : activePanel === 'replace' ? 'Replace the selected canvas element with a photo or video from your device.' : 'Style the appearance of your selected text.'}</p>
           </div>
 
           {activePanel === 'element-color' && <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
@@ -2496,6 +2561,22 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 </div>
                 <button type="button" onClick={() => { setElements(items => items.map(item => item.id === selectedElement.id ? {...item,color:undefined,colorStrength:0.72,colorReplacements:[]} : item)); setSelectedSourceColor(null) }} className="mt-3 w-full rounded-lg border border-white/10 py-2 text-[9px] font-semibold text-slate-300 transition hover:bg-white/[0.06]">Reset all colour changes</button>
               </section>}
+            </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
+          </div>}
+
+          {activePanel === 'replace' && <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+            {selectedElement ? <>
+              <section className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-fuchsia-300/20 bg-fuchsia-400/10 text-fuchsia-200"><RefreshCw className="h-5 w-5" /></div>
+                  <div className="min-w-0"><h3 className="text-[11px] font-bold text-white">Replace selected element</h3><p className="mt-1 truncate text-[9px] text-slate-400">{selectedElement.name}</p></div>
+                </div>
+                <p className="text-[9px] leading-4 text-slate-400">Choose a photo or video from your device. The new media will take this element’s place while keeping its canvas position, size, rotation and timeline start.</p>
+                <button type="button" onClick={() => replaceInput.current?.click()} disabled={replaceBusy} className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[10px] font-bold text-white transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60">
+                  {replaceBusy ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Uploading and replacing…</> : <><ImagePlus className="h-4 w-4" /> Upload from device</>}
+                </button>
+                <p className="mt-2 text-center text-[8px] leading-4 text-slate-500">Photos up to 20 MB · Videos up to 250 MB</p>
+              </section>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
           </div>}
 
@@ -2752,7 +2833,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             {audio ? <><span className="max-w-[140px] truncate text-[9px] text-cyan-100">{audio.name}</span><label className="flex min-w-[120px] flex-1 items-center gap-2 text-[9px] text-slate-400">Volume<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="w-full accent-cyan-400" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="text-[9px] text-red-300">Remove</button></> : <span className="text-[9px] text-slate-500">No audio track added yet.</span>}
           </div>}
           <div data-text-toolbar="true" className="sticky top-0 z-50 flex min-h-[48px] shrink-0 flex-wrap items-center gap-1.5 overflow-visible border-b border-fuchsia-400/20 bg-[#111629] px-3 py-2 shadow-xl sm:px-5" role="toolbar" aria-label="Selected object formatting">
-            {selectedElement && !selectedText && <><button type="button" onClick={() => { setActivePanel('element-color'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Element colour" title="Colour" className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'element-color' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10')}><Palette className="h-4 w-4" /> Colour</button><button type="button" disabled={selectedElement.kind !== 'image'} onClick={() => { if (selectedElement?.kind !== 'image') { const fallbackImage = elements.find(item => item.kind === 'image'); if (fallbackImage) setSelectedElementId(fallbackImage.id) } setActivePanel('eraser'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Eraser tools" title={selectedElement.kind === 'image' ? 'Open eraser tools' : 'Eraser is available for photo elements'} className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'eraser' || activePanel === 'object-eraser' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10') + ' disabled:cursor-not-allowed disabled:opacity-40'}><Eraser className="h-4 w-4" /> Eraser</button></>}
+            {selectedElement && !selectedText && <><button type="button" onClick={() => { setActivePanel('element-color'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Element colour" title="Colour" className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'element-color' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10')}><Palette className="h-4 w-4" /> Colour</button><button type="button" disabled={selectedElement.kind !== 'image'} onClick={() => { if (selectedElement?.kind !== 'image') { const fallbackImage = elements.find(item => item.kind === 'image'); if (fallbackImage) setSelectedElementId(fallbackImage.id) } setActivePanel('eraser'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Eraser tools" title={selectedElement.kind === 'image' ? 'Open eraser tools' : 'Eraser is available for photo elements'} className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'eraser' || activePanel === 'object-eraser' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10') + ' disabled:cursor-not-allowed disabled:opacity-40'}><Eraser className="h-4 w-4" /> Eraser</button><button type="button" onClick={() => { setActivePanel('replace'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Replace selected element" title="Replace this photo or video" className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'replace' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10')}><RefreshCw className="h-4 w-4" /> Replace</button></>}
             {selectedText && <>
             <button type="button" onClick={() => removeTextLayer(selectedText.id)} title="Delete text" aria-label="Delete text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-300 transition hover:bg-red-400/10"><Trash2 className="h-4 w-4" /></button>
             <button type="button" onClick={() => duplicateTextLayer(selectedText.id)} title="Duplicate text" aria-label="Duplicate text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-200 transition hover:bg-white/10"><Copy className="h-4 w-4" /></button>
@@ -2953,6 +3034,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
       <input ref={videoInput} type="file" accept="video/*" multiple className="hidden" onChange={event => { void addMedia(event.target.files,'video'); event.currentTarget.value = '' }} />
       <input ref={imageInput} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif" multiple className="hidden" onChange={event => { void addMedia(event.target.files,'image'); event.currentTarget.value = '' }} />
       <input ref={audioInput} type="file" accept="audio/*" className="hidden" onChange={event => { void addAudio(event.target.files?.[0]); event.currentTarget.value = '' }} />
+      <input ref={replaceInput} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif,video/*" className="hidden" onChange={event => { void replaceSelectedElement(event.target.files?.[0]); event.currentTarget.value = '' }} />
 
       {exporting && <div className="fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-1/2 z-[100] w-[min(92vw,520px)] -translate-x-1/2 rounded-xl border border-violet-300/20 bg-[#171b2d] p-3 shadow-2xl"><div className="mb-2 flex justify-between text-[10px] text-slate-300"><span>Rendering your video</span><span>{exportProgress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-pink-500 transition-[width]" style={{ width: exportProgress + '%' }} /></div><p className="mt-2 text-[9px] text-slate-500">Keep this tab open until the export finishes.</p></div>}
       {error && <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-[100] w-[min(92vw,520px)] -translate-x-1/2 rounded-xl border border-red-400/20 bg-[#171b2d] px-4 py-3 text-xs shadow-2xl" role="alert"><div className="flex items-start gap-2"><span className="text-red-300">{error}</span><button type="button" onClick={() => setError('')} className="ml-auto text-slate-400" aria-label="Dismiss error"><X className="h-4 w-4" /></button></div></div>}
