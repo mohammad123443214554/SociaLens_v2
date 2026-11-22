@@ -37,11 +37,11 @@ import {
 
 function StudioReplaceIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" className={className} fill="none">
-      <path d="M15.9 2.1c5.8 0 10.8 3.1 13.5 7.8l2.1-2.1v8.4h-8.4l2.4-2.4a10.8 10.8 0 0 0-9.6-5.8c-5.1 0-9.4 3.5-10.5 8.2L.8 14.9C2.4 7.5 8.6 2.1 15.9 2.1Z" fill="#079447" />
-      <path d="M16.1 29.9c-5.8 0-10.8-3.1-13.5-7.8L.5 24.7v-8.4h8.4l-2.4 2.4a10.8 10.8 0 0 0 9.6 5.8c5.1 0 9.4-3.5 10.5-8.2l4.6 1.3c-1.6 7.4-7.8 12.3-15.1 12.3Z" fill="#079447" />
-      <path d="M4.9 15.7c1.5-5 6-8.3 11-8.3 3.2 0 6.1 1.4 8.1 3.8-2-1.7-4.5-2.6-7.1-2.6-5.2 0-9.5 3.1-11.2 7.7l-.8-.6Z" fill="#006c37" opacity=".55" />
-      <path d="M27.1 16.3c-1.5 5-6 8.3-11 8.3-3.2 0-6.1-1.4-8.1-3.8 2 1.7 4.5 2.6 7.1 2.6 5.2 0 9.5-3.1 11.2-7.7l.8.6Z" fill="#006c37" opacity=".55" />
+    <svg viewBox="0 0 32 32" aria-hidden="true" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 16A11 11 0 0 1 24 8" />
+      <path d="M22 3.5 26.5 8 22 12.5" />
+      <path d="M27 16A11 11 0 0 1 8 24" />
+      <path d="M10 28.5 5.5 24 10 19.5" />
     </svg>
   )
 }
