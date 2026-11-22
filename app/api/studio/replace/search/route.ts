@@ -126,6 +126,32 @@ async function searchPixabay(query: string, page: number, kind: 'image' | 'video
   return { assets, hasMore: page * 40 < Math.min(total, 500), total }
 }
 
+let openverseToken = ''
+let openverseTokenExpiresAt = 0
+let openverseTokenRequest: Promise<string> | null = null
+
+async function getOpenverseToken(clientId: string, clientSecret: string) {
+  if (openverseToken && Date.now() < openverseTokenExpiresAt - 60_000) return openverseToken
+  if (openverseTokenRequest) return openverseTokenRequest
+  openverseTokenRequest = (async () => {
+    const body = new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' })
+    const response = await fetch('https://api.openverse.org/v1/auth_tokens/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+      body,
+      signal: AbortSignal.timeout(8000),
+      cache: 'no-store',
+    })
+    if (!response.ok) throw Object.assign(new Error('Openverse authentication is temporarily unavailable.'), { status: response.status, code: 'provider_auth_error' })
+    const data = await response.json() as { access_token?: string; expires_in?: number }
+    if (!data.access_token) throw Object.assign(new Error('Openverse did not return an access token.'), { status: 502, code: 'provider_auth_error' })
+    openverseToken = data.access_token
+    openverseTokenExpiresAt = Date.now() + Math.max(60, Number(data.expires_in) || 3600) * 1000
+    return openverseToken
+  })()
+  try { return await openverseTokenRequest } finally { openverseTokenRequest = null }
+}
+
 async function searchOpenverse(query: string, page: number): Promise<{ assets: Asset[]; hasMore: boolean; total: number }> {
   const expandedQuery = expandSearchQuery(query, ['sketch', 'drawing', 'illustration', 'line art', 'pencil art'])
   const url = new URL('https://api.openverse.org/v1/images/')
@@ -137,22 +163,7 @@ async function searchOpenverse(query: string, page: number): Promise<{ assets: A
   const clientId = process.env.OPENVERSE_CLIENT_ID?.trim()
   const clientSecret = process.env.OPENVERSE_CLIENT_SECRET?.trim()
   let authorization = ''
-  if (clientId && clientSecret) {
-    const body = new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' })
-    const tokenResponse = await fetch('https://api.openverse.org/v1/auth_tokens/token/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-      body,
-      signal: AbortSignal.timeout(8000),
-      cache: 'no-store',
-    })
-    if (tokenResponse.ok) {
-      const tokenData = await tokenResponse.json() as { access_token?: string }
-      if (tokenData.access_token) authorization = 'Bearer ' + tokenData.access_token
-    } else if (tokenResponse.status !== 401) {
-      throw Object.assign(new Error('Openverse authentication is temporarily unavailable.'), { status: tokenResponse.status, code: 'provider_auth_error' })
-    }
-  }
+  if (clientId && clientSecret) authorization = 'Bearer ' + await getOpenverseToken(clientId, clientSecret)
   const response = await fetch(url, {
     headers: { Accept: 'application/json', ...(authorization ? { Authorization: authorization } : {}) },
     signal: AbortSignal.timeout(10000),
