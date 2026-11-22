@@ -29,11 +29,22 @@ import { STUDIO_FRAME_DURATION_SECONDS, STUDIO_FRAME_RATE, quantizeStudioTime, s
 const STUDIO_TEXT_ANIMATIONS = [...BASIC_ENTRANCE_ANIMATIONS, ...EXIT_ANIMATIONS, ...BOUNCE_ELASTIC_ANIMATIONS, ...ROTATION_3D_ANIMATIONS, ...TYPING_CHARACTER_ANIMATIONS, ...WORD_LINE_ANIMATIONS, ...WIPE_MASK_REVEAL_ANIMATIONS, ...LOOP_CONTINUOUS_ANIMATIONS, ...MOTION_DYNAMIC_ANIMATIONS, ...CINEMATIC_LIGHT_ANIMATIONS, ...DIGITAL_CREATIVE_ANIMATIONS, ...ARTISTIC_ADVANCED_ANIMATIONS]
 const STUDIO_TEXT_ANIMATION_BY_ID = new Map(STUDIO_TEXT_ANIMATIONS.map(definition => [definition.id, definition]))
 import {
-  ArrowLeft, AudioLines, Check, Clapperboard, Undo2, Redo2, Download, RefreshCw,
+  ArrowLeft, AudioLines, Check, Clapperboard, Undo2, Redo2, Download,
   Bold, CaseUpper, ChevronDown, Copy, FolderOpen, ImagePlus, Italic, List, ListOrdered, Music2,
   Eraser, ImageMinus, ScanSearch, Palette, Pause, Play, Plus, Search, Sparkles, Strikethrough, Trash2, Type, Underline, Video, Move,
   Volume2, VolumeX, X
 } from 'lucide-react'
+
+function StudioReplaceIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden="true" className={className} fill="none">
+      <path d="M15.9 2.1c5.8 0 10.8 3.1 13.5 7.8l2.1-2.1v8.4h-8.4l2.4-2.4a10.8 10.8 0 0 0-9.6-5.8c-5.1 0-9.4 3.5-10.5 8.2L.8 14.9C2.4 7.5 8.6 2.1 15.9 2.1Z" fill="#079447" />
+      <path d="M16.1 29.9c-5.8 0-10.8-3.1-13.5-7.8L.5 24.7v-8.4h8.4l-2.4 2.4a10.8 10.8 0 0 0 9.6 5.8c5.1 0 9.4-3.5 10.5-8.2l4.6 1.3c-1.6 7.4-7.8 12.3-15.1 12.3Z" fill="#079447" />
+      <path d="M4.9 15.7c1.5-5 6-8.3 11-8.3 3.2 0 6.1 1.4 8.1 3.8-2-1.7-4.5-2.6-7.1-2.6-5.2 0-9.5 3.1-11.2 7.7l-.8-.6Z" fill="#006c37" opacity=".55" />
+      <path d="M27.1 16.3c-1.5 5-6 8.3-11 8.3-3.2 0-6.1-1.4-8.1-3.8 2 1.7 4.5 2.6 7.1 2.6 5.2 0 9.5-3.1 11.2-7.7l.8.6Z" fill="#006c37" opacity=".55" />
+    </svg>
+  )
+}
 
 type ClipKind = 'video' | 'image'
 type Clip = {
@@ -2568,14 +2579,13 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             {selectedElement ? <>
               <section className="rounded-xl border border-white/10 bg-black/20 p-3">
                 <div className="mb-3 flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-fuchsia-300/20 bg-fuchsia-400/10 text-fuchsia-200"><RefreshCw className="h-5 w-5" /></div>
-                  <div className="min-w-0"><h3 className="text-[11px] font-bold text-white">Replace selected element</h3><p className="mt-1 truncate text-[9px] text-slate-400">{selectedElement.name}</p></div>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-fuchsia-300/20 bg-fuchsia-400/10"><StudioReplaceIcon className="h-6 w-6" /></div>
+                  <div className="min-w-0"><h3 className="text-[11px] font-bold text-white">Replace selected element</h3></div>
                 </div>
                 <p className="text-[9px] leading-4 text-slate-400">Choose a photo or video from your device. The new media will take this element’s place while keeping its canvas position, size, rotation and timeline start.</p>
                 <button type="button" onClick={() => replaceInput.current?.click()} disabled={replaceBusy} className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[10px] font-bold text-white transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60">
                   {replaceBusy ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Uploading and replacing…</> : <><ImagePlus className="h-4 w-4" /> Upload from device</>}
                 </button>
-                <p className="mt-2 text-center text-[8px] leading-4 text-slate-500">Photos up to 20 MB · Videos up to 250 MB</p>
               </section>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
           </div>}
@@ -2833,7 +2843,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             {audio ? <><span className="max-w-[140px] truncate text-[9px] text-cyan-100">{audio.name}</span><label className="flex min-w-[120px] flex-1 items-center gap-2 text-[9px] text-slate-400">Volume<input type="range" min="0" max="100" value={audioVolume} onChange={event => setAudioVolume(Number(event.target.value))} className="w-full accent-cyan-400" /></label><button type="button" onClick={() => { URL.revokeObjectURL(audio.url); objectUrls.current.delete(audio.url); setAudio(null) }} className="text-[9px] text-red-300">Remove</button></> : <span className="text-[9px] text-slate-500">No audio track added yet.</span>}
           </div>}
           <div data-text-toolbar="true" className="sticky top-0 z-50 flex min-h-[48px] shrink-0 flex-wrap items-center gap-1.5 overflow-visible border-b border-fuchsia-400/20 bg-[#111629] px-3 py-2 shadow-xl sm:px-5" role="toolbar" aria-label="Selected object formatting">
-            {selectedElement && !selectedText && <><button type="button" onClick={() => { setActivePanel('element-color'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Element colour" title="Colour" className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'element-color' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10')}><Palette className="h-4 w-4" /> Colour</button><button type="button" disabled={selectedElement.kind !== 'image'} onClick={() => { if (selectedElement?.kind !== 'image') { const fallbackImage = elements.find(item => item.kind === 'image'); if (fallbackImage) setSelectedElementId(fallbackImage.id) } setActivePanel('eraser'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Eraser tools" title={selectedElement.kind === 'image' ? 'Open eraser tools' : 'Eraser is available for photo elements'} className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'eraser' || activePanel === 'object-eraser' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10') + ' disabled:cursor-not-allowed disabled:opacity-40'}><Eraser className="h-4 w-4" /> Eraser</button><button type="button" onClick={() => { setActivePanel('replace'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Replace selected element" title="Replace this photo or video" className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'replace' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10')}><RefreshCw className="h-4 w-4" /> Replace</button></>}
+            {selectedElement && !selectedText && <><button type="button" onClick={() => { setActivePanel('element-color'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Element colour" title="Colour" className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'element-color' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10')}><Palette className="h-4 w-4" /> Colour</button><button type="button" disabled={selectedElement.kind !== 'image'} onClick={() => { if (selectedElement?.kind !== 'image') { const fallbackImage = elements.find(item => item.kind === 'image'); if (fallbackImage) setSelectedElementId(fallbackImage.id) } setActivePanel('eraser'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Eraser tools" title={selectedElement.kind === 'image' ? 'Open eraser tools' : 'Eraser is available for photo elements'} className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'eraser' || activePanel === 'object-eraser' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10') + ' disabled:cursor-not-allowed disabled:opacity-40'}><Eraser className="h-4 w-4" /> Eraser</button><button type="button" onClick={() => { setActivePanel('replace'); setFontMenuOpen(false); setTransparencyMenuOpen(false) }} aria-label="Replace selected element" title="Replace this photo or video" className={'flex h-8 items-center gap-2 rounded-lg border px-3 text-[10px] font-semibold transition ' + (activePanel === 'replace' ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/10')}><StudioReplaceIcon className="h-4 w-4" /> Replace</button></>}
             {selectedText && <>
             <button type="button" onClick={() => removeTextLayer(selectedText.id)} title="Delete text" aria-label="Delete text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-300 transition hover:bg-red-400/10"><Trash2 className="h-4 w-4" /></button>
             <button type="button" onClick={() => duplicateTextLayer(selectedText.id)} title="Duplicate text" aria-label="Duplicate text" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-200 transition hover:bg-white/10"><Copy className="h-4 w-4" /></button>
