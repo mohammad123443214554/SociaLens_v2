@@ -21,7 +21,7 @@ type Asset = {
 }
 type SearchResponse = { ok: boolean; assets?: Asset[]; hasMore?: boolean; total?: number; error?: string; code?: string; provider?: string }
 
-const GIPHY_API_KEY = Capacitor.isNativePlatform() ? (process.env.NEXT_PUBLIC_GIPHY_API_KEY_ANDROID || '') : (process.env.NEXT_PUBLIC_GIPHY_API_KEY_WEB || '')
+const GIPHY_API_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || process.env.NEXT_PUBLIC_GIPHY_API_KEY_WEB || process.env.NEXT_PUBLIC_GIPHY_API_KEY_ANDROID || ''
 
 function normalizeGiphy(data: any): Asset[] {
   return (Array.isArray(data?.data) ? data.data : []).map((item: any) => {
