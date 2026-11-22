@@ -180,6 +180,7 @@ export function StudioReplaceAssetBrowser({ category, query, onSelectAsset, impo
   }
 
   return <div className="min-h-0 flex-1">
+    {recentError && <p role="alert" className="mb-2 rounded-lg border border-red-400/20 bg-red-400/5 p-2 text-[9px] text-red-200">{recentError}</p>}
     <div className="mb-2 flex items-center justify-between gap-2"><p className="text-[9px] text-slate-500">{loading ? 'Searching…' : total ? total.toLocaleString() + ' results found' : assets.length ? assets.length + ' results' : 'Search results'}</p>{assets.length > 0 && <span className="text-[8px] text-slate-500">Select to import</span>}</div>
     {loading && !assets.length ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><div className="aspect-square animate-pulse rounded-lg bg-white/[0.05]" /><div className="aspect-square animate-pulse rounded-lg bg-white/[0.05]" /><div className="aspect-square animate-pulse rounded-lg bg-white/[0.05]" /><div className="aspect-square animate-pulse rounded-lg bg-white/[0.05]" /></div>
       : error ? <div className="rounded-lg border border-red-400/15 bg-red-400/[0.05] p-3 text-[10px] leading-4 text-red-200" role="alert">{error}</div>
