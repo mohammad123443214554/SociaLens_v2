@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Capacitor } from '@capacitor/core'
 import { LoaderCircle, Search, ExternalLink, Play, Image as ImageIcon, Sparkles } from 'lucide-react'
 
 type Category = 'Recently' | 'Graphic' | 'Sketch' | 'Photo' | 'Video' | 'GIF'
