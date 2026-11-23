@@ -510,6 +510,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [elements, setElements] = useState<ElementLayer[]>([])
   const [replaceBusy, setReplaceBusy] = useState(false)
   const [replaceImportingId, setReplaceImportingId] = useState<string | null>(null)
+  const [replaceDedicatedView, setReplaceDedicatedView] = useState(false)
     const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [elementGuides, setElementGuides] = useState<{ vertical: number | null; horizontal: number | null }>({ vertical: null, horizontal: null })
   const elementDrag = useRef<ElementDrag | null>(null)
@@ -2643,9 +2644,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
           </div>}
 
-          {activePanel === 'replace' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4">
+          {activePanel === 'replace' && <div className={'flex min-h-0 flex-1 flex-col overflow-hidden ' + (replaceDedicatedView ? 'p-0' : 'gap-3 p-4')}>
             {selectedElement ? <>
-              <section className="shrink-0 rounded-xl border border-white/10 bg-black/20 p-3">
+              {!replaceDedicatedView && <section className="shrink-0 rounded-xl border border-white/10 bg-black/20 p-3">
                 <div className="mb-3 flex items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-fuchsia-300/20 bg-fuchsia-400/10"><StudioReplaceIcon className="h-6 w-6" /></div>
                   <div className="min-w-0"><h3 className="text-[11px] font-bold text-white">Replace selected element</h3></div>
@@ -2654,10 +2655,10 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 <button type="button" onClick={() => replaceInput.current?.click()} disabled={replaceBusy} className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[10px] font-bold text-white transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60">
                   {replaceBusy ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Uploading and replacing…</> : <><ImagePlus className="h-4 w-4" /> Upload from device</>}
                 </button>
-              </section>
+              </section>}
 
               <div className="flex min-h-0 flex-1 flex-col">
-                <StudioReplaceAssetBrowser onSelectAsset={replaceFromLibrary} importingId={replaceImportingId} />
+                <StudioReplaceAssetBrowser onSelectAsset={replaceFromLibrary} importingId={replaceImportingId} onDedicatedViewChange={setReplaceDedicatedView} />
               </div>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
           </div>}
