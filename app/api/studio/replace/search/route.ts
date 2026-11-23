@@ -146,6 +146,53 @@ function plainMetadata(value: unknown, fallback: string) {
   return value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\\s+/g, ' ').trim().slice(0, 180) || fallback
 }
 
+async function searchWikimediaImages(query: string, page: number, mode: 'graphic' | 'sketch' | 'photo'): Promise<{ assets: Asset[]; hasMore: boolean; total: number }> {
+  const url = new URL('https://commons.wikimedia.org/w/api.php')
+  url.searchParams.set('action', 'query')
+  url.searchParams.set('generator', 'search')
+  const modeQuery = mode === 'graphic' ? 'filemime:image/svg+xml ' + query : mode === 'sketch' ? '(drawing OR sketch OR illustration) ' + query : '(photograph OR photo) ' + query
+  url.searchParams.set('gsrsearch', modeQuery)
+  url.searchParams.set('gsrnamespace', '6')
+  url.searchParams.set('gsrlimit', '10')
+  url.searchParams.set('gsroffset', String((page - 1) * 10))
+  url.searchParams.set('prop', 'imageinfo')
+  url.searchParams.set('iiprop', 'url|size|mime|extmetadata')
+  url.searchParams.set('iiurlwidth', '480')
+  url.searchParams.set('format', 'json')
+  url.searchParams.set('formatversion', '2')
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json', 'Api-User-Agent': 'SociaLens/2.0 (Studio asset search; https://socia-lens-v2.vercel.app/)' },
+    signal: AbortSignal.timeout(12000),
+    next: { revalidate: 3600 },
+  })
+  if (response.status === 429) throw Object.assign(new Error('Wikimedia Commons search limit reached. Please wait a moment and try again.'), { status: 429, code: 'rate_limited' })
+  if (!response.ok) throw Object.assign(new Error('Wikimedia Commons is temporarily unavailable. Please try again.'), { status: response.status, code: 'provider_error' })
+  const data = await response.json() as { query?: { pages?: Array<Record<string, any>> }; continue?: { gsroffset?: number } }
+  const pages = Array.isArray(data.query?.pages) ? data.query!.pages! : []
+  const allowed = mode === 'graphic' ? new Set(['image/svg+xml']) : new Set(['image/jpeg', 'image/png', 'image/webp'])
+  const assets = pages.flatMap(pageData => {
+    const info = Array.isArray(pageData.imageinfo) ? pageData.imageinfo[0] : null
+    if (!info || !allowed.has(String(info.mime || '').toLowerCase()) || !info.url || !info.thumburl) return []
+    const metadata = info.extmetadata && typeof info.extmetadata === 'object' ? info.extmetadata : {}
+    const title = String(pageData.title || 'Wikimedia Commons asset').replace(/^File:/, '')
+    const sourceUrl = 'https://commons.wikimedia.org/wiki/' + encodeURIComponent(String(pageData.title || '').replace(/ /g, '_'))
+    return [{
+      id: 'commons-' + String(pageData.pageid || title),
+      title: plainMetadata(metadata.ObjectName?.value, title.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')),
+      kind: (mode === 'graphic' ? 'icon' : 'image') as Asset['kind'],
+      previewUrl: String(info.thumburl),
+      assetUrl: String(info.url),
+      sourceUrl,
+      creator: plainMetadata(metadata.Artist?.value, 'Wikimedia Commons contributor'),
+      width: Number(info.width) || undefined,
+      height: Number(info.height) || undefined,
+      license: plainMetadata(metadata.LicenseShortName?.value, 'See source page for license'),
+      licenseUrl: String(metadata.LicenseUrl?.value || ''),
+    }]
+  })
+  return { assets, hasMore: Boolean(data.continue?.gsroffset), total: assets.length }
+}
+
 async function searchWikimediaVideos(query: string, page: number): Promise<{ assets: Asset[]; hasMore: boolean; total: number }> {
   const url = new URL('https://commons.wikimedia.org/w/api.php')
   url.searchParams.set('action', 'query')
@@ -230,12 +277,30 @@ export async function GET(request: NextRequest) {
     return jsonError('This asset category is not supported by this search endpoint.', 400, 'invalid_category')
   }
   try {
-    const result = category === 'Graphic'
-      ? await searchIconify(query, page)
-      : category === 'Sketch'
-        ? await searchOpenverse(query, page, 'sketch')
-        : category === 'Photo' ? await searchOpenverse(query, page, 'photo') : await searchWikimediaVideos(query, page)
-    return NextResponse.json({ ok: true, category, provider: category === 'Graphic' ? 'Iconify' : category === 'Video' ? 'Wikimedia Commons' : 'Openverse', ...result }, { headers: NO_STORE })
+    let result: { assets: Asset[]; hasMore: boolean; total: number }
+    let provider = ''
+    if (category === 'Video') {
+      result = await searchWikimediaVideos(query, page)
+      provider = 'Wikimedia Commons'
+    } else {
+      try {
+        if (category === 'Graphic') {
+          result = await searchIconify(query, page)
+          provider = 'Iconify'
+        } else {
+          result = await searchOpenverse(query, page, category === 'Sketch' ? 'sketch' : 'photo')
+          provider = 'Openverse'
+        }
+      } catch {
+        result = await searchWikimediaImages(query, page, category === 'Graphic' ? 'graphic' : category === 'Sketch' ? 'sketch' : 'photo')
+        provider = 'Wikimedia Commons'
+      }
+      if (!result.assets.length) {
+        const fallback = await searchWikimediaImages(query, page, category === 'Graphic' ? 'graphic' : category === 'Sketch' ? 'sketch' : 'photo')
+        if (fallback.assets.length) { result = fallback; provider = 'Wikimedia Commons' }
+      }
+    }
+    return NextResponse.json({ ok: true, category, provider, ...result }, { headers: NO_STORE })
   } catch (error) {
     const status = Number((error as { status?: number })?.status) || 502
     const code = String((error as { code?: string })?.code || 'search_failed')
