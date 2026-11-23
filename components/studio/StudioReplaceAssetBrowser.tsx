@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { LoaderCircle, Play, Search, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, LoaderCircle, Play, Search, Sparkles, X } from 'lucide-react'
 
 type Category = 'Recently' | 'Graphic' | 'Sketch' | 'Photo' | 'Video' | 'GIF'
 type LibraryCategory = Exclude<Category, 'Recently'>
@@ -219,6 +219,7 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
   const active = activeSection && activeSection !== 'Recently' ? sections[activeSection] : null
   return <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
     <label className="mb-4 flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 focus-within:border-fuchsia-400/50">
+      {activeSection && <button type="button" onClick={() => { setActiveSection(null); setQuery('') }} aria-label="Back to all element categories" className="text-slate-400 hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /></button>}
       <Search className="h-3.5 w-3.5 text-slate-500" />
       <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search elements" aria-label="Search all elements" className="h-full min-w-0 flex-1 bg-transparent text-[11px] text-white outline-none placeholder:text-slate-500" />
       {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search" className="text-slate-400"><X className="h-3.5 w-3.5" /></button>}
