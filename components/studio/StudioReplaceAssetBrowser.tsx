@@ -44,7 +44,7 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null }:
   }))
   const [recent, setRecent] = useState<Asset[]>([])
   const [query, setQuery] = useState('')
-  const [activeSection, setActiveSection] = useState<LibraryCategory | null>(null)
+  const [activeSection, setActiveSection] = useState<Category | null>(null)
   const [searching, setSearching] = useState(false)
   const [searchResults, setSearchResults] = useState<Asset[]>([])
   const [searchError, setSearchError] = useState('')
@@ -206,7 +206,7 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null }:
     </section>
   }
 
-  const active = activeSection ? sections[activeSection] : null
+  const active = activeSection && activeSection !== 'Recently' ? sections[activeSection] : null
   return <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
     <label className="mb-4 flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 focus-within:border-fuchsia-400/50">
       <Search className="h-3.5 w-3.5 text-slate-500" />
@@ -216,9 +216,9 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null }:
     {importError && <p role="alert" className="mb-2 text-[9px] text-red-300">{importError}</p>}
     {activeSection ? <div className="flex min-h-0 flex-1 flex-col">
       <button type="button" onClick={() => setActiveSection(null)} className="mb-3 inline-flex w-fit items-center gap-1 text-[10px] font-semibold text-slate-300 hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> All sections</button>
-      <div className="mb-3 flex items-center justify-between"><h3 className="text-[12px] font-semibold text-white">{activeSection}</h3><span className="text-[9px] text-slate-500">{active?.assets.length || 0} elements</span></div>
-      <div onScroll={event => { const node = event.currentTarget; if (node.scrollHeight - node.scrollTop - node.clientHeight < 180) void loadMore(activeSection) }} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="grid grid-cols-3 gap-2">{active?.assets.map(renderAsset)}</div>
+      <div className="mb-3 flex items-center justify-between"><h3 className="text-[12px] font-semibold text-white">{activeSection}</h3><span className="text-[9px] text-slate-500">{activeSection === 'Recently' ? recent.length : active?.assets.length || 0} elements</span></div>
+      <div onScroll={event => { const node = event.currentTarget; if (activeSection !== 'Recently' && node.scrollHeight - node.scrollTop - node.clientHeight < 180) void loadMore(activeSection) }} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="grid grid-cols-3 gap-2">{(activeSection === 'Recently' ? recent : active?.assets || []).map(renderAsset)}</div>
         {active?.loading && <div className="flex justify-center py-4"><LoaderCircle className="h-4 w-4 animate-spin text-fuchsia-300" /></div>}
       </div>
     </div> : query.trim() ? <div className="min-h-0 flex-1 overflow-y-auto">
@@ -228,7 +228,7 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null }:
         : <div className="py-8 text-center text-[10px] text-slate-500">{searchError || 'No results'}</div>}
     </div> : <div className="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(168,85,247,.45)_transparent]">
       <section className="mb-5">
-        <div className="mb-2 flex items-center justify-between"><h3 className="text-[12px] font-semibold text-slate-100">Recently used</h3><button type="button" onClick={() => setActiveSection('Graphic')} className="text-[10px] text-slate-400 hover:text-white">See more</button></div>
+        <div className="mb-2 flex items-center justify-between"><h3 className="text-[12px] font-semibold text-slate-100">Recently used</h3><button type="button" onClick={() => setActiveSection('Recently')} className="text-[10px] text-slate-400 hover:text-white">See more</button></div>
         {recent.length ? <div className="flex gap-2 overflow-x-auto pb-2">{recent.slice(0,10).map(renderAsset)}</div> : <div className="flex h-[58px] items-center gap-2 text-[10px] text-slate-500"><Sparkles className="h-4 w-4" />Your recently used elements will appear here</div>}
       </section>
       {CATEGORIES.map(renderRow)}
