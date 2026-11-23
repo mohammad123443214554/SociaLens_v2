@@ -71,60 +71,6 @@ function expandSearchQuery(query: string, extras: string[] = []) {
   return [...new Set(expanded)].join(' ').slice(0, 100)
 }
 
-async function searchPixabay(query: string, page: number, kind: 'image' | 'video'): Promise<{ assets: Asset[]; hasMore: boolean; total: number }> {
-  const key = process.env.PIXABAY_API_KEY?.trim()
-  if (!key) throw Object.assign(new Error('Pixabay is not configured yet. Add PIXABAY_API_KEY in Vercel Environment Variables.'), { status: 503, code: 'not_configured' })
-  const url = new URL(kind === 'video' ? 'https://pixabay.com/api/videos/' : 'https://pixabay.com/api/')
-  url.searchParams.set('key', key)
-  url.searchParams.set('q', expandSearchQuery(query))
-  url.searchParams.set('page', String(page))
-  url.searchParams.set('per_page', '40')
-  url.searchParams.set('safesearch', 'true')
-  url.searchParams.set('lang', 'en')
-  if (kind === 'image') {
-    url.searchParams.set('image_type', 'photo')
-    url.searchParams.set('orientation', 'all')
-  } else {
-    url.searchParams.set('video_type', 'all')
-  }
-  const data = await fetchJson(url, 86400) as {
-    total?: number
-    totalHits?: number
-    hits?: Array<Record<string, any>>
-  }
-  const hits = Array.isArray(data.hits) ? data.hits : []
-  const assets = hits.map(hit => {
-    if (kind === 'video') {
-      const videos = hit.videos && typeof hit.videos === 'object' ? hit.videos : {}
-      const rendition = videos.medium || videos.small || videos.tiny || videos.large
-      return {
-        id: 'pixabay-video-' + String(hit.id),
-        title: String(hit.tags || 'Pixabay video').slice(0, 120),
-        kind: 'video' as const,
-        previewUrl: String(rendition?.thumbnail || ''),
-        assetUrl: String(rendition?.url || ''),
-        sourceUrl: String(hit.pageURL || ''),
-        creator: String(hit.user || 'Pixabay contributor'),
-        duration: Number(hit.duration) || undefined,
-        width: Number(rendition?.width) || undefined,
-        height: Number(rendition?.height) || undefined,
-      }
-    }
-    return {
-      id: 'pixabay-photo-' + String(hit.id),
-      title: String(hit.tags || 'Pixabay photo').slice(0, 120),
-      kind: 'image' as const,
-      previewUrl: String(hit.webformatURL || hit.previewURL || ''),
-      assetUrl: String(hit.largeImageURL || hit.webformatURL || ''),
-      sourceUrl: String(hit.pageURL || ''),
-      creator: String(hit.user || 'Pixabay contributor'),
-      width: Number(hit.imageWidth) || undefined,
-      height: Number(hit.imageHeight) || undefined,
-    }
-  }).filter(asset => asset.previewUrl && asset.assetUrl && asset.sourceUrl)
-  const total = Number(data.totalHits ?? data.total) || 0
-  return { assets, hasMore: page * 40 < Math.min(total, 500), total }
-}
 
 let openverseToken = ''
 let openverseTokenExpiresAt = 0
@@ -152,14 +98,18 @@ async function getOpenverseToken(clientId: string, clientSecret: string) {
   try { return await openverseTokenRequest } finally { openverseTokenRequest = null }
 }
 
-async function searchOpenverse(query: string, page: number): Promise<{ assets: Asset[]; hasMore: boolean; total: number }> {
-  const expandedQuery = expandSearchQuery(query, ['sketch', 'drawing', 'illustration', 'line art', 'pencil art'])
+async function searchOpenverse(query: string, page: number, mode: 'photo' | 'sketch'): Promise<{ assets: Asset[]; hasMore: boolean; total: number }> {
+  const expandedQuery = mode === 'photo' ? query : expandSearchQuery(query, ['sketch', 'drawing', 'illustration', 'line art', 'pencil art'])
   const url = new URL('https://api.openverse.org/v1/images/')
   url.searchParams.set('q', expandedQuery)
   url.searchParams.set('page', String(page))
   url.searchParams.set('page_size', '20')
   url.searchParams.set('mature', 'false')
   url.searchParams.set('filter_dead', 'true')
+  if (mode === 'photo') {
+    url.searchParams.set('category', 'photograph')
+    url.searchParams.set('license_type', 'commercial')
+  }
   const clientId = process.env.OPENVERSE_CLIENT_ID?.trim()
   const clientSecret = process.env.OPENVERSE_CLIENT_SECRET?.trim()
   let authorization = ''
@@ -188,6 +138,58 @@ async function searchOpenverse(query: string, page: number): Promise<{ assets: A
   })).filter(item => item.previewUrl && item.assetUrl && item.sourceUrl)
   const total = Number(data.result_count) || 0
   return { assets, hasMore: page < (Number(data.page_count) || 0), total }
+}
+
+
+function plainMetadata(value: unknown, fallback: string) {
+  if (typeof value !== 'string' || !value.trim()) return fallback
+  return value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\\s+/g, ' ').trim().slice(0, 180) || fallback
+}
+
+async function searchWikimediaVideos(query: string, page: number): Promise<{ assets: Asset[]; hasMore: boolean; total: number }> {
+  const url = new URL('https://commons.wikimedia.org/w/api.php')
+  url.searchParams.set('action', 'query')
+  url.searchParams.set('generator', 'search')
+  url.searchParams.set('gsrsearch', 'filetype:video ' + query)
+  url.searchParams.set('gsrnamespace', '6')
+  url.searchParams.set('gsrlimit', '20')
+  url.searchParams.set('gsroffset', String((page - 1) * 20))
+  url.searchParams.set('prop', 'imageinfo')
+  url.searchParams.set('iiprop', 'url|size|mime|extmetadata')
+  url.searchParams.set('iiurlwidth', '480')
+  url.searchParams.set('format', 'json')
+  url.searchParams.set('formatversion', '2')
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json', 'Api-User-Agent': 'SociaLens/2.0 (Studio media search; https://socia-lens-v2.vercel.app/)' },
+    signal: AbortSignal.timeout(12000),
+    next: { revalidate: 3600 },
+  })
+  if (response.status === 429) throw Object.assign(new Error('Wikimedia Commons search limit reached. Please wait a moment and try again.'), { status: 429, code: 'rate_limited' })
+  if (!response.ok) throw Object.assign(new Error('Wikimedia Commons is temporarily unavailable. Please try again.'), { status: response.status, code: 'provider_error' })
+  const data = await response.json() as { query?: { pages?: Array<Record<string, any>> }; continue?: { gsroffset?: number } }
+  const pages = Array.isArray(data.query?.pages) ? data.query!.pages! : []
+  const supportedMimes = new Set(['video/webm', 'video/ogg', 'video/mpeg'])
+  const assets = pages.flatMap(pageData => {
+    const info = Array.isArray(pageData.imageinfo) ? pageData.imageinfo[0] : null
+    if (!info || !supportedMimes.has(String(info.mime || '').toLowerCase()) || !info.url) return []
+    const metadata = info.extmetadata && typeof info.extmetadata === 'object' ? info.extmetadata : {}
+    const title = String(pageData.title || 'Wikimedia Commons video').replace(/^File:/, '')
+    const sourceUrl = 'https://commons.wikimedia.org/wiki/' + encodeURIComponent(String(pageData.title || '').replace(/ /g, '_'))
+    return [{
+      id: 'commons-video-' + String(pageData.pageid || title),
+      title: plainMetadata(metadata.ObjectName?.value, title.replace(/\\.[^.]+$/, '').replace(/[_-]+/g, ' ')),
+      kind: 'video' as const,
+      previewUrl: String(info.thumburl || ''),
+      assetUrl: String(info.url),
+      sourceUrl,
+      creator: plainMetadata(metadata.Artist?.value, 'Wikimedia Commons contributor'),
+      width: Number(info.width) || undefined,
+      height: Number(info.height) || undefined,
+      license: plainMetadata(metadata.LicenseShortName?.value, 'See source page for license'),
+      licenseUrl: String(metadata.LicenseUrl?.value || ''),
+    }]
+  })
+  return { assets, hasMore: Boolean(data.continue?.gsroffset), total: assets.length }
 }
 
 async function searchIconify(query: string, page: number): Promise<{ assets: Asset[]; hasMore: boolean; total: number }> {
@@ -231,9 +233,9 @@ export async function GET(request: NextRequest) {
     const result = category === 'Graphic'
       ? await searchIconify(query, page)
       : category === 'Sketch'
-        ? await searchOpenverse(query, page)
-        : await searchPixabay(query, page, category === 'Video' ? 'video' : 'image')
-    return NextResponse.json({ ok: true, category, provider: category === 'Graphic' ? 'Iconify' : category === 'Sketch' ? 'Openverse' : 'Pixabay', ...result }, { headers: NO_STORE })
+        ? await searchOpenverse(query, page, 'sketch')
+        : category === 'Photo' ? await searchOpenverse(query, page, 'photo') : await searchWikimediaVideos(query, page)
+    return NextResponse.json({ ok: true, category, provider: category === 'Graphic' ? 'Iconify' : category === 'Video' ? 'Wikimedia Commons' : 'Openverse', ...result }, { headers: NO_STORE })
   } catch (error) {
     const status = Number((error as { status?: number })?.status) || 502
     const code = String((error as { code?: string })?.code || 'search_failed')
