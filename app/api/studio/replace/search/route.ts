@@ -103,7 +103,7 @@ async function searchOpenverse(query: string, page: number, mode: 'photo' | 'ske
   const url = new URL('https://api.openverse.org/v1/images/')
   url.searchParams.set('q', expandedQuery)
   url.searchParams.set('page', String(page))
-  url.searchParams.set('page_size', '20')
+  url.searchParams.set('page_size', '10')
   url.searchParams.set('mature', 'false')
   url.searchParams.set('filter_dead', 'true')
   if (mode === 'photo') {
@@ -152,8 +152,8 @@ async function searchWikimediaVideos(query: string, page: number): Promise<{ ass
   url.searchParams.set('generator', 'search')
   url.searchParams.set('gsrsearch', 'filetype:video ' + query)
   url.searchParams.set('gsrnamespace', '6')
-  url.searchParams.set('gsrlimit', '20')
-  url.searchParams.set('gsroffset', String((page - 1) * 20))
+  url.searchParams.set('gsrlimit', '10')
+  url.searchParams.set('gsroffset', String((page - 1) * 10))
   url.searchParams.set('prop', 'imageinfo')
   url.searchParams.set('iiprop', 'url|size|mime|extmetadata')
   url.searchParams.set('iiurlwidth', '480')
@@ -193,10 +193,10 @@ async function searchWikimediaVideos(query: string, page: number): Promise<{ ass
 }
 
 async function searchIconify(query: string, page: number): Promise<{ assets: Asset[]; hasMore: boolean; total: number }> {
-  const start = (page - 1) * 48
+  const start = (page - 1) * 10
   const url = new URL('https://api.iconify.design/search')
   url.searchParams.set('query', expandSearchQuery(query))
-  url.searchParams.set('limit', '48')
+  url.searchParams.set('limit', '10')
   url.searchParams.set('start', String(start))
   const data = await fetchJson(url, 86400) as { icons?: string[]; total?: number; limit?: number }
   const icons = Array.isArray(data.icons) ? data.icons : []
@@ -215,7 +215,7 @@ async function searchIconify(query: string, page: number): Promise<{ assets: Ass
     }
   }).filter((item): item is NonNullable<typeof item> => Boolean(item))
   const total = Number(data.total) || 0
-  return { assets, hasMore: icons.length === 48, total }
+  return { assets, hasMore: icons.length === 10, total }
 }
 
 export async function GET(request: NextRequest) {
