@@ -1,194 +1,237 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { LoaderCircle, ExternalLink, Play, Image as ImageIcon, Sparkles } from 'lucide-react'
+import { ArrowLeft, LoaderCircle, Play, Search, Sparkles, X } from 'lucide-react'
 
 type Category = 'Recently' | 'Graphic' | 'Sketch' | 'Photo' | 'Video' | 'GIF'
+type LibraryCategory = Exclude<Category, 'Recently'>
 type Asset = {
-  id: string
-  title: string
-  kind: 'image' | 'video' | 'icon' | 'gif'
-  previewUrl: string
-  assetUrl: string
-  sourceUrl: string
-  creator?: string
-  duration?: number
-  width?: number
-  height?: number
-  license?: string
-  licenseUrl?: string
+  id: string; title: string; kind: 'image' | 'video' | 'icon' | 'gif'
+  previewUrl: string; assetUrl: string; sourceUrl: string; creator?: string
+  duration?: number; width?: number; height?: number; license?: string; licenseUrl?: string
 }
-type SearchResponse = { ok: boolean; assets?: Asset[]; hasMore?: boolean; total?: number; error?: string; code?: string }
-
-const GIPHY_API_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || process.env.NEXT_PUBLIC_GIPHY_API_KEY_WEB || process.env.NEXT_PUBLIC_GIPHY_API_KEY_ANDROID || ''
+type SearchResponse = { ok: boolean; assets?: Asset[]; hasMore?: boolean; total?: number; error?: string }
+type SectionState = { assets: Asset[]; page: number; hasMore: boolean; loading: boolean; error: string }
+const CATEGORIES: LibraryCategory[] = ['Graphic', 'Sketch', 'Photo', 'Video', 'GIF']
 const PAGE_SIZE = 10
-const DEFAULT_QUERIES: Record<Exclude<Category, 'Recently'>, string> = {
-  Graphic: 'popular',
-  Sketch: 'illustration',
-  Photo: 'nature landscape',
+const DEFAULT_QUERIES: Record<LibraryCategory, string> = {
+  Graphic: 'popular icons',
+  Sketch: 'hand drawn illustration',
+  Photo: 'popular nature photography',
   Video: 'nature',
   GIF: 'trending',
 }
+const EMPTY: SectionState = { assets: [], page: 0, hasMore: true, loading: false, error: '' }
+const GIPHY_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || process.env.NEXT_PUBLIC_GIPHY_API_KEY_WEB || process.env.NEXT_PUBLIC_GIPHY_API_KEY_ANDROID || ''
 
-function normalizeGiphy(data: any): Asset[] {
+function normalizeGif(data: any): Asset[] {
   return (Array.isArray(data?.data) ? data.data : []).map((item: any) => {
     const images = item.images || {}
-    const rendition = images.fixed_width_small || images.preview_gif || images.fixed_width || images.original
-    const original = images.original || images.fixed_width || rendition
-    return {
-      id: 'giphy-' + String(item.id),
-      title: String(item.title || 'Animated GIF').slice(0, 140),
-      kind: 'gif' as const,
-      previewUrl: String(rendition?.url || rendition?.webp || ''),
-      assetUrl: String(original?.url || original?.webp || ''),
-      sourceUrl: String(item.url || ''),
-      creator: String(item.username || 'GIPHY'),
-      width: Number(original?.width) || undefined,
-      height: Number(original?.height) || undefined,
-    }
+    const preview = images.fixed_width_small || images.preview_gif || images.fixed_width || images.original
+    const original = images.original || images.fixed_width || preview
+    return { id: 'giphy-' + String(item.id), title: String(item.title || 'GIF'), kind: 'gif' as const,
+      previewUrl: String(preview?.url || preview?.webp || ''), assetUrl: String(original?.url || original?.webp || ''),
+      sourceUrl: String(item.url || ''), creator: String(item.username || 'GIPHY'),
+      width: Number(original?.width) || undefined, height: Number(original?.height) || undefined }
   }).filter((item: Asset) => item.previewUrl && item.assetUrl && item.sourceUrl)
 }
 
-export function StudioReplaceAssetBrowser({ category, onSelectAsset, importingId = null }: { category: Category; query?: string; onSelectAsset: (asset: Asset) => Promise<void>; importingId?: string | null }) {
-  const [assets, setAssets] = useState<Asset[]>([])
-  const [loading, setLoading] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState('')
-  const [hasMore, setHasMore] = useState(false)
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [recentAssets, setRecentAssets] = useState<Asset[]>([])
-  const [recentError, setRecentError] = useState('')
-  const requestSequence = useRef(0)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const categoryQuery = category === 'Recently' ? '' : DEFAULT_QUERIES[category]
+export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null }: {
+  category?: Category; query?: string; onSelectAsset: (asset: Asset) => Promise<void>; importingId?: string | null
+}) {
+  const [sections, setSections] = useState<Record<LibraryCategory, SectionState>>(() => ({
+    Graphic: { ...EMPTY }, Sketch: { ...EMPTY }, Photo: { ...EMPTY }, Video: { ...EMPTY }, GIF: { ...EMPTY },
+  }))
+  const [recent, setRecent] = useState<Asset[]>([])
+  const [query, setQuery] = useState('')
+  const [activeSection, setActiveSection] = useState<LibraryCategory | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [searchResults, setSearchResults] = useState<Asset[]>([])
+  const [searchError, setSearchError] = useState('')
+  const [importError, setImportError] = useState('')
+  const sectionScrolls = useRef<Record<string, HTMLDivElement | null>>({})
+  const requestIds = useRef<Record<string, number>>({})
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem('socialens-studio-replace-recent-v1')
-      const parsed = raw ? JSON.parse(raw) : []
-      setRecentAssets(Array.isArray(parsed) ? parsed.slice(0, 30) : [])
-    } catch { setRecentAssets([]) }
+      const parsed = JSON.parse(localStorage.getItem('socialens-studio-replace-recent-v1') || '[]')
+      setRecent(Array.isArray(parsed) ? parsed.slice(0, 30) : [])
+    } catch { setRecent([]) }
   }, [])
 
-  const rememberAsset = (asset: Asset) => {
-    if (asset.kind === 'gif') return
-    setRecentAssets(current => {
+  const remember = (asset: Asset) => {
+    setRecent(current => {
       const next = [asset, ...current.filter(item => item.id !== asset.id)].slice(0, 30)
-      try { window.localStorage.setItem('socialens-studio-replace-recent-v1', JSON.stringify(next)) } catch { /* Optional local history. */ }
+      try { localStorage.setItem('socialens-studio-replace-recent-v1', JSON.stringify(next)) } catch {}
       return next
     })
   }
 
-  const chooseAsset = async (asset: Asset) => {
+  const choose = async (asset: Asset) => {
     if (importingId) return
-    setRecentError('')
-    try {
-      await onSelectAsset(asset)
-      rememberAsset(asset)
-    } catch (cause) {
-      setRecentError(cause instanceof Error ? cause.message : 'Could not import this asset.')
-    }
+    setImportError('')
+    try { await onSelectAsset(asset); remember(asset) }
+    catch (error) { setImportError(error instanceof Error ? error.message : 'Could not import this element.') }
   }
 
-  const fetchPage = useCallback(async (targetPage: number, append: boolean, signal?: AbortSignal) => {
-    if (category === 'Recently') return
-    if (category === 'GIF') {
-      if (!GIPHY_API_KEY) throw new Error('GIPHY API key is not configured in Vercel.')
-      const url = new URL('https://api.giphy.com/v1/gifs/' + (targetPage === 1 ? 'trending' : 'trending'))
-      url.searchParams.set('api_key', GIPHY_API_KEY)
-      url.searchParams.set('limit', String(PAGE_SIZE))
-      url.searchParams.set('offset', String((targetPage - 1) * PAGE_SIZE))
-      url.searchParams.set('rating', 'g')
-      const response = await fetch(url, { signal })
-      if (!response.ok) throw new Error(response.status === 429 ? 'GIPHY rate limit reached. Please wait and try again.' : 'GIPHY is temporarily unavailable.')
-      const data = await response.json()
-      const next = normalizeGiphy(data)
-      setAssets(current => append ? [...current, ...next.filter(item => !current.some(existing => existing.id === item.id))] : next)
-      setTotal(Number(data?.pagination?.total_count) || next.length)
-      setHasMore(next.length === PAGE_SIZE && (targetPage * PAGE_SIZE) < (Number(data?.pagination?.total_count) || 0))
-    } else {
-      const params = new URLSearchParams({ category, q: categoryQuery, page: String(targetPage) })
-      const response = await fetch('/api/studio/replace/search?' + params.toString(), { signal })
-      const data = await response.json() as SearchResponse
-      if (!response.ok || !data.ok) throw new Error(data.error || 'Asset library is temporarily unavailable.')
-      const next = data.assets || []
-      setAssets(current => append ? [...current, ...next.filter(item => !current.some(existing => existing.id === item.id))] : next)
-      setTotal(Number(data.total) || next.length)
-      setHasMore(Boolean(data.hasMore))
+  const loadCategory = useCallback(async (category: LibraryCategory, page: number, term: string, append: boolean) => {
+    const id = (requestIds.current[category] || 0) + 1
+    requestIds.current[category] = id
+    setSections(current => ({ ...current, [category]: { ...current[category], loading: true, error: '' } }))
+    try {
+      let assets: Asset[] = []
+      let hasMore = false
+      if (category === 'GIF') {
+        if (!GIPHY_KEY) throw new Error('GIPHY API key is missing.')
+        const url = new URL('https://api.giphy.com/v1/gifs/' + (term ? 'search' : 'trending'))
+        url.searchParams.set('api_key', GIPHY_KEY)
+        url.searchParams.set('limit', String(PAGE_SIZE))
+        url.searchParams.set('offset', String((page - 1) * PAGE_SIZE))
+        url.searchParams.set('rating', 'g')
+        if (term) url.searchParams.set('q', term)
+        const response = await fetch(url)
+        if (!response.ok) throw new Error(response.status === 429 ? 'GIPHY rate limit reached.' : 'GIPHY is temporarily unavailable.')
+        const data = await response.json()
+        assets = normalizeGif(data)
+        hasMore = assets.length === PAGE_SIZE && (page * PAGE_SIZE) < Number(data?.pagination?.total_count || 0)
+      } else {
+        const params = new URLSearchParams({ category, q: term || DEFAULT_QUERIES[category], page: String(page) })
+        const response = await fetch('/api/studio/replace/search?' + params.toString())
+        const data = await response.json() as SearchResponse
+        if (!response.ok || !data.ok) throw new Error(data.error || 'This library is temporarily unavailable.')
+        assets = data.assets || []
+        hasMore = Boolean(data.hasMore)
+        if (!assets.length && term && page === 1) {
+          const fallback = new URLSearchParams({ category, q: DEFAULT_QUERIES[category], page: '1' })
+          const fallbackResponse = await fetch('/api/studio/replace/search?' + fallback.toString())
+          const fallbackData = await fallbackResponse.json() as SearchResponse
+          if (fallbackResponse.ok && fallbackData.ok) { assets = fallbackData.assets || []; hasMore = Boolean(fallbackData.hasMore) }
+        }
+      }
+      if (requestIds.current[category] !== id) return
+      setSections(current => {
+        const previous = current[category]
+        const merged = append ? [...previous.assets, ...assets.filter(asset => !previous.assets.some(old => old.id === asset.id))] : assets
+        return { ...current, [category]: { assets: merged, page, hasMore, loading: false, error: '' } }
+      })
+      return assets
+    } catch (error) {
+      if (requestIds.current[category] === id) setSections(current => ({ ...current, [category]: { ...current[category], loading: false, error: error instanceof Error ? error.message : 'Could not load assets.' } }))
+      return []
     }
-  }, [category, categoryQuery])
+  }, [])
 
   useEffect(() => {
-    const sequence = ++requestSequence.current
-    const controller = new AbortController()
-    setAssets([])
-    setPage(1)
-    setHasMore(false)
-    setTotal(0)
-    setError('')
-    if (category === 'Recently') return () => controller.abort()
-    setLoading(true)
-    void fetchPage(1, false, controller.signal).catch(cause => {
-      if (!controller.signal.aborted && requestSequence.current === sequence) setError(cause instanceof Error ? cause.message : 'Could not load assets.')
-    }).finally(() => {
-      if (!controller.signal.aborted && requestSequence.current === sequence) setLoading(false)
-    })
-    return () => controller.abort()
-  }, [category, fetchPage])
+    CATEGORIES.forEach(category => { void loadCategory(category, 1, '', false) })
+  }, [loadCategory])
 
-  const loadMore = useCallback(async () => {
-    if (loading || loadingMore || !hasMore || category === 'Recently') return
-    setLoadingMore(true)
-    const nextPage = page + 1
-    try {
-      await fetchPage(nextPage, true)
-      setPage(nextPage)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not load more assets.')
-    } finally {
-      setLoadingMore(false)
-    }
-  }, [category, fetchPage, hasMore, loading, loadingMore, page])
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    if (!query.trim()) { setSearchResults([]); setSearchError(''); setSearching(false); return }
+    const term = query.trim()
+    setSearching(true)
+    searchTimer.current = setTimeout(async () => {
+      setSearchError('')
+      const all: Asset[] = []
+      for (const category of CATEGORIES) {
+        const id = (requestIds.current[category] || 0) + 1
+        requestIds.current[category] = id
+        try {
+          let found: Asset[] = []
+          if (category === 'GIF') {
+            if (GIPHY_KEY) {
+              const url = new URL('https://api.giphy.com/v1/gifs/search')
+              url.searchParams.set('api_key', GIPHY_KEY); url.searchParams.set('q', term)
+              url.searchParams.set('limit', String(PAGE_SIZE)); url.searchParams.set('rating', 'g')
+              const response = await fetch(url)
+              if (response.ok) found = normalizeGif(await response.json())
+            }
+          } else {
+            const params = new URLSearchParams({ category, q: term, page: '1' })
+            const response = await fetch('/api/studio/replace/search?' + params.toString())
+            const data = await response.json() as SearchResponse
+            if (response.ok && data.ok) found = data.assets || []
+            if (!found.length) {
+              const fallback = new URLSearchParams({ category, q: DEFAULT_QUERIES[category], page: '1' })
+              const fallbackResponse = await fetch('/api/studio/replace/search?' + fallback.toString())
+              const fallbackData = await fallbackResponse.json() as SearchResponse
+              if (fallbackResponse.ok && fallbackData.ok) found = fallbackData.assets || []
+            }
+          }
+          all.push(...found)
+        } catch {}
+      }
+      const unique = all.filter((asset, index) => all.findIndex(item => item.id === asset.id) === index)
+      setSearchResults(unique)
+      if (!unique.length) setSearchError('No matching assets are available at the moment. Try another word.')
+      setSearching(false)
+    }, 350)
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current) }
+  }, [query])
 
-  const handleScroll = () => {
-    const node = scrollRef.current
-    if (!node || loadingMore || loading || !hasMore) return
-    if (node.scrollHeight - node.scrollTop - node.clientHeight < 180) void loadMore()
+  const loadMore = async (category: LibraryCategory) => {
+    const section = sections[category]
+    if (section.loading || !section.hasMore) return
+    await loadCategory(category, section.page + 1, query.trim(), true)
   }
 
   const renderAsset = (asset: Asset) => (
-    <article key={asset.id} className="group min-w-0 overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.025]">
-      <div className="relative aspect-square overflow-hidden bg-[#171b2b]">
-        <img src={asset.previewUrl} alt={asset.title} loading="lazy" onError={event => { event.currentTarget.style.display = 'none' }} className={asset.kind === 'icon' ? 'h-full w-full object-contain p-5' : 'h-full w-full object-cover transition duration-200 group-hover:scale-[1.03]'} />
-        {asset.kind === 'video' && <span className="absolute bottom-2 left-2 rounded-md bg-black/70 p-1"><Play className="h-3 w-3 text-white" /></span>}
-        {asset.kind === 'gif' && <span className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[8px] font-bold text-white">GIF</span>}
-        {importingId === asset.id && <span className="absolute inset-0 flex items-center justify-center bg-black/60"><LoaderCircle className="h-5 w-5 animate-spin text-white" /></span>}
-      </div>
-      <div className="p-2">
-        <p className="truncate text-[9px] font-medium text-slate-200" title={asset.title}>{asset.title}</p>
-        <p className="mt-0.5 truncate text-[8px] text-slate-500">{asset.creator || 'Community asset'}{asset.duration ? ' · ' + asset.duration + 's' : ''}</p>
-        {asset.license && <p className="mt-1 truncate text-[8px] text-slate-500" title={asset.license}>{asset.license}</p>}
-        <a href={asset.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[8px] text-fuchsia-300 hover:text-fuchsia-200">Source <ExternalLink className="h-2.5 w-2.5" /></a>
-        {asset.kind === 'gif' ? <p className="mt-2 text-[8px] leading-3 text-slate-500">Powered by GIPHY</p> : <button type="button" onClick={() => void chooseAsset(asset)} disabled={Boolean(importingId)} className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-[9px] font-bold text-white disabled:opacity-50">{importingId === asset.id ? <><LoaderCircle className="h-3 w-3 animate-spin" /> Importing…</> : 'Use this asset'}</button>}
-      </div>
-    </article>
+    <button key={asset.id} type="button" onClick={() => void choose(asset)} disabled={Boolean(importingId)}
+      title={asset.title} aria-label={'Use ' + asset.title}
+      className="group relative h-[92px] w-[92px] shrink-0 overflow-hidden rounded-md bg-[#252630] transition hover:ring-2 hover:ring-fuchsia-400/70 disabled:opacity-50">
+      <img src={asset.previewUrl} alt="" loading="lazy" onError={event => { event.currentTarget.style.opacity = '0' }}
+        className={asset.kind === 'icon' ? 'h-full w-full object-contain p-3' : 'h-full w-full object-cover transition group-hover:scale-105'} />
+      {asset.kind === 'video' && <span className="absolute bottom-1 left-1 rounded bg-black/70 p-1"><Play className="h-3 w-3 text-white" /></span>}
+      {asset.kind === 'gif' && <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[8px] font-bold text-white">GIF</span>}
+      {importingId === asset.id && <span className="absolute inset-0 flex items-center justify-center bg-black/60"><LoaderCircle className="h-5 w-5 animate-spin text-white" /></span>}
+    </button>
   )
 
-  return <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(168,85,247,.55)_transparent]">
-    {recentError && <p role="alert" className="mb-2 rounded-lg border border-red-400/20 bg-red-400/5 p-2 text-[9px] text-red-200">{recentError}</p>}
-    {category === 'Recently' ? recentAssets.length
-      ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{recentAssets.map(renderAsset)}</div>
-      : <div className="flex flex-col items-center justify-center py-10 text-center"><Sparkles className="h-5 w-5 text-slate-500" /><p className="mt-3 text-[10px] font-semibold text-slate-300">No recently used assets</p><p className="mt-1 max-w-[230px] text-[9px] leading-4 text-slate-500">Assets you successfully import will appear here on this device.</p></div>
-      : <>
-        <div className="mb-2 flex items-center justify-between gap-2"><p className="text-[9px] text-slate-500">{loading ? 'Loading popular assets…' : total ? total.toLocaleString() + ' results' : assets.length + ' assets'}</p><span className="text-[8px] text-slate-500">Popular picks · {PAGE_SIZE} per batch</span></div>
-        {loading && !assets.length ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{Array.from({ length: PAGE_SIZE }, (_, index) => <div key={index} className="aspect-square animate-pulse rounded-lg bg-white/[0.05]" />)}</div>
-          : error && !assets.length ? <div className="rounded-lg border border-red-400/15 bg-red-400/[0.05] p-3 text-[10px] leading-4 text-red-200" role="alert">{error}</div>
-          : assets.length ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{assets.map(renderAsset)}</div>
-          : <div className="py-10 text-center"><ImageIcon className="mx-auto h-5 w-5 text-slate-600" /><p className="mt-3 text-[10px] font-semibold text-slate-300">No assets available right now</p><p className="mt-1 text-[9px] text-slate-500">This library returned no matching popular assets.</p></div>}
-        {error && assets.length > 0 && <p role="alert" className="mt-2 text-[9px] text-red-300">{error}</p>}
-        {loadingMore && <div className="flex items-center justify-center gap-2 py-4 text-[9px] text-slate-400"><LoaderCircle className="h-3.5 w-3.5 animate-spin" />Loading more assets…</div>}
-        {hasMore && !loadingMore && <p className="py-3 text-center text-[8px] text-slate-500">Scroll down to load more</p>}
-      </>}
+  const renderRow = (category: LibraryCategory) => {
+    const section = sections[category]
+    return <section key={category} className="mb-5 min-w-0">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-[12px] font-semibold text-slate-100">{category}</h3>
+        <button type="button" onClick={() => setActiveSection(category)} className="text-[10px] font-semibold text-slate-300 hover:text-white">See more</button>
+      </div>
+      <div ref={node => { sectionScrolls.current[category] = node }} onScroll={event => {
+        const node = event.currentTarget
+        if (node.scrollWidth - node.scrollLeft - node.clientWidth < 160) void loadMore(category)
+      }} className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:thin] [scrollbar-color:rgba(168,85,247,.45)_transparent]">
+        {section.assets.map(renderAsset)}
+        {section.loading && Array.from({ length: section.assets.length ? 3 : PAGE_SIZE }, (_, index) => <div key={'skeleton-' + index} className="h-[92px] w-[92px] shrink-0 animate-pulse rounded-md bg-white/[0.06]" />)}
+        {!section.loading && !section.assets.length && <div className="flex h-[92px] w-full items-center justify-center rounded-md border border-dashed border-white/10 text-[10px] text-slate-500">{section.error || 'Loading more soon'}</div>}
+      </div>
+    </section>
+  }
+
+  const active = activeSection ? sections[activeSection] : null
+  return <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <label className="mb-4 flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 focus-within:border-fuchsia-400/50">
+      <Search className="h-3.5 w-3.5 text-slate-500" />
+      <input value={query} onChange={event => { setQuery(event.target.value); setActiveSection(null) }} placeholder="Search elements" aria-label="Search all elements" className="h-full min-w-0 flex-1 bg-transparent text-[11px] text-white outline-none placeholder:text-slate-500" />
+      {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search" className="text-slate-400"><X className="h-3.5 w-3.5" /></button>}
+    </label>
+    {importError && <p role="alert" className="mb-2 text-[9px] text-red-300">{importError}</p>}
+    {activeSection ? <div className="flex min-h-0 flex-1 flex-col">
+      <button type="button" onClick={() => setActiveSection(null)} className="mb-3 inline-flex w-fit items-center gap-1 text-[10px] font-semibold text-slate-300 hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> All sections</button>
+      <div className="mb-3 flex items-center justify-between"><h3 className="text-[12px] font-semibold text-white">{activeSection}</h3><span className="text-[9px] text-slate-500">{active?.assets.length || 0} elements</span></div>
+      <div onScroll={event => { const node = event.currentTarget; if (node.scrollHeight - node.scrollTop - node.clientHeight < 180) void loadMore(activeSection) }} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="grid grid-cols-3 gap-2">{active?.assets.map(renderAsset)}</div>
+        {active?.loading && <div className="flex justify-center py-4"><LoaderCircle className="h-4 w-4 animate-spin text-fuchsia-300" /></div>}
+      </div>
+    </div> : query.trim() ? <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mb-2 text-[10px] text-slate-500">{searching ? 'Finding matching elements…' : searchResults.length + ' elements'}</div>
+      {searching ? <div className="grid grid-cols-3 gap-2">{Array.from({length:10},(_,i)=><div key={i} className="aspect-square animate-pulse rounded-md bg-white/[0.06]"/>)}</div>
+        : searchResults.length ? <div className="grid grid-cols-3 gap-2">{searchResults.map(renderAsset)}</div>
+        : <div className="py-8 text-center text-[10px] text-slate-500">{searchError || 'No results'}</div>}
+    </div> : <div className="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(168,85,247,.45)_transparent]">
+      <section className="mb-5">
+        <div className="mb-2 flex items-center justify-between"><h3 className="text-[12px] font-semibold text-slate-100">Recently used</h3><button type="button" onClick={() => setActiveSection('Graphic')} className="text-[10px] text-slate-400 hover:text-white">See more</button></div>
+        {recent.length ? <div className="flex gap-2 overflow-x-auto pb-2">{recent.slice(0,10).map(renderAsset)}</div> : <div className="flex h-[58px] items-center gap-2 text-[10px] text-slate-500"><Sparkles className="h-4 w-4" />Your recently used elements will appear here</div>}
+      </section>
+      {CATEGORIES.map(renderRow)}
+    </div>}
   </div>
 }
