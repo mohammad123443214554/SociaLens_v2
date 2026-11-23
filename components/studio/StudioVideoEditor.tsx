@@ -510,8 +510,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
   const [elements, setElements] = useState<ElementLayer[]>([])
   const [replaceBusy, setReplaceBusy] = useState(false)
   const [replaceImportingId, setReplaceImportingId] = useState<string | null>(null)
-  const [replaceCategory, setReplaceCategory] = useState<'Recently' | 'Graphic' | 'Sketch' | 'Photo' | 'Video' | 'GIF'>('Recently')
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
+    const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [elementGuides, setElementGuides] = useState<{ vertical: number | null; horizontal: number | null }>({ vertical: null, horizontal: null })
   const elementDrag = useRef<ElementDrag | null>(null)
   const [audio, setAudio] = useState<AudioTrack | null>(null)
@@ -2644,7 +2643,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
           </div>}
 
-          {activePanel === 'replace' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+          {activePanel === 'replace' && <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4">
             {selectedElement ? <>
               <section className="shrink-0 rounded-xl border border-white/10 bg-black/20 p-3">
                 <div className="mb-3 flex items-center gap-3">
@@ -2657,25 +2656,9 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
                 </button>
               </section>
 
-              <div className="shrink-0">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h4 className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">Element category</h4>
-                  <span className="text-[9px] text-slate-500">Browse assets</span>
-                </div>
-                <div role="tablist" aria-label="Replace asset categories" className="flex gap-1.5 overflow-x-auto pb-1">
-                  {(['Recently', 'Graphic', 'Sketch', 'Photo', 'Video', 'GIF'] as const).map(category => (
-                    <button key={category} type="button" role="tab" aria-selected={replaceCategory === category} onClick={() => setReplaceCategory(category)} className={'shrink-0 rounded-lg border px-2.5 py-2 text-[9px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 ' + (replaceCategory === category ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100' : 'border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:bg-white/[0.07] hover:text-slate-200')}>{category}</button>
-                  ))}
-                </div>
+              <div className="flex min-h-0 flex-1 flex-col">
+                <StudioReplaceAssetBrowser onSelectAsset={replaceFromLibrary} importingId={replaceImportingId} />
               </div>
-
-              <section className="flex min-h-[170px] flex-1 flex-col rounded-xl border border-white/[0.08] bg-black/10 p-3" aria-live="polite">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <div><h4 className="text-[11px] font-semibold text-white">{replaceCategory}</h4><p className="mt-0.5 text-[9px] text-slate-500">{replaceCategory === 'Recently' ? 'Your recently used assets' : replaceCategory === 'Graphic' ? 'Icons and vector graphics' : replaceCategory === 'Sketch' ? 'Sketches and hand-drawn artwork' : replaceCategory === 'Photo' ? 'Photography and images' : replaceCategory === 'Video' ? 'Stock video clips' : 'Animated GIFs'}</p></div>
-                  {replaceCategory !== 'Recently' && <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[8px] font-medium text-slate-400">{replaceCategory === 'Graphic' ? 'Iconify' : replaceCategory === 'Sketch' || replaceCategory === 'Photo' ? 'Openverse' : replaceCategory === 'Video' ? 'Wikimedia Commons' : 'Powered by GIPHY'}</span>}
-                </div>
-                <StudioReplaceAssetBrowser category={replaceCategory} onSelectAsset={replaceFromLibrary} importingId={replaceImportingId} />
-              </section>
             </> : <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-[10px] text-slate-400">Select an image or video element on the canvas first.</div>}
           </div>}
 
