@@ -150,7 +150,7 @@ async function searchWikimediaImages(query: string, page: number, mode: 'graphic
   const url = new URL('https://commons.wikimedia.org/w/api.php')
   url.searchParams.set('action', 'query')
   url.searchParams.set('generator', 'search')
-  const modeQuery = mode === 'graphic' ? 'filemime:image/svg+xml ' + query : mode === 'sketch' ? '(drawing OR sketch OR illustration) ' + query : '(photograph OR photo) ' + query
+  const modeQuery = mode === 'graphic' ? 'filetype:drawing ' + query : mode === 'sketch' ? 'filetype:bitmap (drawing OR sketch OR illustration) ' + query : 'filetype:bitmap (photograph OR photo) ' + query
   url.searchParams.set('gsrsearch', modeQuery)
   url.searchParams.set('gsrnamespace', '6')
   url.searchParams.set('gsrlimit', '10')
@@ -296,7 +296,12 @@ export async function GET(request: NextRequest) {
         provider = 'Wikimedia Commons'
       }
       if (!result.assets.length) {
-        const fallback = await searchWikimediaImages(query, page, category === 'Graphic' ? 'graphic' : category === 'Sketch' ? 'sketch' : 'photo')
+        const mode = category === 'Graphic' ? 'graphic' : category === 'Sketch' ? 'sketch' : 'photo'
+        let fallback = await searchWikimediaImages(query, page, mode)
+        if (!fallback.assets.length && page === 1) {
+          const broadTerm = mode === 'graphic' ? 'icon symbol' : mode === 'sketch' ? 'pencil drawing' : 'nature landscape'
+          fallback = await searchWikimediaImages(broadTerm, 1, mode)
+        }
         if (fallback.assets.length) { result = fallback; provider = 'Wikimedia Commons' }
       }
     }
