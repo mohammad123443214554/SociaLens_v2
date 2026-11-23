@@ -2679,7 +2679,7 @@ export function StudioVideoEditor({ projectName, templateId, projectId }: { proj
               <section className="flex min-h-[170px] flex-1 flex-col rounded-xl border border-white/[0.08] bg-black/10 p-3" aria-live="polite">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div><h4 className="text-[11px] font-semibold text-white">{replaceCategory}</h4><p className="mt-0.5 text-[9px] text-slate-500">{replaceCategory === 'Recently' ? 'Your recently used assets' : replaceCategory === 'Graphic' ? 'Icons and vector graphics' : replaceCategory === 'Sketch' ? 'Sketches and hand-drawn artwork' : replaceCategory === 'Photo' ? 'Photography and images' : replaceCategory === 'Video' ? 'Stock video clips' : 'Animated GIFs'}</p></div>
-                  {replaceCategory !== 'Recently' && <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[8px] font-medium text-slate-400">{replaceCategory === 'Graphic' ? 'Iconify' : replaceCategory === 'Sketch' ? 'Openverse' : replaceCategory === 'GIF' ? 'Powered by GIPHY' : 'Pixabay'}</span>}
+                  {replaceCategory !== 'Recently' && <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[8px] font-medium text-slate-400">{replaceCategory === 'Graphic' ? 'Iconify' : replaceCategory === 'Sketch' || replaceCategory === 'Photo' ? 'Openverse' : replaceCategory === 'Video' ? 'Wikimedia Commons' : 'Powered by GIPHY'}</span>}
                 </div>
                 <StudioReplaceAssetBrowser category={replaceCategory} query={replaceSearch} onSelectAsset={replaceFromLibrary} importingId={replaceImportingId} />
               </section>
