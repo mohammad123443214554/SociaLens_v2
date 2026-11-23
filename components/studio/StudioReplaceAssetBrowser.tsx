@@ -36,8 +36,8 @@ function normalizeGif(data: any): Asset[] {
   }).filter((item: Asset) => item.previewUrl && item.assetUrl && item.sourceUrl)
 }
 
-export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null }: {
-  category?: Category; query?: string; onSelectAsset: (asset: Asset) => Promise<void>; importingId?: string | null
+export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, onDedicatedViewChange }: {
+  category?: Category; query?: string; onSelectAsset: (asset: Asset) => Promise<void>; importingId?: string | null; onDedicatedViewChange?: (open: boolean) => void
 }) {
   const [sections, setSections] = useState<Record<LibraryCategory, SectionState>>(() => ({
     Graphic: { ...EMPTY }, Sketch: { ...EMPTY }, Photo: { ...EMPTY }, Video: { ...EMPTY }, GIF: { ...EMPTY },
@@ -126,7 +126,10 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null }:
     CATEGORIES.forEach(category => { void loadCategory(category, 1, '', false) })
   }, [loadCategory])
 
+  useEffect(() => { onDedicatedViewChange?.(activeSection !== null) }, [activeSection, onDedicatedViewChange])
+
   useEffect(() => {
+    if (activeSection !== null) return
     if (searchTimer.current) clearTimeout(searchTimer.current)
     if (!query.trim()) { setSearchResults([]); setSearchError(''); setSearching(false); return }
     const term = query.trim()
@@ -168,7 +171,14 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null }:
       setSearching(false)
     }, 350)
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current) }
-  }, [query])
+  }, [query, activeSection])
+
+  useEffect(() => {
+    if (!activeSection || activeSection === 'Recently') return
+    const term = query.trim() || DEFAULT_QUERIES[activeSection]
+    const timer = setTimeout(() => { void loadCategory(activeSection, 1, term, false) }, 250)
+    return () => clearTimeout(timer)
+  }, [activeSection, query, loadCategory])
 
   const loadMore = async (category: LibraryCategory) => {
     const section = sections[category]
@@ -215,11 +225,10 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null }:
     </label>
     {importError && <p role="alert" className="mb-2 text-[9px] text-red-300">{importError}</p>}
     {activeSection ? <div className="flex min-h-0 flex-1 flex-col">
-      <button type="button" onClick={() => setActiveSection(null)} className="mb-3 inline-flex w-fit items-center gap-1 text-[10px] font-semibold text-slate-300 hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> All sections</button>
-      <div className="mb-3 flex items-center justify-between"><h3 className="text-[12px] font-semibold text-white">{activeSection}</h3><span className="text-[9px] text-slate-500">{activeSection === 'Recently' ? recent.length : active?.assets.length || 0} elements</span></div>
       <div onScroll={event => { const node = event.currentTarget; if (activeSection !== 'Recently' && node.scrollHeight - node.scrollTop - node.clientHeight < 180) void loadMore(activeSection) }} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="grid grid-cols-3 gap-2">{(activeSection === 'Recently' ? recent : active?.assets || []).map(renderAsset)}</div>
+        <div className="grid grid-cols-3 gap-2">{(activeSection === 'Recently' ? recent.filter(asset => !query.trim() || asset.title.toLowerCase().includes(query.trim().toLowerCase())) : active?.assets || []).map(renderAsset)}</div>
         {active?.loading && <div className="flex justify-center py-4"><LoaderCircle className="h-4 w-4 animate-spin text-fuchsia-300" /></div>}
+        {active?.error && !active.loading && <p className="py-5 text-center text-[10px] text-slate-500">{active.error}</p>}
       </div>
     </div> : query.trim() ? <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mb-2 text-[10px] text-slate-500">{searching ? 'Finding matching elements…' : searchResults.length + ' elements'}</div>
