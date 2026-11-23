@@ -168,10 +168,10 @@ async function searchWikimediaVideos(query: string, page: number): Promise<{ ass
   if (!response.ok) throw Object.assign(new Error('Wikimedia Commons is temporarily unavailable. Please try again.'), { status: response.status, code: 'provider_error' })
   const data = await response.json() as { query?: { pages?: Array<Record<string, any>> }; continue?: { gsroffset?: number } }
   const pages = Array.isArray(data.query?.pages) ? data.query!.pages! : []
-  const supportedMimes = new Set(['video/webm', 'video/ogg', 'video/mpeg'])
+  const supportedMimes = new Set(['video/webm'])
   const assets = pages.flatMap(pageData => {
     const info = Array.isArray(pageData.imageinfo) ? pageData.imageinfo[0] : null
-    if (!info || !supportedMimes.has(String(info.mime || '').toLowerCase()) || !info.url) return []
+    if (!info || !supportedMimes.has(String(info.mime || '').toLowerCase()) || !info.url || !info.thumburl) return []
     const metadata = info.extmetadata && typeof info.extmetadata === 'object' ? info.extmetadata : {}
     const title = String(pageData.title || 'Wikimedia Commons video').replace(/^File:/, '')
     const sourceUrl = 'https://commons.wikimedia.org/wiki/' + encodeURIComponent(String(pageData.title || '').replace(/ /g, '_'))
