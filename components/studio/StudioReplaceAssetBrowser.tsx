@@ -75,6 +75,25 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
     catch (error) { setImportError(error instanceof Error ? error.message : 'Could not import this element.') }
   }
 
+  const removeRecent = (assetId: string) => {
+    setRecent(current => {
+      const next = current.filter(asset => asset.id !== assetId)
+      try { localStorage.setItem('socialens-studio-replace-recent-v1', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+
+  const renderRecentAsset = (asset: Asset) => (
+    <div key={asset.id} className="group/recent relative h-[92px] w-[92px] shrink-0">
+      {renderAsset(asset)}
+      <button type="button" onClick={() => removeRecent(asset.id)}
+        aria-label={'Remove ' + asset.title + ' from recently used'} title="Remove from recently used"
+        className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white opacity-100 shadow-sm transition hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400">
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  )
+
   const loadCategory = useCallback(async (category: LibraryCategory, page: number, term: string, append: boolean) => {
     const id = (requestIds.current[category] || 0) + 1
     requestIds.current[category] = id
@@ -239,7 +258,7 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
     </div> : <div className="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(168,85,247,.45)_transparent]">
       <section className="mb-5">
         <div className="mb-2 flex items-center justify-between"><h3 className="text-[12px] font-semibold text-slate-100">Recently used</h3><button type="button" onClick={() => setActiveSection('Recently')} className="text-[10px] text-slate-400 hover:text-white">See more</button></div>
-        {recent.length ? <div className="flex gap-2 overflow-x-auto pb-2">{recent.slice(0,10).map(renderAsset)}</div> : <div className="flex h-[58px] items-center gap-2 text-[10px] text-slate-500"><Sparkles className="h-4 w-4" />Your recently used elements will appear here</div>}
+        {recent.length ? <div className="flex gap-2 overflow-x-auto pb-2">{recent.slice(0,10).map(renderRecentAsset)}</div> : <div className="flex h-[58px] items-center gap-2 text-[10px] text-slate-500"><Sparkles className="h-4 w-4" />Your recently used elements will appear here</div>}
       </section>
       {CATEGORIES.map(renderRow)}
     </div>}
