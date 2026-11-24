@@ -218,17 +218,14 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
   }, [sections, query, loadCategory])
 
   const loadMoreSearchResults = async () => {
-    if (searching || searchMoreInFlight.current || !query.trim()) return
+    if (searching || searchMoreInFlight.current || !query.trim() || !searchHasMoreRef.current) return
     searchMoreInFlight.current = true
     setSearching(true)
     const term = query.trim()
-    if (!searchHasMoreRef.current) return
     const nextPage = searchPageRef.current + 1
     const additions: Asset[] = []
     let moreAvailable = false
     for (const category of CATEGORIES) {
-      const section = sections[category]
-      if (!section.hasMore || section.loading) continue
       try {
         if (category === 'GIF') {
           if (!GIPHY_KEY) continue
