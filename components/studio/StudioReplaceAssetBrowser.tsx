@@ -56,6 +56,8 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchPageRef = useRef(1)
   const searchHasMoreRef = useRef(false)
+  const searchMoreInFlight = useRef(false)
+  const categoryMoreInFlight = useRef(new Set<LibraryCategory>())
 
   useEffect(() => {
     try {
@@ -209,12 +211,15 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
 
   const loadMore = useCallback(async (category: LibraryCategory) => {
     const section = sections[category]
-    if (section.loading || !section.hasMore) return
-    await loadCategory(category, section.page + 1, query.trim() || DEFAULT_QUERIES[category], true)
+    if (section.loading || !section.hasMore || categoryMoreInFlight.current.has(category)) return
+    categoryMoreInFlight.current.add(category)
+    try { await loadCategory(category, section.page + 1, query.trim() || DEFAULT_QUERIES[category], true) }
+    finally { categoryMoreInFlight.current.delete(category) }
   }, [sections, query, loadCategory])
 
   const loadMoreSearchResults = async () => {
-    if (searching || !query.trim()) return
+    if (searching || searchMoreInFlight.current || !query.trim()) return
+    searchMoreInFlight.current = true
     setSearching(true)
     const term = query.trim()
     if (!searchHasMoreRef.current) return
@@ -250,6 +255,7 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
       return [...current, ...additions.filter(asset => !known.has(asset.id) && (known.add(asset.id), true))]
     })
     setSearching(false)
+    searchMoreInFlight.current = false
   }
 
   const renderAsset = (asset: Asset) => (
