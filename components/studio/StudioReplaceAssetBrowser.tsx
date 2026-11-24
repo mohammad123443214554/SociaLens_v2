@@ -14,6 +14,8 @@ type SearchResponse = { ok: boolean; assets?: Asset[]; hasMore?: boolean; total?
 type SectionState = { assets: Asset[]; page: number; hasMore: boolean; loading: boolean; error: string }
 const CATEGORIES: LibraryCategory[] = ['Graphic', 'Sketch', 'Photo', 'Video', 'GIF']
 const PAGE_SIZE = 10
+const SECTION_PREFETCH_DISTANCE = 220
+const DEDICATED_PREFETCH_DISTANCE = 260
 const DEFAULT_QUERIES: Record<LibraryCategory, string> = {
   Graphic: 'popular icons',
   Sketch: 'hand drawn illustration',
@@ -199,10 +201,45 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
     return () => clearTimeout(timer)
   }, [activeSection, query, loadCategory])
 
-  const loadMore = async (category: LibraryCategory) => {
+  const loadMore = useCallback(async (category: LibraryCategory) => {
     const section = sections[category]
     if (section.loading || !section.hasMore) return
-    await loadCategory(category, section.page + 1, query.trim(), true)
+    await loadCategory(category, section.page + 1, query.trim() || DEFAULT_QUERIES[category], true)
+  }, [sections, query, loadCategory])
+
+  const loadMoreSearchResults = async () => {
+    if (searching || !query.trim()) return
+    setSearching(true)
+    const term = query.trim()
+    const nextPage = Math.max(1, ...CATEGORIES.map(category => sections[category].page)) + 1
+    const additions: Asset[] = []
+    for (const category of CATEGORIES) {
+      const section = sections[category]
+      if (!section.hasMore || section.loading) continue
+      try {
+        if (category === 'GIF') {
+          if (!GIPHY_KEY) continue
+          const url = new URL('https://api.giphy.com/v1/gifs/search')
+          url.searchParams.set('api_key', GIPHY_KEY)
+          url.searchParams.set('q', term)
+          url.searchParams.set('limit', String(PAGE_SIZE))
+          url.searchParams.set('offset', String((nextPage - 1) * PAGE_SIZE))
+          url.searchParams.set('rating', 'g')
+          const response = await fetch(url)
+          if (response.ok) additions.push(...normalizeGif(await response.json()))
+        } else {
+          const params = new URLSearchParams({ category, q: term, page: String(nextPage) })
+          const response = await fetch('/api/studio/replace/search?' + params.toString())
+          const data = await response.json() as SearchResponse
+          if (response.ok && data.ok) additions.push(...(data.assets || []))
+        }
+      } catch {}
+    }
+    setSearchResults(current => {
+      const known = new Set(current.map(asset => asset.id))
+      return [...current, ...additions.filter(asset => !known.has(asset.id) && (known.add(asset.id), true))]
+    })
+    setSearching(false)
   }
 
   const renderAsset = (asset: Asset) => (
@@ -226,7 +263,7 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
       </div>
       <div ref={node => { sectionScrolls.current[category] = node }} onScroll={event => {
         const node = event.currentTarget
-        if (node.scrollWidth - node.scrollLeft - node.clientWidth < 160) void loadMore(category)
+        if (node.scrollWidth - node.scrollLeft - node.clientWidth < SECTION_PREFETCH_DISTANCE) void loadMore(category)
       }} className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:thin] [scrollbar-color:rgba(168,85,247,.45)_transparent]">
         {section.assets.map(renderAsset)}
         {section.loading && Array.from({ length: section.assets.length ? 3 : PAGE_SIZE }, (_, index) => <div key={'skeleton-' + index} className="h-[92px] w-[92px] shrink-0 animate-pulse rounded-md bg-white/[0.06]" />)}
@@ -245,7 +282,7 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
     </label>
     {importError && <p role="alert" className="mb-2 text-[9px] text-red-300">{importError}</p>}
     {activeSection ? <div className="flex min-h-0 flex-1 flex-col">
-      <div onScroll={event => { const node = event.currentTarget; if (activeSection !== 'Recently' && node.scrollHeight - node.scrollTop - node.clientHeight < 180) void loadMore(activeSection) }} className="min-h-0 flex-1 overflow-y-auto">
+      <div onScroll={event => { const node = event.currentTarget; if (activeSection !== 'Recently' && node.scrollHeight - node.scrollTop - node.clientHeight < DEDICATED_PREFETCH_DISTANCE) void loadMore(activeSection) }} className="min-h-0 flex-1 overflow-y-auto">
         <div className="grid grid-cols-3 gap-2">{(activeSection === 'Recently' ? recent.filter(asset => !query.trim() || asset.title.toLowerCase().includes(query.trim().toLowerCase())) : active?.assets || []).map(renderAsset)}</div>
         {active?.loading && <div className="flex justify-center py-4"><LoaderCircle className="h-4 w-4 animate-spin text-fuchsia-300" /></div>}
         {active?.error && !active.loading && <p className="py-5 text-center text-[10px] text-slate-500">{active.error}</p>}
