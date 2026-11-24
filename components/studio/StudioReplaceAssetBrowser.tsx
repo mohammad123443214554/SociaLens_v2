@@ -54,6 +54,8 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
   const sectionScrolls = useRef<Record<string, HTMLDivElement | null>>({})
   const requestIds = useRef<Record<string, number>>({})
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchPageRef = useRef(1)
+  const searchHasMoreRef = useRef(false)
 
   useEffect(() => {
     try {
@@ -155,9 +157,12 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
     if (!query.trim()) { setSearchResults([]); setSearchError(''); setSearching(false); return }
     const term = query.trim()
     setSearching(true)
+    searchPageRef.current = 1
+    searchHasMoreRef.current = false
     searchTimer.current = setTimeout(async () => {
       setSearchError('')
       const all: Asset[] = []
+      let moreAvailable = false
       for (const category of CATEGORIES) {
         const id = (requestIds.current[category] || 0) + 1
         requestIds.current[category] = id
@@ -169,13 +174,13 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
               url.searchParams.set('api_key', GIPHY_KEY); url.searchParams.set('q', term)
               url.searchParams.set('limit', String(PAGE_SIZE)); url.searchParams.set('rating', 'g')
               const response = await fetch(url)
-              if (response.ok) found = normalizeGif(await response.json())
+              if (response.ok) { const gifData = await response.json(); found = normalizeGif(gifData); moreAvailable = moreAvailable || (Number(gifData?.pagination?.total_count || 0) > PAGE_SIZE) }
             }
           } else {
             const params = new URLSearchParams({ category, q: term, page: '1' })
             const response = await fetch('/api/studio/replace/search?' + params.toString())
             const data = await response.json() as SearchResponse
-            if (response.ok && data.ok) found = data.assets || []
+            if (response.ok && data.ok) { found = data.assets || []; moreAvailable = moreAvailable || Boolean(data.hasMore) }
             if (!found.length) {
               const fallback = new URLSearchParams({ category, q: DEFAULT_QUERIES[category], page: '1' })
               const fallbackResponse = await fetch('/api/studio/replace/search?' + fallback.toString())
@@ -187,6 +192,7 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
         } catch {}
       }
       const unique = all.filter((asset, index) => all.findIndex(item => item.id === asset.id) === index)
+      searchHasMoreRef.current = moreAvailable
       setSearchResults(unique)
       if (!unique.length) setSearchError('No matching assets are available at the moment. Try another word.')
       setSearching(false)
@@ -211,8 +217,10 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
     if (searching || !query.trim()) return
     setSearching(true)
     const term = query.trim()
-    const nextPage = Math.max(1, ...CATEGORIES.map(category => sections[category].page)) + 1
+    if (!searchHasMoreRef.current) return
+    const nextPage = searchPageRef.current + 1
     const additions: Asset[] = []
+    let moreAvailable = false
     for (const category of CATEGORIES) {
       const section = sections[category]
       if (!section.hasMore || section.loading) continue
@@ -226,15 +234,17 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
           url.searchParams.set('offset', String((nextPage - 1) * PAGE_SIZE))
           url.searchParams.set('rating', 'g')
           const response = await fetch(url)
-          if (response.ok) additions.push(...normalizeGif(await response.json()))
+          if (response.ok) { const gifData = await response.json(); additions.push(...normalizeGif(gifData)); moreAvailable = moreAvailable || (Number(gifData?.pagination?.total_count || 0) > nextPage * PAGE_SIZE) }
         } else {
           const params = new URLSearchParams({ category, q: term, page: String(nextPage) })
           const response = await fetch('/api/studio/replace/search?' + params.toString())
           const data = await response.json() as SearchResponse
-          if (response.ok && data.ok) additions.push(...(data.assets || []))
+          if (response.ok && data.ok) { additions.push(...(data.assets || [])); moreAvailable = moreAvailable || Boolean(data.hasMore) }
         }
       } catch {}
     }
+    searchPageRef.current = nextPage
+    searchHasMoreRef.current = moreAvailable
     setSearchResults(current => {
       const known = new Set(current.map(asset => asset.id))
       return [...current, ...additions.filter(asset => !known.has(asset.id) && (known.add(asset.id), true))]
@@ -287,7 +297,7 @@ export function StudioReplaceAssetBrowser({ onSelectAsset, importingId = null, o
         {active?.loading && <div className="flex justify-center py-4"><LoaderCircle className="h-4 w-4 animate-spin text-fuchsia-300" /></div>}
         {active?.error && !active.loading && <p className="py-5 text-center text-[10px] text-slate-500">{active.error}</p>}
       </div>
-    </div> : query.trim() ? <div className="min-h-0 flex-1 overflow-y-auto">
+    </div> : query.trim() ? <div onScroll={event => { const node = event.currentTarget; if (node.scrollHeight - node.scrollTop - node.clientHeight < DEDICATED_PREFETCH_DISTANCE) void loadMoreSearchResults() }} className="min-h-0 flex-1 overflow-y-auto">
       <div className="mb-2 text-[10px] text-slate-500">{searching ? 'Finding matching elements…' : searchResults.length + ' elements'}</div>
       {searching ? <div className="grid grid-cols-3 gap-2">{Array.from({length:10},(_,i)=><div key={i} className="aspect-square animate-pulse rounded-md bg-white/[0.06]"/>)}</div>
         : searchResults.length ? <div className="grid grid-cols-3 gap-2">{searchResults.map(renderAsset)}</div>
